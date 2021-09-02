@@ -46,3 +46,33 @@ export interface PaymentOpts {
     validate?: boolean;
     allowIncomplete?: boolean;
 }
+
+// export interface Input {
+//     hash: Buffer;
+//     index: number;
+//     script: Buffer;
+//     sequence: number;
+//     witness: Buffer[];
+//     decredTree?: number;
+//     decredWitness?: any;
+// }
+// export interface Output {
+//     script: Buffer;
+//     value: number | string;
+//     valueBuffer?: Buffer;
+//     version?: number;
+// }
+
+// export interface Transaction {
+//     version: number;
+//     locktime: number;
+//     ins: Input[];
+//     outs: Output[];
+
+//     network: Network;
+//     useStringValues: boolean | undefined;
+//     type: number | undefined; // Dash, Zcash
+//     timestamp: number | undefined; // Peercoin, Capricoin
+//     extraPayload: Buffer | undefined; // Dash
+//     expiry: number | undefined; // Decred
+// }
