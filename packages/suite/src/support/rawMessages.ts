@@ -272,6 +272,11 @@ const messages = {
         defaultMessage:
             'DEX (Decentralized Exchange) trades are performed by a smart contract running in the blockchain. They could offer better rates and fast execution. TODO...',
     },
+    TR_EXCHANGE_DEX_FEE_INFO: {
+        defaultMessage:
+            'The blockchain fee necessary to perform the exchange is estimated to {approvalFee} ETH for the approval transaction (if necessary) and {swapFee} ETH for the swap transaction.',
+        id: 'TR_EXCHANGE_DEX_FEE_INFO',
+    },
     TR_EXCHANGE_FEES_INCLUDED: {
         id: 'TR_EXCHANGE_FEES_INCLUDED',
         defaultMessage: 'All fees included',
