@@ -263,6 +263,15 @@ const messages = {
         defaultMessage:
             "Floating rates mean that the final amount you'll get may change slightly due to fluctuations in the market between when you select the rate and when your transaction is complete. These rates are usually higher, meaning you could end up with more crypto in the end.",
     },
+    TR_EXCHANGE_DEX_OFFERS: {
+        id: 'TR_EXCHANGE_DEX_OFFERS',
+        defaultMessage: 'DEX offers',
+    },
+    TR_EXCHANGE_DEX_OFFERS_INFO: {
+        id: 'TR_EXCHANGE_DEX_OFFERS_INFO',
+        defaultMessage:
+            'DEX (Decentralized Exchange) trades are performed by a smart contract running in the blockchain. They could offer better rates and fast execution. TODO...',
+    },
     TR_EXCHANGE_FEES_INCLUDED: {
         id: 'TR_EXCHANGE_FEES_INCLUDED',
         defaultMessage: 'All fees included',
