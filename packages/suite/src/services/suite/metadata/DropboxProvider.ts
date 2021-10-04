@@ -1,34 +1,49 @@
-import { Dropbox } from 'dropbox';
+/* eslint-disable camelcase */
+import { Dropbox, DropboxAuth } from 'dropbox';
+import type { users, DropboxResponse } from 'dropbox';
 import { AbstractMetadataProvider } from '@suite-types/metadata';
 import { extractCredentialsFromAuthorizationFlow, getOauthReceiverUrl } from '@suite-utils/oauth';
 import { METADATA } from '@suite-actions/constants';
 import { getRandomId } from '@suite-utils/random';
 
+// this is incorrectly typed in dropbox
+interface GetAccessToken {
+    access_token: string;
+    refresh_token: string;
+}
 class DropboxProvider extends AbstractMetadataProvider {
     client: Dropbox;
-    user: DropboxTypes.users.FullAccount | undefined;
+    auth: DropboxAuth;
+    user: users.FullAccount | undefined;
     isCloud = true;
 
     constructor(token?: string) {
         super('dropbox');
 
         const fetch = window.fetch.bind(window);
-        this.client = new Dropbox({ clientId: METADATA.DROPBOX_CLIENT_ID, fetch });
+
+        const dbxAuth = new DropboxAuth({ clientId: METADATA.DROPBOX_CLIENT_ID, fetch });
+
+        this.auth = dbxAuth;
+
+        this.client = new Dropbox({
+            auth: dbxAuth,
+        });
 
         if (token) {
             // token loaded from storage
-            this.client.setRefreshToken(token);
+            this.auth.setRefreshToken(token);
         }
     }
 
     async isConnected() {
         // no token -> means not connected
-        if (!this.client.getAccessToken()) {
+        if (!this.auth.getAccessToken()) {
             return false;
         }
         // refresh token is present, refresh it and return true
         try {
-            await this.client.refreshAccessToken(['']);
+            await this.auth.refreshAccessToken(['']);
             return true;
         } catch (err) {
             return false;
@@ -40,7 +55,7 @@ class DropboxProvider extends AbstractMetadataProvider {
 
         if (!redirectUrl) return this.error('AUTH_ERROR', 'Failed to get oauth receiver url');
 
-        const url = this.client.getAuthenticationUrl(
+        const url = await this.auth.getAuthenticationUrl(
             redirectUrl,
             getRandomId(10),
             'code',
@@ -53,18 +68,21 @@ class DropboxProvider extends AbstractMetadataProvider {
 
         try {
             // dropbox supports authorization code flow for both web and desktop
+            // @ts-ignore dropbox lib expects String. we have string and it is ok.
             const { code } = await extractCredentialsFromAuthorizationFlow(url);
 
             if (!code)
                 return this.error('AUTH_ERROR', 'Failed to extract code from authorization flow');
 
-            // @ts-ignore todo: types are broken in the lib, latest version 6.0.1 is broken as well at time of writing this
-            const { accessToken, refreshToken } = await this.client.getAccessTokenFromCode(
+            const { result } = (await this.auth.getAccessTokenFromCode(
                 redirectUrl,
                 code,
-            );
-            this.client.setAccessToken(accessToken);
-            this.client.setRefreshToken(refreshToken);
+            )) as DropboxResponse<GetAccessToken>; // wrongly typed in dropbox lib
+
+            const { access_token: accessToken, refresh_token: refreshToken } = result;
+
+            this.auth.setAccessToken(accessToken);
+            this.auth.setRefreshToken(refreshToken);
         } catch (err) {
             if (err instanceof Error) {
                 return this.error('AUTH_ERROR', err.message);
@@ -89,19 +107,29 @@ class DropboxProvider extends AbstractMetadataProvider {
 
     async getFileContent(file: string) {
         try {
-            const exists = await this.client.filesSearch({
-                path: '',
+            const { result } = await this.client.filesSearchV2({
                 query: `${file}.mtdt`,
             });
-            if (exists?.matches?.length > 0) {
+
+            // this is basically impossible to happen (maybe QA team might get there) after few years of testing
+            if (result.has_more) {
+                console.error('Dropbox account that has more then 10000 files in Trezor folder');
+            }
+            if (result?.matches?.length > 0) {
                 // check whether the file is in the regular folder ...
-                let match = exists.matches.find(m => m.metadata.path_lower === `/${file}.mtdt`);
+                let match = result.matches.find(
+                    m =>
+                        'metadata' in m.metadata &&
+                        m.metadata.metadata.path_lower === `/${file}.mtdt`,
+                );
 
                 // ... or in the legacy folder
                 // tldr: in the initial releases, files were saved into wrong location
                 // see more here: https://github.com/trezor/trezor-suite/pull/2642
-                const matchLegacy = exists.matches.find(
-                    m => m.metadata.path_lower === `/apps/trezor/${file}.mtdt`,
+                const matchLegacy = result.matches.find(
+                    m =>
+                        'metadata' in m.metadata &&
+                        m.metadata.metadata.path_lower === `/apps/trezor/${file}.mtdt`,
                 );
 
                 // fail if it is in neither
@@ -110,17 +138,20 @@ class DropboxProvider extends AbstractMetadataProvider {
                 // regular file not found, but found one in the legacy folder
                 if (!match) match = matchLegacy;
 
-                const download = await this.client.filesDownload({
-                    path: match!.metadata.path_lower!,
-                });
+                if (match && 'metadata' in match.metadata) {
+                    const download = await this.client.filesDownload({
+                        path: match!.metadata.metadata.path_lower!,
+                    });
 
-                // @ts-ignore: fileBlob not defined?
-                const buffer = (await download.fileBlob.arrayBuffer()) as Buffer;
+                    // @ts-ignore
+                    const buffer = await download.result.fileBlob.arrayBuffer();
 
-                return this.ok(buffer);
+                    return this.ok(buffer);
+                }
             }
-            return this.ok(undefined);
+
             // not found. this is not error. user just has not created the file yet
+            return this.ok(undefined);
         } catch (err) {
             // example:
             return this.handleProviderError(err);
@@ -144,20 +175,19 @@ class DropboxProvider extends AbstractMetadataProvider {
     }
 
     async getProviderDetails() {
-        const token = this.client.getRefreshToken();
+        const token = this.auth.getRefreshToken();
         if (!token) return this.error('AUTH_ERROR', 'token is missing');
 
         try {
-            const account = await this.client.usersGetCurrentAccount();
-
-            const result = {
+            const { result } = await this.client.usersGetCurrentAccount();
+            const account = {
                 type: this.type,
                 isCloud: this.isCloud,
                 token,
-                user: account.name.given_name,
+                user: result.name.given_name,
             } as const;
 
-            return this.ok(result);
+            return this.ok(account);
         } catch (err) {
             return this.handleProviderError(err);
         }
