@@ -113,6 +113,10 @@ export const withEditable =
             };
 
             window.addEventListener('keydown', keyboardHandler, false);
+            window.addEventListener(
+                'mouseup',
+                () => divRef?.current && moveCaretToEndOfContentEditable(divRef.current),
+            );
 
             return () => {
                 window.removeEventListener('keydown', keyboardHandler, false);
@@ -130,6 +134,7 @@ export const withEditable =
                                 setValue('');
                             }
                         }}
+                        onPaste={e => setValue(e.clipboardData.getData('text/plain'))}
                         ref={divRef}
                         data-test="@metadata/input"
                         touched={touched}
