@@ -25,7 +25,7 @@ export const getLocationOrigin = () => window.location.origin;
 
 export const getLocationHostname = () => window.location.hostname;
 
-/* For usage in Electron (SSR) */
+/* For usage in Electron */
 export const getProcessPlatform = () => process.platform;
 
 let userAgentParser: UAParser;
