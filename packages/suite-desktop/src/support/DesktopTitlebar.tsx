@@ -2,7 +2,7 @@ import React, { MouseEvent, useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { DESKTOP_TITLEBAR_HEIGHT, DESKTOP_WRAPPER_BORDER_WIDTH } from '@suite-constants/layout';
 import { colors, TrezorLogo } from '@trezor/components';
-import { isMacOs } from '@suite-utils/env';
+import { isLinux, isMacOs } from '@suite-utils/env';
 
 const WRAPPER_BORDER_WIDTH = isMacOs() ? '0px' : DESKTOP_WRAPPER_BORDER_WIDTH;
 
@@ -62,7 +62,7 @@ const DesktopTitlebar: React.FC = ({ children }) => {
 
     return (
         <>
-            {!maximized && (
+            {!isLinux() && !maximized && (
                 <Titlebar onClick={onClickTitlebar}>
                     <Drag />
                     <LogoWrapper>
