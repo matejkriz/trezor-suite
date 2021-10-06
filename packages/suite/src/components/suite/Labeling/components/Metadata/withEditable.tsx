@@ -120,6 +120,10 @@ export const withEditable =
 
             return () => {
                 window.removeEventListener('keydown', keyboardHandler, false);
+                window.removeEventListener(
+                    'mouseup',
+                    () => divRef?.current && moveCaretToEndOfContentEditable(divRef.current),
+                );
             };
         }, [submit, onBlur, props.originalValue, divRef, touched]);
 
