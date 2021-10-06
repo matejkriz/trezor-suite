@@ -63,7 +63,7 @@ const init = async () => {
         width: winBounds.width,
         height: winBounds.height,
         frame: process.platform === 'linux',
-        titleBarStyle: 'hiddenInset',
+        titleBarStyle: 'hidden',
         minWidth: MIN_WIDTH,
         minHeight: MIN_HEIGHT,
         webPreferences: {
