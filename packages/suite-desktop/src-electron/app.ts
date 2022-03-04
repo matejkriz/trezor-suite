@@ -28,9 +28,9 @@ if (isDev) app.setVersion(process.env.VERSION);
 
 // Logger
 const log = {
-    level: app.commandLine.getSwitchValue('log-level') || (isDev ? 'debug' : 'error'),
+    level: 'debug',
     writeToConsole: !app.commandLine.hasSwitch('log-no-print'),
-    writeToDisk: app.commandLine.hasSwitch('log-write'),
+    writeToDisk: true,
     outputFile: app.commandLine.getSwitchValue('log-file') || loggerDefaults.outputFile,
     outputPath: app.commandLine.getSwitchValue('log-path') || loggerDefaults.outputPath,
 };

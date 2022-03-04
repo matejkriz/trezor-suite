@@ -5,7 +5,7 @@ import type { ReleaseInfo } from '@suite-types/github';
 import type { TrezorDevice } from '@suite-types';
 
 const REPO_INFO = {
-    owner: 'trezor',
+    owner: 'matejkriz',
     repo: 'trezor-suite',
 };
 
