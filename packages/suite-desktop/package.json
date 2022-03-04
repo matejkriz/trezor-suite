@@ -81,7 +81,7 @@
         "publish": {
             "provider": "github",
             "repo": "trezor-suite",
-            "owner": "trezor"
+            "owner": "matejkriz"
         },
         "dmg": {
             "sign": false,
