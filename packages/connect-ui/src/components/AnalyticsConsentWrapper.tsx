@@ -1,5 +1,3 @@
-import React from 'react';
-
 import styled from 'styled-components';
 
 import { analytics } from '@trezor/connect-analytics';
@@ -9,8 +7,12 @@ const Wrapper = styled.div`
     animation: ${animations.FADE_IN} 0.15s ease-in-out;
 `;
 
+const StyledDataAnalytics = styled(DataAnalytics)`
+    box-shadow: 0 0 6px 1px #e3e3e3;
+`;
+
 type AnalyticsConsentWrapperProps = {
-    onAnalyticsConfirm: () => void;
+    onAnalyticsConfirm: (enabled: boolean) => void;
 };
 
 export const AnalyticsConsentWrapper = ({ onAnalyticsConfirm }: AnalyticsConsentWrapperProps) => {
@@ -21,12 +23,12 @@ export const AnalyticsConsentWrapper = ({ onAnalyticsConfirm }: AnalyticsConsent
             analytics.disable();
         }
 
-        onAnalyticsConfirm();
+        onAnalyticsConfirm(trackingEnabled);
     };
 
     return (
         <Wrapper>
-            <DataAnalytics onConfirm={onConfirm} />
+            <StyledDataAnalytics onConfirm={onConfirm} />
         </Wrapper>
     );
 };

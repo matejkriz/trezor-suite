@@ -1,8 +1,13 @@
 // origin: https://github.com/trezor/connect/blob/develop/src/js/core/methods/helpers/ethereumSignTx.js
 
+import { Common, Chain, Hardfork } from '@ethereumjs/common';
+import { FeeMarketEIP1559TxData, TransactionFactory, LegacyTxData } from '@ethereumjs/tx';
+
+import { EthereumDefinitions } from '@trezor/protobuf/lib/messages';
 import { PROTO, ERRORS } from '../../constants';
 import type { TypedCall } from '../../device/DeviceCommands';
 import type { EthereumAccessList } from '../../types/api/ethereum';
+import { addHexPrefix, deepTransform } from '../../utils/formatUtils';
 
 const splitString = (str?: string, len?: number) => {
     if (str == null) {
@@ -50,6 +55,30 @@ const processTxRequest = async (
     return processTxRequest(typedCall, response.message, rest, chain_id);
 };
 
+const deepHexPrefix = deepTransform(addHexPrefix);
+
+export const serializeEthereumTx = (
+    txData: LegacyTxData | FeeMarketEIP1559TxData,
+    chainId: number,
+) => {
+    // @ethereumjs/tx doesn't support ETC (chain 61) by default
+    // and it needs to be declared as custom chain
+    // see: https://github.com/ethereumjs/ethereumjs-tx/blob/master/examples/custom-chain-tx.ts
+    const txOptions =
+        chainId === 61
+            ? {
+                  common: Common.custom(
+                      { name: 'ethereum-classic', networkId: 1, chainId: 61 },
+                      { baseChain: Chain.Mainnet, hardfork: Hardfork.Petersburg },
+                  ),
+              }
+            : { chain: chainId };
+
+    const ethTx = TransactionFactory.fromTxData(deepHexPrefix(txData), txOptions);
+
+    return `0x${Buffer.from(ethTx.serialize()).toString('hex')}`;
+};
+
 const stripLeadingZeroes = (str: string) => {
     while (/^00/.test(str)) {
         str = str.slice(2);
@@ -58,6 +87,7 @@ const stripLeadingZeroes = (str: string) => {
 };
 
 export const ethereumSignTx = async (
+    // todo: don't we change parameters here to object?
     typedCall: TypedCall,
     address_n: number[],
     to: string,
@@ -66,8 +96,10 @@ export const ethereumSignTx = async (
     gas_price: string,
     nonce: string,
     chain_id: number,
+    chunkify: boolean,
     data?: string,
     tx_type?: number,
+    definitions?: EthereumDefinitions,
 ) => {
     const length = data == null ? 0 : data.length / 2;
 
@@ -81,6 +113,8 @@ export const ethereumSignTx = async (
         gas_limit: stripLeadingZeroes(gas_limit),
         to,
         value: stripLeadingZeroes(value),
+        definitions,
+        chunkify,
     };
 
     if (length !== 0) {
@@ -104,6 +138,7 @@ export const ethereumSignTx = async (
 };
 
 export const ethereumSignTxEIP1559 = async (
+    // todo: don't we change parameters here to object?
     typedCall: TypedCall,
     address_n: number[],
     to: string,
@@ -113,8 +148,10 @@ export const ethereumSignTxEIP1559 = async (
     max_priority_fee: string,
     nonce: string,
     chain_id: number,
+    chunkify: boolean,
     data?: string,
     access_list?: EthereumAccessList[],
+    definitions?: EthereumDefinitions,
 ) => {
     const length = data == null ? 0 : data.length / 2;
 
@@ -135,6 +172,8 @@ export const ethereumSignTxEIP1559 = async (
             address: a.address,
             storage_keys: a.storageKeys,
         })),
+        definitions,
+        chunkify,
     };
 
     const response = await typedCall('EthereumSignTxEIP1559', 'EthereumTxRequest', message);

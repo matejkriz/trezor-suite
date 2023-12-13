@@ -1,59 +1,18 @@
-/* eslint-disable global-require */
-/* eslint-disable @typescript-eslint/no-var-requires */
-
-import { configureStore } from '@suite/support/tests/configureStore';
-
-import { UI_EVENT, UI } from '@trezor/connect';
-
-import { SUITE } from '@suite-actions/constants';
-import routerReducer from '@suite-reducers/routerReducer';
-import suiteReducer from '@suite-reducers/suiteReducer';
-
-import * as deviceSettingsActions from '@settings-actions/deviceSettingsActions';
+import { deviceActions } from '@suite-common/wallet-core';
 import { connectInitThunk } from '@suite-common/connect-init';
+import { UI_EVENT, UI } from '@trezor/connect';
+import { testMocks } from '@suite-common/test-utils';
 
-import suiteMiddleware from '@suite-middlewares/suiteMiddleware';
-import buttonRequestMiddleware from '@suite-middlewares/buttonRequestMiddleware';
+import { configureStore } from 'src/support/tests/configureStore';
+import { SUITE } from 'src/actions/suite/constants';
+import routerReducer from 'src/reducers/suite/routerReducer';
+import suiteReducer from 'src/reducers/suite/suiteReducer';
+import * as deviceSettingsActions from 'src/actions/settings/deviceSettingsActions';
+import suiteMiddleware from 'src/middlewares/suite/suiteMiddleware';
+import buttonRequestMiddleware from 'src/middlewares/suite/buttonRequestMiddleware';
+import { Action } from 'src/types/suite';
 
-import { Action } from '@suite-types';
-
-const { getSuiteDevice } = global.JestMocks;
-
-jest.mock('@trezor/connect', () => {
-    const callbacks: { [key: string]: (e: string) => any } = {};
-
-    const { PROTO } = jest.requireActual('@trezor/connect');
-
-    return {
-        __esModule: true, // this property makes it work
-        default: {
-            init: () => {},
-            on: (event: string, cb: (e: string) => any) => {
-                callbacks[event] = cb;
-            },
-            changePin: () => ({
-                success: true,
-                payload: {
-                    message: 'great success',
-                },
-            }),
-        },
-        DEVICE: {},
-        BLOCKCHAIN: {},
-        TRANSPORT: {},
-        UI: {
-            REQUEST_PIN: 'ui-request_pin',
-            REQUEST_BUTTON: 'ui-request_button',
-        },
-        emit: (event: string, data: any) => {
-            callbacks[event].call(undefined, {
-                event,
-                ...data,
-            });
-        },
-        PROTO,
-    };
-});
+const { getSuiteDevice } = testMocks;
 
 const device = getSuiteDevice();
 
@@ -61,14 +20,16 @@ export const getInitialState = () => ({
     router: routerReducer(undefined, { type: 'foo' } as any),
     suite: {
         ...suiteReducer(undefined, { type: 'foo' } as any),
-        ...{ device },
     },
     wallet: {
         settings: {
             enabledNetworks: [],
         },
     },
-    devices: [device],
+    device: {
+        devices: [device],
+        selectedDevice: device,
+    },
 });
 
 type State = ReturnType<typeof getInitialState>;
@@ -81,14 +42,16 @@ const initStore = (state: State) => {
 
 describe('buttonRequest middleware', () => {
     it('see what happens on pin change call', async () => {
-        require('@trezor/connect');
         const store = initStore(getInitialState());
         await store.dispatch(connectInitThunk());
         const call = store.dispatch(deviceSettingsActions.changePin({ remove: false }));
+        const { emitTestEvent } = testMocks.getTrezorConnectMock();
         // fake few ui events, just like when user is changing PIN
-        const { emit } = require('@trezor/connect');
-        emit(UI_EVENT, { type: UI.REQUEST_BUTTON, payload: { code: 'ButtonRequest_ProtectCall' } });
-        emit(UI_EVENT, {
+        emitTestEvent(UI_EVENT, {
+            type: UI.REQUEST_BUTTON,
+            payload: { code: 'ButtonRequest_ProtectCall' },
+        });
+        emitTestEvent(UI_EVENT, {
             type: UI.REQUEST_PIN,
             payload: { type: 'PinMatrixRequestType_NewFirst', device },
         });
@@ -103,18 +66,16 @@ describe('buttonRequest middleware', () => {
             { type: SUITE.LOCK_DEVICE, payload: true },
             { type: UI.REQUEST_BUTTON, payload: { code: 'ButtonRequest_ProtectCall' } },
             {
-                type: SUITE.ADD_BUTTON_REQUEST,
-                payload: { code: 'ButtonRequest_ProtectCall' },
-                device,
+                type: deviceActions.addButtonRequest.type,
+                payload: { buttonRequest: { code: 'ButtonRequest_ProtectCall' }, device },
             },
             { type: UI.REQUEST_PIN, payload: { type: 'PinMatrixRequestType_NewFirst', device } },
             {
-                type: SUITE.ADD_BUTTON_REQUEST,
-                payload: { code: 'PinMatrixRequestType_NewFirst' },
-                device,
+                type: deviceActions.addButtonRequest.type,
+                payload: { buttonRequest: { code: 'PinMatrixRequestType_NewFirst' }, device },
             },
             { type: SUITE.LOCK_DEVICE, payload: false },
-            { type: SUITE.ADD_BUTTON_REQUEST, device },
+            { type: deviceActions.addButtonRequest.type, payload: { device } },
         ]);
     });
 });

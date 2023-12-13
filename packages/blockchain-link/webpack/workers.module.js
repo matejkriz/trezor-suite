@@ -7,6 +7,7 @@ module.exports = {
         'blockbook-worker': `${SRC}workers/blockbook/index.ts`,
         'ripple-worker': `${SRC}workers/ripple/index.ts`,
         'blockfrost-worker': `${SRC}workers/blockfrost/index.ts`,
+        'solana-worker': `${SRC}workers/solana/index.ts`,
     },
     output: {
         filename: '[name].js',
@@ -22,8 +23,10 @@ module.exports = {
                 exclude: /node_modules/,
                 use: [
                     {
-                        loader: 'ts-loader',
-                        options: { configFile: 'tsconfig.lib.json' },
+                        loader: 'babel-loader',
+                        options: {
+                            presets: ['@babel/preset-typescript'],
+                        },
                     },
                 ],
             },

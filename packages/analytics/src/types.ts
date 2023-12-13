@@ -1,6 +1,8 @@
-export type App = 'suite' | 'connect' | 'mobile';
+import { Environment } from '@trezor/env-utils';
 
-export type Environment = 'desktop' | 'web';
+export type App = 'suite' | 'connect';
+
+export type AnalyticsOptions = { version: string; app: App; useQueue?: boolean };
 
 export type InitOptions = {
     sessionId?: string;
@@ -12,13 +14,17 @@ export type InitOptions = {
         onEnable?: () => void;
         onDisable?: () => void;
     };
-    /* after analytics is enabled, report events happened before enablement */
-    useQueue?: boolean;
 };
 
 export type Event = {
     type: string;
+    timestamp?: string;
     payload?: {
         [key: string]: string | string[] | number | number[] | boolean | null;
     };
+};
+
+export type ReportConfig = {
+    anonymize?: boolean; // Log event without session and instance ID to prevent linking it to other events.
+    force?: boolean; // Log event while analytics are not enabled.
 };

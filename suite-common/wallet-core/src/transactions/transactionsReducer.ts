@@ -1,12 +1,17 @@
 import { memoizeWithArgs } from 'proxy-memoize';
 
 import { Account, WalletAccountTransaction, AccountKey } from '@suite-common/wallet-types';
-import { findTransaction, isPending } from '@suite-common/wallet-utils';
+import { findTransaction, getConfirmations, isPending } from '@suite-common/wallet-utils';
+import { getIsZeroValuePhishing } from '@suite-common/suite-utils';
 import { createReducerWithExtraDeps } from '@suite-common/redux-utils';
 
 import { fiatRatesActions } from '../fiat-rates/fiatRatesActions';
 import { accountsActions } from '../accounts/accountsActions';
 import { transactionsActions } from './transactionsActions';
+import {
+    selectBlockchainHeightBySymbol,
+    BlockchainRootState,
+} from '../blockchain/blockchainReducer';
 
 export interface TransactionsState {
     isLoading: boolean;
@@ -21,11 +26,15 @@ export const transactionsInitialState: TransactionsState = {
     transactions: {},
 };
 
-export interface TransactionsRootState {
+export type TransactionsRootState = {
     wallet: {
-        transactions: TransactionsState;
+        transactions: TransactionsState & {
+            // We need to override types because there could be nulls in transactions array because of pagination
+            // This should be fixed in TransactionsState but it will throw lot of errors then in desktop Suite
+            transactions: { [key: AccountKey]: (WalletAccountTransaction | null)[] };
+        };
     };
-}
+} & BlockchainRootState;
 
 const initializeAccount = (state: TransactionsState, accountKey: AccountKey) => {
     // initialize an empty array at 'accountKey' index if not yet initialized
@@ -46,10 +55,12 @@ export const updateTransaction = (
     if (!accountTxs) return;
 
     const index = accountTxs.findIndex(t => t && t.txid === txid);
-    accountTxs[index] = {
-        ...accountTxs[index],
-        ...updateObject,
-    };
+    if (accountTxs[index]) {
+        accountTxs[index] = {
+            ...accountTxs[index]!,
+            ...updateObject,
+        };
+    }
 };
 
 export const prepareTransactionsReducer = createReducerWithExtraDeps(
@@ -81,7 +92,7 @@ export const prepareTransactionsReducer = createReducerWithExtraDeps(
                 const { account, txs } = payload;
                 const transactions = state.transactions[account.key];
                 state.transactions[account.key] = transactions?.filter(
-                    tx => !txs.some(t => t.txid === tx.txid),
+                    tx => !txs.some(t => t.txid === tx?.txid),
                 );
             })
             .addCase(transactionsActions.addTransaction, (state, { payload }) => {
@@ -110,11 +121,19 @@ export const prepareTransactionsReducer = createReducerWithExtraDeps(
                         const existingTxIndex = accountTxs.findIndex(
                             t => t && t.txid === existingTx.txid,
                         );
+                        const existingBlockHeight = existingTx.blockHeight ?? 0;
+                        const incomingBlockHeight = transaction.blockHeight ?? 0;
+                        const existingIsPending = existingBlockHeight <= 0;
+                        const incomingIsPending = incomingBlockHeight <= 0;
 
                         if (
-                            ((existingTx.blockHeight ?? 0) <= 0 &&
-                                (transaction.blockHeight ?? 0) > 0) ||
-                            (!existingTx.blockTime && transaction.blockTime)
+                            (existingIsPending && !incomingIsPending) ||
+                            (existingIsPending === incomingIsPending &&
+                                existingBlockHeight < incomingBlockHeight) ||
+                            (existingIsPending === incomingIsPending &&
+                                (existingTx.blockTime ?? 0) < (transaction.blockTime ?? 0)) ||
+                            (existingIsPending && !existingTx.rbfParams && transaction.rbfParams) ||
+                            (existingTx.deadline && !transaction.deadline)
                         ) {
                             // pending tx got confirmed (blockHeight changed from undefined/0 to a number > 0)
                             accountTxs[existingTxIndex] = { ...transaction };
@@ -139,20 +158,31 @@ export const prepareTransactionsReducer = createReducerWithExtraDeps(
     },
 );
 
+// Used to define selector cache size
+const EXPECTED_MAX_NUMBER_OF_ACCOUNTS = 50;
+
 export const selectIsLoadingTransactions = (state: TransactionsRootState) =>
     state.wallet.transactions.isLoading;
 export const selectTransactions = (state: TransactionsRootState) =>
     state.wallet.transactions.transactions;
 
 /**
- * Returns transactions for the account specified by accountKey param.
  * The list is not sorted here because it may contain null values as placeholders
  * for transactions that have not been fetched yet. (This affects pagination.)
+ * !!! Use this selector only if you explicitly needs that null placeholder values !!!
  */
-export const selectAccountTransactions = (
+export const selectAccountTransactionsWithNulls = (
     state: TransactionsRootState,
-    accountKey: string | null,
+    accountKey: AccountKey | null,
 ) => state.wallet.transactions.transactions[accountKey ?? ''] ?? [];
+
+export const selectAccountTransactions = memoizeWithArgs(
+    (state: TransactionsRootState, accountKey: AccountKey | null): WalletAccountTransaction[] => {
+        const transactions = selectAccountTransactionsWithNulls(state, accountKey);
+        return transactions.filter(t => t !== null);
+    },
+    { size: EXPECTED_MAX_NUMBER_OF_ACCOUNTS },
+);
 
 export const selectPendingAccountAddresses = memoizeWithArgs(
     (state: TransactionsRootState, accountKey: AccountKey | null) => {
@@ -160,56 +190,95 @@ export const selectPendingAccountAddresses = memoizeWithArgs(
         const pendingAddresses: string[] = [];
         const pendingTxs = accountTransactions.filter(isPending);
         pendingTxs.forEach(t =>
-            t.targets.forEach(target =>
-                target.addresses?.forEach(a => pendingAddresses.unshift(a)),
+            t.targets.forEach(
+                target => target.addresses?.forEach(a => pendingAddresses.unshift(a)),
             ),
         );
         return pendingAddresses;
     },
+    { size: EXPECTED_MAX_NUMBER_OF_ACCOUNTS },
 );
+
+export const selectAllPendingTransactions = (state: TransactionsRootState) => {
+    const { transactions } = state.wallet.transactions;
+    return Object.keys(transactions).reduce(
+        (response, accountKey) => {
+            response[accountKey] = transactions[accountKey].filter(isPending);
+            return response;
+        },
+        {} as typeof transactions,
+    );
+};
 
 // Note: Account key is passed because there can be duplication of TXIDs if self transaction was sent.
-export const selectTransactionByTxidAndAccountKey = memoizeWithArgs(
-    (state: TransactionsRootState, txid: string, accountKey: AccountKey) => {
-        const transactions = selectAccountTransactions(state, accountKey);
-        return transactions.find(tx => tx.txid === txid) ?? null;
-    },
-);
+export const selectTransactionByTxidAndAccountKey = (
+    state: TransactionsRootState,
+    txid: string,
+    accountKey: AccountKey,
+) => {
+    const transactions = selectAccountTransactions(state, accountKey);
+    return transactions.find(tx => tx?.txid === txid) ?? null;
+};
 
-export const selectTransactionBlockTimeById = memoizeWithArgs(
-    (state: TransactionsRootState, txid: string, accountKey: AccountKey) => {
-        const transaction = selectTransactionByTxidAndAccountKey(state, txid, accountKey);
-        if (transaction?.blockTime) {
-            return transaction.blockTime * 1000;
-        }
-        return null;
-    },
-);
+export const selectTransactionBlockTimeById = (
+    state: TransactionsRootState,
+    txid: string,
+    accountKey: AccountKey,
+) => {
+    const transaction = selectTransactionByTxidAndAccountKey(state, txid, accountKey);
+    if (transaction?.blockTime) {
+        return transaction.blockTime * 1000;
+    }
+    return null;
+};
 
-export const selectTransactionTargets = memoizeWithArgs(
-    (state: TransactionsRootState, txid: string, accountKey: AccountKey) => {
-        const transaction = selectTransactionByTxidAndAccountKey(state, txid, accountKey);
-        return transaction?.targets;
-    },
-);
+export const selectTransactionTargets = (
+    state: TransactionsRootState,
+    txid: string,
+    accountKey: AccountKey,
+) => {
+    const transaction = selectTransactionByTxidAndAccountKey(state, txid, accountKey);
+    return transaction?.targets;
+};
 
-export const selectTransactionFirstTargetAddress = memoizeWithArgs(
-    (state: TransactionsRootState, txid: string, accountKey: AccountKey) => {
-        const transactionTargets = selectTransactionTargets(state, txid, accountKey);
-        return transactionTargets?.[0]?.addresses?.[0];
-    },
-);
+export const selectTransactionFirstTargetAddress = (
+    state: TransactionsRootState,
+    txid: string,
+    accountKey: AccountKey,
+) => {
+    const transactionTargets = selectTransactionTargets(state, txid, accountKey);
+    return transactionTargets?.[0]?.addresses?.[0];
+};
 
-export const selectTransactionFirstInputAddress = memoizeWithArgs(
-    (state: TransactionsRootState, txid: string, accountKey: AccountKey) => {
-        const transaction = selectTransactionByTxidAndAccountKey(state, txid, accountKey);
-        return transaction?.details?.vin?.[0].addresses?.[0];
-    },
-);
+export const selectIsTransactionPending = (
+    state: TransactionsRootState,
+    txid: string,
+    accountKey: AccountKey,
+): boolean => {
+    const transaction = selectTransactionByTxidAndAccountKey(state, txid, accountKey);
+    return transaction ? isPending(transaction) : false;
+};
 
-export const selectTransactionFirstOutputAddress = memoizeWithArgs(
-    (state: TransactionsRootState, txid: string, accountKey: AccountKey) => {
-        const transaction = selectTransactionByTxidAndAccountKey(state, txid, accountKey);
-        return transaction?.details?.vout?.[0].addresses?.[0];
-    },
-);
+export const selectTransactionConfirmations = (
+    state: TransactionsRootState,
+    txid: string,
+    accountKey: AccountKey,
+) => {
+    const transaction = selectTransactionByTxidAndAccountKey(state, txid, accountKey);
+    if (!transaction) return 0;
+
+    const blockchainHeight = selectBlockchainHeightBySymbol(state, transaction.symbol);
+    return getConfirmations(transaction, blockchainHeight);
+};
+
+export const selectIsTransactionZeroValuePhishing = (
+    state: TransactionsRootState,
+    txid: string,
+    accountKey: AccountKey,
+) => {
+    const transaction = selectTransactionByTxidAndAccountKey(state, txid, accountKey);
+
+    if (!transaction) return false;
+
+    return getIsZeroValuePhishing(transaction);
+};

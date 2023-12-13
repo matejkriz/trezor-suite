@@ -22,24 +22,6 @@ urls health:
   except:
     <<: *run_everything_rules
 
-.translations duplicates:
-  stage: utils
-  needs: []
-  script:
-    - yarn install --immutable
-    - yarn workspace @trezor/suite translations:list-duplicates
-
-translations duplicates nightly:
-  extends: .translations duplicates
-  only:
-    <<: *run_everything_rules
-
-translations duplicates:
-  extends: .translations duplicates
-  when: manual
-  except:
-    <<: *run_everything_rules
-
 .translations unused:
   stage: utils
   needs: []
@@ -74,6 +56,25 @@ media duplicates nightly:
 
 media duplicates:
   extends: .media duplicates
+  when: manual
+  except:
+    <<: *run_everything_rules
+
+# validate that connect installation (outside monorepo) using npm and yarn works
+.install connect:
+  stage: utils
+  needs: []
+  script:
+    - ./packages/connect/e2e/test-npm-install.sh
+    - ./packages/connect/e2e/test-yarn-install.sh
+
+install connect nightly:
+  extends: .install connect
+  only:
+    <<: *run_everything_rules
+
+install connect manual:
+  extends: .install connect
   when: manual
   except:
     <<: *run_everything_rules

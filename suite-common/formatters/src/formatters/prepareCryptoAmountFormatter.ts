@@ -15,14 +15,17 @@ export type CryptoAmountFormatterDataContext = {
     withSymbol?: boolean;
     isBalance?: boolean;
     maxDisplayedDecimals?: number;
+    isEllipsisAppended?: boolean;
 };
 
-const truncateDecimals = (value: string, maxDecimals: number) => {
+const truncateDecimals = (value: string, maxDecimals: number, isEllipsisAppended: boolean) => {
     const parts = value.split('.');
     const [integerPart, fractionalPart] = parts;
 
     if (fractionalPart && fractionalPart.length > maxDecimals) {
-        return `${integerPart}.${fractionalPart.slice(0, maxDecimals)}…`;
+        return `${integerPart}.${fractionalPart.slice(0, maxDecimals)}${
+            isEllipsisAppended ? '…' : ''
+        }`;
     }
 
     return value;
@@ -34,18 +37,26 @@ const COINS_WITH_SATS = ['btc', 'test'] satisfies NetworkSymbol[];
 
 export const prepareCryptoAmountFormatter = (config: FormatterConfig) =>
     makeFormatter<CryptoAmountFormatterInputValue, string, CryptoAmountFormatterDataContext>(
-        (value, { symbol, isBalance = false, withSymbol = true, maxDisplayedDecimals = 8 }) => {
+        (
+            value,
+            {
+                symbol,
+                isBalance = false,
+                withSymbol = true,
+                maxDisplayedDecimals = 8,
+                isEllipsisAppended = true,
+            },
+        ) => {
             const { bitcoinAmountUnit } = config;
 
-            // TS thinks that symbol is undefined, but it's required in type CryptoAmountFormatterDataContext so it's safe to use "!"
-            const { decimals } = networks[symbol!];
+            const decimals = networks[symbol!]?.decimals || 0;
 
             // const areAmountUnitsSupported = A.includes(features, 'amount-unit');
             const areAmountUnitsSupported = A.includes(COINS_WITH_SATS, symbol);
 
             let formattedValue: string = value;
 
-            // balances are not in sats, but already formatted to BTC so we need to convert it to  back to sats if needed
+            // balances are not in sats, but already formatted to BTC so we need to convert it back to sats if needed
             if (
                 isBalance &&
                 areAmountUnitsSupported &&
@@ -63,7 +74,11 @@ export const prepareCryptoAmountFormatter = (config: FormatterConfig) =>
             }
 
             if (maxDisplayedDecimals) {
-                formattedValue = truncateDecimals(formattedValue, maxDisplayedDecimals);
+                formattedValue = truncateDecimals(
+                    formattedValue,
+                    maxDisplayedDecimals,
+                    isEllipsisAppended,
+                );
             }
 
             if (withSymbol) {
@@ -73,4 +88,5 @@ export const prepareCryptoAmountFormatter = (config: FormatterConfig) =>
 
             return formattedValue;
         },
+        'CryptoAmountFormatter',
     );

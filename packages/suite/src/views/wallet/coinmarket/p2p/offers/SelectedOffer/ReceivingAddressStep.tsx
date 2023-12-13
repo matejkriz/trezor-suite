@@ -1,12 +1,11 @@
-import React from 'react';
 import styled from 'styled-components';
-import { useActions, useDevice } from '@suite-hooks';
-import { Translation } from '@suite-components';
-import * as routerActions from '@suite-actions/routerActions';
+import { useDevice, useDispatch } from 'src/hooks/suite';
+import { Translation } from 'src/components/suite';
+import { goto } from 'src/actions/suite/routerActions';
 import { Button, variables } from '@trezor/components';
-import { useCoinmarketP2pOffersContext } from '@wallet-hooks/useCoinmarketP2pOffers';
-import * as receiveActions from '@wallet-actions/receiveActions';
-import { getUnusedAddressFromAccount } from '@wallet-utils/coinmarket/coinmarketUtils';
+import { useCoinmarketP2pOffersContext } from 'src/hooks/wallet/useCoinmarketP2pOffers';
+import { showAddress } from 'src/actions/wallet/receiveActions';
+import { getUnusedAddressFromAccount } from 'src/utils/wallet/coinmarket/coinmarketUtils';
 
 const Wrapper = styled.div`
     display: flex;
@@ -17,7 +16,7 @@ const Wrapper = styled.div`
 const CardContent = styled.div`
     display: flex;
     flex-direction: column;
-    padding: 16px 24px 0 24px;
+    padding: 16px 24px 0;
 `;
 
 const Row = styled.div`
@@ -46,15 +45,12 @@ const Address = styled.div`
 `;
 
 const Overlay = styled.div`
-    top: 0px;
-    right: 0px;
-    bottom: 0px;
-    left: 0px;
+    inset: 0;
     position: absolute;
     background-image: linear-gradient(
         to right,
-        rgba(0, 0, 0, 0) 0%,
-        ${props => props.theme.BG_WHITE} 120px
+        rgb(0 0 0 / 0%) 0%,
+        ${({ theme }) => theme.BG_WHITE} 120px
     );
 `;
 
@@ -80,18 +76,18 @@ export const ReceivingAddressStep = () => {
     const { isLocked } = useDevice();
     const { providers, account, selectedQuote, callInProgress, goToProvider, providerVisited } =
         useCoinmarketP2pOffersContext();
-    const { address: unusedAddress, path } = getUnusedAddressFromAccount(account);
+    const dispatch = useDispatch();
 
-    const { goto, showAddress } = useActions({
-        goto: routerActions.goto,
-        showAddress: receiveActions.showAddress,
-    });
+    const { address: unusedAddress, path } = getUnusedAddressFromAccount(account);
 
     if (!providers || !selectedQuote || !unusedAddress) {
         return null;
     }
 
     const providerName = providers[selectedQuote.provider].companyName;
+
+    const handleAddressReveal = () => dispatch(showAddress(path, unusedAddress));
+    const goToP2p = () => dispatch(goto('wallet-coinmarket-p2p', { preserveParams: true }));
 
     return (
         <Wrapper>
@@ -110,7 +106,7 @@ export const ReceivingAddressStep = () => {
                             icon="TREZOR_LOGO"
                             isDisabled={isLocked()}
                             isLoading={isLocked()}
-                            onClick={() => showAddress(path, unusedAddress)}
+                            onClick={handleAddressReveal}
                         >
                             <Translation id="TR_P2P_REVEAL_ADDRESS" />
                         </StyledButton>
@@ -136,9 +132,7 @@ export const ReceivingAddressStep = () => {
                     <Translation id="TR_P2P_GO_TO_PROVIDER" values={{ providerName }} />
                 </StyledButton>
                 {providerVisited && (
-                    <StyledButton
-                        onClick={() => goto('wallet-coinmarket-p2p', { preserveParams: true })}
-                    >
+                    <StyledButton onClick={goToP2p}>
                         <Translation id="TR_P2P_BACK_TO_ACCOUNT" />
                     </StyledButton>
                 )}

@@ -1,5 +1,7 @@
 /ci @vdovhanych @mroz22
 
+/.github/workflows @vdovhanych
+
 /docker @vdovhanych @mroz22
 
 /scripts @Nodonisko
@@ -7,6 +9,12 @@
 /packages/analytics @tomasklim
 
 /packages/blockchain-link @mroz22 @marekrjpolak
+
+/packages/blockchain-link-utils @marekrjpolak
+
+/packages/blockchain-link-types @marekrjpolak
+
+/packages/coinjoin @marekrjpolak @szymonlesisz
 
 /packages/components @dahaca @matejkriz
 
@@ -28,11 +36,11 @@
 
 /packages/connect-web @mroz22 @szymonlesisz
 
+/packages/connect-webextension @mroz22 @karliatto
+
 /packages/icons @trezor/suite-mobile
 
-/packages/integration-tests @mroz22 @ondracja
-
-/packages/message-system @tomasklim @matejkriz
+/suite-common/message-system @tomasklim @matejkriz
 
 /packages/suite @tomasklim @matejkriz
 
@@ -64,12 +72,16 @@
 
 /packages/utils @karliatto
 
+/packages/node-utils @karliatto
+
 /packages/utxo-lib @szymonlesisz
 
 /packages/styles @Nodonisko
 
 /translations @alex-jerechinsky
 
-/packages/suite/src/support/messages.ts @alex-jerechinsky @sime
+/packages/suite/src/support/messages.ts @alex-jerechinsky
 
 /suite-common/graph @trezor/suite-mobile @Nodonisko
+
+/packages/connect/src/data/deviceAuthenticityConfig.ts @tsusanka

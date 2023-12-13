@@ -1,9 +1,8 @@
-import * as typef from 'typeforce';
 import * as bs58check from '../bs58check';
 import { decred as DECRED_NETWORK } from '../networks';
 import * as bscript from '../script';
 import * as lazy from './lazy';
-import type { Payment, PaymentOpts, Stack } from './index';
+import { Payment, PaymentOpts, Stack, typeforce } from '../types';
 
 const { OPS } = bscript;
 
@@ -15,12 +14,12 @@ export function sstxpkh(a: Payment, opts?: PaymentOpts): Payment {
 
     opts = Object.assign({ validate: true }, opts || {});
 
-    typef(
+    typeforce(
         {
-            network: typef.maybe(typef.Object),
-            address: typef.maybe(typef.String),
-            hash: typef.maybe(typef.BufferN(20)),
-            output: typef.maybe(typef.Buffer),
+            network: typeforce.maybe(typeforce.Object),
+            address: typeforce.maybe(typeforce.String),
+            hash: typeforce.maybe(typeforce.BufferN(20)),
+            output: typeforce.maybe(typeforce.Buffer),
         },
         a,
     );
@@ -28,14 +27,14 @@ export function sstxpkh(a: Payment, opts?: PaymentOpts): Payment {
     const _address = lazy.value(() => bs58check.decodeAddress(a.address!, a.network));
 
     const network = a.network || DECRED_NETWORK;
-    const o = { name: 'sstxpkh', network } as Payment;
+    const o: Payment = { name: 'sstxpkh', network };
 
     lazy.prop(o, 'address', () => {
         if (!o.hash) return;
         return bs58check.encodeAddress(o.hash, network.pubKeyHash, network);
     });
     lazy.prop(o, 'hash', () => {
-        if (a.output) return a.output.slice(4, 24);
+        if (a.output) return a.output.subarray(4, 24);
         if (a.address) return _address().hash;
     });
     lazy.prop(o, 'output', () => {
@@ -52,7 +51,7 @@ export function sstxpkh(a: Payment, opts?: PaymentOpts): Payment {
 
     // extended validation
     if (opts.validate) {
-        let hash: Buffer = Buffer.from([]);
+        let hash = Buffer.from([]);
         if (a.address) {
             const { version, hash: aHash } = _address();
             if (version !== network.pubKeyHash)
@@ -76,7 +75,7 @@ export function sstxpkh(a: Payment, opts?: PaymentOpts): Payment {
             )
                 throw new TypeError('sstxpkh output is invalid');
 
-            const hash2 = a.output.slice(4, 24);
+            const hash2 = a.output.subarray(4, 24);
             if (hash.length > 0 && !hash.equals(hash2)) throw new TypeError('Hash mismatch');
         }
     }

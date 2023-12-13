@@ -6,7 +6,7 @@ import type {
 import type { ParamListBase, CompositeScreenProps } from '@react-navigation/native';
 import { CompositeNavigationProp } from '@react-navigation/native';
 
-import { IconName } from '@trezor/icons';
+import { IconName } from '@suite-common/icons';
 
 export type TabProps<T extends ParamListBase, K extends keyof T> = BottomTabScreenProps<T, K>;
 export type TabNavigationProp<
@@ -25,6 +25,12 @@ export type TabToStackCompositeNavigationProp<
     K extends string,
     L extends ParamListBase,
 > = CompositeNavigationProp<BottomTabNavigationProp<T, K>, NativeStackNavigationProp<L>>;
+
+export type StackToTabCompositeNavigationProp<
+    T extends ParamListBase,
+    K extends string,
+    L extends ParamListBase,
+> = CompositeNavigationProp<NativeStackNavigationProp<T, K>, BottomTabNavigationProp<L>>;
 
 export type StackToTabCompositeScreenProps<
     T extends ParamListBase,

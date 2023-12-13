@@ -1,15 +1,13 @@
-import React from 'react';
-
-import { Option, OptionsWrapper, OptionsDivider } from '@onboarding-components';
-import { Translation } from '@suite-components';
+import { OnboardingOption, OptionsWrapper, OptionsDivider } from 'src/components/onboarding';
+import { Translation } from 'src/components/suite';
 
 interface SelectRecoveryTypeProps {
     onSelect: (type: 'standard' | 'advanced') => void;
 }
 
-const SelectRecoveryType = ({ onSelect }: SelectRecoveryTypeProps) => (
+export const SelectRecoveryType = ({ onSelect }: SelectRecoveryTypeProps) => (
     <OptionsWrapper>
-        <Option
+        <OnboardingOption
             onClick={() => onSelect('standard')}
             icon="SEED_SINGLE"
             heading={<Translation id="TR_BASIC_RECOVERY" />}
@@ -17,7 +15,7 @@ const SelectRecoveryType = ({ onSelect }: SelectRecoveryTypeProps) => (
             data-test="@recover/select-type/basic"
         />
         <OptionsDivider />
-        <Option
+        <OnboardingOption
             onClick={() => onSelect('advanced')}
             icon="SEED_SHAMIR"
             heading={<Translation id="TR_ADVANCED_RECOVERY" />}
@@ -26,5 +24,3 @@ const SelectRecoveryType = ({ onSelect }: SelectRecoveryTypeProps) => (
         />
     </OptionsWrapper>
 );
-
-export default SelectRecoveryType;

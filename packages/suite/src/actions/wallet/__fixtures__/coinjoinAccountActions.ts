@@ -1,7 +1,7 @@
 import { notificationsActions } from '@suite-common/toast-notifications';
 import { accountsActions } from '@suite-common/wallet-core';
-import { Account } from '@wallet-types';
-import * as COINJOIN from '@wallet-actions/constants/coinjoinConstants';
+import { Account } from 'src/types/wallet';
+import * as COINJOIN from 'src/actions/wallet/constants/coinjoinConstants';
 
 const ACCOUNT: Partial<Account> = {
     accountType: 'coinjoin',
@@ -53,8 +53,8 @@ export const createCoinjoinAccount = [
                 COINJOIN.CLIENT_ENABLE_SUCCESS,
                 COINJOIN.ACCOUNT_PRELOADING,
                 notificationsActions.addToast.type,
-                COINJOIN.ACCOUNT_PRELOADING,
                 COINJOIN.CLIENT_DISABLE,
+                COINJOIN.ACCOUNT_PRELOADING,
             ],
         },
     },
@@ -83,8 +83,8 @@ export const createCoinjoinAccount = [
                 COINJOIN.CLIENT_ENABLE_SUCCESS,
                 COINJOIN.ACCOUNT_PRELOADING,
                 notificationsActions.addToast.type,
-                COINJOIN.ACCOUNT_PRELOADING,
                 COINJOIN.CLIENT_DISABLE,
+                COINJOIN.ACCOUNT_PRELOADING,
             ],
         },
     },
@@ -121,9 +121,12 @@ export const createCoinjoinAccount = [
                 COINJOIN.CLIENT_ENABLE_SUCCESS,
                 COINJOIN.ACCOUNT_PRELOADING,
                 accountsActions.createAccount.type,
-                COINJOIN.ACCOUNT_CREATE,
+                COINJOIN.ACCOUNT_DISCOVERY_RESET,
                 COINJOIN.ACCOUNT_PRELOADING,
                 accountsActions.startCoinjoinAccountSync.type,
+                COINJOIN.ACCOUNT_DISCOVERY_PROGRESS,
+                COINJOIN.ACCOUNT_SET_LIQUIDITY_CLUE,
+                accountsActions.updateAccount.type,
                 accountsActions.endCoinjoinAccountSync.type,
             ],
         },
@@ -250,7 +253,6 @@ export const restoreCoinjoinAccounts = [
         },
         result: {
             actions: [
-                COINJOIN.SESSION_PAUSE, // pause account-A session
                 COINJOIN.CLIENT_ENABLE,
                 COINJOIN.CLIENT_ENABLE_FAILED,
                 notificationsActions.addToast.type, // failed account 1 + 2 client init

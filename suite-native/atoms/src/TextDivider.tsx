@@ -1,4 +1,3 @@
-import React from 'react';
 import { View } from 'react-native';
 
 import { NativeStyleObject, prepareNativeStyle, useNativeStyles } from '@trezor/styles';
@@ -16,7 +15,7 @@ const textDividerStyle = prepareNativeStyle(utils => ({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: utils.spacings.extraLarge,
+    marginBottom: utils.spacings.medium,
 }));
 
 export const TextDivider = ({ title, style }: TextDividerProps) => {

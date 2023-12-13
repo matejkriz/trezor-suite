@@ -7,7 +7,7 @@ const connectUrl = process.env.URL
     ? process.env.URL.replace('connect-explorer', 'connect')
     : 'https://connect.trezor.io/9/';
 
-const url = `https://unchained-capital.github.io/caravan?trezor-connect-src=${connectUrl}#/test`;
+const url = `https://unchained-capital.github.io/caravan?trezor-connect-src=${connectUrl}`;
 
 test.beforeAll(async () => {
     await TrezorUserEnvLink.connect();
@@ -91,9 +91,28 @@ const signTransaction = async (page: Page, iteration: number) => {
     await popup.waitForSelector('//p[contains(., "Check recipient")]', {
         state: 'visible',
         timeout: 40000,
+        strict: false,
     });
-    await TrezorUserEnvLink.send({ type: 'emulator-press-yes' });
-    await TrezorUserEnvLink.send({ type: 'emulator-press-yes' });
+    let confirmOnTrezorScreenStilVisible = true;
+    while (confirmOnTrezorScreenStilVisible) {
+        try {
+            await popup.waitForSelector('//p[contains(., "Check recipient")]', {
+                state: 'visible',
+                timeout: 501,
+                strict: false,
+            });
+            await TrezorUserEnvLink.send({ type: 'emulator-press-yes' });
+            await popup.waitForTimeout(501);
+        } catch (err) {
+            confirmOnTrezorScreenStilVisible = false;
+        }
+    }
+
+    await popup.waitForSelector('//p[contains(., "Follow instructions on your device")]', {
+        state: 'visible',
+        timeout: 501,
+        strict: false,
+    });
     await TrezorUserEnvLink.send({ type: 'emulator-press-yes' });
     await assertSuccess(page);
 };
@@ -123,7 +142,7 @@ test.beforeEach(async () => {
  * 4. execute all 19 tests
  */
 test('Verify unchained test suite', async ({ browser }) => {
-    test.slow();
+    test.setTimeout(1000 * 60 * 3);
 
     const context = await browser.newContext({
         userAgent:
@@ -132,6 +151,7 @@ test('Verify unchained test suite', async ({ browser }) => {
     const page = await context.newPage();
     const keystoreInput = '#keystore-select';
     await page.goto(url);
+    await page.getByRole('link', { name: 'tested' }).click();
     await page.locator(keystoreInput).click();
     // select trezor
     await page.locator('[data-value="trezor"]').click();

@@ -1,28 +1,31 @@
-import React from 'react';
 import styled from 'styled-components';
 
-import { P, variables } from '@trezor/components';
-import { HELP_CENTER_XPUB_URL } from '@trezor/urls';
-import { WalletLayout } from '@wallet-components';
-import { useDevice, useActions, useSelector } from '@suite-hooks';
-import { Card, Translation } from '@suite-components';
-import * as modalActions from '@suite-actions/modalActions';
 import {
     getAccountTypeName,
     getAccountTypeTech,
     getAccountTypeUrl,
     getAccountTypeDesc,
 } from '@suite-common/wallet-utils';
-import { ActionColumn, Row, TextColumn, ActionButton } from '@suite-components/Settings';
-import { CARD_PADDING_SIZE } from '@suite-constants/layout';
-import { NETWORKS } from '@wallet-config';
-import { CoinjoinLogs } from '@wallet-components/PrivacyAccount/CoinjoinLogs';
-import { CoinjoinSetup } from '@wallet-components/PrivacyAccount/CoinjoinSetup';
+import { P, variables } from '@trezor/components';
+
+import { ActionButton, ActionColumn, Card, TextColumn, Translation } from 'src/components/suite';
+
+import { HELP_CENTER_BIP32_URL, HELP_CENTER_XPUB_URL } from '@trezor/urls';
+import { showXpub } from 'src/actions/wallet/publicKeyActions';
+import { WalletLayout } from 'src/components/wallet';
+import { NETWORKS } from 'src/config/wallet';
+import { CARD_PADDING_SIZE } from 'src/constants/suite/layout';
+import { useDevice, useDispatch, useSelector } from 'src/hooks/suite';
+import { CoinjoinLogs } from './CoinjoinLogs';
+import { CoinjoinSetup } from './CoinjoinSetup/CoinjoinSetup';
+import { RescanAccount } from './RescanAccount';
+import { Row } from './Row';
 
 const Heading = styled.h3`
     color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
     font-size: ${variables.FONT_SIZE.SMALL};
     font-weight: ${variables.FONT_WEIGHT.DEMI_BOLD};
+    margin: 14px 0 4px;
     text-transform: uppercase;
 `;
 
@@ -40,10 +43,7 @@ const AccountTypeLabel = styled.div`
     line-height: 20px;
     text-align: center;
     min-width: 170px;
-
-    div:first-child {
-        margin-bottom: 8px;
-    }
+    gap: 8px;
 `;
 
 const StyledCard = styled(Card)`
@@ -66,18 +66,17 @@ const NoWrap = styled.span`
 
 const Details = () => {
     const selectedAccount = useSelector(state => state.wallet.selectedAccount);
-
-    const { openModal } = useActions({
-        openModal: modalActions.openModal,
-    });
+    const dispatch = useDispatch();
 
     const { device, isLocked } = useDevice();
+
     if (!device || selectedAccount.status !== 'loaded') {
         return <WalletLayout title="TR_ACCOUNT_DETAILS_HEADER" account={selectedAccount} />;
     }
 
     const { account } = selectedAccount;
-    const disabled = !!device.authConfirm;
+    const locked = isLocked(true);
+    const disabled = !!device.authConfirm || locked;
 
     // check if all network types
     const accountTypes =
@@ -90,14 +89,15 @@ const Details = () => {
     const accountTypeTech = getAccountTypeTech(account.path);
     const accountTypeUrl = getAccountTypeUrl(account.path);
     const accountTypeDesc = getAccountTypeDesc(account.path);
+    const isCoinjoinAccount = account.backendType === 'coinjoin';
 
-    const isCoinjoinAccount = account.accountType === 'coinjoin';
+    const handleXpubClick = () => dispatch(showXpub());
 
     return (
         <WalletLayout
             title="TR_ACCOUNT_DETAILS_HEADER"
             account={selectedAccount}
-            showEmptyHeaderPlaceholder
+            showEmptyHeaderPlaceholder={!isCoinjoinAccount}
         >
             <Cards>
                 {isCoinjoinAccount && (
@@ -129,7 +129,19 @@ const Details = () => {
                             </P>
                         </AccountTypeLabel>
                     </Row>
-                    {!isCoinjoinAccount && (
+                    <Row>
+                        <TextColumn
+                            title={<Translation id="TR_ACCOUNT_DETAILS_PATH_HEADER" />}
+                            description={<Translation id="TR_ACCOUNT_DETAILS_PATH_DESC" />}
+                            buttonLink={HELP_CENTER_BIP32_URL}
+                        />
+                        <AccountTypeLabel>
+                            <P size="small" weight="medium">
+                                {account.path}
+                            </P>
+                        </AccountTypeLabel>
+                    </Row>
+                    {!isCoinjoinAccount ? (
                         <Row>
                             <TextColumn
                                 title={<Translation id="TR_ACCOUNT_DETAILS_XPUB_HEADER" />}
@@ -140,24 +152,16 @@ const Details = () => {
                                 <ActionButton
                                     variant="secondary"
                                     data-test="@wallets/details/show-xpub-button"
-                                    onClick={() =>
-                                        openModal({
-                                            type: 'xpub',
-                                            xpub: account.descriptor,
-                                            accountPath: account.path,
-                                            accountIndex: account.index,
-                                            accountType: account.accountType,
-                                            symbol: account.symbol,
-                                            accountLabel: account.metadata.accountLabel,
-                                        })
-                                    }
-                                    isLoading={isLocked() && !disabled}
+                                    onClick={handleXpubClick}
                                     isDisabled={disabled}
+                                    isLoading={locked}
                                 >
                                     <Translation id="TR_ACCOUNT_DETAILS_XPUB_BUTTON" />
                                 </ActionButton>
                             </ActionColumn>
                         </Row>
+                    ) : (
+                        <RescanAccount account={account} />
                     )}
                 </StyledCard>
 

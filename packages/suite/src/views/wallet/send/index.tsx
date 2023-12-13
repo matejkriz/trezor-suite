@@ -1,18 +1,22 @@
-import React from 'react';
+import { ReactNode } from 'react';
 import styled from 'styled-components';
 
-import { Card } from '@suite-components';
-import { useSelector } from '@suite-hooks';
-import { WalletLayout } from '@wallet-components';
-import { useSendForm, SendContext, UseSendFormProps } from '@wallet-hooks/useSendForm';
+import { Card, Translation } from 'src/components/suite';
+import { useSelector } from 'src/hooks/suite';
+import { WalletLayout } from 'src/components/wallet';
+import { useSendForm, SendContext, UseSendFormProps } from 'src/hooks/wallet/useSendForm';
 import { Header } from './components/Header';
 import Outputs from './components/Outputs';
-import Options from './components/Options';
-import { SendFees } from './components/Fees';
+import { Options } from './components/Options/Options';
+import { SendFees } from './components/SendFees';
 import { TotalSent } from './components/TotalSent';
 import { ReviewButton } from './components/ReviewButton';
 import Raw from './components/Raw';
-import { selectCurrentTargetAnonymity } from '@wallet-reducers/coinjoinReducer';
+import {
+    selectTargetAnonymityByAccountKey,
+    selectRegisteredUtxosByAccountKey,
+} from 'src/reducers/wallet/coinjoinReducer';
+import { Warning } from '@trezor/components';
 
 const StyledCard = styled(Card)`
     display: flex;
@@ -21,18 +25,39 @@ const StyledCard = styled(Card)`
     padding: 0;
 `;
 
-interface SendLoadedProps extends UseSendFormProps {
-    children?: React.ReactNode;
+const StyledWarning = styled(Warning)`
+    margin-top: 8px;
+`;
+
+interface SendProps {
+    children: ReactNode;
+}
+
+interface SendLoadedProps extends SendProps {
+    selectedAccount: UseSendFormProps['selectedAccount'];
 }
 
 // inner component for selectedAccount.status = "loaded"
 // separated to call `useSendForm` hook at top level
 // children are only for test purposes, this prop is not available in regular build
-const SendLoaded = ({ children, ...props }: SendLoadedProps) => {
-    const sendContextValues = useSendForm({ ...props });
+const SendLoaded = ({ children, selectedAccount }: SendLoadedProps) => {
+    const props = useSelector(state => ({
+        fiat: state.wallet.fiat,
+        localCurrency: state.wallet.settings.localCurrency,
+        fees: state.wallet.fees,
+        online: state.suite.online,
+        sendRaw: state.wallet.send.sendRaw,
+        metadataEnabled: state.metadata.enabled && !!state.metadata.providers[0],
+        targetAnonymity: selectTargetAnonymityByAccountKey(state, selectedAccount.account.key),
+        prison: selectRegisteredUtxosByAccountKey(state, selectedAccount.account.key),
+    }));
+
+    const sendContextValues = useSendForm({ ...props, selectedAccount });
+
+    const { symbol } = selectedAccount.account;
 
     return (
-        <WalletLayout title="TR_NAV_SEND" account={props.selectedAccount}>
+        <WalletLayout title="TR_NAV_SEND" account={selectedAccount}>
             <SendContext.Provider value={sendContextValues}>
                 <Header />
                 {!props.sendRaw && (
@@ -43,30 +68,22 @@ const SendLoaded = ({ children, ...props }: SendLoadedProps) => {
                         </StyledCard>
                         <SendFees />
                         <TotalSent />
+                        {symbol === 'dsol' && (
+                            <StyledWarning withIcon>
+                                <Translation id="TR_SOLANA_DEVNET_SHORTCUT_WARNING" />
+                            </StyledWarning>
+                        )}
                         <ReviewButton />
                         {children}
                     </>
                 )}
             </SendContext.Provider>
-            {props.sendRaw && <Raw network={props.selectedAccount.network} />}
+            {props.sendRaw && <Raw network={selectedAccount.network} />}
         </WalletLayout>
     );
 };
 
-interface SendProps {
-    children: React.ReactNode;
-}
-
 const Send = ({ children }: SendProps) => {
-    const props = useSelector(state => ({
-        fiat: state.wallet.fiat,
-        localCurrency: state.wallet.settings.localCurrency,
-        fees: state.wallet.fees,
-        online: state.suite.online,
-        sendRaw: state.wallet.send.sendRaw,
-        metadataEnabled: state.metadata.enabled && !!state.metadata.provider,
-        targetAnonymity: selectCurrentTargetAnonymity(state),
-    }));
     const selectedAccount = useSelector(state => state.wallet.selectedAccount);
 
     if (selectedAccount.status !== 'loaded') {
@@ -74,11 +91,7 @@ const Send = ({ children }: SendProps) => {
     }
 
     /* children are only for test purposes, this prop is not available in regular build */
-    return (
-        <SendLoaded {...props} selectedAccount={selectedAccount}>
-            {children}
-        </SendLoaded>
-    );
+    return <SendLoaded selectedAccount={selectedAccount}>{children}</SendLoaded>;
 };
 
 export default Send;

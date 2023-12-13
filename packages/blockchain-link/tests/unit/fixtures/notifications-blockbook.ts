@@ -6,6 +6,7 @@ const tx = {
     // blockTime: undefined,
     // fee: undefined,
     // txid: undefined,
+    internalTransfers: [],
     tokens: [],
     targets: [],
 };
@@ -81,7 +82,7 @@ const notifyBlocks = [
                 data: { hash: 'efgh05', height: 5 },
             },
         ],
-        notificationsCount: 1,
+        notificationsCount: 2,
         result: {
             blockHash: 'efgh05',
             blockHeight: 5,

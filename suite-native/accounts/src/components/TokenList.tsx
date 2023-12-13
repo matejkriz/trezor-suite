@@ -1,35 +1,41 @@
-import React from 'react';
 import { useSelector } from 'react-redux';
 
 import { A } from '@mobily/ts-belt';
 
-import { VStack } from '@suite-native/atoms';
-import { selectEthereumAccountsTokensWithBalance } from '@suite-native/ethereum-tokens';
-import { AccountsRootState, selectAccountLabel } from '@suite-common/wallet-core';
+import {
+    getEthereumTokenName,
+    selectEthereumAccountsTokensWithFiatRates,
+} from '@suite-native/ethereum-tokens';
+import { AccountKey, TokenAddress } from '@suite-common/wallet-types';
+import { FiatRatesRootState } from '@suite-native/fiat-rates';
+import { SettingsSliceRootState } from '@suite-native/module-settings';
 
 import { TokenListItem } from './TokenListItem';
 
-export const TokenList = ({ accountKey }: { accountKey: string }) => {
-    const accountTokens = useSelector((state: AccountsRootState) =>
-        selectEthereumAccountsTokensWithBalance(state, accountKey),
-    );
-    const accountLabel = useSelector((state: AccountsRootState) =>
-        selectAccountLabel(state, accountKey),
+type TokenListProps = {
+    accountKey: string;
+    onSelectAccount: (accountKey: AccountKey, tokenContract?: TokenAddress) => void;
+};
+
+export const TokenList = ({ accountKey, onSelectAccount }: TokenListProps) => {
+    const accountTokens = useSelector((state: FiatRatesRootState & SettingsSliceRootState) =>
+        selectEthereumAccountsTokensWithFiatRates(state, accountKey),
     );
 
     if (A.isEmpty(accountTokens)) return null;
 
     return (
-        <VStack>
-            {accountTokens.map((token, index) => (
+        <>
+            {accountTokens.map(token => (
                 <TokenListItem
-                    key={token.name}
-                    symbol={token.symbol}
+                    key={token.contract}
+                    contract={token.contract}
+                    accountKey={accountKey}
+                    onSelectAccount={onSelectAccount}
                     balance={token.balance}
-                    label={`${accountLabel} ${token.name}`}
-                    isLast={accountTokens?.length - 1 === index}
+                    label={getEthereumTokenName(token.name)}
                 />
             ))}
-        </VStack>
+        </>
     );
 };

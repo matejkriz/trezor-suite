@@ -7,9 +7,15 @@
 // https://github.com/trezor/trezor-firmware/blob/1fceca73da523c5bf2bb0f398c91e00c728bdbe0/core/tests/test_apps.bitcoin.txweight.py
 
 import * as baddress from '../src/address';
-import { OUTPUT_SCRIPT_LENGTH, TxType } from '../src/coinselect/utils';
-import type { Network } from '../src';
-import type { ComposeResult } from '../src/compose/result';
+import { OUTPUT_SCRIPT_LENGTH } from '../src/coinselect/coinselectUtils';
+import {
+    Network,
+    ComposeInput,
+    ComposeOutput,
+    ComposeChangeAddress,
+    ComposeResultFinal,
+    CoinSelectPaymentType,
+} from '../src';
 
 // transaction header size: 4 byte version
 const _TXSIZE_HEADER = 4;
@@ -184,26 +190,24 @@ export class TxWeightCalculator {
     }
 }
 
-type FinalResult = Exclude<ComposeResult, { type: 'nonfinal' } | { type: 'error' }>;
-
 export function verifyTxBytes(
-    tx: FinalResult,
-    txType: Exclude<TxType, 'p2wsh'> = 'p2pkh',
+    tx: ComposeResultFinal<ComposeInput, ComposeOutput, ComposeChangeAddress>,
+    txType: Exclude<CoinSelectPaymentType, 'p2wsh'> = 'p2pkh',
     network?: Network,
 ) {
     const calc = new TxWeightCalculator();
-    tx.transaction.inputs.forEach(() => {
+    tx.inputs.forEach(() => {
         calc.addInputByKey(txType);
     });
 
-    tx.transaction.outputs.sorted.forEach(out => {
-        if (out.opReturnData) {
-            calc.addOutput({ length: 2 + out.opReturnData.length });
+    tx.outputs.forEach(out => {
+        if (out.type === 'opreturn') {
+            calc.addOutput({ length: 2 + out.dataHex.length / 2 });
         }
-        if (out.address) {
+        if (out.type === 'payment') {
             calc.addOutput({ length: baddress.toOutputScript(out.address, network).length });
         }
-        if (out.path) {
+        if (out.type === 'change') {
             calc.addOutputByKey(txType); // change output
         }
     });

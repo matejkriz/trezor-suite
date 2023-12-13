@@ -1,5 +1,6 @@
 import { applyFlags } from './applyFlags';
 import { applySettings } from './applySettings';
+import { authenticateDevice } from './authenticateDevice';
 import { authorizeCoinjoin } from './authorizeCoinjoin';
 import { backupDevice } from './backupDevice';
 import { binanceGetAddress } from './binanceGetAddress';
@@ -21,6 +22,7 @@ import { cardanoGetAddress } from './cardanoGetAddress';
 import { cardanoGetNativeScriptHash } from './cardanoGetNativeScriptHash';
 import { cardanoGetPublicKey } from './cardanoGetPublicKey';
 import { cardanoSignTransaction } from './cardanoSignTransaction';
+import { cardanoComposeTransaction } from './cardanoComposeTransaction';
 import { changePin } from './changePin';
 import { cipherKeyValue } from './cipherKeyValue';
 import { composeTransaction } from './composeTransaction';
@@ -35,6 +37,7 @@ import { ethereumSignTransaction } from './ethereumSignTransaction';
 import { ethereumSignTypedData } from './ethereumSignTypedData';
 import { ethereumVerifyMessage } from './ethereumVerifyMessage';
 import { firmwareUpdate } from './firmwareUpdate';
+import { getAccountDescriptor } from './getAccountDescriptor';
 import { getAccountInfo } from './getAccountInfo';
 import { getAddress } from './getAddress';
 import { getCoinInfo } from './getCoinInfo';
@@ -65,6 +68,9 @@ import { setBusy } from './setBusy';
 import { setProxy } from './setProxy';
 import { signMessage } from './signMessage';
 import { signTransaction } from './signTransaction';
+import { solanaGetPublicKey } from './solanaGetPublicKey';
+import { solanaGetAddress } from './solanaGetAddress';
+import { solanaSignTransaction } from './solanaSignTransaction';
 import { stellarGetAddress } from './stellarGetAddress';
 import { stellarSignTransaction } from './stellarSignTransaction';
 import { tezosGetAddress } from './tezosGetAddress';
@@ -75,6 +81,8 @@ import { unlockPath } from './unlockPath';
 import { verifyMessage } from './verifyMessage';
 import { wipeDevice } from './wipeDevice';
 import { checkFirmwareAuthenticity } from './checkFirmwareAuthenticity';
+import { cancelCoinjoinAuthorization } from './cancelCoinjoinAuthorization';
+import { showDeviceTutorial } from './showDeviceTutorial';
 
 export interface TrezorConnect {
     // https://github.com/trezor/trezor-suite/blob/develop/docs/packages/connect/methods/applyFlags.md
@@ -83,8 +91,17 @@ export interface TrezorConnect {
     // https://github.com/trezor/trezor-suite/blob/develop/docs/packages/connect/methods/applySettings.md
     applySettings: typeof applySettings;
 
+    // https://github.com/trezor/trezor-suite/blob/develop/docs/packages/connect/methods/authenticateDevice.md
+    authenticateDevice: typeof authenticateDevice;
+
     // https://github.com/trezor/trezor-suite/blob/develop/docs/packages/connect/methods/authorizeCoinjoin.md
     authorizeCoinjoin: typeof authorizeCoinjoin;
+
+    // https://github.com/trezor/trezor-suite/blob/develop/docs/packages/connect/methods/cancelCoinjoinAuthorization.md
+    cancelCoinjoinAuthorization: typeof cancelCoinjoinAuthorization;
+
+    // https://github.com/trezor/trezor-suite/blob/develop/docs/packages/connect/methods/showDeviceTutorial.md
+    showDeviceTutorial: typeof showDeviceTutorial;
 
     // https://github.com/trezor/trezor-suite/blob/develop/docs/packages/connect/methods/backupDevice.md
     backupDevice: typeof backupDevice;
@@ -146,6 +163,8 @@ export interface TrezorConnect {
     // https://github.com/trezor/trezor-suite/blob/develop/docs/packages/connect/methods/cardanoSignTransaction.md
     cardanoSignTransaction: typeof cardanoSignTransaction;
 
+    cardanoComposeTransaction: typeof cardanoComposeTransaction;
+
     // https://github.com/trezor/trezor-suite/blob/develop/docs/packages/connect/methods/changePin.md
     changePin: typeof changePin;
 
@@ -189,6 +208,9 @@ export interface TrezorConnect {
 
     // https://github.com/trezor/trezor-suite/blob/develop/docs/packages/connect/methods/firmwareUpdate.md
     firmwareUpdate: typeof firmwareUpdate;
+
+    // https://github.com/trezor/trezor-suite/blob/develop/docs/packages/connect/methods/getAccountDescriptor.md
+    getAccountDescriptor: typeof getAccountDescriptor;
 
     // https://github.com/trezor/trezor-suite/blob/develop/docs/packages/connect/methods/getAccountInfo.md
     getAccountInfo: typeof getAccountInfo;
@@ -276,6 +298,15 @@ export interface TrezorConnect {
 
     // https://github.com/trezor/trezor-suite/blob/develop/docs/packages/connect/methods/signTransaction.md
     signTransaction: typeof signTransaction;
+
+    // https://github.com/trezor/trezor-suite/blob/develop/docs/packages/connect/methods/solanaGetPublicKey.md
+    solanaGetPublicKey: typeof solanaGetPublicKey;
+
+    // https://github.com/trezor/trezor-suite/blob/develop/docs/packages/connect/methods/solanaGetAddress.md
+    solanaGetAddress: typeof solanaGetAddress;
+
+    // https://github.com/trezor/trezor-suite/blob/develop/docs/packages/connect/methods/solanaSignTransaction.md
+    solanaSignTransaction: typeof solanaSignTransaction;
 
     // https://github.com/trezor/trezor-suite/blob/develop/docs/packages/connect/methods/stellarGetAddress.md
     stellarGetAddress: typeof stellarGetAddress;

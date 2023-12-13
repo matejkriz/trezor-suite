@@ -3,7 +3,7 @@ import { RippleError } from 'ripple-lib/dist/npm/common/errors';
 import BigNumber from 'bignumber.js';
 import { CustomError } from '@trezor/blockchain-link-types/lib/constants/errors';
 import { MESSAGES, RESPONSES } from '@trezor/blockchain-link-types/lib/constants';
-import { BaseWorker, CONTEXT, ContextType } from '../base';
+import { BaseWorker, CONTEXT, ContextType } from '../baseWorker';
 import * as utils from '@trezor/blockchain-link-utils/lib/ripple';
 import type { Response, SubscriptionAccountInfo, AccountInfo } from '@trezor/blockchain-link-types';
 import type * as MessageTypes from '@trezor/blockchain-link-types/lib/messages';
@@ -430,7 +430,8 @@ class RippleWorker extends BaseWorker<RippleAPI> {
     async tryConnect(url: string): Promise<RippleAPI> {
         const options: APIOptions = {
             server: url,
-            connectionTimeout: this.settings.timeout || DEFAULT_TIMEOUT,
+            timeout: this.settings.timeout || DEFAULT_TIMEOUT, // timeout is used for request and heartbeat (ping), see node_modules/ripple-lib/dist/npm/common/connection.js
+            connectionTimeout: this.settings.timeout || DEFAULT_TIMEOUT, // connectionTimeout is used only for connection
         };
         // proxy agent is available only in suite because of the patch.
         // it will fail in standalone trezor-connect implementation where this patch is not present.

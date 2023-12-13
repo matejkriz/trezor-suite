@@ -11,16 +11,16 @@ const homeStack = enhanceTabOption({
 const accountsStack = enhanceTabOption({
     routeName: AppTabsRoutes.AccountsStack,
     iconName: 'discover',
-    label: 'My Coins',
+    label: 'My assets',
     params: {
         screen: AccountsStackRoutes.Accounts,
     },
 });
 
-const sendReceiveStack = enhanceTabOption({
-    routeName: AppTabsRoutes.SendReceiveStack,
+const receiveStack = enhanceTabOption({
+    routeName: AppTabsRoutes.ReceiveStack,
     label: 'Receive',
-    iconName: 'receive',
+    iconName: 'arrowDownLight',
 });
 
 const settingsStack = enhanceTabOption({
@@ -32,6 +32,6 @@ const settingsStack = enhanceTabOption({
 export const rootTabsOptions = {
     ...homeStack,
     ...accountsStack,
-    ...sendReceiveStack,
+    ...receiveStack,
     ...settingsStack,
 };

@@ -38,14 +38,16 @@ describe('Use regtest to test pending transactions', () => {
         // create 2 transactions (one self, one fund another account of mine)
         [ADDRESS_ACCOUNT_1_INDEX_1, ADDRESS_ACCOUNT_2_INDEX_1].forEach((address, index) => {
             cy.getTestElement('@wallet/menu/wallet-send').click();
-            cy.getTestElement('outputs[0].amount').type('0.3');
-            cy.getTestElement('outputs[0].address').type(address);
+            cy.getTestElement('outputs.0.amount').type('0.3');
+            cy.getTestElement('outputs.0.address').type(address);
             // lets have 2 outputs (we want to make sure there is only 1 prepending transaction)
             cy.getTestElement('add-output').click();
-            cy.getTestElement('outputs[1].amount').type('0.7');
-            cy.getTestElement('outputs[1].address').type(address);
+            cy.getTestElement('outputs.1.amount').type('0.7');
+            cy.getTestElement('outputs.1.address').type(address);
             cy.getTestElement('@send/review-button').click();
             cy.getTestElement('@prompts/confirm-on-device');
+            cy.task('pressYes');
+            cy.task('pressYes');
             cy.task('pressYes');
             cy.task('pressYes');
             cy.task('pressYes');
@@ -62,7 +64,7 @@ describe('Use regtest to test pending transactions', () => {
                 cy.getTestElement('@transaction-group/pending/count').contains(index + 1);
             });
             cy.getTestElement('@tx-detail/txid-value').then($el => {
-                cy.task('set', { key: address, value: $el.text() });
+                cy.task('set', { key: address, value: $el.attr('id') });
             });
 
             cy.getTestElement('@modal/close-button').click();

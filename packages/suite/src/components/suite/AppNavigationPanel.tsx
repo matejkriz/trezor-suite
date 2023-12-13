@@ -1,18 +1,26 @@
-import React, { useEffect, useState, useRef } from 'react';
+import {
+    useEffect,
+    useState,
+    useRef,
+    ReactNode,
+    ReactElement,
+    isValidElement,
+    cloneElement,
+} from 'react';
 import styled from 'styled-components';
 import { H1, variables } from '@trezor/components';
-import { MAX_WIDTH, MAX_WIDTH_WALLET_CONTENT } from '@suite-constants/layout';
+import { MAX_WIDTH, MAX_WIDTH_WALLET_CONTENT } from 'src/constants/suite/layout';
 
 const Wrapper = styled.div`
     display: flex;
     width: 100%;
     justify-content: center;
-    background: ${props => props.theme.BG_LIGHT_GREY};
-    padding: 24px 32px 10px 32px;
+    background: ${({ theme }) => theme.BG_LIGHT_GREY};
+    padding: 24px 32px 10px;
     z-index: ${variables.Z_INDEX.PAGE_HEADER};
 
     @media screen and (max-width: ${variables.SCREEN_SIZE.LG}) {
-        padding: 24px 16px 20px 16px;
+        padding: 24px 16px 20px;
     }
 `;
 
@@ -30,13 +38,14 @@ const BasicInfo = styled.div`
 
 const Title = styled(H1)`
     font-weight: ${variables.FONT_WEIGHT.DEMI_BOLD};
-    color: ${props => props.theme.TYPE_DARK_GREY};
+    color: ${({ theme }) => theme.TYPE_DARK_GREY};
     white-space: nowrap;
     overflow: hidden;
 `;
 
 const Aside = styled.div`
     display: flex;
+
     & > * + * {
         margin-left: 10px;
     }
@@ -57,11 +66,11 @@ const TitleRow = styled(Row)`
 const Delimeter = styled.div``;
 
 interface AppNavigationPanelProps {
-    title: React.ReactNode;
-    titleContent?: (isAppNavigationPanelInView: boolean) => React.ReactNode | undefined;
+    title: ReactNode;
+    titleContent?: (isAppNavigationPanelInView: boolean) => ReactNode | undefined;
     maxWidth: 'small' | 'default';
-    navigation?: React.ReactElement<{ inView: boolean }>;
-    children?: React.ReactNode;
+    navigation?: ReactElement<{ inView: boolean }>;
+    children?: ReactNode;
     className?: string;
 }
 
@@ -111,7 +120,7 @@ export const AppNavigationPanel = ({
                     </BasicInfo>
                 </Content>
             </Wrapper>
-            {React.isValidElement(navigation) && React.cloneElement(navigation, { inView })}
+            {isValidElement(navigation) && cloneElement(navigation, { inView })}
             <Delimeter />
         </>
     );

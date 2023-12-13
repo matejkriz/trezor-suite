@@ -1,11 +1,122 @@
-# 9.0.8 (not released)
+# 9.1.6
 
--   feat(connect): support multiple intermediary FWs for model 1 and devkit binaries
+-   chore(connect): remove web3-utils (2f683f6)
+-   feat(connect): serialize in ethereumSignTransaction (8f62896)
+-   feat(connect): add serializeEthereumTx util (a9b21a3)
+-   refactor(connect): improve ethereumSignTransaction (788910b)
+-   feat(connect-popup): shared worker logger load dynamically only when required (424383e, f5400f8)
+-   feat(connect): update solana backend urls, fee info, workers, account descriptor and fw integration (876f609, a3ae0ae, e1058ea, cadffc6, 3d9c703)
+-   feat(connect-popup): add new method that allow set to use core (d944e50)
+-   feat(core): new events for core in popup (242a169)
+-   chore(connect-iframe): suppress subtle crypto warning (1f0e722)
+-   feat(connect-iframe): standalone core build (c344c3d)
+-   feat(deps): update deps without breaking changes (7e0584c)
+-   fix(connect-web, connect-popup): remove trust-issues handle from query param (79036e8, b8640d8, 87b4b84)
+-   feat(connect-explorer): settings page to restart connect (33e41f6)
+-   feat(connect): update protobuf messages in custom Transports (if not set) (1eb5156)
+-   fix(connect): device.run race condition (7d0545c, 7978eab)
+-   feat(connect-common): add T2T1 & T2B1 firmware binaries 2.6.3 bootloader 2.1.4 (9cca8b1)
+-   fix(mobile): Fix modularized connect in React Native (57fcb9d, ba42388, 1ef62e7)
+-   chore(deps): bump @fivebinaries/coin-selection (5e16f60)
+-   chore(connect): ethereum api dynamic load (b22d228)
+-   chore(connect): cardano api dynamic load (3ef0e77)
+-   chore(connect): stellar api dynamic import (473ea94)
+-   chore(connect): nem api dynamic import (52e2f99)
+-   chore(connect): eos api dynamic import (cf5b3ad)
+-   chore(connect): binance api dynamic import (3ccf149)
+-   chore(connect): tezos api dynamic import (273a9fe)
+-   chore(connect): ripple api dynamic import (9b17e38)
+-   chore(connect): prepare for dynamic method import (d4868eb)
+-   chore(connect): blockchain link workers dynamic import (74fd083)
+-   chore(connect): implement @trezor/utxo-lib 2.0.0 (06a9f7a)
+-   feat(connect): add getAccountDescriptor method (0b005ec)
+
+# 9.1.5
+
+-   feat(suite): T2B1 replace Model R name by official Trezor Safe 3 name (7460372ed1)
+-   feat(connect): add authenticateDevice method (45b99c0813, af907a296d, 249ddc358a)
+-   feat(connect): btg, dash, dgb, nmc, vrc no support for T2B1 (0819ff6fc1)
+-   feat(suite): support t2b1 firmware installation (9ef2bf627a)
+-   fix(connect): get firmware status and release after ensuring internal model (dca3333c2d)
+-   fix(connect-popup): webusb in popup if iframe is on same origin as host (e571971586)
+-   feat(connect-web): trust-issues query string param (b1b6e3f287)
+-   feat(connect-plugin-stellar): Update stellar-sdk and stellar-base (ee7e67db04)
+-   chore(connect): t1 emulator with pin (33c6ca58bf)
+-   fix(connect-popup): allow decimal custom fee entry (bf20f23f05, 8a8d93b5e8)
+-   feat(connect-explorer): add rebootToBootloader method (9996676358)
+-   fix(connect): wrong version format in discovery (19b13d1d4c)
+-   feat(connect-popup): logger in sharedworker collecting from all environments (732bc7d, 2521c7c, 6501dfa4fd)
+-   chore(connect): do not lowercase device color (7229b88c20)
+
+# 9.1.4
+
+-   feat(connect-popup): add metamask extension id to known third party (f137b3e4d6)
+-   test(connect): composeTransaction fix doge fee (69a92483c6)
+-   refactor(connect): remove doge fee branch (c79f3f25d8)
+-   feat(transport): udp support for transport methods (65e617195c)
+-   fix(connect): accept signTransaction inputs/outputs with `address_n: string` (82910e0766)
+-   fix(connect-explorer, connect-popup): add favicon (cafb574ada, c6071123f3)
+-   feat(connect-popup): use trezor icons with display off from suite-data (1c806519a7)
+-   feat(connect): trezor color in device object (31535e2b0f)
+-   feat(connect): trezor name in device object (a0ecb66390)
+-   feat(connect-common): copy models.json from submodules (6d80197523)
+-   fix(connect-iframe): device event not propagating to host (d35e37863a)
+-   feat(connect, suite): unify no backup warning button text (375f3fa1a1)
+-   feat(connect): add suppressBackupWarning param to getPublicKey and getAccountInfo (2c2698d8af)
+-   fix(type-check): connect-web includes connect-iframe package.json (f9f576ab66)
+-   fix(connect-iframe): method.initAsync method superfluous call (37ace99a5d)
+-   fix(connect-iframe): define plugin in build to support analytics (c793ce358c)
+
+# 9.1.3
+
+-   fix(connect): correct import of internal connect dependency (https://github.com/trezor/trezor-suite/issues/9389)
+
+# 9.1.2
+
+-   feat(connect): analytics method name and method param names (23df6d8)
+-   feat(connect): improve calculation of fees and dust limit. (d726aab, 9d1ef05, 60f1e26, 2187c34, d84e3ca)
+-   fix(connect): device.firmwareType can't be safely determined in bootloader mode so we set it to undefined (c3d33a0)
+-   feat(connect): signTransaction with refTxs passed as AccountTransaction interface (d7ec435)
+-   feat(connect): decoding ethereum definitions which allows richer UI in connect-popup (0e9356f)
+-   feat(connect-explorer): updated examples ethereum (b025834, e58c416), applySettings (1a28816)
+-   feat(connect-explorer): render docs from docs folder on index page (93fddc4)
+
+# 9.1.1
+
+-   feat(connect-popup): added device model_internal in features
+-   feat(connect): add cancelCoinjoinAuthorization method
+-   feat(connect): added nodeusb transport. TrezorConnect is now capable of communicating with Trezor devices without using TrezorBridge (in node.js environment).
+-   feat(connect-popup): when a call to TrezorConnect returns `success: false` popup remains opened and displays error page instead.
+-   feat(connect-popup): add no-backup warning to getPublicKey method
+-   fix(connect): respect useEmptyPassphrase param in cipherKeyValue method
+
+# 9.0.11
+
+-   fix(connect-web): fix imports from connect
+
+# 9.0.10
+
+-   fix(connect-popup): fix connect-popup in firefox
+-   feat(connect-popup): tiny visual updates, added loading messages based on communication with iframe
+-   fix(connect-web): prevent unexpected import of transport runtime code in connect/web
+
+# 9.0.9
+
+-   fix(connect): prevent .asArray of undefined runtime error
+-   fix(connect): add missing currencies param for getFiatRatesForTimestamps
+
+# 9.0.8
+
+-   feat: support multiple intermediary FWs for T1B1 and devkit binaries
     -   `FirmwareUpdate` now accepts `intermediaryVersion` param instead of `intermediary`
-    -   `getInfo` returns `intermediaryVersion` needed for T1 and removed `latest` param. 'release' always return latest version for T1 so it means abandoning the concept of incremental updates for T1.
--   chore(rollout): remove FW rollout feature completely
+    -   `getInfo` returns `intermediaryVersion` needed for T1B1 and removed `latest` param. 'release' always return latest version for T1B1 so it means abandoning the concept of incremental updates for T1B1.
 -   feat: signTransaction now returns `signedTransaction` which can be used for visualization purposes before notification about pending transaction from blockchain is received.
 -   feat(blockchain): `blockchainGetCurrentFiatRates` and `blockchainGetFiatRatesForTimestamps` now accept additional `token` parameter
+-   feat: support coinjoin for T1B1
+-   feat(transport): eth definitions
+-   feat(webextension): Ignore port events if it is not port created by current popup
+-   feat(cardano): allow external reward addresses in governance registrations
+-   refactor(connect): removing browser related code from @trezor/connect
 
 # 9.0.7
 

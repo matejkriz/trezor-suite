@@ -1,27 +1,18 @@
-import React from 'react';
-
-import { Screen, ScreenHeader } from '@suite-native/navigation';
-import { VStack, Card, Text, Button } from '@suite-native/atoms';
-import { useOpenLink } from '@suite-native/link';
+import { Screen, ScreenSubHeader } from '@suite-native/navigation';
+import { VStack } from '@suite-native/atoms';
+import { useTranslate } from '@suite-native/intl';
 
 import { FAQInfoPanel } from '../components/FAQInfoPanel';
+import { SupportCard } from '../components/SupportCard';
 
 export const SettingsFAQScreen = () => {
-    const openLink = useOpenLink();
+    const { translate } = useTranslate();
+
     return (
-        <Screen header={<ScreenHeader title="Get help" />}>
+        <Screen screenHeader={<ScreenSubHeader content={translate('moduleSettings.faq.title')} />}>
             <VStack spacing="large">
                 <FAQInfoPanel />
-                <Card>
-                    <VStack spacing="medium">
-                        <Text numberOfLines={3} variant="titleSmall">
-                            Need more help?
-                        </Text>
-                        <Button onPress={() => openLink('https://trezor.io/support')}>
-                            Contact support
-                        </Button>
-                    </VStack>
-                </Card>
+                <SupportCard />
             </VStack>
         </Screen>
     );

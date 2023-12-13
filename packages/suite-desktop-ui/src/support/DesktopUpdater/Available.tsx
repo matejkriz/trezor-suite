@@ -1,28 +1,28 @@
-import React, { useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 
 import styled from 'styled-components';
-import { Translation, Modal } from '@suite-components';
-import { useActions } from '@suite-hooks';
-import { getReleaseUrl } from '@suite/services/github';
-import * as desktopUpdateActions from '@suite-actions/desktopUpdateActions';
 
 import { Button, H2, variables, Link } from '@trezor/components';
 import { desktopApi, UpdateInfo } from '@trezor/suite-desktop-api';
 
+import { Translation, Modal } from 'src/components/suite';
+import { useDispatch } from 'src/hooks/suite';
+import { getReleaseUrl } from 'src/services/github';
+import { download } from 'src/actions/suite/desktopUpdateActions';
+
 const GreenH2 = styled(H2)`
     text-align: left;
-    color: ${props => props.theme.TYPE_GREEN};
+    color: ${({ theme }) => theme.TYPE_GREEN};
 `;
 
 const ChangelogWrapper = styled.div`
-    margin: 20px 0px;
-    background: ${props => props.theme.BG_GREY};
+    margin: 20px 0;
+    background: ${({ theme }) => theme.BG_GREY};
     border-radius: 8px;
     max-height: 400px;
     overflow-y: auto;
     padding: 16px 20px;
-    color: ${props => props.theme.TYPE_DARK_GREY};
+    color: ${({ theme }) => theme.TYPE_DARK_GREY};
     font-size: ${variables.FONT_SIZE.SMALL};
     font-weight: ${variables.FONT_WEIGHT.MEDIUM};
     text-align: left;
@@ -39,12 +39,12 @@ const ChangelogWrapper = styled.div`
         margin-left: 36px; /* hacky way to add enough indentation so it is rendered right of an emoji in a section heading */
     }
 
-    li + li {
-        margin-top: 4px;
-    }
-
     li {
         line-height: 1.57;
+    }
+
+    li + li {
+        margin-top: 4px;
     }
 
     /*
@@ -55,6 +55,7 @@ const ChangelogWrapper = styled.div`
         cursor: pointer;
         text-decoration: underline;
         color: inherit;
+
         &:visited,
         &:active,
         &:hover {
@@ -105,14 +106,12 @@ interface AvailableProps {
 }
 
 export const Available = ({ hideWindow, isCancelable, latest }: AvailableProps) => {
-    const { download } = useActions({
-        download: desktopUpdateActions.download,
-    });
+    const dispatch = useDispatch();
 
-    const downloadUpdate = useCallback(() => {
-        download();
+    const downloadUpdate = () => {
+        dispatch(download());
         desktopApi.downloadUpdate();
-    }, [download]);
+    };
 
     return (
         <StyledModal

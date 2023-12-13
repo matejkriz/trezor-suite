@@ -5,6 +5,7 @@
         {
             "path": "../../suite-common/formatters"
         },
+        { "path": "../../suite-common/icons" },
         {
             "path": "../../suite-common/redux-utils"
         },
@@ -22,12 +23,15 @@
         },
         { "path": "../accounts" },
         { "path": "../alerts" },
+        { "path": "../analytics" },
         { "path": "../atoms" },
         { "path": "../config" },
+        { "path": "../device-manager" },
         { "path": "../ethereum-tokens" },
+        { "path": "../fiat-rates" },
         { "path": "../formatters" },
         { "path": "../forms" },
-        { "path": "../module-devices" },
+        { "path": "../intl" },
         { "path": "../module-settings" },
         { "path": "../navigation" },
         { "path": "../qr-code" },
@@ -39,8 +43,9 @@
             "path": "../../packages/blockchain-link-types"
         },
         { "path": "../../packages/connect" },
-        { "path": "../../packages/icons" },
         { "path": "../../packages/styles" },
+        { "path": "../../packages/utxo-lib" },
         { "path": "../../packages/validation" }
-    ]
+    ],
+    "include": [".", "**/*.json"]
 }

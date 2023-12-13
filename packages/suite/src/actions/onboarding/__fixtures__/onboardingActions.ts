@@ -1,8 +1,10 @@
-import * as onboardingActions from '@onboarding-actions/onboardingActions';
-import onboardingReducer from '@onboarding-reducers/onboardingReducer';
-import * as STEP from '@onboarding-constants/steps';
+import { testMocks } from '@suite-common/test-utils';
 
-const { getSuiteDevice } = global.JestMocks;
+import * as onboardingActions from 'src/actions/onboarding/onboardingActions';
+import onboardingReducer from 'src/reducers/onboarding/onboardingReducer';
+import * as STEP from 'src/constants/onboarding/steps';
+
+const { getSuiteDevice } = testMocks;
 
 export default [
     {
@@ -14,7 +16,7 @@ export default [
         },
         action: () => onboardingActions.goToNextStep(),
         expect: {
-            toMatchObject: { activeStepId: STEP.ID_FIRMWARE_STEP },
+            toMatchObject: { activeStepId: STEP.ID_AUTHENTICATE_DEVICE_STEP },
         },
     },
     {
@@ -27,18 +29,6 @@ export default [
         action: () => onboardingActions.goToNextStep('firmware'),
         expect: {
             toMatchObject: { activeStepId: STEP.ID_FIRMWARE_STEP },
-        },
-    },
-    {
-        description: 'goToSubStep',
-        initialState: {
-            suite: {
-                device: getSuiteDevice(),
-            },
-        },
-        action: () => onboardingActions.goToSubStep('moo'),
-        expect: {
-            toMatchObject: { activeSubStep: 'moo' },
         },
     },
     {

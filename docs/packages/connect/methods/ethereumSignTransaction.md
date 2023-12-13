@@ -15,12 +15,13 @@ const result = await TrezorConnect.ethereumSignTransaction(params);
 
 -   `path` — _required_ `string | Array<number>` minimum length is `3`. [read more](../path.md)
 -   `transaction` - _required_ `Object` type of [`EthereumTransactionEIP1559`](https://github.com/trezor/trezor-suite/blob/develop/packages/connect/src/types/api/ethereum/index.ts)`|`[`EthereumSignTransaction`](https://github.com/trezor/trezor-suite/blob/develop/packages/connect/src/types/api/ethereum/index.ts) "0x" prefix for each field is optional
+-   `chunkify` — _optional_ `boolean` determines if recipient address will be displayed in chunks of 4 characters. Default is set to `false`
 
 ### Examples
 
 #### EIP1559 ([after The London Upgrade](https://ethereum.org/en/developers/docs/gas/#post-london))
 
-> :warning: **Supported firmware versions** Trezor 1 v1.10.4 and Trezor T v2.4.2
+> :warning: **Supported firmware versions** T1B1 v1.10.4 and T2T1 v2.4.2
 
 If both parameters `maxFeePerGas` and `maxPriorityFeePerGas` are defined, transaction will be signed as the new type introduced in [EIP1559](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559.md).
 
@@ -42,7 +43,7 @@ TrezorConnect.ethereumSignTransaction({
 
 #### Legacy
 
-For Trezor One and Trezor T with firmware older than 2.4.2 (but supported newer firmware versions too).
+For T1B1 and T2T1 with firmware older than 2.4.2 (but supported newer firmware versions too).
 
 ```javascript
 TrezorConnect.ethereumSignTransaction({

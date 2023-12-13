@@ -1,5 +1,5 @@
 import path from 'path';
-import { DefinePlugin } from 'webpack';
+import webpack, { DefinePlugin } from 'webpack';
 import HtmlWebpackPlugin from 'html-webpack-plugin';
 import TerserPlugin from 'terser-webpack-plugin';
 import CopyPlugin from 'copy-webpack-plugin';
@@ -12,11 +12,12 @@ const DIST = path.resolve(__dirname, '../build');
 
 const commitHash = execSync('git rev-parse HEAD').toString().trim();
 
-export default {
+const config: webpack.Configuration = {
     target: 'web',
     mode: 'production',
     entry: {
         popup: path.resolve(__dirname, '../src/index.tsx'),
+        log: path.resolve(__dirname, '../src/log.tsx'),
     },
     output: {
         filename: 'js/[name].[contenthash].js',
@@ -34,7 +35,15 @@ export default {
                     loader: 'babel-loader',
                     options: {
                         cacheDirectory: true,
-                        presets: ['@babel/preset-react', '@babel/preset-typescript'],
+                        presets: [
+                            [
+                                '@babel/preset-react',
+                                {
+                                    runtime: 'automatic',
+                                },
+                            ],
+                            '@babel/preset-typescript',
+                        ],
                         plugins: [
                             '@babel/plugin-proposal-class-properties',
                             [
@@ -77,36 +86,36 @@ export default {
             minify: false,
             urls: URLS,
         }),
+        new HtmlWebpackPlugin({
+            chunks: ['log'],
+            template: `${STATIC_SRC}/log.html`,
+            filename: 'log.html',
+            inject: false,
+            minify: false,
+            urls: URLS,
+        }),
         new CopyPlugin({
             patterns: [
                 {
                     from: `${STATIC_SRC}/popup.css`,
                     to: DIST,
                 },
-            ],
-        }),
-        // legacy fonts, should be removed once refactoring into React is finished
-        new CopyPlugin({
-            patterns: [
+                // legacy fonts, should be removed once refactoring into React is finished
                 {
                     from: `${STATIC_SRC}/fonts`,
                     to: `${DIST}/fonts`,
                 },
-            ],
-        }),
-        new CopyPlugin({
-            patterns: [
                 {
                     from: `${path.join(__dirname, '../../suite-data/files/fonts')}`,
                     to: `${DIST}/fonts`,
                 },
-            ],
-        }),
-        new CopyPlugin({
-            patterns: [
                 {
-                    from: `${STATIC_SRC}/images`,
-                    to: `${DIST}/images`,
+                    from: path.join(__dirname, '../../suite-data/files/images/png/trezor-*'),
+                    to: `${DIST}/images/[name][ext]`,
+                },
+                {
+                    from: path.join(__dirname, '../../connect-iframe/build'),
+                    to: `${DIST}`,
                 },
             ],
         }),
@@ -124,4 +133,9 @@ export default {
             }),
         ],
     },
+    externals: {
+        'js/core': 'js/core',
+    },
 };
+
+export default config;

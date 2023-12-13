@@ -36,9 +36,7 @@ __pycache__/
 .eslintcache
 .stylelintcache
 *.tsbuildinfo
-
-# model 1 emulation file
-docker/trezor-user-env/controller/emulator.img
+.nx
 
 # Vagrant
 .vagrant
@@ -153,3 +151,7 @@ local.properties
 packages/suite-data/files/browser-detection
 packages/suite-data/files/guide
 packages/suite-data/files/translations/master.json
+
+# cypress download folder
+
+packages/suite-web/e2e/downloads

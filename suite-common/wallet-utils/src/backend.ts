@@ -1,3 +1,4 @@
+import { parseElectrumUrl } from '@trezor/utils';
 import type {
     CustomBackend,
     BlockchainNetworks,
@@ -8,6 +9,9 @@ import { TREZOR_CONNECT_BACKENDS, BackendType, NetworkSymbol } from '@suite-comm
 export const getDefaultBackendType = (coin: NetworkSymbol) => {
     if (coin === 'ada' || coin === 'tada') {
         return 'blockfrost';
+    }
+    if (coin === 'sol' || coin === 'dsol') {
+        return 'solana';
     }
     return 'blockbook';
 };
@@ -37,9 +41,7 @@ export const getCustomBackends = (blockchains: BlockchainNetworks): CustomBacken
         }))
         .filter(isBackend);
 
-const electrumUrlRegex = /^([a-zA-Z0-9.-]+):[0-9]{1,5}:[ts]$/; // URL is in format host:port:[t|s] (t for tcp, s for ssl)
-
-export const isElectrumUrl = (value: string) => electrumUrlRegex.test(value);
+export const isElectrumUrl = (value: string) => !!parseElectrumUrl(value);
 
 // check if account.backendType or NETWORK.accountType.backendType is supported by TrezorConnect api (defined in TREZOR_CONNECT_BACKENDS)
 // if it's not then different (non-standard) api should be used for fetching data

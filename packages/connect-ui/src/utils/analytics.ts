@@ -33,7 +33,10 @@ const onEnable = () => {
 
 const onDisable = () => {
     saveTrackingEnablement(false);
-    analytics.report({ type: EventType.SettingsTracking, payload: { value: false } }, true);
+    analytics.report(
+        { type: EventType.SettingsTracking, payload: { value: false } },
+        { force: true },
+    );
 };
 
 export const initAnalytics = () => {
@@ -45,7 +48,7 @@ export const initAnalytics = () => {
 
     const userAllowedTracking = storage.load().tracking_enabled;
 
-    analytics.init(userAllowedTracking || false, {
+    analytics.init(userAllowedTracking, {
         instanceId: trackingId,
         commitId: process.env.COMMIT_HASH || '',
         isDev: process.env.NODE_ENV === 'development',
@@ -53,7 +56,6 @@ export const initAnalytics = () => {
             onEnable,
             onDisable,
         },
-        useQueue: true,
     });
 
     analytics.report({

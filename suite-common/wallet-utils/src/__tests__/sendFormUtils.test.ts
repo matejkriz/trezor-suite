@@ -1,6 +1,3 @@
-import { Transaction } from '@ethereumjs/tx';
-import { sha3 } from 'web3-utils';
-
 import { networksCompatibility as NETWORKS } from '@suite-common/wallet-config';
 import { testMocks } from '@suite-common/test-utils';
 
@@ -16,9 +13,9 @@ import {
     getExternalComposeOutput,
     getFiatRate,
     getInputState,
+    getLamportsFromSol,
     prepareEthereumTransaction,
     restoreOrigOutputsOrder,
-    serializeEthereumTx,
 } from '../sendFormUtils';
 
 const { getUtxo, getWalletAccount } = testMocks;
@@ -27,21 +24,6 @@ describe('sendForm utils', () => {
     fixtures.prepareEthereumTransaction.forEach(f => {
         it(`prepareEthereumTransaction: ${f.description}`, () => {
             expect(prepareEthereumTransaction(f.txInfo)).toEqual(f.result);
-        });
-    });
-
-    fixtures.serializeEthereumTx.forEach(f => {
-        it(`serializeEthereumTx: ${f.description}`, () => {
-            // verify hash using 2 different tools
-            if (f.tx.chainId !== 61) {
-                // ETC is not supported
-                const tx = Transaction.fromTxData(f.tx);
-                const hash1 = tx.hash().toString('hex');
-                expect(`0x${hash1}`).toEqual(f.result);
-            }
-            const serialized = serializeEthereumTx(f.tx);
-            const hash2 = sha3(serialized);
-            expect(hash2).toEqual(f.result);
         });
     });
 
@@ -101,19 +83,26 @@ describe('sendForm utils', () => {
         expect(
             findComposeErrors({
                 someField: { type: 'validate' },
+                // @ts-expect-error: should not fail TODO
                 outputs: [
                     { amount: { type: 'compose' }, address: { type: 'validate' } },
                     { amount: { type: 'validate' }, address: { type: 'compose' } },
                 ],
                 topLevelField: { type: 'compose' },
+                // @ts-expect-error: params
                 invalidFieldNull: null,
+                // @ts-expect-error: params
                 invalidFieldBool: true,
+                // @ts-expect-error: params
                 invalidFieldNumber: 1,
+                // @ts-expect-error: params
                 invalidFieldString: 'A',
+                // should fail?
                 invalidFieldEmpty: {},
+                // @ts-expect-error: params
                 invalidArray: [null, true, 1, 'A', {}],
             }),
-        ).toEqual(['outputs[0].amount', 'outputs[1].address', 'topLevelField']);
+        ).toEqual(['outputs.0.amount', 'outputs.1.address', 'topLevelField']);
     });
 
     it('getBitcoinComposeOutputs', () => {
@@ -135,10 +124,10 @@ describe('sendForm utils', () => {
             { type: 'payment', amount: '1' },
         ];
         expect(getBitcoinComposeOutputs({ outputs }, 'btc')).toEqual([
-            { type: 'noaddress', amount: '100000000' },
+            { type: 'payment-noaddress', amount: '100000000' },
         ]);
         expect(getBitcoinComposeOutputs({ outputs }, 'btc', true)).toEqual([
-            { type: 'noaddress', amount: '1' },
+            { type: 'payment-noaddress', amount: '1' },
         ]);
 
         outputs = [
@@ -160,9 +149,9 @@ describe('sendForm utils', () => {
                 'btc',
             ),
         ).toEqual([
-            { type: 'external', amount: '100000000', address: 'A' },
+            { type: 'payment', amount: '100000000', address: 'A' },
             { type: 'send-max-noaddress' },
-            { type: 'noaddress', amount: '200000000' },
+            { type: 'payment-noaddress', amount: '200000000' },
             { type: 'opreturn', dataHex: 'deadbeef' },
         ]);
 
@@ -194,7 +183,7 @@ describe('sendForm utils', () => {
             { type: 'payment', amount: '1', address: 'B' },
         ];
         expect(getBitcoinComposeOutputs({ outputs }, 'btc')).toEqual([
-            { type: 'noaddress', amount: '100000000', address: 'B' },
+            { type: 'payment-noaddress', amount: '100000000', address: 'B' },
         ]);
 
         // edge case, final Output are changed to not-final
@@ -217,7 +206,7 @@ describe('sendForm utils', () => {
             { type: 'payment', amount: '1' },
         ];
         expect(getBitcoinComposeOutputs({ outputs }, 'btc')).toEqual([
-            { type: 'noaddress', amount: '100000000' },
+            { type: 'payment-noaddress', amount: '100000000' },
         ]);
     });
 
@@ -253,8 +242,8 @@ describe('sendForm utils', () => {
 
         const EthAccount = getWalletAccount({
             tokens: [
-                { type: 'ERC20', address: 'A', symbol: 'A', decimals: 2 },
-                { type: 'ERC20', address: 'B', symbol: 'B', decimals: 6 },
+                { type: 'ERC20', contract: 'A', symbol: 'A', decimals: 2, name: 'A' },
+                { type: 'ERC20', contract: 'B', symbol: 'B', decimals: 6, name: 'B' },
             ],
         });
         const EthNetwork: any = NETWORKS.find(n => n.symbol === 'eth');
@@ -280,7 +269,7 @@ describe('sendForm utils', () => {
             ),
         ).toEqual({
             decimals: 18,
-            output: { type: 'noaddress', amount: '1000000000000000000' },
+            output: { type: 'payment-noaddress', amount: '1000000000000000000' },
             tokenInfo: undefined,
         });
 
@@ -292,7 +281,7 @@ describe('sendForm utils', () => {
             ),
         ).toEqual({
             decimals: 18,
-            output: { type: 'external', address: 'A', amount: '1000000000000000000' },
+            output: { type: 'payment', address: 'A', amount: '1000000000000000000' },
             tokenInfo: undefined,
         });
 
@@ -328,7 +317,7 @@ describe('sendForm utils', () => {
             ),
         ).toEqual({
             decimals: 2,
-            output: { type: 'external', address: 'A', amount: '100' },
+            output: { type: 'payment', address: 'A', amount: '100' },
             tokenInfo: EthAccount.tokens![0],
         });
 
@@ -340,7 +329,7 @@ describe('sendForm utils', () => {
             ),
         ).toEqual({
             decimals: 6,
-            output: { type: 'noaddress', amount: '1000000' },
+            output: { type: 'payment-noaddress', amount: '1000000' },
             tokenInfo: undefined,
         });
     });
@@ -379,17 +368,17 @@ describe('sendForm utils', () => {
         });
         const lowAnonymityDustUtxo = getUtxo({
             address: 'one',
-            amount: '1',
+            amount: '100',
             vout: 2,
         });
         const lowAnonymityUtxo = getUtxo({
             address: 'one',
-            amount: '2',
+            amount: '1000',
             vout: 3,
         });
         const spendableUtxo = getUtxo({
             address: 'two',
-            amount: '2',
+            amount: '546',
             vout: 4,
         });
 
@@ -397,12 +386,17 @@ describe('sendForm utils', () => {
             utxos: [dustUtxo, lowAnonymityDustUtxo, lowAnonymityUtxo, spendableUtxo],
             anonymitySet: { one: 1, two: 2 },
             targetAnonymity: 2,
-            dustLimit: 1,
+            dustLimit: 546,
         });
 
         expect(excludedUtxos[getUtxoOutpoint(dustUtxo)]).toBe('dust');
         expect(excludedUtxos[getUtxoOutpoint(lowAnonymityDustUtxo)]).toBe('dust');
         expect(excludedUtxos[getUtxoOutpoint(lowAnonymityUtxo)]).toBe('low-anonymity');
         expect(excludedUtxos[getUtxoOutpoint(spendableUtxo)]).toBe(undefined);
+    });
+
+    it('getLamportsFromSol', () => {
+        expect(getLamportsFromSol('1')).toEqual(1000000000n);
+        expect(getLamportsFromSol('0.000000001')).toEqual(1n);
     });
 });

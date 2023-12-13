@@ -1,135 +1,61 @@
-import React, { useState } from 'react';
-import { TouchableOpacity } from 'react-native';
-import { useSelector } from 'react-redux';
+import { Alert } from 'react-native';
 
-import { isDebugEnv, isDevelopOrDebugEnv } from '@suite-native/config';
-import { Box, Button, Card, CheckBox, Text, useDebugView, VStack } from '@suite-native/atoms';
+import * as Sentry from '@sentry/react-native';
+
+import { isDebugEnv, isDevelopOrDebugEnv, isProduction } from '@suite-native/config';
+import { Button, Card, VStack } from '@suite-native/atoms';
 import {
     Screen,
     StackProps,
     DevUtilsStackParamList,
     DevUtilsStackRoutes,
-    ScreenHeader,
+    ScreenSubHeader,
 } from '@suite-native/navigation';
-import { purgeStorage, useStoragePersistor } from '@suite-native/storage';
-import { selectLogs } from '@suite-common/logger';
-import { useCopyToClipboard } from '@suite-native/helpers';
+import { clearStorage } from '@suite-native/storage';
 
 import { BuildInfo } from '../components/BuildInfo';
-
-const DevCheckBoxListItem = ({
-    title,
-    onPress,
-    isChecked,
-}: {
-    title: string;
-    onPress: () => void;
-    isChecked: boolean;
-}) => (
-    <TouchableOpacity onPress={onPress}>
-        <Box
-            flexDirection="row"
-            justifyContent="space-between"
-            alignItems="center"
-            paddingVertical="small"
-        >
-            <Text variant="body">{title}</Text>
-            <CheckBox isChecked={isChecked} onChange={onPress} />
-        </Box>
-    </TouchableOpacity>
-);
-
-const CopyLogsButton = () => {
-    const logs = useSelector(selectLogs);
-    const copyToClipboard = useCopyToClipboard();
-
-    const handleCopy = async () => {
-        await copyToClipboard(JSON.stringify(logs), 'Logs copied');
-    };
-
-    return <Button onPress={handleCopy}>Copy logs</Button>;
-};
-
-const Logs = () => {
-    const logs = useSelector(selectLogs);
-    return (
-        <Box>
-            <Text>{JSON.stringify(logs)}</Text>
-        </Box>
-    );
-};
+import { RenderingUtils } from '../components/RenderingUtils';
+import { CopyLogsButton } from '../components/CopyLogsButton';
+import { FeatureFlags } from '../components/FeatureFlags';
+import { TestnetsToggle } from '../components/TestnetsToggle';
 
 export const DevUtilsScreen = ({
     navigation,
 }: StackProps<DevUtilsStackParamList, DevUtilsStackRoutes.DevUtils>) => {
-    const persistor = useStoragePersistor();
-    const {
-        toggleFlashOnRerender,
-        toggleRerenderCount,
-        isFlashOnRerenderEnabled,
-        isRerenderCountEnabled,
-    } = useDebugView();
-    const [areLogsVisible, setAreLogsVisible] = useState(false);
-
-    const handleResetStorage = () => {
-        purgeStorage(persistor);
-    };
+    const shouldShowFeatureFlags = isDevelopOrDebugEnv();
 
     return (
-        <Screen header={<ScreenHeader title="DEV utils" hasGoBackIcon />}>
-            {isDevelopOrDebugEnv() ? (
-                <Box marginBottom="large">
-                    <Box
-                        flexDirection="row"
-                        justifyContent="space-between"
-                        alignItems="center"
-                        marginBottom="large"
-                    >
-                        <Box>
-                            <Text color="textSubdued" variant="hint">
-                                This section is shown only in local and develop builds! (Not in
-                                staging and production environments)
-                            </Text>
-                        </Box>
-                    </Box>
+        <Screen screenHeader={<ScreenSubHeader content="DEV utils" />}>
+            <VStack>
+                <Card>
                     <VStack spacing="medium">
                         {!isDebugEnv() && <BuildInfo />}
-
-                        <Card>
-                            <DevCheckBoxListItem
-                                title="Flash on rerender"
-                                onPress={toggleFlashOnRerender}
-                                isChecked={isFlashOnRerenderEnabled}
-                            />
-                            <DevCheckBoxListItem
-                                title="Show rerender count"
-                                onPress={toggleRerenderCount}
-                                isChecked={isRerenderCountEnabled}
-                            />
-                        </Card>
-
-                        <Button onPress={() => navigation.navigate(DevUtilsStackRoutes.Demo)}>
-                            See Component Demo
-                        </Button>
-                        <Button colorScheme="primary" onPress={handleResetStorage}>
-                            Reset storage
+                        {isDebugEnv() && (
+                            <Button onPress={() => navigation.navigate(DevUtilsStackRoutes.Demo)}>
+                                See Component Demo
+                            </Button>
+                        )}
+                        {!isProduction() && <RenderingUtils />}
+                        {shouldShowFeatureFlags && <FeatureFlags />}
+                        <Button
+                            onPress={() => {
+                                const errorMessage = `Sentry test error - ${Date.now()}`;
+                                Sentry.captureException(new Error(errorMessage));
+                                Alert.alert('Sentry error thrown', errorMessage);
+                            }}
+                        >
+                            Throw Sentry error
                         </Button>
                         <CopyLogsButton />
-
-                        <Card>
-                            <Box flexDirection="row" justifyContent="space-between">
-                                <Text>Show logs</Text>
-                                <CheckBox
-                                    isChecked={areLogsVisible}
-                                    onChange={() => setAreLogsVisible(!areLogsVisible)}
-                                />
-                            </Box>
-                        </Card>
-
-                        {areLogsVisible && <Logs />}
+                        <Button colorScheme="dangerElevation0" onPress={clearStorage}>
+                            Wipe all data
+                        </Button>
                     </VStack>
-                </Box>
-            ) : null}
+                </Card>
+                <Card>
+                    <TestnetsToggle />
+                </Card>
+            </VStack>
         </Screen>
     );
 };

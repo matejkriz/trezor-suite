@@ -1,8 +1,15 @@
 import { Dimensions, Platform } from 'react-native';
+import Config from 'react-native-config';
 
 import { getLocales } from 'expo-localization';
 
 import { EnvUtils } from './types';
+
+const isWeb = () => false;
+
+const isDesktop = () => false;
+
+const getEnvironment = () => 'mobile' as const;
 
 const getUserAgent = () => '';
 
@@ -15,6 +22,10 @@ const getBrowserVersion = () => '';
 const getDeviceType = () => '';
 
 const getOsVersion = () => `${Platform.Version}`;
+
+const getSuiteVersion = () => Config.VERSION || '';
+
+const getCommitHash = () => Config.COMMIT_HASH || '';
 
 const isFirefox = () => false;
 
@@ -47,6 +58,8 @@ const isAndroid = () => getPlatform() === 'android';
 
 const isLinux = () => false;
 
+const isCodesignBuild = () => Config.CODESIGN_BUILD === 'true';
+
 const getPlatformLanguages = () => getLocales().map(language => language.languageTag);
 
 const getOsName = () => {
@@ -61,13 +74,18 @@ const getOsNameWeb = () => '';
 const getOsFamily = (): 'Linux' => 'Linux';
 
 export const envUtils: EnvUtils = {
+    isWeb,
+    isDesktop,
+    getEnvironment,
     getUserAgent,
     isAndroid,
     isChromeOs,
     getBrowserName,
     getBrowserVersion,
+    getCommitHash,
     getDeviceType,
     getOsVersion,
+    getSuiteVersion,
     isFirefox,
     getPlatform,
     getPlatformLanguages,
@@ -82,6 +100,7 @@ export const envUtils: EnvUtils = {
     isWindows,
     isIOs,
     isLinux,
+    isCodesignBuild,
     getOsName,
     getOsNameWeb,
     getOsFamily,

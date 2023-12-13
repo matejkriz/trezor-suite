@@ -1,7 +1,8 @@
 // original file https://github.com/trezor/connect/blob/develop/src/js/device/DeviceCommands.js
 
-import randombytes from 'randombytes';
+import { randomBytes } from 'crypto';
 import { Transport, Messages } from '@trezor/transport';
+import { versionUtils } from '@trezor/utils';
 import { ERRORS, NETWORK } from '../constants';
 import { DEVICE } from '../events';
 import * as hdnodeUtils from '../utils/hdnodeUtils';
@@ -14,7 +15,6 @@ import {
     toHardened,
 } from '../utils/pathUtils';
 import { getAccountAddressN } from '../utils/accountUtils';
-import { versionCompare } from '../utils/versionUtils';
 import { getSegwitNetwork, getBech32Network } from '../data/coinInfo';
 import { initLog } from '../utils/debug';
 
@@ -31,7 +31,7 @@ export type TypedResponseMessage<T extends MessageKey> = {
 type TypedCallResponseMap = {
     [K in keyof MessageType]: TypedResponseMessage<K>;
 };
-export type DefaultMessageResponse = TypedCallResponseMap[keyof MessageType];
+type DefaultMessageResponse = TypedCallResponseMap[keyof MessageType];
 
 export type PassphrasePromptResponse = {
     passphrase?: string;
@@ -53,7 +53,7 @@ const assertType = (res: DefaultMessageResponse, resType: string | string[]) => 
 
 const generateEntropy = (len: number) => {
     try {
-        return randombytes(len);
+        return randomBytes(len);
     } catch (err) {
         throw ERRORS.TypedError(
             'Runtime',
@@ -98,10 +98,11 @@ export class DeviceCommands {
 
     disposed: boolean;
 
-    callPromise?: Promise<DefaultMessageResponse>;
+    callPromise?: ReturnType<Transport['call']>;
 
     // see DeviceCommands.cancel
     _cancelableRequest?: (error?: any) => void;
+    _cancelableRequestBySend?: boolean;
 
     constructor(device: Device, transport: Transport, sessionId: string) {
         this.device = device;
@@ -263,7 +264,7 @@ export class DeviceCommands {
     }
 
     async getAddress(
-        { address_n, show_display, multisig, script_type }: Messages.GetAddress,
+        { address_n, show_display, multisig, script_type, chunkify }: Messages.GetAddress,
         coinInfo: BitcoinNetworkInfo,
     ) {
         if (!script_type) {
@@ -286,6 +287,7 @@ export class DeviceCommands {
             show_display,
             multisig,
             script_type: script_type || 'SPENDADDRESS',
+            chunkify,
         });
 
         return {
@@ -295,10 +297,17 @@ export class DeviceCommands {
         };
     }
 
-    async ethereumGetAddress({ address_n, show_display }: Messages.EthereumGetAddress) {
+    async ethereumGetAddress({
+        address_n,
+        show_display,
+        encoded_network,
+        chunkify,
+    }: Messages.EthereumGetAddress) {
         const response = await this.typedCall('EthereumGetAddress', 'EthereumAddress', {
             address_n,
             show_display,
+            encoded_network,
+            chunkify,
         });
         return {
             path: address_n,
@@ -362,25 +371,33 @@ export class DeviceCommands {
     }
 
     // Sends an async message to the opened device.
-    async call(
+    private async call(
         type: MessageKey,
         msg: DefaultMessageResponse['message'] = {},
     ): Promise<DefaultMessageResponse> {
-        const logMessage = filterForLog(type, msg);
-        logger.debug('Sending', type, logMessage);
+        logger.debug('Sending', type, filterForLog(type, msg));
 
-        try {
-            const promise = this.transport.call(this.sessionId, type, msg, false) as any; // TODO: https://github.com/trezor/trezor-suite/issues/5301
-            this.callPromise = promise;
-            const res = await promise;
-            const logMessage = filterForLog(res.type, res.message);
-            logger.debug('Received', res.type, logMessage);
-            return res;
-        } catch (error) {
-            logger.warn('Received error', error);
-            // TODO: throw trezor error
-            throw error;
+        this.callPromise = this.transport.call({
+            session: this.sessionId,
+            name: type,
+            data: msg,
+            protocol: this.device.protocol,
+        });
+        const res = await this.callPromise.promise;
+        this.callPromise = undefined;
+        if (!res.success) {
+            logger.warn('Received error', res.error);
+            throw new Error(res.error);
         }
+
+        logger.debug(
+            'Received',
+            res.payload.type,
+            filterForLog(res.payload.type, res.payload.message),
+        );
+        // TODO: https://github.com/trezor/trezor-suite/issues/5301
+        // @ts-expect-error
+        return res.payload;
     }
 
     typedCall<T extends MessageKey, R extends MessageKey[]>(
@@ -401,14 +418,16 @@ export class DeviceCommands {
         if (this.disposed) {
             throw ERRORS.TypedError('Runtime', 'typedCall: DeviceCommands already disposed');
         }
-
         const response = await this._commonCall(type, msg);
         try {
             assertType(response, resType);
         } catch (error) {
             // handle possible race condition
             // Bridge may have some unread message in buffer, read it
-            await this.transport.read(this.sessionId, false);
+            await this.transport.receive({
+                session: this.sessionId,
+                protocol: this.device.protocol,
+            });
             // throw error anyway, next call should be resolved properly
             throw error;
         }
@@ -417,14 +436,19 @@ export class DeviceCommands {
 
     async _commonCall(type: MessageKey, msg?: DefaultMessageResponse['message']) {
         const resp = await this.call(type, msg);
+        if (this.disposed) {
+            throw ERRORS.TypedError('Runtime', 'typedCall: DeviceCommands already disposed');
+        }
         return this._filterCommonTypes(resp);
     }
 
     _filterCommonTypes(res: DefaultMessageResponse): Promise<DefaultMessageResponse> {
+        this._cancelableRequestBySend = false;
+
         if (res.type === 'Failure') {
             const { code } = res.message;
             let { message } = res.message;
-            // Model One does not send any message in firmware update
+            // T1B1 does not send any message in firmware update
             // https://github.com/trezor/trezor-firmware/issues/1334
             // @ts-expect-error, TODO: https://github.com/trezor/trezor-suite/issues/5299
             if (code === 'Failure_FirmwareError' && !message) {
@@ -450,6 +474,7 @@ export class DeviceCommands {
         }
 
         if (res.type === 'ButtonRequest') {
+            this._cancelableRequestBySend = true;
             if (res.message.code === '_Deprecated_ButtonRequest_PassphraseType') {
                 // for backwards compatibility stick to old message type
                 // which was part of protobuf in versions < 2.3.0
@@ -458,7 +483,7 @@ export class DeviceCommands {
             }
 
             if (res.message.code === 'ButtonRequest_PassphraseEntry') {
-                this.device.emit(DEVICE.PASSPHRASE_ON_DEVICE, this.device);
+                this.device.emit(DEVICE.PASSPHRASE_ON_DEVICE);
             } else {
                 this.device.emit(DEVICE.BUTTON, this.device, res.message);
             }
@@ -473,7 +498,14 @@ export class DeviceCommands {
 
         if (res.type === 'PinMatrixRequest') {
             return this._promptPin(res.message.type).then(
-                pin => this._commonCall('PinMatrixAck', { pin }),
+                pin =>
+                    this._commonCall('PinMatrixAck', { pin }).then(response => {
+                        if (!this.device.features.unlocked) {
+                            // reload features to after successful PIN
+                            return this.device.getFeatures().then(() => response);
+                        }
+                        return response;
+                    }),
                 () => this._commonCall('Cancel', {}),
             );
         }
@@ -483,14 +515,14 @@ export class DeviceCommands {
             const legacy = this.device.useLegacyPassphrase();
             const legacyT1 = legacy && this.device.isT1();
 
-            // T1 fw lower than 1.9.0, passphrase is cached in internal state
+            // T1B1 fw lower than 1.9.0, passphrase is cached in internal state
             if (legacyT1 && typeof state === 'string') {
                 return this._commonCall('PassphraseAck', { passphrase: state });
             }
 
-            // TT fw lower than 2.3.0, entering passphrase on device
+            // T2T1 fw lower than 2.3.0, entering passphrase on device
             if (legacy && res.message._on_device) {
-                this.device.emit(DEVICE.PASSPHRASE_ON_DEVICE, this.device);
+                this.device.emit(DEVICE.PASSPHRASE_ON_DEVICE);
                 return this._commonCall('PassphraseAck', { _state: state });
             }
 
@@ -508,6 +540,8 @@ export class DeviceCommands {
                         ? this._commonCall('PassphraseAck', { passphrase })
                         : this._commonCall('PassphraseAck', { on_device: true });
                 },
+                // todo: does it make sense? error might have resulted from device disconnected.
+                // with webusb, this leads to pretty common "Session not found"
                 err =>
                     this._commonCall('Cancel', {}).catch((e: any) => {
                         throw err || e;
@@ -515,7 +549,7 @@ export class DeviceCommands {
             );
         }
 
-        // TT fw lower than 2.3.0, device send his current state
+        // T2T1 fw lower than 2.3.0, device send his current state
         // new passphrase design set this value from `features.session_id`
         if (res.type === 'Deprecated_PassphraseStateRequest') {
             const { state } = res.message;
@@ -673,22 +707,24 @@ export class DeviceCommands {
             };
         }
 
+        if (coinInfo.shortcut === 'SOL' || coinInfo.shortcut === 'DSOL') {
+            const { message } = await this.typedCall('SolanaGetAddress', 'SolanaAddress', {
+                address_n,
+            });
+            return {
+                descriptor: message.address,
+                address_n,
+            };
+        }
+
         throw ERRORS.TypedError(
             'Runtime',
             'DeviceCommands.getAccountDescriptor: unsupported coinInfo.type',
         );
     }
 
-    // TODO: implement whole "cancel" logic in "trezor-link"
     async cancel() {
-        // TEMP: this patch should be implemented in 'trezor-link' instead
-        // NOTE:
-        // few ButtonRequests can be canceled by design because they are awaiting for user input
-        // those are: Pin, Passphrase, Word
-        // _cancelableRequest holds reference to the UI promise `reject` method
-        // in those cases `this.transport.call` needs to be used
-        // calling `this.transport.post` (below) will result with throttling somewhere in low level
-        // trezor-link or trezord (not sure which one) will reject NEXT incoming call with "Cancelled" error
+        // _cancelableRequest is transport.call({ name: 'Cancel' }).
         if (this._cancelableRequest) {
             this._cancelableRequest();
             this._cancelableRequest = undefined;
@@ -698,20 +734,40 @@ export class DeviceCommands {
         if (this.disposed) {
             return;
         }
+        this.dispose();
 
+        if (!this._cancelableRequestBySend) {
+            if (this.callPromise) {
+                await this.callPromise.promise;
+            }
+            return;
+        }
         /**
          * Bridge version =< 2.0.28 has a bug that doesn't permit it to cancel
          * user interactions in progress, so we have to do it manually.
          */
         const { name, version } = this.transport;
-        if (name === 'BridgeTransport' && versionCompare(version, '2.0.28') < 1) {
-            await this.device.legacyForceRelease();
+        if (name === 'BridgeTransport' && !versionUtils.isNewer(version, '2.0.28')) {
+            try {
+                await this.device.legacyForceRelease();
+            } catch (err) {
+                // ignore
+            }
         } else {
-            await this.transport.post(this.sessionId, 'Cancel', {}, false).catch(() => {});
-            // post does not read back from usb stack. this means that there is a pending message left
-            // and we need to remove it so that it does not interfere with the next transport call.
-            // see DeviceCommands.typedCall
-            await this.transport.read(this.sessionId, false).catch(() => {});
+            await this.transport.send({
+                protocol: this.device.protocol,
+                session: this.sessionId,
+                name: 'Cancel',
+                data: {},
+            }).promise;
+
+            if (this.callPromise) {
+                await this.callPromise.promise;
+            }
+            // if my observations are correct, it is not necessary to transport.receive after send
+            // transport.call -> transport.send -> tranpsport call returns Failure meaning it won't be
+            // returned in subsequent calls
+            // await this.transport.receive({ session: this.sessionId }).promise;
         }
     }
 }

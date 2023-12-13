@@ -1,71 +1,61 @@
 {
     "extends": "nx/presets/npm.json",
-    "tasksRunnerOptions": {
-        "default": {
-            "runner": "@nrwl/nx-cloud",
-            "options": {
-                "cacheableOperations": [
-                    "lint",
-                    "test:unit",
-                    "type-check",
-                    "lint:js",
-                    "lint:styles",
-                    "build:lib"
-                ],
-                "accessToken": "NmE2NmFlYTUtN2JhZi00ZmQ3LWEyYzMtYWRkNzc3MTg0YmUyfHJlYWQ=",
-                "parallel": 3
-            }
-        }
-    },
     "namedInputs": {
-        "default": ["{projectRoot}/**/*"],
-        "prod": ["!{projectRoot}/**/*.test.{ts,tsx}"]
+        "sharedGlobals": [
+            "{workspaceRoot}/nx.json",
+            "{workspaceRoot}/.yarnrc.yml",
+            "{workspaceRoot}/patches/*.patch",
+            "{workspaceRoot}/package.json"
+        ],
+        "default": ["{projectRoot}/**/*", "sharedGlobals"],
+        "prod": ["default", "!{projectRoot}/**/*.test.{ts,tsx}"]
     },
     "targetDefaults": {
         "build:lib": {
             "dependsOn": ["^build:lib"],
             "inputs": [
-                "default",
                 "^prod",
                 "{workspaceRoot}/tsconfig.json",
-                "{workspaceRoot}/tsconfig.aliases.json",
                 "{workspaceRoot}/tsconfig.lib.json"
             ],
-            "outputs": ["./lib", "./build"]
+            "outputs": ["{projectRoot}/lib", "{projectRoot}/build"],
+            "cache": true
         },
         "type-check": {
             "dependsOn": ["^build:lib", "^type-check"],
             "inputs": [
-                "default",
                 "^prod",
                 "{workspaceRoot}/tsconfig.json",
-                "{workspaceRoot}/tsconfig.aliases.json",
                 "{workspaceRoot}/tsconfig.lib.json"
-            ]
+            ],
+            "outputs": ["{projectRoot}/libDev"],
+            "cache": true
         },
         "test:unit": {
             "dependsOn": ["^build:lib"],
             "inputs": [
-                "default",
                 "^prod",
                 "{workspaceRoot}/jest.config.base.js",
                 "{workspaceRoot}/jest.config.native.js"
-            ]
+            ],
+            "cache": true
         },
         "lint:js": {
-            "inputs": ["default", "{workspaceRoot}/.eslintrc.js"]
+            "inputs": ["default", "{workspaceRoot}/.eslintrc.js"],
+            "cache": true
         },
         "lint:styles": {
-            "inputs": ["default"]
+            "inputs": ["default"],
+            "cache": true
+        },
+        "lint": {
+            "cache": true
         }
-    },
-    "implicitDependencies": {
-        "package.json": "*",
-        "nx.json": "*",
-        ".yarnrc.yml": "*",
-        "patches/*.patch": "*"
     },
     "affected": {
         "defaultBase": "origin/develop"
-    }
+    },
+    "$schema": "./node_modules/nx/schemas/nx-schema.json",
+    "nxCloudAccessToken": "NmE2NmFlYTUtN2JhZi00ZmQ3LWEyYzMtYWRkNzc3MTg0YmUyfHJlYWQ=",
+    "parallel": 3
 }

@@ -1,12 +1,17 @@
-import React, { useEffect } from 'react';
+import { useMemo, useEffect } from 'react';
 import { Controller } from 'react-hook-form';
 import { Select, variables } from '@trezor/components';
 import { components } from 'react-select';
 import styled from 'styled-components';
-import { useSendFormContext } from '@wallet-hooks';
-import { Account } from '@wallet-types';
-import { Output } from '@wallet-types/sendForm';
-import { getShortFingerprint } from '@wallet-utils/cardanoUtils';
+import { useSendFormContext } from 'src/hooks/wallet';
+import { Account } from 'src/types/wallet';
+import { Output } from 'src/types/wallet/sendForm';
+import {
+    getShortFingerprint,
+    enhanceTokensWithRates,
+    sortTokensWithRates,
+} from '@suite-common/wallet-utils';
+import { useSelector } from 'src/hooks/suite';
 
 interface Option {
     label: string;
@@ -14,20 +19,21 @@ interface Option {
     fingerprint: string | undefined;
 }
 
-export const buildTokenOptions = (account: Account) => {
+export const buildTokenOptions = (tokens: Account['tokens'], symbol: Account['symbol']) => {
+    // ETH option
     const result: Option[] = [
         {
             value: null,
             fingerprint: undefined,
-            label: account.symbol.toUpperCase(),
+            label: symbol.toUpperCase(),
         },
     ];
 
-    if (account.tokens) {
-        account.tokens.forEach(token => {
+    if (tokens) {
+        tokens.forEach(token => {
             const tokenName = token.symbol || 'N/A';
             result.push({
-                value: token.address,
+                value: token.contract,
                 label: tokenName.toUpperCase(),
                 fingerprint: token.name,
             });
@@ -37,7 +43,7 @@ export const buildTokenOptions = (account: Account) => {
     return result;
 };
 
-interface Props {
+interface TokenSelectProps {
     output: Partial<Output>;
     outputId: number;
 }
@@ -52,6 +58,7 @@ const OptionValueName = styled.div`
 
 const OptionWrapper = styled.div`
     max-width: 200px;
+
     @media (max-width: ${variables.SCREEN_SIZE.XL}) {
         max-width: 120px;
     }
@@ -103,7 +110,7 @@ const CardanoSingleValue = ({ tokenInputName, ...optionProps }: any) => (
     </components.SingleValue>
 );
 
-export const TokenSelect = ({ output, outputId }: Props) => {
+export const TokenSelect = ({ output, outputId }: TokenSelectProps) => {
     const {
         account,
         clearErrors,
@@ -115,13 +122,20 @@ export const TokenSelect = ({ output, outputId }: Props) => {
         composeTransaction,
         watch,
     } = useSendFormContext();
+    const coins = useSelector(state => state.wallet.fiat.coins);
 
-    const tokenInputName = `outputs[${outputId}].token`;
-    const amountInputName = `outputs[${outputId}].amount`;
+    const sortedTokens = useMemo(() => {
+        const tokensWithRates = enhanceTokensWithRates(account.tokens, coins);
+
+        return tokensWithRates.sort(sortTokensWithRates);
+    }, [account.tokens, coins]);
+
+    const tokenInputName = `outputs.${outputId}.token` as const;
+    const amountInputName = `outputs.${outputId}.amount` as const;
     const tokenValue = getDefaultValue(tokenInputName, output.token);
     const isSetMaxActive = getDefaultValue('setMaxOutputId') === outputId;
     const dataEnabled = getDefaultValue('options', []).includes('ethereumData');
-    const options = buildTokenOptions(account);
+    const options = buildTokenOptions(sortedTokens, account.symbol);
 
     // Amount needs to be re-validated again AFTER token change propagation (decimal places, available balance)
     // watch token change and use "useSendFormFields.setAmount" util for validation (if amount is set)
@@ -130,7 +144,7 @@ export const TokenSelect = ({ output, outputId }: Props) => {
     const tokenWatch = watch(tokenInputName, null);
     useEffect(() => {
         if (account.networkType === 'ethereum' && !isSetMaxActive) {
-            const amountValue = getValues(`outputs[${outputId}].amount`) as string;
+            const amountValue = getValues(`outputs.${outputId}.amount`) as string;
             if (amountValue) setAmount(outputId, amountValue);
         }
     }, [outputId, tokenWatch, setAmount, getValues, account.networkType, isSetMaxActive]);
@@ -149,7 +163,7 @@ export const TokenSelect = ({ output, outputId }: Props) => {
             name={tokenInputName}
             data-test={tokenInputName}
             defaultValue={tokenValue}
-            render={({ onChange }) => (
+            render={({ field: { onChange } }) => (
                 <Select
                     options={options}
                     minWidth="58px"

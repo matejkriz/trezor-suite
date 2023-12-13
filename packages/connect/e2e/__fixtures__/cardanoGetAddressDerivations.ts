@@ -1,6 +1,8 @@
+/* eslint-disable @typescript-eslint/prefer-ts-expect-error */
+// @ts-ignore
 import commonFixtures from '../../../../submodules/trezor-common/tests/fixtures/cardano/get_base_address.derivations.json';
 
-import { CardanoAddressType, CardanoDerivationType } from '@trezor/transport/lib/types/messages';
+import { CardanoAddressType, CardanoDerivationType } from '@trezor/protobuf/lib/messages';
 
 export default {
     method: 'cardanoGetAddress',

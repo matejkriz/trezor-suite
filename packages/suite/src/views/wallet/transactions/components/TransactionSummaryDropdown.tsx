@@ -1,7 +1,6 @@
-import React from 'react';
 import { Dropdown } from '@trezor/components';
-import { GraphScaleDropdownItem } from '@suite-components/TransactionsGraph/components/GraphScaleDropdownItem';
-import { Translation } from '@suite-components';
+
+import { GraphScaleDropdownItem, Translation } from 'src/components/suite';
 
 export const TransactionSummaryDropdown = () => (
     <Dropdown

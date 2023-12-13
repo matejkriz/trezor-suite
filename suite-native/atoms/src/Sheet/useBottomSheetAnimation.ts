@@ -6,7 +6,6 @@ import {
     useAnimatedStyle,
     useSharedValue,
     withTiming,
-    useAnimatedKeyboard,
 } from 'react-native-reanimated';
 import { useCallback, useEffect } from 'react';
 import { PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
@@ -38,7 +37,6 @@ export const useBottomSheetAnimation = ({
     const colorOverlay = utils.transparentize(0.3, utils.colors.backgroundNeutralBold);
     const translatePanY = useSharedValue(SCREEN_HEIGHT);
     const animatedTransparency = useSharedValue(transparency);
-    const keyboard = useAnimatedKeyboard();
 
     useEffect(() => {
         animatedTransparency.value = withTiming(transparency, {
@@ -61,34 +59,34 @@ export const useBottomSheetAnimation = ({
     const animatedSheetWrapperStyle = useAnimatedStyle(() => ({
         transform: [
             {
-                translateY: translatePanY.value - keyboard.height.value,
+                translateY: translatePanY.value,
             },
         ],
     }));
 
-    const closeSheetAnimated = useCallback(() => {
-        'worklet';
-
-        return new Promise((resolve, _) => {
-            translatePanY.value = withTiming(SCREEN_HEIGHT, {
-                duration: ANIMATION_DURATION,
-                easing: Easing.out(Easing.cubic),
-            });
-            animatedTransparency.value = withTiming(
-                0,
-                {
+    const closeSheetAnimated = useCallback(
+        () =>
+            new Promise((resolve, _) => {
+                translatePanY.value = withTiming(SCREEN_HEIGHT, {
                     duration: ANIMATION_DURATION,
                     easing: Easing.out(Easing.cubic),
-                },
-                () => {
-                    if (onClose) runOnJS(onClose)(false);
-                    if (setIsCloseScrollEnabled) runOnJS(setIsCloseScrollEnabled)(true);
-                },
-            );
+                });
+                animatedTransparency.value = withTiming(
+                    0,
+                    {
+                        duration: ANIMATION_DURATION,
+                        easing: Easing.out(Easing.cubic),
+                    },
+                    () => {
+                        if (onClose) runOnJS(onClose)(false);
+                        if (setIsCloseScrollEnabled) runOnJS(setIsCloseScrollEnabled)(true);
+                    },
+                );
 
-            setTimeout(resolve, ANIMATION_DURATION);
-        });
-    }, [translatePanY, animatedTransparency, onClose, setIsCloseScrollEnabled]);
+                setTimeout(resolve, ANIMATION_DURATION);
+            }),
+        [translatePanY, animatedTransparency, onClose, setIsCloseScrollEnabled],
+    );
 
     const openSheetAnimated = useCallback(() => {
         'worklet';
@@ -124,7 +122,7 @@ export const useBottomSheetAnimation = ({
         onEnd: event => {
             const { translationY, velocityY } = event;
             if (translationY > 50 && velocityY > 2) {
-                closeSheetAnimated();
+                runOnJS(closeSheetAnimated)();
             } else {
                 openSheetAnimated();
             }

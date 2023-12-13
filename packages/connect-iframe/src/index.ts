@@ -4,12 +4,15 @@
 
 import {
     CORE_EVENT,
+    RESPONSE_EVENT,
     UI_EVENT,
     DEVICE_EVENT,
     TRANSPORT_EVENT,
+    TRANSPORT,
     POPUP,
     IFRAME,
     UI,
+    DEVICE,
     parseMessage,
     createResponseMessage,
     createIFrameMessage,
@@ -19,21 +22,26 @@ import {
     CoreMessage,
     PostMessageEvent,
 } from '@trezor/connect';
-import { Core, init as initCore, initTransport } from '@trezor/connect/src/core';
+import { Core, initCore, initTransport } from '@trezor/connect/src/core';
 import { DataManager } from '@trezor/connect/src/data/DataManager';
 import { config } from '@trezor/connect/src/data/config';
-import { initLog } from '@trezor/connect/src/utils/debug';
+import { initLog, LogWriter } from '@trezor/connect/src/utils/debug';
 import { getOrigin } from '@trezor/connect/src/utils/urlUtils';
 import { suggestBridgeInstaller } from '@trezor/connect/src/data/transportInfo';
 import { suggestUdevInstaller } from '@trezor/connect/src/data/udevInfo';
-import { storage } from '@trezor/connect-common';
+import { storage, getSystemInfo, getInstallerPackage } from '@trezor/connect-common';
 import { parseConnectSettings, isOriginWhitelisted } from './connectSettings';
-import { getSystemInfo, getInstallerPackage } from './systemInfo';
+import { analytics, EventType } from '@trezor/connect-analytics';
+// @ts-expect-error (typescript does not know this is worker constructor, this is done by webpack)
+import LogWorker from './sharedLoggerWorker';
+import { initLogWriterWithWorker } from './sharedLoggerUtils';
 
 let _core: Core | undefined;
 
 // custom log
 const _log = initLog('IFrame');
+let logWriterProxy: LogWriter | undefined;
+
 let _popupMessagePort: (MessagePort | BroadcastChannel) | undefined;
 
 // Wrapper which listens to events from Core
@@ -41,7 +49,7 @@ let _popupMessagePort: (MessagePort | BroadcastChannel) | undefined;
 // since iframe.html needs to send message via window.postMessage
 // we need to listen to events from Core and convert it to simple objects possible to send over window.postMessage
 
-const handleMessage = (event: PostMessageEvent) => {
+const handleMessage = async (event: PostMessageEvent) => {
     // ignore messages from myself (chrome bug?)
     if (event.source === window || !event.data) return;
     const { data } = event;
@@ -51,6 +59,13 @@ const handleMessage = (event: PostMessageEvent) => {
         postMessage(createResponseMessage(id, false, { error }));
         postMessage(createPopupMessage(POPUP.CANCEL_POPUP_REQUEST));
     };
+
+    if (data.type === IFRAME.LOG && data.payload.prefix === '@trezor/connect-web') {
+        if (logWriterProxy) {
+            logWriterProxy.add(data.payload);
+        }
+        return;
+    }
 
     // respond to call
     // TODO: instead of error _core should be initialized automatically
@@ -67,11 +82,15 @@ const handleMessage = (event: PostMessageEvent) => {
 
     // popup handshake initialization process, get reference to message channel
     if (data.type === POPUP.HANDSHAKE && event.origin === window.location.origin) {
-        if (!_popupMessagePort || _popupMessagePort instanceof MessagePort) {
-            if (!event.ports || event.ports.length < 1) {
+        // check if message was received via BroadcastChannel (persistent default channel. see "init")
+        // or reassign _popupMessagePort to current MessagePort (dynamic channel. created by popup. see @trezor/connect-popup initMessageChannel)
+        // event.target === BroadcastChannel only in if message was sent via BroadcastChannel otherwise event.target = Window message was send via iframe.postMessage
+        if (event.target !== _popupMessagePort) {
+            if (event.ports?.length < 1) {
                 fail('POPUP.HANDSHAKE: popupMessagePort not found');
                 return;
             }
+            // reassign to current MessagePort
             [_popupMessagePort] = event.ports;
         }
 
@@ -80,20 +99,65 @@ const handleMessage = (event: PostMessageEvent) => {
             return;
         }
 
-        const method = _core.getCurrentMethod()[0];
+        const transport = _core.getTransportInfo();
+        const settings = DataManager.getSettings();
+
         postMessage(
             createPopupMessage(POPUP.HANDSHAKE, {
                 settings: DataManager.getSettings(),
-                transport: _core.getTransportInfo(),
-                method: method ? method.info : undefined,
+                transport,
             }),
         );
+        _log.debug('loading current method');
+        const method = await _core.getCurrentMethod();
+        (method.initAsyncPromise ? method.initAsyncPromise : Promise.resolve()).finally(() => {
+            if (method.info) {
+                postMessage(
+                    createPopupMessage(POPUP.METHOD_INFO, {
+                        method: method.name,
+                        info: method.info, // method.info might change based on initAsync
+                    }),
+                );
+            }
+
+            // eslint-disable-next-line camelcase
+            const { tracking_enabled, tracking_id } = storage.load();
+
+            analytics.init(tracking_enabled, {
+                // eslint-disable-next-line camelcase
+                instanceId: tracking_id,
+                commitId: process.env.COMMIT_HASH || '',
+                isDev: process.env.NODE_ENV === 'development',
+            });
+
+            analytics.report({
+                type: EventType.AppReady,
+                payload: {
+                    version: settings?.version,
+                    origin: settings?.origin,
+                    referrerApp: settings?.manifest?.appUrl,
+                    referrerEmail: settings?.manifest?.email,
+                    method: method.name,
+                    payload: method.payload ? Object.keys(method.payload) : undefined,
+                    transportType: transport?.type,
+                    transportVersion: transport?.version,
+                },
+            });
+        });
     }
 
     // clear reference to popup MessagePort
     if (data.type === POPUP.CLOSED) {
         if (_popupMessagePort instanceof MessagePort) {
             _popupMessagePort = undefined;
+        }
+    }
+
+    if (data.type === POPUP.ANALYTICS_RESPONSE) {
+        if (data.payload.enabled) {
+            analytics.enable();
+        } else {
+            analytics.disable();
         }
     }
 
@@ -116,13 +180,25 @@ const handleMessage = (event: PostMessageEvent) => {
     event.preventDefault();
     event.stopImmediatePropagation();
 
+    const safeMessages: CoreMessage['type'][] = [
+        IFRAME.CALL,
+        POPUP.CLOSED,
+        // UI.CHANGE_SETTINGS,
+        UI.LOGIN_CHALLENGE_RESPONSE,
+        TRANSPORT.DISABLE_WEBUSB,
+    ];
+
+    if (!isTrustedDomain && safeMessages.indexOf(message.type) === -1) {
+        return;
+    }
+
     // pass data to Core
     if (_core) {
-        _core.handleMessage(message, isTrustedDomain);
+        _core.handleMessage(message);
     }
 };
 
-// communication with parent window
+// Communication with 3rd party window and Trezor Popup.
 const postMessage = (message: CoreMessage) => {
     _log.debug('postMessage', message);
 
@@ -133,7 +209,7 @@ const postMessage = (message: CoreMessage) => {
     // popup handshake is resolved automatically
     if (!usingPopup) {
         if (_core && message.type === UI.REQUEST_UI_WINDOW) {
-            _core.handleMessage({ event: UI_EVENT, type: POPUP.HANDSHAKE }, true);
+            _core.handleMessage({ event: UI_EVENT, type: POPUP.HANDSHAKE });
             return;
         }
         if (message.type === POPUP.CANCEL_POPUP_REQUEST) {
@@ -156,18 +232,19 @@ const postMessage = (message: CoreMessage) => {
         message.payload.udev = suggestUdevInstaller(platform);
     }
 
-    if (usingPopup && targetUiEvent(message)) {
-        if (_popupMessagePort) {
-            _popupMessagePort.postMessage(message);
-        }
-    } else {
+    if (usingPopup && _popupMessagePort) {
+        _popupMessagePort.postMessage(message);
+    }
+
+    if (!usingPopup || shouldUiEventBeSentToHost(message)) {
         let origin = DataManager.getSettings('origin');
         if (!origin || origin.indexOf('file://') >= 0) origin = '*';
         window.parent.postMessage(message, origin);
     }
 };
 
-const targetUiEvent = (message: CoreMessage) => {
+const shouldUiEventBeSentToHost = (message: CoreMessage) => {
+    // whitelistedMessages are messages that are sent to 3rd party/host/parent.
     const whitelistedMessages: CoreMessage['type'][] = [
         IFRAME.LOADED,
         IFRAME.ERROR,
@@ -176,8 +253,14 @@ const targetUiEvent = (message: CoreMessage) => {
         UI.LOGIN_CHALLENGE_REQUEST,
         UI.BUNDLE_PROGRESS,
         UI.ADDRESS_VALIDATION,
+        RESPONSE_EVENT,
+        DEVICE.CONNECT,
+        DEVICE.CONNECT_UNACQUIRED,
+        DEVICE.CHANGED,
+        DEVICE.DISCONNECT,
+        DEVICE.BUTTON,
     ];
-    return message.event === UI_EVENT && whitelistedMessages.indexOf(message.type) < 0;
+    return whitelistedMessages.includes(message.type);
 };
 
 const filterDeviceEvent = (message: DeviceEvent) => {
@@ -222,11 +305,20 @@ const init = async (payload: IFrameInit['payload'], origin: string) => {
         }
     }
 
+    let logWriterFactory;
+    if (parsedSettings.sharedLogger !== false) {
+        logWriterFactory = initLogWriterWithWorker(LogWorker);
+        // `logWriterProxy` is used here to pass to shared logger worker logs from
+        // environments that do not have access to it, like connect-web, webextension.
+        // It does not log anything in this environment, just used as proxy.
+        logWriterProxy = logWriterFactory();
+    }
+
     _log.enabled = !!parsedSettings.debug;
 
     try {
         // initialize core
-        _core = await initCore(parsedSettings);
+        _core = await initCore(parsedSettings, logWriterFactory);
         _core.on(CORE_EVENT, postMessage);
 
         // initialize transport and wait for the first transport event (start or error)

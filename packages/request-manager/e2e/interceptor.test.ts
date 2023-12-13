@@ -1,5 +1,7 @@
 import path from 'path';
+import http from 'http';
 import WebSocket from 'ws';
+import fetch from 'cross-fetch';
 
 import { TorController, createInterceptor } from '../src';
 import { torRunner } from './torRunner';
@@ -22,18 +24,21 @@ const testGetUrlHttp = 'http://check.torproject.org/';
 const testGetUrlHttps = 'https://check.torproject.org/';
 const testPostUrlHttps = 'https://httpbin.org/post';
 
-const INTERCEPTOR = {
-    handler: () => {},
-    getIsTorEnabled: () => true,
-};
-
 describe('Interceptor', () => {
-    let torProcess: any;
-    let torController: any;
+    let torProcess: ReturnType<typeof torRunner> | null;
+    let torController: TorController;
+    let torIdentities: TorIdentities;
+
+    const torSettings = { running: true, host, port };
+
+    const INTERCEPTOR = {
+        handler: () => {},
+        getTorSettings: () => torSettings,
+    };
 
     beforeAll(async () => {
         // Callback in in createInterceptor should return true in order for the request to use Tor.
-        createInterceptor(INTERCEPTOR);
+        torIdentities = createInterceptor(INTERCEPTOR).torIdentities;
         // Starting Tor controller to make sure that Tor is running.
         torController = new TorController({
             host,
@@ -47,7 +52,6 @@ describe('Interceptor', () => {
             torParams,
         });
 
-        TorIdentities.init(torController);
         // Waiting for Tor to be ready to accept successful connections.
         await torController.waitUntilAlive();
     });
@@ -165,7 +169,7 @@ describe('Interceptor', () => {
             await createWebSocket();
             await createWebSocket();
 
-            const identities = Object.keys(TorIdentities.identities).filter(name =>
+            const identities = Object.keys((torIdentities as any).identities).filter(name =>
                 name.includes('WebSocket'),
             );
 
@@ -180,7 +184,7 @@ describe('Interceptor', () => {
                 'Proxy-Authorization': 'Basic WebSocket-Identity',
             });
 
-            const identities = Object.keys(TorIdentities.identities).filter(name =>
+            const identities = Object.keys((torIdentities as any).identities).filter(name =>
                 name.includes('WebSocket-Identity'),
             );
 
@@ -188,8 +192,151 @@ describe('Interceptor', () => {
         });
     });
 
+    describe('TorControl', () => {
+        it('closing circuits', async () => {
+            await fetch(testGetUrlHttps, {
+                headers: { 'Proxy-Authorization': 'Basic user-circuit-1' },
+            });
+
+            await fetch(testGetUrlHttps, {
+                headers: { 'Proxy-Authorization': 'Basic user-circuit-2' },
+            });
+
+            const circuits1 = await torController.controlPort.getCircuits();
+            // there should be at least 2 circuits
+            expect(circuits1.length).toBeGreaterThanOrEqual(2);
+            // there should be circuits with requested username
+            expect(circuits1.map(c => c.username)).toEqual(
+                expect.arrayContaining(['user-circuit-1', 'user-circuit-2']),
+            );
+
+            // close specific circuit
+            await torController.controlPort.closeCircuit('user-circuit-1');
+
+            // and validate state afterward
+            const circuits2 = await torController.controlPort.getCircuits();
+            expect(circuits2.map(c => c.username)).not.toEqual(
+                expect.arrayContaining(['user-circuit-1']),
+            );
+            expect(circuits2.map(c => c.username)).toEqual(
+                expect.arrayContaining(['user-circuit-2']),
+            );
+
+            // close remaining circuits
+            await torController.controlPort.closeActiveCircuits();
+
+            // and validate state afterward
+            const circuits3 = await torController.controlPort.getCircuits();
+            expect(circuits3.length).toEqual(0);
+        });
+    });
+
+    describe('Allowed-Headers', () => {
+        // create simple http server and respond with received headers
+        const createHttpServer = () =>
+            new Promise<{ server: http.Server; serverUrl: string; host: string }>(
+                (resolve, reject) => {
+                    const server = http.createServer((request, response) => {
+                        response.setHeader('Content-Type', 'application/json');
+                        response.write(JSON.stringify(request.headers));
+                        response.end();
+                    });
+                    server.unref();
+                    server.on('error', reject);
+                    server.listen(0, () => {
+                        const addr = server.address() as any; // as net.AddressInfo
+                        resolve({
+                            server,
+                            serverUrl: `http://localhost:${addr.port}`,
+                            host: `localhost:${addr.port}`,
+                        });
+                    });
+                },
+            );
+
+        let serverInit: Awaited<ReturnType<typeof createHttpServer>>;
+        beforeAll(async () => {
+            serverInit = await createHttpServer();
+        });
+
+        afterAll(() => new Promise(resolve => serverInit.server.close(resolve)));
+
+        const fetchHeaders = (url: string, options: RequestInit) =>
+            fetch(url, options).then(r => r.json());
+
+        it('POST request headers', async () => {
+            const { serverUrl, host } = serverInit;
+
+            // default headers added by cross-fetch and underlying libs
+            await expect(
+                fetchHeaders(serverUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({ test: 'test' }),
+                    headers: { 'User-Agent': 'TrezorSuite' },
+                }),
+            ).resolves.toEqual({
+                host,
+                accept: '*/*',
+                'accept-encoding': 'gzip,deflate',
+                connection: 'close',
+                'content-length': '15',
+                'content-type': 'text/plain;charset=UTF-8',
+                'user-agent': 'TrezorSuite',
+            });
+
+            // restricted headers
+            await expect(
+                fetchHeaders(serverUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({ test: 'test' }),
+                    headers: {
+                        'User-Agent': 'TrezorSuite',
+                        'Allowed-Headers': 'AcCePt-EnCoDiNg;content-type;Content-Length;HOST', // case insensitive
+                    },
+                }),
+            ).resolves.toEqual({
+                host,
+                'accept-encoding': 'gzip,deflate',
+                'content-length': '15',
+                'content-type': 'text/plain;charset=UTF-8',
+            });
+        });
+
+        it('GET request headers', async () => {
+            const { serverUrl, host } = serverInit;
+
+            // default headers added by cross-fetch and underlying libs
+            await expect(
+                fetchHeaders(serverUrl, {
+                    method: 'GET',
+                    headers: { 'User-Agent': 'TrezorSuite' },
+                }),
+            ).resolves.toEqual({
+                host,
+                accept: '*/*',
+                'accept-encoding': 'gzip,deflate',
+                connection: 'close',
+                'user-agent': 'TrezorSuite',
+            });
+
+            // restricted headers
+            await expect(
+                fetchHeaders(serverUrl, {
+                    method: 'GET',
+                    headers: {
+                        'User-Agent': 'TrezorSuite',
+                        'Allowed-Headers': 'Accept-Encoding;Content-Type;Content-Length;Host',
+                    },
+                }),
+            ).resolves.toEqual({
+                host,
+                'accept-encoding': 'gzip,deflate',
+            });
+        });
+    });
+
     it('Block unauthorized requests', async () => {
-        jest.spyOn(INTERCEPTOR, 'getIsTorEnabled').mockImplementation(() => false);
+        torSettings.running = false;
 
         await expect(
             fetch(testPostUrlHttps, {

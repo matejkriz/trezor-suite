@@ -1,5 +1,4 @@
 import { WalletAccountTransaction } from '@suite-common/wallet-types';
-import { AccountMetadata } from '@suite-common/metadata-types';
 import { testMocks } from '@suite-common/test-utils';
 
 import * as fixtures from '../__fixtures__/transactionUtils';
@@ -19,6 +18,8 @@ import {
     MonthKey,
     generateTransactionMonthKey,
 } from '../transactionUtils';
+
+const { getWalletTransaction } = testMocks;
 
 describe('transaction utils', () => {
     it('parseTransactionDateKey', () => {
@@ -41,27 +42,23 @@ describe('transaction utils', () => {
 
     it('groupTransactionsByDate - groupBy day', () => {
         const groupedTxs = groupTransactionsByDate([
-            testMocks.getWalletTransaction({ blockTime: 1565792979, blockHeight: 5 }),
-            testMocks.getWalletTransaction({ blockTime: 1565792379, blockHeight: 4 }),
-            testMocks.getWalletTransaction({ blockHeight: 0 }),
-            testMocks.getWalletTransaction({ blockTime: 1570147200, blockHeight: 2 }),
-            testMocks.getWalletTransaction({ blockTime: 1570127200, blockHeight: 3 }),
-            testMocks.getWalletTransaction({ blockHeight: undefined }),
+            getWalletTransaction({ blockTime: 1565792979, blockHeight: 5 }),
+            getWalletTransaction({ blockTime: 1565792379, blockHeight: 4 }),
+            getWalletTransaction({ blockHeight: 0 }),
+            getWalletTransaction({ blockTime: 1570147200, blockHeight: 2 }),
+            getWalletTransaction({ blockTime: 1570127200, blockHeight: 3 }),
+            getWalletTransaction({ blockHeight: undefined }),
         ]);
         expect(groupedTxs).toEqual({
             pending: [
-                testMocks.getWalletTransaction({ blockHeight: 0 }),
-                testMocks.getWalletTransaction({ blockHeight: undefined }),
+                getWalletTransaction({ blockHeight: 0 }),
+                getWalletTransaction({ blockHeight: undefined }),
             ],
-            '2019-10-4': [
-                testMocks.getWalletTransaction({ blockTime: 1570147200, blockHeight: 2 }),
-            ],
-            '2019-10-3': [
-                testMocks.getWalletTransaction({ blockTime: 1570127200, blockHeight: 3 }),
-            ],
+            '2019-10-4': [getWalletTransaction({ blockTime: 1570147200, blockHeight: 2 })],
+            '2019-10-3': [getWalletTransaction({ blockTime: 1570127200, blockHeight: 3 })],
             '2019-8-14': [
-                testMocks.getWalletTransaction({ blockTime: 1565792979, blockHeight: 5 }),
-                testMocks.getWalletTransaction({ blockTime: 1565792379, blockHeight: 4 }),
+                getWalletTransaction({ blockTime: 1565792979, blockHeight: 5 }),
+                getWalletTransaction({ blockTime: 1565792379, blockHeight: 4 }),
             ],
         });
     });
@@ -69,12 +66,12 @@ describe('transaction utils', () => {
     it('groupTransactionsByDate - groupBy month', () => {
         const groupedTxs = groupTransactionsByDate(
             [
-                testMocks.getWalletTransaction({ blockTime: 1565792979, blockHeight: 5 }),
-                testMocks.getWalletTransaction({ blockTime: 1565792379, blockHeight: 4 }),
-                testMocks.getWalletTransaction({ blockHeight: 0 }),
-                testMocks.getWalletTransaction({ blockTime: 1570147200, blockHeight: 2 }),
-                testMocks.getWalletTransaction({ blockTime: 1570127200, blockHeight: 3 }),
-                testMocks.getWalletTransaction({ blockHeight: undefined }),
+                getWalletTransaction({ blockTime: 1565792979, blockHeight: 5 }),
+                getWalletTransaction({ blockTime: 1565792379, blockHeight: 4 }),
+                getWalletTransaction({ blockHeight: 0 }),
+                getWalletTransaction({ blockTime: 1570147200, blockHeight: 2 }),
+                getWalletTransaction({ blockTime: 1570127200, blockHeight: 3 }),
+                getWalletTransaction({ blockHeight: undefined }),
             ],
             'month',
         );
@@ -85,16 +82,16 @@ describe('transaction utils', () => {
         const secondMonth = generateTransactionMonthKey(new Date(secondBlocktime * 1000));
         expect(groupedTxs).toEqual({
             pending: [
-                testMocks.getWalletTransaction({ blockHeight: 0 }),
-                testMocks.getWalletTransaction({ blockHeight: undefined }),
+                getWalletTransaction({ blockHeight: 0 }),
+                getWalletTransaction({ blockHeight: undefined }),
             ],
             [firstMonth]: [
-                testMocks.getWalletTransaction({ blockTime: firstBlocktime, blockHeight: 3 }),
-                testMocks.getWalletTransaction({ blockTime: 1570147200, blockHeight: 2 }),
+                getWalletTransaction({ blockTime: firstBlocktime, blockHeight: 3 }),
+                getWalletTransaction({ blockTime: 1570147200, blockHeight: 2 }),
             ],
             [secondMonth]: [
-                testMocks.getWalletTransaction({ blockTime: secondBlocktime, blockHeight: 5 }),
-                testMocks.getWalletTransaction({ blockTime: 1565792379, blockHeight: 4 }),
+                getWalletTransaction({ blockTime: secondBlocktime, blockHeight: 5 }),
+                getWalletTransaction({ blockTime: 1565792379, blockHeight: 4 }),
             ],
         });
     });
@@ -114,7 +111,7 @@ describe('transaction utils', () => {
                 'joint',
                 'joint',
             ] as const
-        ).map((type, blockHeight) => testMocks.getWalletTransaction({ type, blockHeight }));
+        ).map((type, blockHeight) => getWalletTransaction({ type, blockHeight }));
         const groupedTxs = groupJointTransactions([j1, r2, j3, j4, s5, s6, j7, f8, j9, j10, j11]);
         expect(groupedTxs).toEqual([
             { type: 'single-tx', tx: j1 },
@@ -160,12 +157,27 @@ describe('transaction utils', () => {
 
     fixtures.findChainedTransactions.forEach(f => {
         it(`findChainedTransactions: ${f.description}`, () => {
-            expect(findChainedTransactions(f.txid, f.transactions as any)).toEqual(f.result);
+            const chained = findChainedTransactions(f.descriptor, f.txid, f.transactions as any);
+            if (!chained || !f.result) {
+                expect(chained).toEqual(f.result);
+                return;
+            }
+
+            expect(
+                chained.own.map(t => ({
+                    txid: t.txid,
+                })),
+            ).toEqual(f.result.own);
+            expect(
+                chained.others.map(t => ({
+                    txid: t.txid,
+                })),
+            ).toEqual(f.result.others);
         });
     });
 
     const transactions = stMock.transactions as WalletAccountTransaction[];
-    const metadata = stMock.metadata as AccountMetadata;
+    const metadata = stMock.labels;
     fixtures.searchTransactions.forEach(f => {
         it(`searchTransactions - ${f.description}`, () => {
             const search = advancedSearchTransactions(transactions, metadata, f.search);

@@ -1,13 +1,12 @@
-import React from 'react';
 import styled from 'styled-components';
-import { variables, Loader, Button, Link } from '@trezor/components';
-import { Translation } from '@suite-components/Translation';
+import { variables, Spinner, Button, Link } from '@trezor/components';
+import { Translation } from 'src/components/suite/Translation';
 
 const Wrapper = styled.div`
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 60px 20px 60px 20px;
+    padding: 60px 20px;
     flex-direction: column;
 `;
 
@@ -20,13 +19,13 @@ const StyledLink = styled(Link)`
     margin-top: 50px;
 `;
 
-interface Props {
+interface PaymentConvertingProps {
     supportUrl?: string;
 }
 
-const PaymentConverting = ({ supportUrl }: Props) => (
+const PaymentConverting = ({ supportUrl }: PaymentConvertingProps) => (
     <Wrapper>
-        <Loader />
+        <Spinner />
         <Title>
             <Translation id="TR_SELL_DETAIL_PENDING_TITLE" />
         </Title>

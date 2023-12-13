@@ -8,7 +8,21 @@
         {
             "path": "../../suite-common/redux-utils"
         },
+        {
+            "path": "../../suite-common/suite-config"
+        },
+        {
+            "path": "../../suite-common/suite-constants"
+        },
+        {
+            "path": "../../suite-common/wallet-config"
+        },
+        {
+            "path": "../../suite-common/wallet-types"
+        },
         { "path": "../config" },
-        { "path": "../../packages/analytics" }
+        { "path": "../../packages/analytics" },
+        { "path": "../../packages/connect" },
+        { "path": "../../packages/env-utils" }
     ]
 }

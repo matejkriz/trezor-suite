@@ -1,10 +1,9 @@
-import React from 'react';
 import styled from 'styled-components';
-import { Translation } from '@suite-components';
+import { Translation } from 'src/components/suite';
 import { SavingsPaymentMethod } from 'invity-api';
 
 const StyledCard = styled.div`
-    background: rgba(239, 201, 65, 0.1);
+    background: rgb(239 201 65 / 10%);
     color: #ba9924;
     border-radius: 6px;
     display: flex;
@@ -20,7 +19,7 @@ const Header = styled.div`
     line-height: 28px;
 `;
 const Description = styled.div`
-    color: ${props => props.theme.TYPE_LIGHT_GREY};
+    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
     font-size: 14px;
     line-height: 18px;
 `;

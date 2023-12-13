@@ -2,6 +2,7 @@ export * from './api';
 export * from './account';
 export * from './coinInfo';
 export * from './device';
+export * from './fees';
 export * from './firmware';
 export * from './params';
 export * from './settings';
@@ -13,15 +14,31 @@ export * from './api/bitcoin';
 export * from './api/eos';
 export * from './api/ripple';
 export * from './api/ethereum';
+export * from './api/solana';
 export * from './api/stellar';
 export * from './api/tezos';
 
 // types used in @trezor/suite. if you need a type, reexport it from ./api/<method>
-export type { ComposeOutput, PrecomposedTransaction } from './api/composeTransaction';
+export type {
+    ComposeOutput,
+    PrecomposeResultError,
+    PrecomposeResultNonFinal,
+    PrecomposeResultFinal,
+    PrecomposedResult,
+} from './api/composeTransaction';
+export type {
+    PrecomposedTransactionCardano,
+    PrecomposedTransactionErrorCardano,
+    PrecomposedTransactionFinalCardano,
+    PrecomposedTransactionNonFinalCardano,
+} from './api/cardanoComposeTransaction';
 export type { RecoveryDevice } from './api/recoveryDevice';
+export type { AuthenticateDeviceResult } from './api/authenticateDevice';
 export type {
     TokenInfo,
-    Transaction as AccountTransaction,
+    TokenTransfer,
+    InternalTransfer,
+    FiatRates,
     Target as TransactionTarget,
     AccountBalanceHistory as BlockchainAccountBalanceHistory,
 } from '@trezor/blockchain-link';

@@ -1,17 +1,17 @@
-import { Network, BackendType, NetworkSymbol, AccountType } from '@suite-common/wallet-config';
-import { AccountInfo, PROTO } from '@trezor/connect';
+import { Network, BackendType, NetworkSymbol } from '@suite-common/wallet-config';
+import { AccountEntityKeys } from '@suite-common/metadata-types';
+import { AccountInfo, PROTO, TokenInfo } from '@trezor/connect';
 
 export type MetadataItem = string;
 export type XpubAddress = string;
 
-export interface AccountMetadata {
-    key: string; // legacy xpub format (btc-like coins) or account descriptor (other coins)
-    fileName: string; // file name in dropbox
-    aesKey: string; // asymmetric key for file encryption
-    accountLabel?: MetadataItem;
-    outputLabels: { [txid: string]: { [index: string]: MetadataItem } };
-    addressLabels: { [address: string]: MetadataItem };
-}
+export type TokenSymbol = string & { __type: 'TokenSymbol' };
+export type TokenAddress = string & { __type: 'TokenAddress' };
+
+export type TokenInfoBranded = TokenInfo & {
+    symbol: TokenSymbol;
+    contract: TokenAddress;
+};
 
 type AccountNetworkSpecific =
     | {
@@ -42,6 +42,12 @@ type AccountNetworkSpecific =
     | {
           networkType: 'ethereum';
           misc: { nonce: string };
+          marker: undefined;
+          page: AccountInfo['page'];
+      }
+    | {
+          networkType: 'solana';
+          misc: undefined;
           marker: undefined;
           page: AccountInfo['page'];
       };
@@ -79,9 +85,16 @@ export type Account = {
     addresses?: AccountInfo['addresses'];
     utxo: AccountInfo['utxo'];
     history: AccountInfo['history'];
-    metadata: AccountMetadata;
+    metadata: AccountEntityKeys;
+    /**
+     * accountLabel was introduced by mobile app. In early stage of developement, it was not possible to connect device and work with
+     * metadata/labeling feature which requires device for encryption. local accountLabel field was introduced.
+     */
+    accountLabel?: string;
 } & AccountBackendSpecific &
     AccountNetworkSpecific;
+
+export type AccountType = Account['accountType'];
 
 export type WalletParams =
     | NonNullable<{
@@ -90,3 +103,9 @@ export type WalletParams =
           accountType: AccountType | 'normal';
       }>
     | undefined;
+
+export interface ReceiveInfo {
+    path: string;
+    address: string;
+    isVerified: boolean;
+}

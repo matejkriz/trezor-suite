@@ -1,4 +1,4 @@
-import React, { ReactNode } from 'react';
+import { ReactNode } from 'react';
 
 import { useNavigation } from '@react-navigation/core';
 
@@ -30,6 +30,7 @@ type AccountImportOverviewCardProps = {
     icon: ReactNode;
     cryptoAmount: ReactNode;
     coinName: string;
+    shouldDisplayDeleteIcon?: boolean;
     symbol: NetworkSymbol;
 };
 export const AccountImportOverviewCard = ({
@@ -38,6 +39,7 @@ export const AccountImportOverviewCard = ({
     coinName,
     symbol,
     cryptoAmount,
+    shouldDisplayDeleteIcon = true,
 }: AccountImportOverviewCardProps) => {
     const navigation = useNavigation<NavigationProp>();
     const { applyStyle } = useNativeStyles();
@@ -60,12 +62,15 @@ export const AccountImportOverviewCard = ({
                         {cryptoAmount}
                     </Box>
                 </Box>
-                <IconButton
-                    iconName="trash"
-                    colorScheme="tertiaryElevation1"
-                    onPress={handleNavigateToQRScan}
-                    size="medium"
-                />
+                {shouldDisplayDeleteIcon && (
+                    <IconButton
+                        data-testID="@account-import/coin-synced/delete-icon"
+                        iconName="trashAlt"
+                        colorScheme="tertiaryElevation1"
+                        onPress={handleNavigateToQRScan}
+                        size="medium"
+                    />
+                )}
             </Box>
             {children}
         </Card>

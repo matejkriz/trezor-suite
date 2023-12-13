@@ -1,9 +1,9 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { Modal, Pressable } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-import { Button, Text, Card, VStack, useBottomSheetAnimation } from '@suite-native/atoms';
+import { Button, Card, VStack, useBottomSheetAnimation, Pictogram } from '@suite-native/atoms';
 
 import { useShakeAnimation } from '../useShakeAnimation';
 import { Alert } from '../alertsAtoms';
@@ -18,6 +18,7 @@ const alertSheetContainerStyle = prepareNativeStyle(utils => ({
     alignItems: 'center',
     paddingTop: utils.spacings.extraLarge,
     paddingHorizontal: utils.spacings.large,
+    paddingVertical: utils.spacings.extraLarge,
     marginBottom: utils.spacings.extraLarge,
     marginHorizontal: utils.spacings.small,
     borderRadius: utils.borders.radii.medium,
@@ -56,15 +57,19 @@ export const AlertSheet = ({ alert }: AlertSheetProps) => {
     const {
         title,
         description,
+        icon,
+        pictogramVariant,
         onPressPrimaryButton,
         primaryButtonTitle,
         onPressSecondaryButton,
         secondaryButtonTitle,
+        primaryButtonVariant = 'primary',
+        appendix,
     } = alert;
 
     const handlePressPrimaryButton = async () => {
         await closeSheetAnimated();
-        onPressPrimaryButton();
+        onPressPrimaryButton?.();
     };
 
     const handlePressSecondaryButton = async () => {
@@ -82,21 +87,24 @@ export const AlertSheet = ({ alert }: AlertSheetProps) => {
                     >
                         <Card style={applyStyle(alertSheetContainerStyle)}>
                             <VStack style={applyStyle(alertSheetContentStyle)} spacing="large">
-                                <VStack alignItems="center" spacing="small">
-                                    <Text variant="titleSmall">{title}</Text>
-                                    <Text color="textSubdued" align="center">
-                                        {description}
-                                    </Text>
-                                </VStack>
+                                <Pictogram
+                                    title={title}
+                                    variant={pictogramVariant}
+                                    subtitle={description}
+                                    icon={icon}
+                                />
+                                {appendix}
                                 <VStack spacing="medium">
                                     <Button
-                                        colorScheme="primary"
+                                        size="large"
+                                        colorScheme={primaryButtonVariant}
                                         onPress={handlePressPrimaryButton}
                                     >
                                         {primaryButtonTitle}
                                     </Button>
                                     {secondaryButtonTitle && (
                                         <Button
+                                            size="large"
                                             colorScheme="tertiaryElevation1"
                                             onPress={handlePressSecondaryButton}
                                         >

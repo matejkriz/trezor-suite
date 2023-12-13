@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, ReactElement } from 'react';
 import { View, StyleSheet, LayoutChangeEvent } from 'react-native';
 import Reanimated, {
     runOnJS,
@@ -10,28 +10,25 @@ import Reanimated, {
     withSequence,
     withTiming,
     withDelay,
+    withSpring,
 } from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
 
 import {
     Canvas,
-    runSpring,
     SkPath,
     LinearGradient,
     Path,
     Skia,
-    useValue,
-    useComputedValue,
     vec,
     Group,
     PathCommand,
-    useSharedValueEffect,
     mix,
     Circle,
     Shadow,
 } from '@shopify/react-native-skia';
 
-import type { AnimatedLineGraphProps } from './LineGraphProps';
+import type { AnimatedLineGraphProps, GraphEventWithCords } from './LineGraphProps';
 import { SelectionDot as DefaultSelectionDot } from './SelectionDot';
 import {
     createGraphPath,
@@ -45,13 +42,15 @@ import { getSixDigitHex } from './utils/getSixDigitHex';
 import { usePanGesture } from './hooks/usePanGesture';
 import { getYForX } from './GetYForX';
 import { hexToRgba } from './utils/hexToRgba';
+import { DefaultGraphEvent } from './DefaultGraphEvent';
+import { useEventTooltipProps } from './hooks/useEventTooltipProps';
 
 const INDICATOR_RADIUS = 7;
 const INDICATOR_BORDER_MULTIPLIER = 1.3;
 const INDICATOR_PULSE_BLUR_RADIUS_SMALL = INDICATOR_RADIUS * INDICATOR_BORDER_MULTIPLIER;
 const INDICATOR_PULSE_BLUR_RADIUS_BIG = INDICATOR_RADIUS * INDICATOR_BORDER_MULTIPLIER + 20;
 
-export function AnimatedLineGraph({
+export function AnimatedLineGraph<TEventPayload extends object>({
     points: allPoints,
     color,
     gradientFillColors,
@@ -72,38 +71,63 @@ export function AnimatedLineGraph({
     verticalPadding = lineThickness,
     TopAxisLabel,
     BottomAxisLabel,
+    events,
+    EventComponent = DefaultGraphEvent,
+    EventTooltipComponent,
+    onEventHover,
     ...props
-}: AnimatedLineGraphProps): React.ReactElement {
+}: AnimatedLineGraphProps<TEventPayload>): ReactElement {
     const [width, setWidth] = useState(0);
     const [height, setHeight] = useState(0);
-    const interpolateProgress = useValue(0);
+    const interpolateProgress = useSharedValue(0);
+
+    const [eventsWithCords, setEventsWithCords] = useState<
+        GraphEventWithCords<TEventPayload>[] | null
+    >(null);
+    const { eventTooltipProps, handleDisplayEventTooltip } = useEventTooltipProps(
+        eventsWithCords,
+        onEventHover,
+    );
 
     const { gesture, isActive, x } = usePanGesture({
         enabled: enablePanGesture,
         holdDuration: panGestureDelay,
     });
-    const circleX = useValue(0);
-    const circleY = useValue(0);
-    const pathEnd = useValue(0);
-    const indicatorRadius = useValue(enableIndicator ? INDICATOR_RADIUS : 0);
-    const indicatorBorderRadius = useComputedValue(
-        () => indicatorRadius.current * INDICATOR_BORDER_MULTIPLIER,
-        [indicatorRadius],
+    const circleX = useSharedValue(0);
+    const circleY = useSharedValue(0);
+    const pathEnd = useSharedValue(0);
+    const indicatorRadius = useSharedValue(enableIndicator ? INDICATOR_RADIUS : 0);
+    const indicatorBorderRadius = useDerivedValue(
+        () => indicatorRadius.value * INDICATOR_BORDER_MULTIPLIER,
     );
 
-    const pulseTrigger = useDerivedValue(() => {
-        'worklet';
-
-        return isActive.value ? 1 : 0;
-    }, []);
+    const pulseTrigger = useDerivedValue(() => (isActive.value ? 1 : 0));
     const indicatorPulseAnimation = useSharedValue(0);
-    const indicatorPulseRadius = useValue(INDICATOR_PULSE_BLUR_RADIUS_SMALL);
-    const indicatorPulseOpacity = useValue(1);
+    const indicatorPulseRadius = useDerivedValue(() => {
+        if (pulseTrigger.value === 0) {
+            return mix(
+                indicatorPulseAnimation.value,
+                INDICATOR_PULSE_BLUR_RADIUS_SMALL,
+                INDICATOR_PULSE_BLUR_RADIUS_BIG,
+            );
+        }
+        return 0;
+    });
+    const indicatorPulseOpacity = useDerivedValue(() => {
+        if (pulseTrigger.value === 0) {
+            return mix(indicatorPulseAnimation.value, 1, 0);
+        }
+        return 0;
+    });
 
-    const positions = useComputedValue(
-        () => [0, Math.min(0.15, pathEnd.current), pathEnd.current, pathEnd.current, 1],
-        [pathEnd],
-    );
+    const positions = useDerivedValue(() => [
+        0,
+        Math.min(0.15, pathEnd.value),
+        pathEnd.value,
+        pathEnd.value,
+        1,
+    ]);
+
     const onLayout = useCallback(({ nativeEvent: { layout } }: LayoutChangeEvent) => {
         setWidth(Math.round(layout.width));
         setHeight(Math.round(layout.height));
@@ -121,9 +145,9 @@ export function AnimatedLineGraph({
         return path;
     }, [height, width]);
 
-    const paths = useValue<{ from?: SkPath; to?: SkPath }>({});
-    const gradientPaths = useValue<{ from?: SkPath; to?: SkPath }>({});
-    const commands = useRef<PathCommand[]>([]);
+    const paths = useSharedValue<{ from?: SkPath; to?: SkPath }>({});
+    const gradientPaths = useSharedValue<{ from?: SkPath; to?: SkPath }>({});
+    const commands = useSharedValue<PathCommand[]>([]);
     const [commandsChanged, setCommandsChanged] = useState(0);
     const pointSelectedIndex = useRef<number>();
 
@@ -147,20 +171,24 @@ export function AnimatedLineGraph({
         return Math.max(getXInRange(drawingWidth, lastPoint.date, pathRange.x), 0);
     }, [drawingWidth, pathRange.x, pointsInRange]);
 
-    const indicatorX = useMemo(
-        () => (commandsChanged >= 0 ? Math.floor(lineWidth) + horizontalPadding : undefined),
-        [commandsChanged, horizontalPadding, lineWidth],
-    );
-    const indicatorY = useMemo(
-        () =>
-            commandsChanged >= 0 && indicatorX != null
-                ? getYForX(commands.current, indicatorX)
-                : undefined,
-        [commandsChanged, indicatorX],
-    );
+    const indicatorX = useDerivedValue(() => Math.floor(lineWidth) + horizontalPadding);
+    const indicatorY = useDerivedValue(() => getYForX(commands.value, indicatorX.value) || 0);
+
     const indicatorPulseColor = useMemo(() => hexToRgba(color, 0.4), [color]);
 
     const shouldFillGradient = gradientFillColors != null;
+
+    const calculateEventsPoints = useCallback(() => {
+        if (events) {
+            const eventsWithCords: GraphEventWithCords<TEventPayload>[] = [];
+            events.forEach(e => {
+                const eventX = getXInRange(drawingWidth, e.date, pathRange.x) + horizontalPadding;
+                const eventY = getYForX(commands.value, eventX) ?? 0;
+                eventsWithCords.push({ ...e, x: eventX, y: eventY });
+            });
+            setEventsWithCords(eventsWithCords);
+        }
+    }, [commands, drawingWidth, events, horizontalPadding, pathRange.x]);
 
     useEffect(() => {
         if (height < 1 || width < 1) {
@@ -194,54 +222,58 @@ export function AnimatedLineGraph({
             path = createGraphPath(createGraphPathProps);
         }
 
-        commands.current = path.toCmds();
+        commands.value = path.toCmds();
 
         if (gradientPath != null) {
-            const previous = gradientPaths.current;
+            const previous = gradientPaths.value;
             let from: SkPath = previous.to ?? straightLine;
-            if (previous.from != null && interpolateProgress.current < 1)
-                from = from.interpolate(previous.from, interpolateProgress.current) ?? from;
+            if (previous.from != null && interpolateProgress.value < 1)
+                from = from.interpolate(previous.from, interpolateProgress.value) ?? from;
 
             if (gradientPath.isInterpolatable(from)) {
-                gradientPaths.current = {
+                gradientPaths.value = {
                     from,
                     to: gradientPath,
                 };
             } else {
-                gradientPaths.current = {
+                gradientPaths.value = {
                     from: gradientPath,
                     to: gradientPath,
                 };
             }
         }
 
-        const previous = paths.current;
+        const previous = paths.value;
         let from: SkPath = previous.to ?? straightLine;
-        if (previous.from != null && interpolateProgress.current < 1)
-            from = from.interpolate(previous.from, interpolateProgress.current) ?? from;
+        if (previous.from != null && interpolateProgress.value < 1)
+            from = from.interpolate(previous.from, interpolateProgress.value) ?? from;
 
         if (path.isInterpolatable(from)) {
-            paths.current = {
+            paths.value = {
                 from,
                 to: path,
             };
         } else {
-            paths.current = {
+            paths.value = {
                 from: path,
                 to: path,
             };
         }
 
         setCommandsChanged(commandsChanged + 1);
+        setEventsWithCords(null);
 
-        runSpring(
-            interpolateProgress,
-            { from: 0, to: 1 },
+        interpolateProgress.value = 0;
+        interpolateProgress.value = withSpring(
+            1,
             {
                 mass: 1,
                 stiffness: 500,
                 damping: 400,
                 velocity: 0,
+            },
+            () => {
+                runOnJS(calculateEventsPoints)();
             },
         );
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -273,27 +305,19 @@ export function AnimatedLineGraph({
         return [color, color, color, `${getSixDigitHex(color)}33`, `${getSixDigitHex(color)}33`];
     }, [color, enableFadeInMask]);
 
-    const path = useComputedValue(
-        () => {
-            const from = paths.current.from ?? straightLine;
-            const to = paths.current.to ?? straightLine;
+    const path = useDerivedValue(() => {
+        const from = paths.value.from ?? straightLine;
+        const to = paths.value.to ?? straightLine;
 
-            return to.interpolate(from, interpolateProgress.current);
-        },
-        // RN Skia deals with deps differently. They are actually the required SkiaValues that the derived value listens to, not react values.
-        [interpolateProgress],
-    );
+        return to.interpolate(from, interpolateProgress.value);
+    }, [interpolateProgress, paths]);
 
-    const gradientPath = useComputedValue(
-        () => {
-            const from = gradientPaths.current.from ?? straightLine;
-            const to = gradientPaths.current.to ?? straightLine;
+    const gradientPath = useDerivedValue(() => {
+        const from = gradientPaths.value.from ?? straightLine;
+        const to = gradientPaths.value.to ?? straightLine;
 
-            return to.interpolate(from, interpolateProgress.current);
-        },
-        // RN Skia deals with deps differently. They are actually the required SkiaValues that the derived value listens to, not react values.
-        [interpolateProgress],
-    );
+        return to.interpolate(from, interpolateProgress.value);
+    });
 
     const stopPulsating = useCallback(() => {
         cancelAnimation(indicatorPulseAnimation);
@@ -316,17 +340,8 @@ export function AnimatedLineGraph({
         );
     }, [indicatorPulseAnimation]);
 
-    const setFingerX = useCallback(
+    const setFingerPoint = useCallback(
         (fingerX: number) => {
-            const y = getYForX(commands.current, fingerX);
-
-            if (y != null) {
-                circleX.current = fingerX;
-                circleY.current = y;
-            }
-
-            if (isActive.value) pathEnd.current = fingerX / width;
-
             const fingerXInRange = Math.max(fingerX - horizontalPadding, 0);
 
             const index = Math.round(
@@ -349,23 +364,30 @@ export function AnimatedLineGraph({
                 }
             }
         },
-        [
-            circleX,
-            circleY,
-            drawingWidth,
-            horizontalPadding,
-            isActive.value,
-            onPointSelected,
-            pathEnd,
-            pathRange.x,
-            pointsInRange,
-            width,
-        ],
+        [drawingWidth, horizontalPadding, onPointSelected, pathRange.x, pointsInRange],
+    );
+
+    const setFingerX = useCallback(
+        (fingerX: number) => {
+            'worklet';
+
+            const y = getYForX(commands.value, fingerX);
+
+            if (y != null) {
+                circleX.value = fingerX;
+                circleY.value = y;
+            }
+
+            if (isActive.value) pathEnd.value = fingerX / width;
+        },
+        // pathRange.x must be extra included in deps otherwise onPointSelected doesn't work, IDK why
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [circleX, circleY, isActive, pathEnd, pathRange.x, width, commands],
     );
 
     const setIsActive = useCallback(
         (active: boolean) => {
-            runSpring(indicatorRadius, !active ? INDICATOR_RADIUS : 0, {
+            indicatorRadius.value = withSpring(!active ? INDICATOR_RADIUS : 0, {
                 mass: 1,
                 stiffness: 1000,
                 damping: 50,
@@ -378,7 +400,7 @@ export function AnimatedLineGraph({
             } else {
                 onGestureEnd?.();
                 pointSelectedIndex.current = undefined;
-                pathEnd.current = 1;
+                pathEnd.value = 1;
                 startPulsating();
             }
         },
@@ -389,7 +411,8 @@ export function AnimatedLineGraph({
         () => x.value,
         fingerX => {
             if (isActive.value || fingerX) {
-                runOnJS(setFingerX)(fingerX);
+                setFingerX(fingerX);
+                runOnJS(setFingerPoint)(fingerX);
             }
         },
         [isActive, setFingerX, width, x],
@@ -404,7 +427,7 @@ export function AnimatedLineGraph({
     );
 
     useEffect(() => {
-        if (pointsInRange.length !== 0 && commands.current.length !== 0) pathEnd.current = 1;
+        if (pointsInRange.length !== 0 && commands.value.length !== 0) pathEnd.value = 1;
     }, [commands, pathEnd, pointsInRange.length]);
 
     useEffect(() => {
@@ -414,27 +437,12 @@ export function AnimatedLineGraph({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [indicatorPulsating]);
 
-    useSharedValueEffect(
-        () => {
-            if (pulseTrigger.value === 0) {
-                indicatorPulseRadius.current = mix(
-                    indicatorPulseAnimation.value,
-                    INDICATOR_PULSE_BLUR_RADIUS_SMALL,
-                    INDICATOR_PULSE_BLUR_RADIUS_BIG,
-                );
-                indicatorPulseOpacity.current = mix(indicatorPulseAnimation.value, 1, 0);
-            } else {
-                indicatorPulseRadius.current = 0;
-            }
-        },
-        indicatorPulseAnimation,
-        pulseTrigger,
-    );
-
     const axisLabelContainerStyle = {
         paddingTop: TopAxisLabel != null ? 20 : 0,
         paddingBottom: BottomAxisLabel != null ? 20 : 0,
     };
+
+    const indicatorVisible = enableIndicator && commandsChanged > 0;
 
     return (
         <View {...props}>
@@ -450,23 +458,7 @@ export function AnimatedLineGraph({
                     {/* Actual Skia Graph */}
                     <View style={styles.container} onLayout={onLayout}>
                         {/* Fix for react-native-skia's incorrect type declarations */}
-                        <Canvas
-                            style={styles.svg}
-                            onPointerEnter={undefined}
-                            onPointerEnterCapture={undefined}
-                            onPointerLeave={undefined}
-                            onPointerLeaveCapture={undefined}
-                            onPointerMove={undefined}
-                            onPointerMoveCapture={undefined}
-                            onPointerCancel={undefined}
-                            onPointerCancelCapture={undefined}
-                            onPointerDown={undefined}
-                            onPointerDownCapture={undefined}
-                            onPointerUp={undefined}
-                            onPointerUpCapture={undefined}
-                            accessibilityLabelledBy={undefined}
-                            accessibilityLanguage={undefined}
-                        >
+                        <Canvas style={styles.svg}>
                             <Group>
                                 <Path
                                     // @ts-expect-error
@@ -508,7 +500,26 @@ export function AnimatedLineGraph({
                                 />
                             )}
 
-                            {enableIndicator && (
+                            {/* Render Event Component for every event. */}
+                            {EventComponent != null && eventsWithCords && (
+                                <Group>
+                                    {eventsWithCords?.map((event, index) => (
+                                        <EventComponent
+                                            key={event.date.getTime()}
+                                            index={index}
+                                            isGraphActive={isActive}
+                                            fingerX={circleX}
+                                            eventX={event.x}
+                                            eventY={event.y}
+                                            color={color}
+                                            onEventHover={handleDisplayEventTooltip}
+                                            {...event.payload}
+                                        />
+                                    ))}
+                                </Group>
+                            )}
+
+                            {indicatorVisible && (
                                 <Group>
                                     {indicatorPulsating && (
                                         <Circle
@@ -548,6 +559,11 @@ export function AnimatedLineGraph({
                     )}
                 </Reanimated.View>
             </GestureDetector>
+
+            {/* Tooltip displayed on hover on EventComponent. */}
+            {EventTooltipComponent && eventTooltipProps && (
+                <EventTooltipComponent {...eventTooltipProps} />
+            )}
         </View>
     );
 }

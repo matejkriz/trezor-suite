@@ -115,7 +115,7 @@ logger.exit();
 
 ### How to format a string?
 
-The library does not have any formatting capabilities as JavaScript already has templating features built-in. Simply use string literals (for example: `` logger.info('Topic', `My string ${myvar}.`) ``).
+The library does not have any formatting capabilities as JavaScript already has templating features built-in. Simply use string literals (for example: ``logger.info('Topic', `My string ${myvar}.`)``).
 
 ### How to output an object?
 
@@ -124,4 +124,4 @@ The library does not include any helper for this as there is already a language 
 ### How can I write the log in JSON format?
 
 You can change the `logOutput` option to be formatted like JSON. For example: `logOutput: '{ "ts": "%ts", "lvl": "%lvl", "topic": "%top", "message": "%msg" },'`.
-In order to display/use it properly, you will have to edit the output a little bit. Wrap all the messages in square brakets ([, ]) and remove the comma (,) from the last message.
+In order to display/use it properly, you will have to edit the output a little bit. Wrap all the messages in square brackets ([, ]) and remove the comma (,) from the last message.

@@ -1,4 +1,5 @@
-import type { App, Environment, Event as AnalyticsEvent } from './types';
+import type { Environment } from '@trezor/env-utils';
+import type { App, Event as AnalyticsEvent } from './types';
 import { getWeakRandomId } from '@trezor/utils';
 
 export const getTrackingRandomId = () => getWeakRandomId(10);
@@ -12,7 +13,7 @@ export const encodeDataToQueryString = <T extends AnalyticsEvent>(
     version: string,
     event: T,
 ) => {
-    const { type } = event;
+    const { type, timestamp } = event;
 
     const params = new URLSearchParams({
         c_v: version,
@@ -20,7 +21,7 @@ export const encodeDataToQueryString = <T extends AnalyticsEvent>(
         c_commit: commitId,
         c_instance_id: instanceId,
         c_session_id: sessionId,
-        c_timestamp: Date.now().toString(),
+        c_timestamp: timestamp || Date.now().toString(),
         c_message_id: getRandomId(),
     });
 

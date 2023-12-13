@@ -3,42 +3,62 @@
     "compilerOptions": { "outDir": "libDev" },
     "references": [
         {
+            "path": "../../suite-common/analytics"
+        },
+        {
             "path": "../../suite-common/connect-init"
         },
         {
             "path": "../../suite-common/formatters"
         },
+        { "path": "../../suite-common/icons" },
+        {
+            "path": "../../suite-common/message-system"
+        },
         {
             "path": "../../suite-common/redux-utils"
         },
         {
+            "path": "../../suite-common/suite-constants"
+        },
+        {
             "path": "../../suite-common/wallet-core"
         },
+        { "path": "../accounts" },
         { "path": "../alerts" },
         { "path": "../analytics" },
         { "path": "../atoms" },
+        { "path": "../biometrics" },
         { "path": "../config" },
-        { "path": "../module-accounts" },
+        { "path": "../device" },
+        { "path": "../feature-flags" },
+        { "path": "../fiat-rates" },
+        { "path": "../intl" },
+        { "path": "../message-system" },
         { "path": "../module-accounts-import" },
+        {
+            "path": "../module-accounts-management"
+        },
+        { "path": "../module-connect-device" },
         { "path": "../module-dev-utils" },
         { "path": "../module-home" },
-        { "path": "../module-send-receive" },
+        { "path": "../module-onboarding" },
+        { "path": "../module-receive" },
         { "path": "../module-settings" },
         { "path": "../navigation" },
         { "path": "../notifications" },
+        { "path": "../receive" },
         { "path": "../state" },
         { "path": "../storage" },
         { "path": "../theme" },
         { "path": "../toasts" },
         { "path": "../transactions" },
         { "path": "../../packages/connect" },
-        { "path": "../../packages/icons" },
-        { "path": "../../packages/styles" },
-        { "path": "../../packages/suite-data" },
-        { "path": "../../packages/theme" },
         {
-            "path": "../../packages/transport-native"
-        }
+            "path": "../../packages/react-native-usb"
+        },
+        { "path": "../../packages/styles" },
+        { "path": "../../packages/theme" }
     ],
     "include": [".", "**.json"]
 }

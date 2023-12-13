@@ -1,8 +1,7 @@
-import React from 'react';
 import { TouchableOpacity, View } from 'react-native';
 
-import { Icon, IconName } from '@trezor/icons';
-import { Text } from '@suite-native/atoms';
+import { Icon, IconName } from '@suite-common/icons';
+import { Text, TITLE_MAX_FONT_MULTIPLIER } from '@suite-native/atoms';
 import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
 
 type TabBarItemProps = {
@@ -14,14 +13,14 @@ type TabBarItemProps = {
 
 const tabBarItemStyle = prepareNativeStyle(_ => ({
     flex: 1,
-    marginTop: 11,
     alignItems: 'center',
     justifyContent: 'center',
 }));
 
-const tabBarItemContainerStyle = prepareNativeStyle(_ => ({
+const tabBarItemContainerStyle = prepareNativeStyle(utils => ({
     justifyContent: 'center',
     alignItems: 'center',
+    paddingTop: utils.spacings.small,
 }));
 
 const TAB_BAR_ITEM_HORIZONTAL_HIT_SLOP = 15;
@@ -53,7 +52,12 @@ export const TabBarItem = ({ isFocused, onPress, iconName, title }: TabBarItemPr
                     color={isFocused ? 'iconPrimaryDefault' : 'iconDisabled'}
                 />
                 {title && (
-                    <Text variant="label" color={isFocused ? 'textPrimaryDefault' : 'textDisabled'}>
+                    <Text
+                        maxFontSizeMultiplier={TITLE_MAX_FONT_MULTIPLIER}
+                        variant="label"
+                        textAlign="center"
+                        color={isFocused ? 'textPrimaryDefault' : 'textDisabled'}
+                    >
                         {title}
                     </Text>
                 )}

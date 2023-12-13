@@ -1,12 +1,7 @@
 import { createAction } from '@reduxjs/toolkit';
 
 import { AccountInfo } from '@trezor/connect';
-import {
-    Account,
-    SelectedAccountStatus,
-    DiscoveryItem,
-    MetadataItem,
-} from '@suite-common/wallet-types';
+import { Account, SelectedAccountStatus, DiscoveryItem } from '@suite-common/wallet-types';
 import {
     enhanceAddresses,
     enhanceTokens,
@@ -34,59 +29,93 @@ const removeAccount = createAction(
     }),
 );
 
+type CreateAccountActionProps = {
+    deviceState: string;
+    discoveryItem: DiscoveryItem;
+    accountInfo: AccountInfo;
+    imported?: boolean;
+    accountLabel?: string;
+};
+
+type CreateIndexLabeledAccountActionProps = Omit<
+    CreateAccountActionProps,
+    'imported' | 'accountLabel'
+>;
+
+const composeCreateAccountActionPayload = ({
+    deviceState,
+    discoveryItem,
+    accountInfo,
+    imported,
+    accountLabel,
+}: CreateAccountActionProps): Account => ({
+    deviceState,
+    accountLabel,
+    imported,
+    index: discoveryItem.index,
+    path: discoveryItem.path,
+    unlockPath: discoveryItem.unlockPath,
+    descriptor: accountInfo.descriptor,
+    key: getAccountKey(accountInfo.descriptor, discoveryItem.coin, deviceState),
+    accountType: discoveryItem.accountType,
+    symbol: discoveryItem.coin,
+    empty: accountInfo.empty,
+    ...(discoveryItem.backendType === 'coinjoin'
+        ? {
+              backendType: 'coinjoin',
+              status: discoveryItem.status,
+          }
+        : {
+              backendType: discoveryItem.backendType,
+          }),
+    visible:
+        !accountInfo.empty ||
+        discoveryItem.accountType === 'coinjoin' ||
+        (discoveryItem.accountType === 'normal' && discoveryItem.index === 0),
+    balance: accountInfo.balance,
+    availableBalance: accountInfo.availableBalance,
+    formattedBalance: formatNetworkAmount(
+        // xrp `availableBalance` is reduced by reserve, use regular balance
+        discoveryItem.networkType === 'ripple' ? accountInfo.balance : accountInfo.availableBalance,
+        discoveryItem.coin,
+    ),
+    tokens: enhanceTokens(accountInfo.tokens),
+    addresses: enhanceAddresses(accountInfo, discoveryItem),
+    utxo: enhanceUtxo(accountInfo.utxo, discoveryItem.networkType, discoveryItem.index),
+    history: accountInfo.history,
+    metadata: {
+        key: accountInfo.legacyXpub || accountInfo.descriptor,
+    },
+    ...getAccountSpecific(accountInfo, discoveryItem.networkType),
+});
+
+const createIndexLabeledAccount = createAction(
+    `${actionPrefix}/createIndexLabeledAccount`,
+    ({
+        deviceState,
+        discoveryItem,
+        accountInfo,
+    }: CreateIndexLabeledAccountActionProps): { payload: Account } => ({
+        payload: composeCreateAccountActionPayload({ deviceState, discoveryItem, accountInfo }),
+    }),
+);
+
 const createAccount = createAction(
     `${actionPrefix}/createAccount`,
-    (
-        deviceState: string,
-        discoveryItem: DiscoveryItem,
-        accountInfo: AccountInfo,
-        accountLabel?: MetadataItem,
-    ): { payload: Account } => ({
-        payload: {
+    ({
+        deviceState,
+        discoveryItem,
+        accountInfo,
+        imported,
+        accountLabel,
+    }: CreateAccountActionProps): { payload: Account } => ({
+        payload: composeCreateAccountActionPayload({
             deviceState,
-            index: discoveryItem.index,
-            path: discoveryItem.path,
-            unlockPath: discoveryItem.unlockPath,
-            descriptor: accountInfo.descriptor,
-            key: getAccountKey(accountInfo.descriptor, discoveryItem.coin, deviceState),
-            accountType: discoveryItem.accountType,
-            symbol: discoveryItem.coin,
-            empty: accountInfo.empty,
-            ...(discoveryItem.backendType === 'coinjoin'
-                ? {
-                      backendType: 'coinjoin',
-                      status: discoveryItem.status,
-                  }
-                : {
-                      backendType: discoveryItem.backendType,
-                  }),
-            visible:
-                !accountInfo.empty ||
-                discoveryItem.accountType === 'coinjoin' ||
-                (discoveryItem.accountType === 'normal' && discoveryItem.index === 0),
-            balance: accountInfo.balance,
-            availableBalance: accountInfo.availableBalance,
-            formattedBalance: formatNetworkAmount(
-                // xrp `availableBalance` is reduced by reserve, use regular balance
-                discoveryItem.networkType === 'ripple'
-                    ? accountInfo.balance
-                    : accountInfo.availableBalance,
-                discoveryItem.coin,
-            ),
-            tokens: enhanceTokens(accountInfo.tokens),
-            addresses: enhanceAddresses(accountInfo, discoveryItem),
-            utxo: enhanceUtxo(accountInfo.utxo, discoveryItem.networkType, discoveryItem.index),
-            history: accountInfo.history,
-            metadata: {
-                key: accountInfo.legacyXpub || accountInfo.descriptor,
-                fileName: '',
-                aesKey: '',
-                accountLabel,
-                outputLabels: {},
-                addressLabels: {},
-            },
-            ...getAccountSpecific(accountInfo, discoveryItem.networkType),
-        },
+            discoveryItem,
+            accountInfo,
+            imported,
+            accountLabel,
+        }),
     }),
 );
 
@@ -167,6 +196,7 @@ export const accountsActions = {
     disposeAccount,
     removeAccount,
     createAccount,
+    createIndexLabeledAccount,
     updateAccount,
     renameAccount,
     updateSelectedAccount,

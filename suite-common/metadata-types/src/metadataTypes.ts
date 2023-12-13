@@ -1,7 +1,24 @@
+export interface LabelableEntityKeys {
+    fileName: string; // file name in data provider
+    aesKey: string; // symmetric key for file encryption
+}
+
+export type DeviceEntityKeys = {
+    [Version in MetadataEncryptionVersion]?: LabelableEntityKeys & { key: string };
+};
+
+export type AccountEntityKeys = {
+    [Version in MetadataEncryptionVersion]?: LabelableEntityKeys;
+} & {
+    key: string; // legacy xpub format (btc-like coins) or account descriptor (other coins)
+};
+
+export type LabelableEntityKeysByVersion = DeviceEntityKeys | AccountEntityKeys;
+
 export type MetadataAddPayload =
     | {
           type: 'outputLabel';
-          accountKey: string;
+          entityKey: string;
           txid: string;
           outputIndex: number;
           defaultValue: string;
@@ -9,19 +26,19 @@ export type MetadataAddPayload =
       }
     | {
           type: 'addressLabel';
-          accountKey: string;
+          entityKey: string;
           defaultValue: string;
           value?: string;
       }
     | {
           type: 'accountLabel';
-          accountKey: string;
+          entityKey: string;
           defaultValue: string;
           value?: string;
       }
     | {
           type: 'walletLabel';
-          deviceState: string;
+          entityKey: string;
           defaultValue: string;
           value?: string;
       };
@@ -38,19 +55,6 @@ export type MetadataProviderType = 'dropbox' | 'google' | 'fileSystem' | 'sdCard
 export type Tokens = {
     accessToken?: string;
     refreshToken?: string;
-};
-
-/**
- * Representation of provider data stored in reducer
- * properties 'tokens' and 'type' are needed to recreate corresponding provider instance
- * others may be used in UI
- */
-
-export type MetadataProvider = {
-    type: MetadataProviderType;
-    user: string;
-    tokens: Tokens;
-    isCloud: boolean;
 };
 
 /**
@@ -94,6 +98,7 @@ export abstract class AbstractMetadataProvider {
     /* isCloud means that this provider is not local and allows multi client sync. These providers are suitable for backing up data. */
     abstract isCloud: boolean;
 
+    // eslint-disable-next-line no-empty-function
     constructor(public type: MetadataProviderType) {}
 
     abstract connect(): Result<void>;
@@ -106,7 +111,7 @@ export abstract class AbstractMetadataProvider {
     /**
      * Get details if provider that are supposed to be saved in reducer
      */
-    abstract getProviderDetails(): Result<MetadataProvider>;
+    abstract getProviderDetails(): Result<Omit<MetadataProvider, 'data'>>;
     /**
      * For given filename download metadata file from provider
      */
@@ -115,6 +120,12 @@ export abstract class AbstractMetadataProvider {
      * Upload metadata content in cloud provider for given filename and content
      */
     abstract setFileContent(file: string, content: any): Result<void>;
+    /**
+     * Get a list of metadata file names if any
+     */
+    abstract getFilesList(): Result<string[] | undefined>;
+
+    abstract renameFile(from: string, to: string): Result<void>;
 
     ok(): Success<void>;
     ok<T>(payload: T): Success<T>;
@@ -137,37 +148,94 @@ export abstract class AbstractMetadataProvider {
             error: reason,
         } as const;
     }
+
+    scheduleApiRequest<T extends () => ReturnType<R>, R extends (...args: any) => Result<any>>(
+        fn: T,
+        options: { retries: number; delay: number } = { retries: 3, delay: 1000 },
+    ) {
+        let retried = 0;
+        return new Promise<Awaited<ReturnType<R>>>(resolve => {
+            const { retries, delay } = options;
+            const run = async () => {
+                const res = await fn();
+
+                if (res.success) {
+                    return resolve(res);
+                }
+
+                if (retries > 0 && retried < retries) {
+                    retried++;
+                    setTimeout(run, delay);
+                } else {
+                    // reached retries limit, return error
+                    resolve(res);
+                }
+            };
+            run();
+        });
+    }
 }
 
-export interface AccountMetadata {
-    key: string; // legacy xpub format (btc-like coins) or account descriptor (other coins)
-    fileName: string; // file name in dropbox
-    aesKey: string; // asymmetric key for file encryption
+export interface AccountLabels {
     accountLabel?: MetadataItem;
     outputLabels: { [txid: string]: { [index: string]: MetadataItem } };
     addressLabels: { [address: string]: MetadataItem };
 }
 
-export type DeviceMetadata =
-    | {
-          status: 'disabled' | 'cancelled'; // user rejects "Enable labeling" on device
-      }
-    | {
-          status: 'enabled';
-          key: string; // master key for all values (Device and Account)
-          fileName: string; // file name in dropbox
-          aesKey: string; // asymmetric key for file encryption
-          walletLabel?: string;
-      };
+export interface WalletLabels {
+    walletLabel?: string;
+}
+
+export type Labels = AccountLabels | WalletLabels;
+
+export type DeviceMetadata = DeviceEntityKeys;
+
+type Data = Record<
+    LabelableEntityKeys['fileName'], // unique "id" for mapping with labelable entitties
+    Labels
+>;
+
+/**
+ * DataType dictates shape of data.
+ * in the future, it could be
+ * 'labels' | 'passwords' | 'contacts'...
+ */
+export type DataType = 'labels';
+
+/**
+ * Representation of provider data stored in reducer
+ * properties 'tokens' and 'type' are needed to recreate corresponding provider instance
+ * others may be used in UI
+ */
+export type MetadataProvider = {
+    type: MetadataProviderType;
+    user: string;
+    tokens: Tokens;
+    isCloud: boolean;
+    // decrypted content of data per provider
+    data: Data;
+    clientId: string;
+};
 
 export interface MetadataState {
     enabled: boolean; // global for all devices
-    provider?: MetadataProvider;
+    providers: MetadataProvider[];
+    // being selected means:
+    // - see data from this provider
+    // - save data to this provider when making changes
+    selectedProvider: { [key in DataType]: MetadataProvider['clientId'] };
     // is there active inline input? only one may be active at time so we save this
     // information in reducer to make it easily accessible in UI.
     // field shall hold default value for which user may add metadata (address, txId, etc...);
     editing?: string;
     initiating?: boolean;
+    /**
+     * error, typical reasons:
+     * - user clicked cancel button on device when "Enable labeling" was shown.
+     * - device disconnected
+     */
+    error?: { [deviceState: string]: boolean };
 }
 
 export type OAuthServerEnvironment = 'production' | 'staging' | 'localhost';
+export type MetadataEncryptionVersion = 1 | 2;

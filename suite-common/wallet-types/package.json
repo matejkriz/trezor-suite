@@ -11,17 +11,18 @@
     },
     "dependencies": {
         "@suite-common/intl-types": "workspace:*",
+        "@suite-common/metadata-types": "workspace:*",
         "@suite-common/suite-config": "workspace:*",
         "@suite-common/wallet-config": "workspace:*",
         "@suite-common/wallet-constants": "workspace:*",
-        "@trezor/connect": "workspace:9.0.7",
+        "@trezor/connect": "workspace:*",
         "@trezor/type-utils": "workspace:*",
         "@trezor/utils": "workspace:*",
         "react": "18.2.0",
-        "react-hook-form": "6.15.7"
+        "react-hook-form": "^7.48.2"
     },
     "devDependencies": {
-        "jest": "^26.6.3",
-        "typescript": "4.9.5"
+        "jest": "29.5.0",
+        "typescript": "5.3.2"
     }
 }

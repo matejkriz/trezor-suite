@@ -1,30 +1,19 @@
+import { Network } from '@trezor/utxo-lib';
+import { FeeLevel } from './fees';
+
+export type { Network } from '@trezor/utxo-lib';
+
 export interface CoinSupport {
     connect: boolean;
-    trezor1: string;
-    trezor2: string;
-}
-
-// copy-paste from '@trezor/utxo-lib' module
-export interface Network {
-    messagePrefix: string;
-    bech32: string;
-    bip32: {
-        public: number;
-        private: number;
-    };
-    pubKeyHash: number;
-    scriptHash: number;
-    wif: number;
-    forkId?: number;
+    T1B1: string | false;
+    T2T1: string | false;
+    T2B1: string | false;
 }
 
 export interface BlockchainLink {
     type: string;
     url: string[];
 }
-
-export type BitcoinDefaultFeesKeys = 'High' | 'Normal' | 'Economy' | 'Low';
-export type BitcoinDefaultFees = { [key in BitcoinDefaultFeesKeys]: number };
 
 interface Common {
     label: string; // Human readable format, label != name
@@ -34,9 +23,10 @@ interface Common {
     support: CoinSupport;
     decimals: number;
     blockchainLink?: BlockchainLink;
-    blocktime: number;
+    blockTime: number;
     minFee: number;
     maxFee: number;
+    defaultFees: FeeLevel[];
 }
 
 export interface BitcoinNetworkInfo extends Common {
@@ -50,7 +40,6 @@ export interface BitcoinNetworkInfo extends Common {
     maxFeeSatoshiKb: number;
     minAddressLength: number;
     minFeeSatoshiKb: number;
-    defaultFees: BitcoinDefaultFees;
     segwit: boolean;
 
     xPubMagic: number;
@@ -61,28 +50,18 @@ export interface BitcoinNetworkInfo extends Common {
     // custom
     network: Network;
     isBitcoin: boolean;
-    // used in backend
-    blocks?: number;
 }
 
 export interface EthereumNetworkInfo extends Common {
     type: 'ethereum';
-    chain: string;
     chainId: number;
-    rskip60: boolean;
-    defaultFees: Array<{
-        label: 'high' | 'normal' | 'low';
-        feePerUnit: string;
-        feeLimit: string;
-    }>;
-    network: typeof undefined;
+    network?: typeof undefined;
 }
 
 export interface MiscNetworkInfo extends Common {
     type: 'misc' | 'nem';
     curve: string;
-    defaultFees: BitcoinDefaultFees;
-    network: typeof undefined; // compatibility
+    network?: typeof undefined; // compatibility
 }
 
 export type CoinInfo = BitcoinNetworkInfo | EthereumNetworkInfo | MiscNetworkInfo;

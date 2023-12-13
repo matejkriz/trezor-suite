@@ -31,7 +31,7 @@ describe('analytics', () => {
         const sessionId = getRandomId();
         const commitId = 'abc';
 
-        const analytics = new Analytics('1.18', app);
+        const analytics = new Analytics({ version: '1.18', app });
 
         analytics.init(false, { environment, isDev, instanceId, sessionId, commitId });
 
@@ -48,7 +48,7 @@ describe('analytics', () => {
         expect(global.fetch).toHaveBeenNthCalledWith(
             1,
             `https://data.trezor.io/${app}/log/${environment}/develop.log?c_v=1.18&c_type=${actionType}&c_commit=${commitId}&c_instance_id=${instanceId}&c_session_id=${sessionId}&c_timestamp=${timestamp}&c_message_id=random`,
-            { method: 'GET' },
+            { method: 'GET', keepalive: true },
         );
         expect(global.fetch).toHaveBeenCalledTimes(1);
 
@@ -81,7 +81,7 @@ describe('analytics', () => {
         const sessionId = getRandomId();
         const commitId = 'abc';
 
-        const analytics = new Analytics('1.18', app);
+        const analytics = new Analytics({ version: '1.18', app });
 
         analytics.init(true, { isDev, instanceId, sessionId, commitId });
 
@@ -92,7 +92,7 @@ describe('analytics', () => {
         expect(global.fetch).toHaveBeenNthCalledWith(
             1,
             `https://data.trezor.io/${app}/log/stable.log?c_v=1.18&c_type=${actionType}&c_commit=${commitId}&c_instance_id=${instanceId}&c_session_id=${sessionId}&c_timestamp=${timestamp}&c_message_id=random`,
-            { method: 'GET' },
+            { method: 'GET', keepalive: true },
         );
         expect(global.fetch).toHaveBeenCalledTimes(1);
     });
@@ -107,7 +107,7 @@ describe('analytics', () => {
         const sessionId = getRandomId();
         const commitId = 'abc';
 
-        const analytics = new Analytics('1.18', app);
+        const analytics = new Analytics({ version: '1.18', app });
         analytics.init(false, {
             environment,
             isDev,
@@ -146,8 +146,8 @@ describe('analytics', () => {
         const sessionId = getRandomId();
         const commitId = 'abc';
 
-        const analytics = new Analytics('1.18', app);
-        analytics.init(false, {
+        const analytics = new Analytics({ version: '1.18', app, useQueue: true });
+        analytics.init(undefined, {
             environment,
             isDev,
             instanceId,
@@ -157,7 +157,6 @@ describe('analytics', () => {
                 onDisable: () => console.log('disabled'),
                 onEnable: () => console.log('enabled'),
             },
-            useQueue: true,
         });
 
         expect(analytics.isEnabled()).toBeFalsy();
@@ -170,6 +169,88 @@ describe('analytics', () => {
         expect(global.fetch).toHaveBeenCalledTimes(0);
 
         analytics.enable();
+
+        expect(global.fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not report queued events if first disabled and then enabled', () => {
+        const mockFetchPromise = Promise.resolve({
+            json: () => Promise.resolve({}),
+        });
+
+        jest.spyOn(console, 'log').mockImplementation(() => {});
+        global.fetch = jest.fn().mockImplementation(() => mockFetchPromise);
+
+        const app = 'suite';
+        const environment = 'desktop';
+        const isDev = true;
+        const instanceId = getRandomId();
+        const sessionId = getRandomId();
+        const commitId = 'abc';
+
+        const analytics = new Analytics({ version: '1.18', app, useQueue: true });
+        analytics.init(false, {
+            environment,
+            isDev,
+            instanceId,
+            sessionId,
+            commitId,
+            callbacks: {
+                onDisable: () => console.log('disabled'),
+                onEnable: () => console.log('enabled'),
+            },
+        });
+
+        expect(analytics.isEnabled()).toBeFalsy();
+
+        const actionType = 'very-important-action';
+
+        analytics.report({ type: actionType });
+        analytics.report({ type: actionType });
+
+        expect(global.fetch).toHaveBeenCalledTimes(0);
+
+        analytics.disable();
+
+        analytics.enable();
+
+        expect(global.fetch).toHaveBeenCalledTimes(0);
+    });
+
+    it('does report events', () => {
+        const mockFetchPromise = Promise.resolve({
+            json: () => Promise.resolve({}),
+        });
+
+        jest.spyOn(console, 'log').mockImplementation(() => {});
+        global.fetch = jest.fn().mockImplementation(() => mockFetchPromise);
+
+        const app = 'suite';
+        const environment = 'desktop';
+        const isDev = true;
+        const instanceId = getRandomId();
+        const sessionId = getRandomId();
+        const commitId = 'abc';
+
+        const analytics = new Analytics({ version: '1.18', app, useQueue: true });
+        analytics.init(true, {
+            environment,
+            isDev,
+            instanceId,
+            sessionId,
+            commitId,
+            callbacks: {
+                onDisable: () => console.log('disabled'),
+                onEnable: () => console.log('enabled'),
+            },
+        });
+
+        expect(analytics.isEnabled()).toBeTruthy();
+
+        const actionType = 'very-important-action';
+
+        analytics.report({ type: actionType });
+        analytics.report({ type: actionType });
 
         expect(global.fetch).toHaveBeenCalledTimes(2);
     });

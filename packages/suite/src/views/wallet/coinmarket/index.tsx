@@ -1,6 +1,6 @@
 import styled from 'styled-components';
 import { Icon, variables, SelectBar } from '@trezor/components';
-import { CardWithHeader } from '@suite-components/CardWithHeader';
+import { CardWithHeader } from 'src/components/suite/CardWithHeader';
 
 interface ResponsiveSize {
     responsiveSize: keyof typeof variables.SCREEN_SIZE;
@@ -13,6 +13,7 @@ export const Wrapper = styled.div<ResponsiveSize>`
     @media screen and (min-width: ${props => variables.SCREEN_SIZE[props.responsiveSize]}) {
         flex-flow: wrap;
     }
+
     @media screen and (max-width: ${props => variables.SCREEN_SIZE[props.responsiveSize]}) {
         flex-direction: column;
     }
@@ -53,7 +54,7 @@ export const StyledIcon = styled(Icon)<ResponsiveSize>`
 
 export const FeesWrapper = styled.div`
     margin: 25px 0;
-    border-top: 1px solid ${props => props.theme.STROKE_GREY};
+    border-top: 1px solid ${({ theme }) => theme.STROKE_GREY};
 `;
 
 export const NoProviders = styled.div`
@@ -65,7 +66,7 @@ export const FooterWrapper = styled.div`
     display: flex;
     align-items: center;
     padding-top: 30px;
-    border-top: 1px solid ${props => props.theme.STROKE_GREY};
+    border-top: 1px solid ${({ theme }) => theme.STROKE_GREY};
 
     @media screen and (max-width: ${variables.SCREEN_SIZE.MD}) {
         flex-direction: column;
@@ -74,6 +75,7 @@ export const FooterWrapper = styled.div`
 
 export const StyledSelectBar = styled(SelectBar)`
     width: 100%;
+
     & div div {
         justify-content: center;
     }

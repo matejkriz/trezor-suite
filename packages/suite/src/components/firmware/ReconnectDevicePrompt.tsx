@@ -1,27 +1,28 @@
-import React from 'react';
+import { ReactNode } from 'react';
 import styled, { css } from 'styled-components';
 import * as semver from 'semver';
-import {
-    DeviceModel,
-    getDeviceModel,
-    pickByDeviceModel,
-    getFirmwareVersion,
-} from '@trezor/device-utils';
 
-import { H1, Button, ConfirmOnDevice, variables } from '@trezor/components';
-import { Modal, Translation, WebUsbButton } from '@suite-components';
-import { DeviceConfirmImage } from '@suite-components/images/DeviceConfirmImage';
-import { DeviceAnimation } from '@onboarding-components/DeviceAnimation';
-import { useDevice, useFirmware } from '@suite-hooks';
+import { pickByDeviceModel, getFirmwareVersion } from '@trezor/device-utils';
+import {
+    H1,
+    Button,
+    ConfirmOnDevice,
+    variables,
+    DeviceAnimation,
+    AnimationDeviceType,
+} from '@trezor/components';
+import { DeviceModelInternal } from '@trezor/connect';
+import { Modal, Translation, WebUsbButton } from 'src/components/suite';
+import { DeviceConfirmImage } from 'src/components/suite/DeviceConfirmImage';
+import { useDevice, useFirmware } from 'src/hooks/suite';
 import {
     useRebootRequest,
     RebootRequestedMode,
     RebootPhase,
     RebootMethod,
-} from '@firmware-hooks/useRebootRequest';
-
-import type { TrezorDevice } from '@suite/types/suite';
-import { AbortButton } from '@suite-components/Modal/DevicePromptModal';
+} from 'src/hooks/firmware/useRebootRequest';
+import type { TrezorDevice } from 'src/types/suite';
+import { AbortButton } from 'src/components/suite/modals/AbortButton';
 
 const StyledModal = styled(Modal)`
     width: 580px;
@@ -34,6 +35,7 @@ const StyledModal = styled(Modal)`
 const Wrapper = styled.div`
     display: flex;
     align-items: center;
+    justify-content: space-around;
 
     ${variables.SCREEN_QUERY.MOBILE} {
         flex-direction: column;
@@ -45,10 +47,6 @@ const Content = styled.div`
     flex-direction: column;
     padding: 10px 14px;
     margin-left: 24px;
-
-    ${variables.SCREEN_QUERY.MOBILE} {
-        margin-left: 0px;
-    }
 `;
 
 const BulletPointWrapper = styled.div`
@@ -161,24 +159,24 @@ const ReconnectLabel = ({
     device?: TrezorDevice;
 }) => {
     const deviceFwVersion = getFirmwareVersion(device);
-    const deviceModel = getDeviceModel(device);
+    const deviceModelInternal = device?.features?.internal_model;
 
     if (requestedMode === 'bootloader') {
-        const switchToBootloaderModeMessage = pickByDeviceModel(deviceModel, {
+        const switchToBootloaderModeMessage = pickByDeviceModel(deviceModelInternal, {
             default: 'TR_SWITCH_TO_BOOTLOADER_HOLD_LEFT_BUTTON',
-            [DeviceModel.T1]:
+            [DeviceModelInternal.T1B1]:
                 semver.valid(deviceFwVersion) && semver.satisfies(deviceFwVersion, '<1.8.0')
                     ? 'TR_SWITCH_TO_BOOTLOADER_HOLD_BOTH_BUTTONS'
                     : 'TR_SWITCH_TO_BOOTLOADER_HOLD_LEFT_BUTTON',
-            [DeviceModel.TT]: 'TR_SWITCH_TO_BOOTLOADER_SWIPE_YOUR_FINGERS',
+            [DeviceModelInternal.T2T1]: 'TR_SWITCH_TO_BOOTLOADER_SWIPE_YOUR_FINGERS',
         } as const);
 
         return <Translation id={switchToBootloaderModeMessage} />;
     }
 
-    const switchToNormalModeMessage = pickByDeviceModel(deviceModel, {
+    const switchToNormalModeMessage = pickByDeviceModel(deviceModelInternal, {
         default: 'FIRMWARE_CONNECT_IN_NORMAL_MODEL_NO_BUTTON',
-        [DeviceModel.TR]: 'FIRMWARE_CONNECT_IN_NORMAL_MODEL_NO_TOUCH',
+        [DeviceModelInternal.T2B1]: 'FIRMWARE_CONNECT_IN_NORMAL_MODEL_NO_TOUCH',
     } as const);
 
     return <Translation id={switchToNormalModeMessage} />;
@@ -187,7 +185,7 @@ const ReconnectLabel = ({
 interface ReconnectStepProps {
     order?: number;
     active: boolean;
-    children: React.ReactNode;
+    children: ReactNode;
     dataTest: string;
 }
 
@@ -214,9 +212,29 @@ const RebootDeviceGraphics = ({
         return device ? <StyledConfirmImage device={device} /> : null;
     }
 
-    const type = requestedMode === 'bootloader' ? 'BOOTLOADER' : 'NORMAL';
+    const deviceModelInternal = device?.features?.internal_model;
 
-    return <StyledDeviceAnimation type={type} size={220} shape="ROUNDED" device={device} loop />;
+    // T1B1 bootloader before firmware version 1.8.0 can only be invoked by holding both buttons
+    const deviceFwVersion = device?.features ? getFirmwareVersion(device) : '';
+    let type: AnimationDeviceType = requestedMode === 'bootloader' ? 'BOOTLOADER' : 'NORMAL';
+    if (
+        type === 'BOOTLOADER' &&
+        deviceModelInternal === DeviceModelInternal.T1B1 &&
+        semver.valid(deviceFwVersion) &&
+        semver.satisfies(deviceFwVersion, '<1.8.0')
+    ) {
+        type = 'BOOTLOADER_TWO_BUTTONS';
+    }
+
+    return (
+        <StyledDeviceAnimation
+            type={type}
+            size={220}
+            shape="ROUNDED"
+            deviceModelInternal={deviceModelInternal}
+            loop
+        />
+    );
 };
 
 interface ReconnectDevicePromptProps {
@@ -237,7 +255,8 @@ export const ReconnectDevicePrompt = ({
     const { rebootPhase, rebootMethod } = useRebootRequest(device, requestedMode);
 
     const isRebootAutomatic = rebootMethod === 'automatic';
-    const deviceModel = getDeviceModel(device);
+    const isAnimationVisible = requestedMode === 'bootloader' && rebootPhase !== 'done';
+    const deviceModelInternal = device?.features?.internal_model;
 
     return (
         <StyledModal
@@ -245,7 +264,8 @@ export const ReconnectDevicePrompt = ({
                 isRebootAutomatic && (
                     <ConfirmOnDevice
                         title={<Translation id="TR_CONFIRM_ON_TREZOR" />}
-                        deviceModel={deviceModel}
+                        deviceModelInternal={deviceModelInternal}
+                        deviceUnitColor={device?.features?.unit_color}
                         isConfirmed={rebootPhase !== 'wait-for-confirm'}
                     />
                 )
@@ -254,11 +274,13 @@ export const ReconnectDevicePrompt = ({
             {onClose && rebootPhase === 'initial' && <StyledAbortButton onAbort={onClose} />}
 
             <Wrapper data-test={`@firmware/reconnect-device/${requestedMode}`}>
-                <RebootDeviceGraphics
-                    device={expectedDevice}
-                    method={rebootMethod}
-                    requestedMode={requestedMode}
-                />
+                {isAnimationVisible && (
+                    <RebootDeviceGraphics
+                        device={expectedDevice}
+                        method={rebootMethod}
+                        requestedMode={requestedMode}
+                    />
+                )}
 
                 <Content>
                     <Heading>

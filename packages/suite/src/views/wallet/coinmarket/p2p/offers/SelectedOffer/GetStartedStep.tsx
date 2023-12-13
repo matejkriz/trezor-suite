@@ -1,8 +1,7 @@
-import React from 'react';
 import styled from 'styled-components';
-import { Translation } from '@suite-components';
+import { Translation } from 'src/components/suite';
 import { Button, variables } from '@trezor/components';
-import { useCoinmarketP2pOffersContext } from '@wallet-hooks/useCoinmarketP2pOffers';
+import { useCoinmarketP2pOffersContext } from 'src/hooks/wallet/useCoinmarketP2pOffers';
 
 const Wrapper = styled.div`
     display: flex;
@@ -13,7 +12,7 @@ const Wrapper = styled.div`
 const CardContent = styled.div`
     display: flex;
     flex-direction: column;
-    padding: 16px 24px 0 24px;
+    padding: 16px 24px 0;
 `;
 
 const HowToText = styled.div`
@@ -22,13 +21,13 @@ const HowToText = styled.div`
 `;
 
 const HowToList = styled.ol`
-    margin: 10px 20px 0 20px;
+    margin: 10px 20px 0;
 `;
 
 const HowToItem = styled.li`
     font-size: ${variables.FONT_SIZE.SMALL};
     font-weight: ${variables.FONT_WEIGHT.REGULAR};
-    padding: 0 10px 8px 10px;
+    padding: 0 10px 8px;
 `;
 
 const ButtonWrapper = styled.div`

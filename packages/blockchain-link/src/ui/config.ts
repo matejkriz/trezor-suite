@@ -89,32 +89,6 @@ export default [
     },
     {
         blockchain: {
-            name: 'Ethereum Testnet (Ropsten)',
-            worker: 'js/blockbook-worker.js',
-            server: ['https://ropsten1.trezor.io', 'https://ropsten2.trezor.io'],
-            debug: true,
-        },
-        data: {
-            // address: '0x103262f243e6f67d12d6a4ea0d45302c1fa4bb0a',
-            address: '0x73d0385F4d8E00C5e6504C6030F47BF6212736A8',
-            accountInfoOptions: {
-                page: 0,
-                pageSize: 25,
-                contractFilter: undefined,
-                // tokens: 'derived',
-                // from: 0,
-                // to: 0,
-            },
-            estimateFeeOptions: {
-                blocks: [1, 2, 10],
-            },
-            txid: '',
-            tx: '',
-            subscribe: '0x103262f243e6f67d12d6a4ea0d45302c1fa4bb0a',
-        },
-    },
-    {
-        blockchain: {
             name: 'Ethereum Classic',
             worker: 'js/blockbook-worker.js',
             server: ['https://etc1.trezor.io', 'https://etc2.trezor.io'],
@@ -473,6 +447,60 @@ export default [
             txid: '28172ea876c3d1e691284e5179fae2feb3e69d7d41e43f8023dc380115741026',
             blockNumber: '5f20df933584822601f9e3f8c024eb5eb252fe8cefb24d1317dc3d432e940ebb',
             tx: '83a400818258208911f640d452c3be4ff3d89db63b41ce048c056951286e2e28bbf8a51588ab44000181825839009493315cd92eb5d8c4304e67b7e16ae36d61d34502694657811a2c8e32c728d3861e164cab28cb8f006448139c8f1740ffb8e7aa9e5232dc1a10b2531f021a00029519075820cb798b0bce50604eaf2e0dc89367896b18f0a6ef6b32b57e3c9f83f8ee71e608a1008182582073fea80d424276ad0978d4fe5310e8bc2d485f5f6bb3bf87612989f112ad5a7d5840c40425229749a9434763cf01b492057fd56d7091a6372eaa777a1c9b1ca508c914e6a4ee9c0d40fc10952ed668e9ad65378a28b149de6bd4204bd9f095b0a902a11907b0a1667469636b657281a266736f757263656b736f757263655f6e616d656576616c7565736675676961742076656e69616d206d696e7573',
+        },
+    },
+    {
+        blockchain: {
+            name: 'Solana Mainnet',
+            // we do not use path to worker build here because its not used, we use it just to match this config to actual implementation of the worker
+            worker: 'solana',
+            server: ['https://solana1.trezor.io'],
+            debug: true,
+        },
+        data: {
+            estimateFeeOptions: {
+                // please note that fee estimation is time sensitive and this specific params are outdated
+                specific: {
+                    data: '01000102c80f8b50107e9f3e3c16a661b8c806df454a6deb293d5e8730a9d28f2f4998c60000000000000000000000000000000000000000000000000000000000000000c41dc0c82a686ce8dfed732687b5869180d6239c026af160a5297506ad87ea5901010200000c020000000000000000000000',
+                },
+            },
+            accountInfoOptions: {
+                page: 0,
+                pageSize: 25,
+            },
+            address: 'ETxHeBBcuw9Yu4dGuP3oXrD12V5RECvmi8ogQ9PkjyVF',
+            txid: '', // not implemented
+            blockNumber: '', // not implemented
+            // please note transaction submission is time sensitive and this specific params are outdated
+            // also the transaction has already been submitted so its invalid
+            tx: '016b6504fe0a54f4e30c13e4707fdea772496a932d3cb87cbf817ddad7a7924d6cae2aaf687dd57851829c2d884f1c135abad4a1a36167dcebdb28286c31d6d80b01000102c80f8b50107e9f3e3c16a661b8c806df454a6deb293d5e8730a9d28f2f4998c60000000000000000000000000000000000000000000000000000000000000000c41dc0c82a686ce8dfed732687b5869180d6239c026af160a5297506ad87ea5901010200000c0200000070ec9b0700000000',
+        },
+    },
+    {
+        blockchain: {
+            name: 'Solana Devnet',
+            // we do not use path to worker build here because its not used, we use it just to match this config to actual implementation of the worker
+            worker: 'solana',
+            server: ['https://solana-dev.trezor.io'],
+            debug: true,
+        },
+        data: {
+            estimateFeeOptions: {
+                // please note that fee estimation is time sensitive and this specific params are outdated
+                specific: {
+                    data: '01000102c80f8b50107e9f3e3c16a661b8c806df454a6deb293d5e8730a9d28f2f4998c60000000000000000000000000000000000000000000000000000000000000000c41dc0c82a686ce8dfed732687b5869180d6239c026af160a5297506ad87ea5901010200000c020000000000000000000000',
+                },
+            },
+            accountInfoOptions: {
+                page: 0,
+                pageSize: 25,
+            },
+            address: 'ETxHeBBcuw9Yu4dGuP3oXrD12V5RECvmi8ogQ9PkjyVF',
+            txid: '', // not implemented
+            blockNumber: '', // not implemented
+            // please note transaction submission is time sensitive and this specific params are outdated
+            // also the transaction has already been submitted so its invalid
+            tx: '016b6504fe0a54f4e30c13e4707fdea772496a932d3cb87cbf817ddad7a7924d6cae2aaf687dd57851829c2d884f1c135abad4a1a36167dcebdb28286c31d6d80b01000102c80f8b50107e9f3e3c16a661b8c806df454a6deb293d5e8730a9d28f2f4998c60000000000000000000000000000000000000000000000000000000000000000c41dc0c82a686ce8dfed732687b5869180d6239c026af160a5297506ad87ea5901010200000c0200000070ec9b0700000000',
         },
     },
 ];

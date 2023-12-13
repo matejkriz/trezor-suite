@@ -1,12 +1,17 @@
-import { A, D, pipe } from '@mobily/ts-belt';
+import { A, D, G, pipe } from '@mobily/ts-belt';
 import BigNumber from 'bignumber.js';
 import { fromUnixTime, getUnixTime } from 'date-fns';
 
 import { FiatCurrencyCode } from '@suite-common/suite-config';
-import { NetworkSymbol } from '@suite-common/wallet-config';
+import { NetworkSymbol, getNetworkType } from '@suite-common/wallet-config';
 import { formatNetworkAmount } from '@suite-common/wallet-utils';
 import { AccountBalanceHistory as AccountMovementHistory } from '@trezor/blockchain-link';
 import TrezorConnect from '@trezor/connect';
+import { getFiatRatesForTimestamps } from '@suite-common/fiat-services';
+import {
+    AccountBalanceHistory,
+    TransactionCacheEngine,
+} from '@suite-common/transaction-cache-engine';
 
 import { NUMBER_OF_POINTS } from './constants';
 import {
@@ -19,7 +24,7 @@ import {
 import { AccountItem, FiatGraphPoint, FiatGraphPointWithCryptoBalance } from './types';
 
 export const addBalanceForAccountMovementHistory = (
-    data: AccountMovementHistory[],
+    data: AccountMovementHistory[] | AccountBalanceHistory[],
     symbol: NetworkSymbol,
 ): AccountHistoryBalancePoint[] => {
     let balance = new BigNumber('0');
@@ -46,56 +51,96 @@ export const addBalanceForAccountMovementHistory = (
     return historyWithBalance;
 };
 
+export const getLatestAccountBalance = async ({
+    coin,
+    descriptor,
+}: {
+    coin: NetworkSymbol;
+    descriptor: string;
+}) => {
+    const networkType = getNetworkType(coin);
+
+    const accountInfo = await TrezorConnect.getAccountInfo({
+        coin,
+        descriptor,
+        suppressBackupWarning: true,
+    });
+
+    if (!accountInfo?.success) {
+        throw new Error(`Get account balance info error: ${accountInfo.payload.error}`);
+    }
+
+    switch (networkType) {
+        case 'ripple':
+            // On Ripple, if we use availableBalance, we will get higher balance, IDK why.
+            return accountInfo.payload.balance;
+        default:
+            return accountInfo.payload.availableBalance;
+    }
+};
+
 const accountBalanceHistoryCache: Record<string, AccountHistoryBalancePoint[]> = {};
 
 export const getAccountBalanceHistory = async ({
     coin,
     descriptor,
     endOfTimeFrameDate,
+    forceRefetch,
 }: {
     coin: NetworkSymbol;
     descriptor: string;
     endOfTimeFrameDate: Date;
+    forceRefetch?: boolean;
 }): Promise<AccountHistoryBalancePoint[]> => {
     const endTimeFrameTimestamp = getUnixTime(endOfTimeFrameDate);
     const cacheKey = `${coin}-${descriptor}-${endTimeFrameTimestamp}`;
 
-    if (accountBalanceHistoryCache[cacheKey]) {
+    if (accountBalanceHistoryCache[cacheKey] && !forceRefetch) {
         return accountBalanceHistoryCache[cacheKey];
     }
 
-    const [accountMovementHistory, accountInfo] = await Promise.all([
-        TrezorConnect.blockchainGetAccountBalanceHistory({
+    const getBalanceHistory = async () => {
+        if (getNetworkType(coin) === 'ripple') {
+            return TransactionCacheEngine.getAccountBalanceHistory({
+                coin,
+                descriptor,
+            });
+        }
+        const connectBalanceHistory = await TrezorConnect.blockchainGetAccountBalanceHistory({
             coin,
             descriptor,
             to: endTimeFrameTimestamp,
+            groupBy: 1,
             // we don't need currencies at all here, this will just reduce transferred data size
             // TODO: doesn't work at all, fix it in connect or blockchain-link?
+            // issue: https://github.com/trezor/trezor-suite/issues/8888
             currencies: ['usd'],
-        }),
-        TrezorConnect.getAccountInfo({ coin, descriptor }),
+        });
+
+        if (!connectBalanceHistory?.success) {
+            throw new Error(
+                `Get account balance movement error: ${connectBalanceHistory.payload.error}`,
+            );
+        }
+
+        return connectBalanceHistory.payload;
+    };
+
+    const [accountMovementHistory, latestAccountBalance] = await Promise.all([
+        getBalanceHistory(),
+        getLatestAccountBalance({ coin, descriptor }),
     ]);
 
-    if (!accountMovementHistory?.success) {
-        throw new Error(
-            `Get account balance movement error: ${accountMovementHistory.payload.error}`,
-        );
-    }
-
-    if (!accountInfo?.success) {
-        throw new Error(`Get account balance info error: ${accountInfo.payload.error}`);
-    }
-
     const accountMovementHistoryWithBalance = addBalanceForAccountMovementHistory(
-        accountMovementHistory.payload,
+        accountMovementHistory,
         coin,
     );
 
     // Last point must be balance from getAccountInfo because blockchainGetAccountBalanceHistory it's not always reliable for coins like ETH.
-    // TODO: We can get value from redux store instead of fetching it again?
+    // TODO: We can get value from Transaction Cache engine instead of fetching it again?
     accountMovementHistoryWithBalance.push({
         time: endTimeFrameTimestamp,
-        cryptoBalance: formatNetworkAmount(accountInfo.payload.balance, coin),
+        cryptoBalance: formatNetworkAmount(latestAccountBalance, coin),
     });
 
     accountBalanceHistoryCache[cacheKey] = accountMovementHistoryWithBalance;
@@ -112,40 +157,34 @@ type FiatRatesItem = {
 
 const fiatRatesCache: Record<string, FiatRatesItem[]> = {};
 
-export const getFiatRatesForNetworkInTimeFrame = async (
-    timestamps: number[],
-    networkSymbol: NetworkSymbol,
-) => {
-    const cacheKey = `${networkSymbol}-${JSON.stringify(timestamps)}`;
+export const getFiatRatesForNetworkInTimeFrame = async ({
+    timestamps,
+    coin,
+    fiatCurrency,
+    forceRefetch,
+}: {
+    timestamps: number[];
+    coin: NetworkSymbol;
+    fiatCurrency: FiatCurrencyCode;
+    forceRefetch?: boolean;
+}) => {
+    const cacheKey = `${coin}-${fiatCurrency}-${JSON.stringify(timestamps)}`;
 
-    if (fiatRatesCache[cacheKey]) {
+    if (fiatRatesCache[cacheKey] && !forceRefetch) {
         return fiatRatesCache[cacheKey];
     }
 
-    const fiatRatesForDatesInRange = await TrezorConnect.blockchainGetFiatRatesForTimestamps({
-        coin: networkSymbol,
-        timestamps,
-    }).then(res => {
-        if (res.success) {
-            if (timestamps.length !== res.payload.tickers.length) {
-                throw new Error(
-                    `Get fiat rates error: number of returned rates doesn't match number of requested timestamps`,
-                );
-            }
+    const fiatRates = await getFiatRatesForTimestamps({ symbol: coin }, timestamps, fiatCurrency);
+    if (G.isNullable(fiatRates)) return null;
 
-            return res.payload.tickers.map(({ rates }, index) => ({
-                // blockbook returns little bit different timestamps than we requested.
-                // It's probably mapping to closes that is in his database, so we remap it back to requested timestamps.
-                time: timestamps[index],
-                rates,
-            }));
-        }
-        throw new Error(`Get fiat rates error: ${res.payload.error}`);
-    });
+    const formattedFiatRates = fiatRates.tickers.map((ticker, index) => ({
+        time: timestamps[index],
+        rates: ticker.rates,
+    }));
 
-    fiatRatesCache[cacheKey] = fiatRatesForDatesInRange;
+    fiatRatesCache[cacheKey] = formattedFiatRates;
 
-    return fiatRatesForDatesInRange;
+    return formattedFiatRates;
 };
 
 export const getMultipleAccountBalanceHistoryWithFiat = async ({
@@ -154,19 +193,22 @@ export const getMultipleAccountBalanceHistoryWithFiat = async ({
     endOfTimeFrameDate,
     numberOfPoints = NUMBER_OF_POINTS,
     fiatCurrency,
+    forceRefetch,
 }: {
     accounts: AccountItem[];
     startOfTimeFrameDate: Date | null;
     endOfTimeFrameDate: Date;
     numberOfPoints?: number;
     fiatCurrency: FiatCurrencyCode;
-}) => {
+    forceRefetch?: boolean;
+}): Promise<FiatGraphPoint[] | FiatGraphPointWithCryptoBalance[]> => {
     const accountsWithBalanceHistory = await Promise.all(
         accounts.map(({ coin, descriptor }) =>
             getAccountBalanceHistory({
                 coin,
                 descriptor,
                 endOfTimeFrameDate,
+                forceRefetch,
             }).then(balanceHistory => ({
                 coin,
                 descriptor,
@@ -201,9 +243,17 @@ export const getMultipleAccountBalanceHistoryWithFiat = async ({
     const coinsFiatRates = D.fromPairs(
         await Promise.all(
             coins.map(coin =>
-                getFiatRatesForNetworkInTimeFrame(timestamps, coin).then(
-                    res => [coin, res] as const,
-                ),
+                getFiatRatesForNetworkInTimeFrame({
+                    timestamps,
+                    coin,
+                    fiatCurrency,
+                    forceRefetch,
+                }).then(res => {
+                    if (res === null)
+                        throw new Error(`Unable to fetch fiat rates for defined timestamps.`);
+
+                    return [coin, res] as const;
+                }),
             ),
         ),
     );

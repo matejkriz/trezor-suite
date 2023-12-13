@@ -16,7 +16,7 @@ const GlobalStyle = createGlobalStyle<{ theme: SuiteThemeColors }>`
     }
 
     body, html {
-        background: ${props => props.theme.BG_GREY};
+        background: ${({ theme }) => theme.BG_GREY};
         font-size: ${variables.FONT_SIZE.NORMAL};
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
@@ -40,13 +40,13 @@ const GlobalStyle = createGlobalStyle<{ theme: SuiteThemeColors }>`
     }
 
     *,
-    *:before,
-    *:after {
+    *::before,
+    *::after {
         box-sizing: border-box;
     }
 
     :root {
-        color-scheme: ${props => (props.theme.THEME === 'light' ? 'light' : 'dark')};
+        color-scheme: ${({ theme }) => (theme.THEME === 'light' ? 'light' : 'dark')};
     }
 
     ${animations}

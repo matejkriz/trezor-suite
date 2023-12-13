@@ -1,16 +1,25 @@
-import { DeepMap, FieldError, UseFormMethods } from 'react-hook-form';
+import {
+    FieldError,
+    FieldErrors,
+    FieldErrorsImpl,
+    FieldPath,
+    FieldValues,
+    Merge,
+} from 'react-hook-form';
 
 import BigNumber from 'bignumber.js';
-import { Common, Chain, Hardfork } from '@ethereumjs/common';
-import { Transaction, TxData } from '@ethereumjs/tx';
 import { fromWei, padLeft, toHex, toWei } from 'web3-utils';
 
-import { TypedFieldError } from '@suite-common/wallet-types';
-import { FIAT } from '@suite-common/suite-config';
+import { fiatCurrencies } from '@suite-common/suite-config';
 import { isFeatureFlagEnabled } from '@suite-common/suite-utils';
-import { Network } from '@suite-common/wallet-config';
+import { Network, NetworkType } from '@suite-common/wallet-config';
 import { EthereumTransaction, TokenInfo, ComposeOutput, PROTO } from '@trezor/connect';
-import { DEFAULT_PAYMENT, DEFAULT_VALUES, ERC20_TRANSFER } from '@suite-common/wallet-constants';
+import {
+    COMPOSE_ERROR_TYPES,
+    DEFAULT_PAYMENT,
+    DEFAULT_VALUES,
+    ERC20_TRANSFER,
+} from '@suite-common/wallet-constants';
 import type {
     FormState,
     FeeInfo,
@@ -88,25 +97,24 @@ const getSerializedErc20Transfer = (token: TokenInfo, to: string, amount: string
     return `0x${ERC20_TRANSFER}${erc20recipient}${erc20amount}`;
 };
 
-// TrezorConnect.blockchainEstimateFee for ethereum
-// NOTE:
-// - amount cannot be "0" (send max calculation), use at least 1 unit.
+// TrezorConnect.blockchainEstimateFee for ETH
 export const getEthereumEstimateFeeParams = (
     to: string,
+    amount: string,
     token?: TokenInfo,
-    amount?: string,
     data?: string,
 ) => {
     if (token) {
         return {
-            to: token.address,
+            to: token.contract,
             value: '0x0',
-            data: getSerializedErc20Transfer(token, to, amount || token.balance!), // if amount is not set (set-max case) use whole token balance
+            data: getSerializedErc20Transfer(token, to, amount),
         };
     }
+
     return {
         to,
-        value: amount ? getSerializedAmount(amount) : toHex('1'), // if amount is not set (set-max case) use at least 1 wei
+        value: getSerializedAmount(amount),
         data: data || '',
     };
 };
@@ -130,36 +138,12 @@ export const prepareEthereumTransaction = (txInfo: EthTransactionData) => {
         // join data
         result.data = getSerializedErc20Transfer(txInfo.token, txInfo.to, txInfo.amount);
         // replace tx recipient to smart contract address
-        result.to = txInfo.token.address;
+        result.to = txInfo.token.contract;
         // replace tx value
         result.value = '0x00';
     }
 
     return result;
-};
-
-export const serializeEthereumTx = (tx: TxData & EthereumTransaction) => {
-    // @ethereumjs/tx doesn't support ETC (chain 61) by default
-    // and it needs to be declared as custom chain
-    // see: https://github.com/ethereumjs/ethereumjs-tx/blob/master/examples/custom-chain-tx.ts
-    const options =
-        tx.chainId === 61
-            ? {
-                  common: Common.custom(
-                      {
-                          name: 'ethereum-classic',
-                          networkId: 1,
-                          chainId: 61,
-                      },
-                      { baseChain: Chain.Mainnet, hardfork: Hardfork.Petersburg },
-                  ),
-              }
-            : {
-                  chain: tx.chainId,
-              };
-
-    const ethTx = new Transaction(tx, options);
-    return `0x${ethTx.serialize().toString('hex')}`;
 };
 
 export const getFeeLevels = (networkType: Network['networkType'], feeInfo: FeeInfo) => {
@@ -189,7 +173,10 @@ export const getFeeLevels = (networkType: Network['networkType'], feeInfo: FeeIn
     return levels;
 };
 
-export const getInputState = (error?: FieldError, value?: string) => {
+export const getInputState = (
+    error?: FieldError | Merge<FieldError, FieldErrorsImpl<FieldValues>>,
+    value?: string,
+) => {
     if (error) {
         return 'error';
     }
@@ -199,49 +186,46 @@ export const getInputState = (error?: FieldError, value?: string) => {
     }
 };
 
-export const isLowAnonymityWarning = (
-    outputErrors?: DeepMap<Output, FieldError> | (DeepMap<Output, FieldError> | undefined)[],
-) => {
-    const isLowAnonymityMessage = (error?: DeepMap<Output, FieldError>) =>
-        ((error?.amount as TypedFieldError)?.message as { id: string })?.id === // TODO: type message as ExtendedMessageDescriptor after https://github.com/trezor/trezor-suite/pull/5647 is merged
-        'TR_NOT_ENOUGH_ANONYMIZED_FUNDS_WARNING';
-
-    return Array.isArray(outputErrors)
-        ? outputErrors?.some(isLowAnonymityMessage)
-        : isLowAnonymityMessage(outputErrors);
-};
+export const isLowAnonymityWarning = (error?: Merge<FieldError, FieldErrorsImpl<Output>>) =>
+    error?.amount?.type === COMPOSE_ERROR_TYPES.ANONYMITY;
 
 export const getFiatRate = (fiatRates: CoinFiatRates | undefined, currency: string) => {
     if (!fiatRates || !fiatRates.current || !fiatRates.current.rates) return;
     return fiatRates.current.rates[currency];
 };
 
-export const getFeeUnits = (networkType: Network['networkType']) => {
+export const getFeeUnits = (networkType: NetworkType) => {
     if (networkType === 'ethereum') return 'GWEI';
     if (networkType === 'ripple') return 'Drops';
     if (networkType === 'cardano') return 'Lovelaces/B';
+    if (networkType === 'solana') return 'Lamports';
     return 'sat/B';
 };
 
-// Find all errors with type='compose' in FormState errors
-export const findComposeErrors = (errors: UseFormMethods['errors'], prefix?: string) => {
-    const composeErrors: string[] = [];
+// Find all validation errors set while composing a transaction
+export const findComposeErrors = <T extends FieldValues>(
+    errors: FieldErrors<T>,
+    prefix?: string,
+) => {
+    const composeErrors: FieldPath<T>[] = [];
     if (!errors || typeof errors !== 'object') return composeErrors;
     Object.keys(errors).forEach(key => {
         const val = errors[key];
         if (val) {
             if (Array.isArray(val)) {
                 // outputs
-                val.forEach((output, index) =>
-                    composeErrors.push(...findComposeErrors(output, `outputs[${index}]`)),
+                val.forEach((output: FieldErrors<Output>, index) =>
+                    composeErrors.push(
+                        ...(findComposeErrors(output, `outputs.${index}`) as FieldPath<T>[]),
+                    ),
                 );
             } else if (
                 typeof val === 'object' &&
                 Object.prototype.hasOwnProperty.call(val, 'type') &&
-                val.type === 'compose'
+                Object.values(COMPOSE_ERROR_TYPES).includes(val.type as string)
             ) {
                 // regular top level field
-                composeErrors.push(prefix ? `${prefix}.${key}` : key);
+                composeErrors.push((prefix ? `${prefix}.${key}` : key) as FieldPath<T>);
             }
         }
     });
@@ -250,7 +234,7 @@ export const findComposeErrors = (errors: UseFormMethods['errors'], prefix?: str
 
 export const findToken = (tokens: Account['tokens'], address?: string | null) => {
     if (!address || !tokens) return;
-    return tokens.find(t => t.address === address);
+    return tokens.find(t => t.contract === address);
 };
 
 // BTC composeTransaction
@@ -293,13 +277,13 @@ export const getBitcoinComposeOutputs = (
 
             if (address) {
                 result.push({
-                    type: 'external',
+                    type: 'payment',
                     address,
                     amount,
                 });
             } else {
                 result.push({
-                    type: 'noaddress',
+                    type: 'payment-noaddress',
                     amount,
                 });
             }
@@ -313,10 +297,11 @@ export const getBitcoinComposeOutputs = (
         (o, i) => setMaxOutputId !== i && o && o.address && !o.amount,
     );
     if (hasIncompleteOutput) {
-        const finalOutput = result.find(o => o.type === 'send-max' || o.type === 'external');
+        const finalOutput = result.find(o => o.type === 'send-max' || o.type === 'payment');
         if (finalOutput) {
-            // replace to noaddress
-            finalOutput.type = finalOutput.type === 'external' ? 'noaddress' : 'send-max-noaddress';
+            // replace to *-noaddress
+            finalOutput.type =
+                finalOutput.type === 'payment' ? 'payment-noaddress' : 'send-max-noaddress';
         }
     }
 
@@ -356,13 +341,13 @@ export const getExternalComposeOutput = (
         }
     } else if (address) {
         output = {
-            type: 'external',
+            type: 'payment',
             address,
             amount: amountInSatoshi,
         };
     } else {
         output = {
-            type: 'noaddress',
+            type: 'payment-noaddress',
             amount: amountInSatoshi,
         };
     }
@@ -422,7 +407,7 @@ export const getDefaultValues = (
 export const buildCurrencyOptions = (selected: CurrencyOption) => {
     const result: CurrencyOption[] = [];
 
-    FIAT.currencies.forEach(currency => {
+    Object.keys(fiatCurrencies).forEach(currency => {
         if (selected.value === currency) {
             return;
         }
@@ -455,7 +440,7 @@ export const getExcludedUtxos = ({
     utxos?.forEach(utxo => {
         const outpoint = getUtxoOutpoint(utxo);
         const anonymity = (anonymitySet && anonymitySet[utxo.address]) || 1;
-        if (new BigNumber(utxo.amount).lte(Number(dustLimit))) {
+        if (new BigNumber(utxo.amount).lt(Number(dustLimit))) {
             // is lower than dust limit
             excludedUtxos[outpoint] = 'dust';
         } else if (anonymity < (targetAnonymity || 1)) {
@@ -465,3 +450,8 @@ export const getExcludedUtxos = ({
     });
     return excludedUtxos;
 };
+
+// SOL Specific
+
+export const getLamportsFromSol = (amountInSol: string) =>
+    BigInt(new BigNumber(amountInSol).times(10 ** 9).toString());

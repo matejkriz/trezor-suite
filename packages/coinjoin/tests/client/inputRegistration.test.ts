@@ -3,8 +3,6 @@ import { createServer } from '../mocks/server';
 import { createInput } from '../fixtures/input.fixture';
 import { createCoinjoinRound } from '../fixtures/round.fixture';
 
-let server: Awaited<ReturnType<typeof createServer>>;
-
 // mock random delay function
 jest.mock('@trezor/utils', () => {
     const originalModule = jest.requireActual('@trezor/utils');
@@ -16,18 +14,19 @@ jest.mock('@trezor/utils', () => {
 });
 
 describe('inputRegistration', () => {
+    let server: Awaited<ReturnType<typeof createServer>>;
+
     beforeAll(async () => {
         server = await createServer();
-        // jest.spyOn('@trezor/utils', 'getRandomNumberInRange').mockImplementation(() => {});
     });
 
-    beforeEach(() => {
+    afterEach(() => {
         server?.removeAllListeners('test-request');
     });
 
     afterAll(() => {
         jest.clearAllMocks();
-        if (server) server.close();
+        server?.close();
     });
 
     it('try to register without ownership proof', async () => {
@@ -61,9 +60,10 @@ describe('inputRegistration', () => {
 
         response.inputs.forEach(input => {
             expect(input.ownershipProof).toEqual(expect.any(String));
-            expect(input.registrationData).toMatchObject({ aliceId: expect.any(String) });
+            expect(input.registrationData).toMatchObject({ AliceId: expect.any(String) });
             expect(input.realAmountCredentials).toEqual(expect.any(Object));
             expect(input.realVsizeCredentials).toEqual(expect.any(Object));
+            input.clearConfirmationInterval();
         });
     });
 
@@ -71,19 +71,19 @@ describe('inputRegistration', () => {
         server?.addListener('test-request', ({ url, data, resolve }) => {
             if (
                 url.endsWith('/input-registration') &&
-                (data.input === 'A1' || data.input === 'B1')
+                (data.Input === 'A1' || data.Input === 'B1')
             ) {
                 // first input from each account is remixed (no coordinator fee)
                 resolve({
-                    aliceId: data.input,
-                    isPayingZeroCoordinationFee: true,
+                    AliceId: data.input,
+                    IsPayingZeroCoordinationFee: true,
                 });
             }
             if (url.endsWith('/get-real-credential-requests')) {
                 resolve({
-                    realCredentialRequests: {
-                        credentialsRequest: {
-                            delta: data.amountsToRequest[0],
+                    RealCredentialRequests: {
+                        CredentialsRequest: {
+                            Delta: data.AmountsToRequest[0],
                         },
                     },
                 });
@@ -137,38 +137,39 @@ describe('inputRegistration', () => {
 
         response.inputs.forEach(input => {
             if (input.outpoint === 'A1') {
-                expect(input.realAmountCredentials?.credentialsRequest.delta).toEqual(123448017); // remix
-                expect(input.realVsizeCredentials?.credentialsRequest.delta).toEqual(187);
+                expect(input.realAmountCredentials?.CredentialsRequest.Delta).toEqual(123448017); // remix
+                expect(input.realVsizeCredentials?.CredentialsRequest.Delta).toEqual(187);
             }
             if (input.outpoint === 'B1') {
-                expect(input.realAmountCredentials?.credentialsRequest.delta).toEqual(123449307); // remix
-                expect(input.realVsizeCredentials?.credentialsRequest.delta).toEqual(197);
+                expect(input.realAmountCredentials?.CredentialsRequest.Delta).toEqual(123449307); // remix
+                expect(input.realVsizeCredentials?.CredentialsRequest.Delta).toEqual(197);
             }
 
             if (input.outpoint === 'A2') {
-                expect(input.realAmountCredentials?.credentialsRequest.delta).toEqual(123077647); // coordinator fee
-                expect(input.realVsizeCredentials?.credentialsRequest.delta).toEqual(187);
+                expect(input.realAmountCredentials?.CredentialsRequest.Delta).toEqual(123077647); // coordinator fee
+                expect(input.realVsizeCredentials?.CredentialsRequest.Delta).toEqual(187);
             }
             if (input.outpoint === 'B2') {
-                expect(input.realAmountCredentials?.credentialsRequest.delta).toEqual(123078937); // coordinator fee
-                expect(input.realVsizeCredentials?.credentialsRequest.delta).toEqual(197);
+                expect(input.realAmountCredentials?.CredentialsRequest.Delta).toEqual(123078937); // coordinator fee
+                expect(input.realVsizeCredentials?.CredentialsRequest.Delta).toEqual(197);
             }
 
             if (input.outpoint === 'A3') {
-                expect(input.realAmountCredentials?.credentialsRequest.delta).toEqual(991227); // plebs
-                expect(input.realVsizeCredentials?.credentialsRequest.delta).toEqual(187);
+                expect(input.realAmountCredentials?.CredentialsRequest.Delta).toEqual(991227); // plebs
+                expect(input.realVsizeCredentials?.CredentialsRequest.Delta).toEqual(187);
             }
             if (input.outpoint === 'B3') {
-                expect(input.realAmountCredentials?.credentialsRequest.delta).toEqual(992517); // plebs
-                expect(input.realVsizeCredentials?.credentialsRequest.delta).toEqual(197);
+                expect(input.realAmountCredentials?.CredentialsRequest.Delta).toEqual(992517); // plebs
+                expect(input.realVsizeCredentials?.CredentialsRequest.Delta).toEqual(197);
             }
+            input.clearConfirmationInterval();
         });
     });
 
     it('error in coordinator input-registration', async () => {
         server?.addListener('test-request', ({ url, data, resolve, reject }) => {
             if (url.endsWith('/input-registration')) {
-                if (data.ownershipProof === '01A2') {
+                if (data.OwnershipProof === '01A2') {
                     reject(500, { error: 'ExpectedRuntimeError' });
                 }
             }
@@ -191,7 +192,7 @@ describe('inputRegistration', () => {
 
         response.inputs.forEach(input => {
             if (input.outpoint === 'A1') {
-                expect(input.registrationData).toMatchObject({ aliceId: expect.any(String) });
+                expect(input.registrationData).toMatchObject({ AliceId: expect.any(String) });
             }
 
             if (input.outpoint === 'A2') {
@@ -199,8 +200,9 @@ describe('inputRegistration', () => {
             }
 
             if (input.outpoint === 'A3') {
-                expect(input.registrationData).toMatchObject({ aliceId: expect.any(String) });
+                expect(input.registrationData).toMatchObject({ AliceId: expect.any(String) });
             }
+            input.clearConfirmationInterval();
         });
     });
 
@@ -248,7 +250,7 @@ describe('inputRegistration', () => {
             server?.requestOptions,
         );
         // input have registrationData but also have an error and should be excluded
-        expect(response.inputs[0].registrationData).toMatchObject({ aliceId: expect.any(String) });
+        expect(response.inputs[0].registrationData).toMatchObject({ AliceId: expect.any(String) });
         expect(response.inputs[0].error?.message).toMatch(/ExpectedRuntimeError/);
     });
 
@@ -269,7 +271,7 @@ describe('inputRegistration', () => {
                 ...server?.requestOptions,
                 round: { phaseDeadline: Date.now() + 10000 },
                 roundParameters: {
-                    connectionConfirmationTimeout: '0d 0h 0m 5s',
+                    ConnectionConfirmationTimeout: '0d 0h 0m 5s',
                 },
             }),
             server?.requestOptions,
@@ -294,7 +296,7 @@ describe('inputRegistration', () => {
                 ...server?.requestOptions,
                 round: { phaseDeadline: Date.now() + 10000 },
                 roundParameters: {
-                    connectionConfirmationTimeout: '0d 0h 0m 4s',
+                    ConnectionConfirmationTimeout: '0d 0h 0m 4s',
                 },
             }),
             server?.requestOptions,
@@ -304,11 +306,11 @@ describe('inputRegistration', () => {
 
         expect(spy).toBeCalledTimes(1); // connection-confirmation was called 1 time and responded with real realCredentials (default response of MockedServer)
         expect(response.inputs[0].confirmationData).toMatchObject({
-            realAmountCredentials: expect.any(Object),
+            RealAmountCredentials: expect.any(Object),
         });
     });
 
-    it('success. confirmation interval is aborted after registration', async done => {
+    it('success. confirmation interval is aborted after registration', async () => {
         const spy = jest.fn();
         server?.addListener('test-request', ({ url, resolve }) => {
             if (url.endsWith('/connection-confirmation')) {
@@ -323,13 +325,13 @@ describe('inputRegistration', () => {
                 ...server?.requestOptions,
                 round: { phaseDeadline: Date.now() + 10000 },
                 roundParameters: {
-                    connectionConfirmationTimeout: '0d 0h 0m 2s',
+                    ConnectionConfirmationTimeout: '0d 0h 0m 2s',
                 },
             }),
             server?.requestOptions,
         );
 
-        expect(response.inputs[0].registrationData).toMatchObject({ aliceId: expect.any(String) });
+        expect(response.inputs[0].registrationData).toMatchObject({ AliceId: expect.any(String) });
         expect(response.inputs[0].getConfirmationInterval()).not.toBeUndefined();
         expect(response.inputs[0].error).toBeUndefined(); // input without error even if request failed
 
@@ -343,7 +345,6 @@ describe('inputRegistration', () => {
                 res.forEach(input => {
                     expect(input?.getConfirmationInterval()).toBeUndefined();
                 });
-                done();
             },
         );
 

@@ -1,14 +1,15 @@
-import React from 'react';
 import { useSelector } from 'react-redux';
 
-import { ErrorMessage } from '@suite-native/atoms';
+import { Box, ErrorMessage, Pictogram, VStack, Text } from '@suite-native/atoms';
 import {
     AccountsRootState,
-    selectAccountByDescriptorAndNetworkSymbol,
+    DeviceRootState,
+    selectDeviceAccountByDescriptorAndNetworkSymbol,
 } from '@suite-common/wallet-core';
 import { NetworkSymbol } from '@suite-common/wallet-config';
 import { AccountInfo } from '@trezor/connect';
-import { enabledNetworks } from '@suite-native/config';
+import { supportedNetworkSymbols } from '@suite-native/config';
+import { useTranslate } from '@suite-native/intl';
 
 import { AccountImportSummaryForm } from './AccountImportSummaryForm';
 import { AccountAlreadyImported } from './AccountAlreadyImported';
@@ -19,19 +20,61 @@ type AccountImportDetailProps = {
 };
 
 export const AccountImportSummary = ({ networkSymbol, accountInfo }: AccountImportDetailProps) => {
-    const account = useSelector((state: AccountsRootState) =>
-        selectAccountByDescriptorAndNetworkSymbol(state, accountInfo.descriptor, networkSymbol),
+    const { translate } = useTranslate();
+    const account = useSelector((state: AccountsRootState & DeviceRootState) =>
+        selectDeviceAccountByDescriptorAndNetworkSymbol(
+            state,
+            accountInfo.descriptor,
+            networkSymbol,
+        ),
     );
 
-    const isAccountImportSupported = enabledNetworks.some(network => network === networkSymbol);
+    const isAccountImportSupported = supportedNetworkSymbols.some(
+        network => network === networkSymbol,
+    );
 
     if (!isAccountImportSupported) {
-        return <ErrorMessage errorMessage="Unsupported account network type." />;
+        return (
+            <ErrorMessage
+                errorMessage={translate('moduleAccountImport.error.unsupportedNetworkType')}
+            />
+        );
     }
 
-    return account ? (
-        <AccountAlreadyImported account={account} />
-    ) : (
-        <AccountImportSummaryForm networkSymbol={networkSymbol} accountInfo={accountInfo} />
+    const title = translate(
+        account
+            ? 'moduleAccountImport.summaryScreen.title.alreadySynced'
+            : 'moduleAccountImport.summaryScreen.title.confirmToAdd',
+    );
+    const subtitle = account ? translate('moduleAccountImport.summaryScreen.subtitle') : undefined;
+
+    return (
+        <VStack spacing="extraLarge" flex={1}>
+            <Box flex={1} alignItems="center" justifyContent="center">
+                <Pictogram
+                    title={
+                        <Text
+                            variant="titleSmall"
+                            data-testID="@account-import/coin-synced/success-text"
+                        >
+                            {title}
+                        </Text>
+                    }
+                    subtitle={subtitle}
+                    variant="green"
+                    icon="syncedCoin"
+                />
+            </Box>
+            <Box flex={1}>
+                {account ? (
+                    <AccountAlreadyImported account={account} />
+                ) : (
+                    <AccountImportSummaryForm
+                        networkSymbol={networkSymbol}
+                        accountInfo={accountInfo}
+                    />
+                )}
+            </Box>
+        </VStack>
     );
 };

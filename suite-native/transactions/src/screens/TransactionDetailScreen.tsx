@@ -1,13 +1,13 @@
-import React from 'react';
+import { useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { Linking } from 'react-native';
 
-import { Button, VStack } from '@suite-native/atoms';
+import { Box, Button, Divider, VStack } from '@suite-native/atoms';
 import {
     RootStackParamList,
     RootStackRoutes,
     Screen,
-    ScreenHeader,
+    ScreenSubHeader,
     StackProps,
 } from '@suite-native/navigation';
 import {
@@ -17,6 +17,8 @@ import {
     TransactionsRootState,
 } from '@suite-common/wallet-core';
 import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
+import { analytics, EventType } from '@suite-native/analytics';
+import { EthereumTokenTransfer, WalletAccountTransaction } from '@suite-native/ethereum-tokens';
 
 import { TransactionDetailHeader } from '../components/TransactionDetail/TransactionDetailHeader';
 import { TransactionDetailData } from '../components/TransactionDetail/TransactionDetailData';
@@ -30,28 +32,55 @@ export const TransactionDetailScreen = ({
     route,
 }: StackProps<RootStackParamList, RootStackRoutes.TransactionDetail>) => {
     const { applyStyle, utils } = useNativeStyles();
-    const { txid, accountKey } = route.params;
+    const { txid, accountKey, tokenTransfer } = route.params;
     const transaction = useSelector((state: TransactionsRootState) =>
         selectTransactionByTxidAndAccountKey(state, txid, accountKey),
-    );
+    ) as WalletAccountTransaction;
     const blockchainExplorer = useSelector((state: BlockchainRootState) =>
         selectBlockchainExplorerBySymbol(state, transaction?.symbol),
     );
+
+    useEffect(() => {
+        // TODO: Report tokenSymbol if displaying ERC20 token transaction detail.
+        // related to issue: https://github.com/trezor/trezor-suite/issues/7881
+        if (transaction)
+            analytics.report({
+                type: EventType.TransactionDetail,
+                payload: { assetSymbol: transaction.symbol },
+            });
+    }, [transaction]);
 
     if (!transaction) return null;
 
     const handleOpenBlockchain = () => {
         if (!blockchainExplorer) return;
+        analytics.report({ type: EventType.TransactionDetailExploreInBlockchain });
         Linking.openURL(`${blockchainExplorer.tx}${transaction.txid}`);
     };
 
+    const isTokenTransaction = !!tokenTransfer;
+
     return (
-        <Screen customHorizontalPadding={utils.spacings.small} header={<ScreenHeader />}>
+        <Screen customHorizontalPadding={utils.spacings.small} screenHeader={<ScreenSubHeader />}>
             <VStack spacing="large">
-                <TransactionDetailHeader transaction={transaction} />
-                <TransactionDetailData transaction={transaction} accountKey={accountKey} />
+                <TransactionDetailHeader
+                    transaction={transaction}
+                    tokenTransfer={tokenTransfer as EthereumTokenTransfer}
+                />
+                <TransactionDetailData
+                    transaction={transaction}
+                    accountKey={accountKey}
+                    tokenTransfer={tokenTransfer as EthereumTokenTransfer}
+                />
             </VStack>
-            <TransactionDetailSheets transaction={transaction} />
+            <Box marginVertical="large">
+                <Divider />
+            </Box>
+            <TransactionDetailSheets
+                transaction={transaction}
+                isTokenTransaction={isTokenTransaction}
+                accountKey={accountKey}
+            />
             <Button
                 iconLeft="arrowUpRight"
                 onPress={handleOpenBlockchain}

@@ -3,6 +3,7 @@ import type { FormattedTransactionType as RippleTransaction } from 'ripple-lib';
 
 import type { Transaction as BlockbookTransaction, VinVout } from './blockbook';
 import type { BlockfrostTransaction } from './blockfrost';
+import type { TokenTransfer as BlockbookTokenTransfer } from './blockbook-api';
 
 /* Common types used in both params and responses */
 
@@ -30,17 +31,22 @@ export interface ServerInfo {
     consensusBranchId?: number; // zcash current branch id
 }
 
-/* Transaction */
+export type TokenStandard = 'ERC20' | 'ERC1155' | 'ERC721' | 'SPL';
 
-export interface TokenTransfer {
-    type: 'sent' | 'recv' | 'self' | 'failed' | 'unknown';
-    name: string;
-    symbol: string;
-    address: string;
-    decimals: number;
+export type TransferType = 'sent' | 'recv' | 'self' | 'unknown';
+
+/* Transaction */
+export type TokenTransfer = Omit<BlockbookTokenTransfer, 'value'> & {
+    type: TransferType;
+    standard?: TokenStandard;
     amount: string;
-    from?: string;
-    to?: string;
+};
+
+export interface InternalTransfer {
+    type: TransferType;
+    amount: string;
+    from: string;
+    to: string;
 }
 
 export interface Target {
@@ -92,8 +98,9 @@ export interface AccountBalanceHistory {
 }
 
 export interface Transaction {
-    type: 'sent' | 'recv' | 'self' | 'joint' | 'failed' | 'unknown';
+    type: 'sent' | 'recv' | 'self' | 'joint' | 'contract' | 'failed' | 'unknown';
     txid: string;
+    hex?: string;
     blockTime?: number;
     blockHeight?: number;
     blockHash?: string;
@@ -106,6 +113,7 @@ export interface Transaction {
     tokens: TokenTransfer[];
     rbf?: boolean;
     ethereumSpecific?: BlockbookTransaction['ethereumSpecific'];
+    internalTransfers: InternalTransfer[];
     cardanoSpecific?: {
         subtype:
             | 'withdrawal'
@@ -115,6 +123,9 @@ export interface Transaction {
             | null;
         withdrawal?: string;
         deposit?: string;
+    };
+    solanaSpecific?: {
+        status: 'confirmed';
     };
     details: TransactionDetail;
     vsize?: number;
@@ -158,13 +169,19 @@ export interface Utxo {
     };
 }
 
+export interface TokenAccount {
+    publicKey: string;
+    balance: string;
+}
+
 export interface TokenInfo {
     type: string; // token type: ERC20...
-    address: string; // token address
+    contract: string; // token address
     balance?: string; // token balance
     name?: string; // token name
     symbol?: string; // token symbol
     decimals: number; // token decimals or 0
+    accounts?: TokenAccount[]; // token accounts for solana
     // transfers: number, // total transactions?
 }
 
@@ -181,6 +198,7 @@ export interface AccountInfo {
         unconfirmed: number; // unconfirmed transactions
         transactions?: Transaction[]; // list of transactions
         txids?: string[]; // not implemented
+        addrTxCount?: number; // number of confirmed address/transaction pairs, only for bitcoin-like
     };
     misc?: {
         // ETH
@@ -198,6 +216,8 @@ export interface AccountInfo {
             rewards: string;
             poolId: string | null;
         };
+        // SOL
+        owner?: string; // The Solana program owning the account
     };
     page?: {
         // blockbook and blockfrost
@@ -215,6 +235,7 @@ export interface AccountInfo {
 export interface SubscriptionAccountInfo {
     descriptor: string;
     addresses?: AccountAddresses; // bitcoin addresses
+    subscriptionId?: number;
 }
 
 export type ChannelMessage<T> = T & { id: number };

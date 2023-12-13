@@ -11,16 +11,26 @@
         "type-check": "tsc --build"
     },
     "dependencies": {
+        "@mobily/ts-belt": "^3.13.1",
         "@suite-common/formatters": "workspace:*",
+        "@suite-common/suite-types": "workspace:*",
         "@suite-common/wallet-config": "workspace:*",
         "@suite-common/wallet-core": "workspace:*",
         "@suite-common/wallet-types": "workspace:*",
         "@suite-common/wallet-utils": "workspace:*",
         "@suite-native/atoms": "workspace:*",
         "@suite-native/ethereum-tokens": "workspace:*",
+        "@suite-native/fiat-rates": "workspace:*",
         "@suite-native/module-settings": "workspace:*",
         "@trezor/blockchain-link": "workspace:*",
+        "@trezor/styles": "workspace:*",
+        "bignumber.js": "^9.1.1",
         "react": "18.2.0",
-        "react-redux": "8.0.5"
+        "react-native": "0.71.8",
+        "react-redux": "8.0.7",
+        "web3-utils": "^1.10.0"
+    },
+    "devDependencies": {
+        "jest": "29.5.0"
     }
 }

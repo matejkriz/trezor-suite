@@ -1,11 +1,9 @@
-import React from 'react';
-
 import styled from 'styled-components';
-import { HiddenPlaceholder, Sign } from '@suite-components';
-import { NetworkSymbol } from '@wallet-types';
-import { NETWORKS } from '@wallet-config';
-import { useSelector } from '@suite-hooks';
-import { useBitcoinAmountUnit } from '@wallet-hooks/useBitcoinAmountUnit';
+import { HiddenPlaceholder, Sign } from 'src/components/suite';
+import { NetworkSymbol } from 'src/types/wallet';
+import { NETWORKS } from 'src/config/wallet';
+import { useSelector } from 'src/hooks/suite';
+import { useBitcoinAmountUnit } from 'src/hooks/wallet/useBitcoinAmountUnit';
 
 import { SignValue } from '@suite-common/suite-types';
 import {
@@ -25,13 +23,11 @@ const Value = styled.span`
     text-overflow: ellipsis;
 `;
 
-const Symbol = styled.span`
-    word-break: initial;
-`;
+const Symbol = styled.span``;
 
 export interface FormattedCryptoAmountProps {
-    value: string | number | undefined;
-    symbol: string | undefined;
+    value?: string | number;
+    symbol?: string;
     isBalance?: boolean;
     signValue?: SignValue;
     disableHiddenPlaceholder?: boolean;

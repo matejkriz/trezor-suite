@@ -1,11 +1,13 @@
-import React, { ReactNode } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { ReactNode } from 'react';
+import { useSelector } from 'react-redux';
 
-import { Screen, ScreenHeader } from '@suite-native/navigation';
-import { disableAnalyticsThunk, enableAnalyticsThunk } from '@suite-native/analytics';
+import { analytics, EventType } from '@suite-native/analytics';
+import { Screen, ScreenSubHeader } from '@suite-native/navigation';
 import { selectIsAnalyticsEnabled } from '@suite-common/analytics';
 import { Box, Card, DiscreetCanvas, Text, useDiscreetMode } from '@suite-native/atoms';
 import { useNativeStyles } from '@trezor/styles';
+import { useBiometricsSettings, useIsBiometricsEnabled } from '@suite-native/biometrics';
+import { useTranslate } from '@suite-native/intl';
 
 import { TouchableSwitchRow } from '../components/TouchableSwitchRow';
 
@@ -19,21 +21,32 @@ const DiscreetTextExample = () => {
     const { utils } = useNativeStyles();
 
     return (
-        <DiscreetCanvas
-            text="$100"
-            color="textSubdued"
-            width={30}
-            fontSize={utils.typography.hint.fontSize}
-            height={utils.typography.hint.lineHeight}
-        />
+        <Box style={{ height: utils.typography.hint.lineHeight }}>
+            <DiscreetCanvas
+                text="$100"
+                color="textSubdued"
+                width={30}
+                fontSize={utils.typography.hint.fontSize}
+                height={utils.typography.hint.lineHeight}
+            />
+        </Box>
     );
 };
 
 const DiscreetModeSwitchRow = () => {
     const { isDiscreetMode, setIsDiscreetMode } = useDiscreetMode();
+
+    const handleSetDiscreetMode = (value: boolean) => {
+        setIsDiscreetMode(value);
+        analytics.report({
+            type: EventType.SettingsDiscreetToggle,
+            payload: { discreetMode: value },
+        });
+    };
+
     return (
         <TouchableSwitchRow
-            text="Hide balances"
+            text="Discreet mode"
             description={
                 <Box flexDirection="row" alignItems="center">
                     <RowDescription>{`$100 -> `}</RowDescription>
@@ -42,21 +55,20 @@ const DiscreetModeSwitchRow = () => {
             }
             iconName="detective"
             isChecked={isDiscreetMode}
-            onChange={setIsDiscreetMode}
+            onChange={handleSetDiscreetMode}
         />
     );
 };
 
 const AnalyticsSwitchRow = () => {
-    const dispatch = useDispatch();
     const isAnalyticsEnabled = useSelector(selectIsAnalyticsEnabled);
 
     const handleAnalyticsChange = (isEnabled: boolean) => {
         if (isEnabled) {
-            dispatch(enableAnalyticsThunk());
+            analytics.enable();
             return;
         }
-        dispatch(disableAnalyticsThunk());
+        analytics.disable();
     };
 
     return (
@@ -65,7 +77,7 @@ const AnalyticsSwitchRow = () => {
             iconName="database"
             description={
                 <RowDescription>
-                    All data is kept strictly anonymous; we only use it to improve the Trezor
+                    All collected data is anonymous and is only used to improve the Trezor
                     ecosystem.
                 </RowDescription>
             }
@@ -75,11 +87,39 @@ const AnalyticsSwitchRow = () => {
     );
 };
 
-export const SettingsPrivacyAndSecurity = () => (
-    <Screen header={<ScreenHeader title="Privacy & Security" />}>
-        <Card>
-            <DiscreetModeSwitchRow />
-            <AnalyticsSwitchRow />
-        </Card>
-    </Screen>
-);
+const BiometricsSwitchRow = () => {
+    const { isBiometricsOptionEnabled } = useIsBiometricsEnabled();
+    const { toggleBiometricsOption } = useBiometricsSettings();
+
+    return (
+        <TouchableSwitchRow
+            isChecked={isBiometricsOptionEnabled}
+            onChange={toggleBiometricsOption}
+            text="Biometrics"
+            iconName="userFocus"
+            description={
+                <RowDescription>
+                    Use facial or fingerprint verification to unlock the app
+                </RowDescription>
+            }
+        />
+    );
+};
+
+export const SettingsPrivacyAndSecurity = () => {
+    const { translate } = useTranslate();
+
+    return (
+        <Screen
+            screenHeader={
+                <ScreenSubHeader content={translate('moduleSettings.privacyAndSecurity.title')} />
+            }
+        >
+            <Card>
+                <BiometricsSwitchRow />
+                <DiscreetModeSwitchRow />
+                <AnalyticsSwitchRow />
+            </Card>
+        </Screen>
+    );
+};

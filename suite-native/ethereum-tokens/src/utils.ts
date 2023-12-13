@@ -1,3 +1,7 @@
-import { NetworkSymbol } from '@suite-common/wallet-config';
+import { G, S } from '@mobily/ts-belt';
 
-export const isEthereumAccountSymbol = (symbol: NetworkSymbol) => symbol === 'eth';
+export const getEthereumTokenName = (tokenName?: string) => {
+    if (G.isNullable(tokenName) || S.isEmpty(tokenName)) return 'Unknown token';
+
+    return tokenName;
+};

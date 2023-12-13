@@ -1,8 +1,8 @@
-import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { Select } from '@suite-native/atoms';
 import { FiatCurrency, fiatCurrencies, FiatCurrencyCode } from '@suite-common/suite-config';
+import { analytics, EventType } from '@suite-native/analytics';
 
 import { selectFiatCurrency, setFiatCurrency } from '../slice';
 
@@ -17,8 +17,12 @@ export const CurrencySelector = () => {
     const selectedFiatCurrency = useSelector(selectFiatCurrency);
     const dispatch = useDispatch();
 
-    const handleSelectCurrency = (value: FiatCurrencyCode) => {
-        dispatch(setFiatCurrency(value));
+    const handleSelectCurrency = (localCurrency: FiatCurrencyCode) => {
+        dispatch(setFiatCurrency({ localCurrency }));
+        analytics.report({
+            type: EventType.SettingsChangeCurrency,
+            payload: { localCurrency },
+        });
     };
 
     return (

@@ -22,6 +22,8 @@ module.exports = config => {
         hostname: 'localhost',
         port: 8099,
         autoWatch: false,
+        // to debug locally set single run to false and go to http://localhost:8099/debug.html
+        // for local changes to take effect build connect-iframe and connect-web
         singleRun: true,
 
         client: {
@@ -32,6 +34,10 @@ module.exports = config => {
             mocha: {
                 bail: true,
             },
+            // uncomment to disable random ordering of tests
+            // jasmine: {
+            //     random: false,
+            // },
         },
         browserConsoleLogOptions: {
             terminal: true,
@@ -90,10 +96,9 @@ module.exports = config => {
                         exclude: /node_modules/,
                         use: [
                             {
-                                loader: 'ts-loader',
+                                loader: 'babel-loader',
                                 options: {
-                                    transpileOnly: true,
-                                    // configFile: '../../tsconfig.json',
+                                    presets: ['@babel/preset-typescript'],
                                 },
                             },
                         ],
@@ -112,9 +117,10 @@ module.exports = config => {
                 }),
                 // replace TrezorConnect module used in ./tests/common.setup.js
                 new webpack.NormalModuleReplacementPlugin(
-                    /^@trezor\/connect$/,
+                    /^(\.\.\/)+src$/,
                     path.join(__dirname, '../../connect-web/build/trezor-connect.js'),
                 ),
+
                 // replace ws module used in ./tests/websocket-client.js
                 new webpack.NormalModuleReplacementPlugin(
                     /ws$/,

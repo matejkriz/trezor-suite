@@ -42,7 +42,7 @@
 | development (sldev)   | `com.trezor.suite.dev` | `Trezor Suite Dev`   | `@trezor/suite-desktop-dev`   |
 | local                 | `com.github.Electron`  | `Trezor Suite Local` | `@trezor/suite-desktop-local` |
 
-Suite app name and ID are set by the environment so that Suite uses different user data dir and it's not mixed between environments. The main benefit is that you can switch back and forth between Suite dev versions without losing your remembered production wallets. One disadvantage of this solution is checking of other instance running is not so straitforward between environments.
+Suite app name and ID are set by the environment so that Suite uses different user data dir and it's not mixed between environments. The main benefit is that you can switch back and forth between Suite dev versions without losing your remembered production wallets. One disadvantage of this solution is checking of other instance running is not so straightforward between environments.
 
 Same concept (user data separated by environment) works on web out of the box (storage per domain name).
 
@@ -104,27 +104,6 @@ Available flags:
 | `--enable-updater`    | Enables the auto updater (if disabled in feature flags)                                                                                                                                |
 | `--disable-updater`   | Disables the auto updater (if enabled in feature flags)                                                                                                                                |
 | `--updater-url=URL`   | Set custom URL for auto-updater (default is github)                                                                                                                                    |
-
-## Mock
-
-Some libraries are difficult to test in development environments, such as the auto-updater. In order to still allow certain interactions with the feature in developments, libraries can be mocked.
-
-### How to use mocks?
-
--   By default, development builds load mocks.
--   Non-development builds can include mocks if the `USE_MOCKS` environment variable is defined.
-
-### How to make a new mock?
-
-1. Open the suite-desktop build script located at `/packages/suite-desktop/scripts/build.ts`.
-1. Add a new entry to the `mocks` object. The key should be the name of the package, exactly as written when imported. The value should be the path to the mock file to point to (located in `/packages/suite-desktop/src/mocks`).
-1. Create the file in `/packages/suite-desktop/src/mocks` and export mocked properties that you have imported across the project.
-
-### Mocked libraries
-
-#### Auto-Updater
-
-The auto-updater has been mocked to simulate similar behavior to the actual library. Unless the command line parameter `--mock-trigger-updater-after=DELAY` is passed, checking for updates will always return `not-available`. This command line parameter requires a value, representing a delay in seconds before making the update available. Using `0` as a value will make the update available immediately. For example, if you wish to make an update available after 1 minute, you will use the parameter as follows: `--mock-trigger-updater-after=60`. Note that his parameter is **ONLY** available with mocks enabled.
 
 ## Debugging build
 

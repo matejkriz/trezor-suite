@@ -1,16 +1,29 @@
 export enum RootStackRoutes {
     AppTabs = 'AppTabs',
+    Onboarding = 'Onboarding',
     AccountsImport = 'AccountsImport',
+    ConnectDevice = 'ConnectDevice',
+    AccountDetail = 'AccountDetail',
     DevUtilsStack = 'DevUtilsStack',
     AccountSettings = 'AccountSettings',
     TransactionDetail = 'TransactionDetail',
+    ReceiveModal = 'ReceiveModal',
+    DeviceInfo = 'DeviceInfo',
 }
 
 export enum AppTabsRoutes {
     HomeStack = 'HomeStack',
     AccountsStack = 'AccountsStack',
-    SendReceiveStack = 'SendReceiveStack',
+    ReceiveStack = 'ReceiveStack',
     SettingsStack = 'SettingsStack',
+}
+
+export enum OnboardingStackRoutes {
+    Welcome = 'Welcome',
+    TrackBalances = 'TrackBalances',
+    AboutReceiveCoinsFeature = 'AboutReceiveCoinsFeature',
+    AnalyticsConsent = 'AnalyticsConsent',
+    ConnectTrezor = 'ConnectTrezor',
 }
 
 export enum AccountsImportStackRoutes {
@@ -19,6 +32,12 @@ export enum AccountsImportStackRoutes {
     XpubScanModal = 'XpubScanModal',
     AccountImportLoading = 'AccountImportLoading',
     AccountImportSummary = 'AccountImportSummary',
+}
+
+export enum ConnectDeviceStackRoutes {
+    ConnectAndUnlockDevice = 'ConnectAndUnlockDevice',
+    PinMatrix = 'PinMatrix',
+    ConnectingDevice = 'ConnectingDevice',
 }
 
 export enum DevUtilsStackRoutes {
@@ -32,18 +51,15 @@ export enum HomeStackRoutes {
 
 export enum AccountsStackRoutes {
     Accounts = 'Accounts',
-    AccountDetail = 'AccountDetail',
-    AccountDetailSettings = 'AccountDetailSettings',
 }
 
-export enum SendReceiveStackRoutes {
+export enum ReceiveStackRoutes {
     ReceiveAccounts = 'ReceiveAccounts',
-    Receive = 'Receive',
 }
 
 export enum SettingsStackRoutes {
     Settings = 'Settings',
-    SettingsLocalisation = 'SettingsLocalisation',
+    SettingsLocalization = 'SettingsLocalization',
     SettingsCustomization = 'SettingsCustomization',
     SettingsPrivacyAndSecurity = 'SettingsPrivacyAndSecurity',
     SettingsAbout = 'SettingsAbout',

@@ -1,10 +1,11 @@
 import addressValidator from 'trezor-address-validator';
 
+import { getTestnetSymbols } from '@suite-common/wallet-config';
 import { Account } from '@suite-common/wallet-types';
 
 const getNetworkType = (symbol: Account['symbol']) => {
     if (symbol === 'regtest') return symbol;
-    const testnets = ['test', 'txrp', 'trop', 'tgor', 'tada'];
+    const testnets = getTestnetSymbols();
     return testnets.includes(symbol) ? 'testnet' : 'prod';
 };
 
@@ -17,8 +18,11 @@ const getCoinFromTestnet = (symbol: Account['symbol']) => {
             return 'xrp';
         case 'tada':
             return 'ada';
-        case 'trop':
+        case 'dsol':
+            return 'sol';
+        case 'tsep':
         case 'tgor':
+        case 'thol':
             return 'eth';
         default:
             return symbol;
@@ -28,6 +32,7 @@ const getCoinFromTestnet = (symbol: Account['symbol']) => {
 export const isAddressValid = (address: string, symbol: Account['symbol']) => {
     const networkType = getNetworkType(symbol);
     const updatedSymbol = getCoinFromTestnet(symbol);
+
     return addressValidator.validate(address, updatedSymbol.toUpperCase(), networkType);
 };
 

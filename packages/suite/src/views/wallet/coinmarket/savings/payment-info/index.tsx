@@ -1,17 +1,11 @@
-import {
-    KYCError,
-    KYCFailed,
-    KYCInProgress,
-    withCoinmarket,
-    WithCoinmarketProps,
-} from '@wallet-components';
-import { useSavingsPaymentInfo } from '@wallet-hooks/useCoinmarketSavingsPaymentInfo';
+import { KycError, KycFailed, KycInProgress } from 'src/views/wallet/coinmarket/common';
+import { useSavingsPaymentInfo } from 'src/hooks/wallet/useCoinmarketSavingsPaymentInfo';
 import { Button } from '@trezor/components';
-import React from 'react';
 import styled from 'styled-components';
-import { Translation } from '@suite-components';
+import { Translation } from 'src/components/suite';
 import { useFormatters } from '@suite-common/formatters';
-import ReauthorizationCard from '@wallet-components/CoinmarketReauthorizationCard';
+import { CoinmarketReauthorizationCard } from '../CoinmarketReauthorizationCard';
+import { withCoinmarket, WithCoinmarketProps } from '../withCoinmarket';
 
 const Header = styled.div`
     font-size: 24px;
@@ -21,39 +15,35 @@ const Header = styled.div`
 const Description = styled.div`
     font-size: 14px;
     line-height: 24px;
-    color: ${props => props.theme.TYPE_LIGHT_GREY};
+    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
     margin-bottom: 13px;
 `;
 
 const Divider = styled.div`
     height: 1px;
     width: 100%;
-    border: 1px solid ${props => props.theme.BG_GREY};
+    border: 1px solid ${({ theme }) => theme.BG_GREY};
 `;
 
 const Setup = styled.div`
     margin: 9px 0;
     display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    justify-content: space-between;
+    flex-flow: row nowrap;
+    place-content: stretch space-between;
     align-items: stretch;
-    align-content: stretch;
 `;
 const Values = styled.div`
     font-size: 16px;
     line-height: 24px;
-    color: ${props => props.theme.TYPE_GREEN};
+    color: ${({ theme }) => theme.TYPE_GREEN};
 `;
 
 const PaymentInfoOverview = styled.div`
     margin: 15px 0;
     display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    justify-content: space-between;
+    flex-flow: row nowrap;
+    place-content: stretch space-between;
     align-items: stretch;
-    align-content: stretch;
 `;
 
 const PaymentInfoItem = styled.div`
@@ -63,7 +53,7 @@ const PaymentInfoItemLabel = styled.div`
     font-weight: 600;
     font-size: 12px;
     line-height: 24px;
-    color: ${props => props.theme.TYPE_LIGHT_GREY};
+    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
 `;
 const PaymentInfoItemValue = styled.div`
     display: flex;
@@ -97,12 +87,14 @@ const PaymentInfo = (props: WithCoinmarketProps) => {
 
     return (
         <>
-            {reauthorizationUrl && <ReauthorizationCard reauthorizationUrl={reauthorizationUrl} />}
-            {isWatchingKYCStatus && <KYCInProgress />}
-            {!isWatchingKYCStatus && kycFinalStatus === 'Failed' && (
-                <KYCFailed providerName={selectedProviderName} />
+            {reauthorizationUrl && (
+                <CoinmarketReauthorizationCard reauthorizationUrl={reauthorizationUrl} />
             )}
-            {!isWatchingKYCStatus && kycFinalStatus === 'Error' && <KYCError />}
+            {isWatchingKYCStatus && <KycInProgress />}
+            {!isWatchingKYCStatus && kycFinalStatus === 'Failed' && (
+                <KycFailed providerName={selectedProviderName} />
+            )}
+            {!isWatchingKYCStatus && kycFinalStatus === 'Error' && <KycError />}
             <Header>
                 <Translation id="TR_SAVINGS_PAYMENT_INFO_HEADER" />
             </Header>

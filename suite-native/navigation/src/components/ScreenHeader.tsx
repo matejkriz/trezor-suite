@@ -1,82 +1,14 @@
-import React, { ReactNode } from 'react';
-import { View } from 'react-native';
+import { ReactNode } from 'react';
 
-import { useNavigation } from '@react-navigation/native';
+import { ScreenHeaderWrapper } from '@suite-native/atoms';
 
-import { NativeStyleObject, prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-import { IconButton, StepsProgressBar, Text } from '@suite-native/atoms';
-
-type ScreenHeaderWithIconsProps = {
-    leftIcon?: ReactNode;
-    rightIcon?: ReactNode;
-    title?: string;
-    style?: NativeStyleObject;
-    hasGoBackIcon?: boolean;
-    numberOfSteps?: number;
-    activeStep?: number;
+type ScreenHeaderProps = {
+    children: ReactNode;
+    hasBottomPadding?: boolean;
 };
 
-const ICON_SIZE = 48;
-
-const screenHeaderStyle = prepareNativeStyle(() => ({
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    height: ICON_SIZE,
-}));
-
-const iconWrapperStyle = prepareNativeStyle(() => ({
-    width: ICON_SIZE,
-    height: ICON_SIZE,
-}));
-
-const progressBarWrapperStyle = prepareNativeStyle(() => ({
-    height: ICON_SIZE,
-    alignItems: 'center',
-    paddingTop: 7,
-    justifyContent: 'space-between',
-}));
-
-const GoBackIcon = () => {
-    const navigation = useNavigation();
-    return (
-        <IconButton
-            iconName="chevronLeft"
-            size="medium"
-            colorScheme="tertiaryElevation0"
-            onPress={() => navigation.goBack()}
-        />
-    );
-};
-
-export const ScreenHeader = ({
-    leftIcon,
-    rightIcon,
-    style,
-    title,
-    numberOfSteps,
-    activeStep,
-    hasGoBackIcon = true,
-}: ScreenHeaderWithIconsProps) => {
-    const { applyStyle } = useNativeStyles();
-
-    const shouldDisplayGoBackButton = hasGoBackIcon && !leftIcon;
-
-    return (
-        <View style={[applyStyle(screenHeaderStyle), style]}>
-            <View style={applyStyle(iconWrapperStyle)}>
-                {shouldDisplayGoBackButton ? <GoBackIcon /> : leftIcon}
-            </View>
-            {activeStep && numberOfSteps ? (
-                <View style={applyStyle(progressBarWrapperStyle)}>
-                    <StepsProgressBar numberOfSteps={numberOfSteps} activeStep={activeStep} />
-                    {title && <Text variant="titleSmall">{title}</Text>}
-                </View>
-            ) : (
-                <>{title && <Text variant="titleSmall">{title}</Text>}</>
-            )}
-
-            <View style={applyStyle(iconWrapperStyle)}>{rightIcon}</View>
-        </View>
-    );
-};
+export const ScreenHeader = ({ hasBottomPadding, children }: ScreenHeaderProps) => (
+    <ScreenHeaderWrapper marginBottom={hasBottomPadding ? 'small' : undefined}>
+        {children}
+    </ScreenHeaderWrapper>
+);

@@ -1,6 +1,13 @@
 import BigNumber from 'bignumber.js';
 
-import { AccountInfo, AccountAddresses, AccountAddress, AccountTransaction } from '@trezor/connect';
+import {
+    AccountInfo,
+    AccountAddresses,
+    AccountAddress,
+    AccountTransaction,
+    AccountUtxo,
+    PrecomposedTransactionFinalCardano,
+} from '@trezor/connect';
 import { arrayDistinct, bufferUtils } from '@trezor/utils';
 import {
     networksCompatibility as NETWORKS,
@@ -13,7 +20,6 @@ import {
     CoinFiatRates,
     Discovery,
     PrecomposedTransactionFinal,
-    PrecomposedTransactionFinalCardano,
     ReceiveInfo,
     TxFinalCardano,
 } from '@suite-common/wallet-types';
@@ -26,6 +32,8 @@ import {
 } from '@trezor/urls';
 
 import { toFiatCurrency } from './fiatConverterUtils';
+
+export const isEthereumAccountSymbol = (symbol: NetworkSymbol) => symbol === 'eth';
 
 export const isUtxoBased = (account: Account) =>
     account.networkType === 'bitcoin' || account.networkType === 'cardano';
@@ -134,10 +142,12 @@ export const getTitleForNetwork = (symbol: NetworkSymbol) => {
             return 'TR_NETWORK_ZCASH';
         case 'eth':
             return 'TR_NETWORK_ETHEREUM';
-        case 'trop':
-            return 'TR_NETWORK_ETHEREUM_TESTNET';
+        case 'tsep':
+            return 'TR_NETWORK_ETHEREUM_SEPOLIA';
         case 'tgor':
             return 'TR_NETWORK_ETHEREUM_GOERLI';
+        case 'thol':
+            return 'TR_NETWORK_ETHEREUM_HOLESKY';
         case 'etc':
             return 'TR_NETWORK_ETHEREUM_CLASSIC';
         case 'xem':
@@ -154,8 +164,24 @@ export const getTitleForNetwork = (symbol: NetworkSymbol) => {
             return 'TR_NETWORK_XRP_TESTNET';
         case 'tada':
             return 'TR_NETWORK_CARDANO_TESTNET';
+        case 'sol':
+            return 'TR_NETWORK_SOLANA_MAINNET';
+        case 'dsol':
+            return 'TR_NETWORK_SOLANA_DEVNET';
         default:
             return 'TR_NETWORK_UNKNOWN';
+    }
+};
+
+export const getAccountTypePrefix = (path: string) => {
+    if (typeof path !== 'string') return null;
+    const coinType = path.split('/')[2];
+    switch (coinType) {
+        case `501'`: {
+            return 'TR_ACCOUNT_TYPE_SOLANA_BIP44_CHANGE';
+        }
+        default:
+            return null;
     }
 };
 
@@ -182,6 +208,8 @@ export const getBip43Type = (path: string) => {
 };
 
 export const getAccountTypeName = (path: string) => {
+    const accountTypePrefix = getAccountTypePrefix(path);
+    if (accountTypePrefix) return `${accountTypePrefix}_NAME` as const;
     const bip43 = getBip43Type(path);
     if (bip43 === 'bip86') return 'TR_ACCOUNT_TYPE_BIP86_NAME';
     if (bip43 === 'bip84') return 'TR_ACCOUNT_TYPE_BIP84_NAME';
@@ -192,6 +220,8 @@ export const getAccountTypeName = (path: string) => {
 };
 
 export const getAccountTypeTech = (path: string) => {
+    const accountTypePrefix = getAccountTypePrefix(path);
+    if (accountTypePrefix) return `${accountTypePrefix}_TECH` as const;
     const bip43 = getBip43Type(path);
     if (bip43 === 'bip86') return 'TR_ACCOUNT_TYPE_BIP86_TECH';
     if (bip43 === 'bip84') return 'TR_ACCOUNT_TYPE_BIP84_TECH';
@@ -202,6 +232,8 @@ export const getAccountTypeTech = (path: string) => {
 };
 
 export const getAccountTypeDesc = (path: string) => {
+    const accountTypePrefix = getAccountTypePrefix(path);
+    if (accountTypePrefix) return `${accountTypePrefix}_DESC` as const;
     const bip43 = getBip43Type(path);
     if (bip43 === 'bip86') return 'TR_ACCOUNT_TYPE_BIP86_DESC';
     if (bip43 === 'bip84') return 'TR_ACCOUNT_TYPE_BIP84_DESC';
@@ -486,10 +518,12 @@ export const enhanceHistory = ({
     total,
     unconfirmed,
     tokens,
+    addrTxCount,
 }: AccountInfo['history']): Account['history'] => ({
     total,
     unconfirmed,
     tokens,
+    addrTxCount,
 });
 
 export const getAccountFiatBalance = (
@@ -512,7 +546,7 @@ export const getAccountFiatBalance = (
     // sum fiat value of all tokens
     account.tokens?.forEach(t => {
         const tokenRates = fiat.find(
-            f => f.mainNetworkSymbol === account.symbol && f.tokenAddress === t.address,
+            f => f.mainNetworkSymbol === account.symbol && f.tokenAddress === t.contract,
         );
         if (tokenRates && t.balance) {
             const tokenBalance = toFiatCurrency(
@@ -549,47 +583,45 @@ export const isTestnet = (symbol: NetworkSymbol) => {
 };
 
 export const isAccountOutdated = (account: Account, freshInfo: AccountInfo) => {
-    // changed transaction count when app is running during tx confirmation
-    const changedTxCountOnline =
-        freshInfo.history.total + (freshInfo.history.unconfirmed || 0) >
-        account.history.total + (account.history.unconfirmed || 0);
+    if (
+        // if backend/coin supports addrTxCount, compare it instead of total
+        typeof freshInfo.history.addrTxCount === 'number'
+            ? // addrTxCount (address/tx pairs) is different than before
+              account.history.addrTxCount !== freshInfo.history.addrTxCount
+            : // confirmed tx count is different than before
+              // (unreliable for different getAccountInfo levels, that's why addrTxCount was added)
+              account.history.total !== freshInfo.history.total
+    )
+        return true;
 
-    // changed transaction count when app was closed before tx confirmation
-    const changedTxCountOffline =
-        freshInfo.history.total > account.history.total &&
-        (freshInfo.history.unconfirmed || 0) < (account.history.unconfirmed || 0);
+    // unconfirmed tx count is different than before
+    if (account.history.unconfirmed !== freshInfo.history.unconfirmed) return true;
 
-    // changed transaction count when app was closed during tx confirmation and account was empty
-    const changedTxCountOfflineFresh =
-        freshInfo.history.total === 0 && freshInfo.history.unconfirmed;
-
-    // different sequence or balance
-    const changedRipple =
-        account.networkType === 'ripple' &&
-        (freshInfo.misc!.sequence !== account.misc.sequence ||
-            freshInfo.balance !== account.balance ||
-            freshInfo.misc!.reserve !== account.misc.reserve);
-
-    const changedEthereum =
-        account.networkType === 'ethereum' && freshInfo.misc!.nonce !== account.misc.nonce;
-
-    const changedCardano =
-        account.networkType === 'cardano' &&
-        // stake address (de)registration
-        (freshInfo.misc!.staking?.isActive !== account.misc.staking.isActive ||
-            // changed rewards amount (rewards are distributed every epoch (5 days))
-            freshInfo.misc!.staking?.rewards !== account.misc.staking.rewards ||
-            // changed stake pool
-            freshInfo.misc!.staking?.poolId !== account.misc.staking.poolId);
-
-    return (
-        changedTxCountOfflineFresh ||
-        changedTxCountOffline ||
-        changedTxCountOnline ||
-        changedCardano ||
-        changedRipple ||
-        changedEthereum
-    );
+    switch (account.networkType) {
+        case 'ripple':
+            // different sequence or balance
+            return (
+                freshInfo.misc!.sequence !== account.misc.sequence ||
+                freshInfo.balance !== account.balance ||
+                freshInfo.misc!.reserve !== account.misc.reserve
+            );
+        case 'ethereum':
+            return (
+                freshInfo.misc!.nonce !== account.misc.nonce ||
+                freshInfo.balance !== account.balance // balance can change because of beacon chain txs (staking)
+            );
+        case 'cardano':
+            return (
+                // stake address (de)registration
+                freshInfo.misc!.staking?.isActive !== account.misc.staking.isActive ||
+                // changed rewards amount (rewards are distributed every epoch (5 days))
+                freshInfo.misc!.staking?.rewards !== account.misc.staking.rewards ||
+                // changed stake pool
+                freshInfo.misc!.staking?.poolId !== account.misc.staking.poolId
+            );
+        default:
+            return false;
+    }
 };
 
 // Used in accountActions and failed accounts
@@ -637,6 +669,15 @@ export const getAccountSpecific = (
         };
     }
 
+    if (networkType === 'solana') {
+        return {
+            networkType,
+            misc: undefined,
+            marker: undefined,
+            page: accountInfo.page,
+        };
+    }
+
     return {
         networkType,
         misc: undefined,
@@ -672,10 +713,6 @@ export const getFailedAccounts = (discovery: Discovery): Account[] =>
             },
             metadata: {
                 key: descriptor,
-                fileName: '',
-                aesKey: '',
-                outputLabels: {},
-                addressLabels: {},
             },
             ...getAccountSpecific({}, getNetwork(f.symbol)!.networkType),
         };
@@ -691,6 +728,7 @@ export const accountSearchFn = (
     account: Account,
     rawSearchString?: string,
     coinFilter?: NetworkSymbol,
+    metadataAccountLabel?: string,
 ) => {
     // if coin filter is active and account symbol doesn't match return false and don't continue the search
     const coinFilterMatch = coinFilter ? account.symbol === coinFilter : true;
@@ -718,7 +756,8 @@ export const accountSearchFn = (
     const matchXRPAlternativeName =
         network?.networkType === 'ripple' && 'ripple'.includes(searchString);
 
-    const metadataMatch = account.metadata.accountLabel?.toLowerCase().includes(searchString);
+    const metadataMatch = !!metadataAccountLabel?.toLowerCase().includes(searchString);
+    const accountLabelMatch = !!account.accountLabel?.toLowerCase().includes(searchString);
 
     return (
         symbolMatch ||
@@ -727,7 +766,8 @@ export const accountSearchFn = (
         descriptorMatch ||
         addressMatch ||
         matchXRPAlternativeName ||
-        metadataMatch
+        metadataMatch ||
+        accountLabelMatch
     );
 };
 
@@ -754,11 +794,10 @@ export const getUtxoFromSignedTransaction = ({
     const findUtxo = (
         // this little func is needed in order to slightly change type inputs array to stop ts complaining
         // not sure how to do this in more elegant way
-        inputs:
-            | (
-                  | PrecomposedTransactionFinalCardano['transaction']['inputs'][number]
-                  | PrecomposedTransactionFinal['transaction']['inputs'][number]
-              )[],
+        inputs: (
+            | PrecomposedTransactionFinalCardano['inputs'][number]
+            | PrecomposedTransactionFinal['inputs'][number]
+        )[],
     ) =>
         account.utxo?.filter(
             u =>
@@ -766,7 +805,7 @@ export const getUtxoFromSignedTransaction = ({
                 u.txid !== prevTxid,
         ) || [];
 
-    const utxo = findUtxo(tx.transaction.inputs);
+    const utxo = findUtxo(tx.inputs);
 
     // join all account addresses
     const addresses = account.addresses
@@ -774,7 +813,7 @@ export const getUtxoFromSignedTransaction = ({
         : [];
 
     // append utxo created by this transaction
-    tx.transaction.outputs.forEach((output, vout) => {
+    tx.outputs.forEach((output, vout) => {
         let addr: AccountAddress | undefined;
         if (!receivingAccount && 'address_n' in output && output.address_n) {
             // find change address
@@ -847,7 +886,7 @@ export const getPendingAccount = ({
 
         const addresses = getAccountAddresses(account);
 
-        tx.transaction.outputs.forEach(output => {
+        tx.outputs.forEach(output => {
             if ('address' in output) {
                 // find self address
                 if (addresses.find(a => a.address === output.address)) {
@@ -881,9 +920,13 @@ export const getNetworkFeatures = ({
     )?.features || [];
 
 export const hasNetworkFeatures = (
-    account: Account,
+    account: Account | undefined,
     features: NetworkFeature | Array<NetworkFeature>,
 ) => {
+    if (!account) {
+        return false;
+    }
+
     const networkFeatures = getNetworkFeatures(account);
 
     if (!networkFeatures) {
@@ -912,7 +955,10 @@ export const getUtxoOutpoint = (utxo: { txid: string; vout: number }) => {
 // https://developer.bitcoin.org/reference/transactions.html#outpoint-the-specific-part-of-a-specific-output
 export const readUtxoOutpoint = (outpoint: string) => {
     const buffer = Buffer.from(outpoint, 'hex');
-    const txid = bufferUtils.reverseBuffer(buffer.slice(0, 32));
+    const txid = bufferUtils.reverseBuffer(buffer.subarray(0, 32));
     const vout = buffer.readUInt32LE(txid.length);
     return { txid: txid.toString('hex'), vout };
 };
+
+export const isSameUtxo = (a: AccountUtxo, b: AccountUtxo) =>
+    a.txid === b.txid && a.vout === b.vout;

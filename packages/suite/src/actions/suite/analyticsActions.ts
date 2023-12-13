@@ -3,9 +3,9 @@
  * @docs docs/misc/analytics.md
  */
 
-import { allowSentryReport, setSentryUser } from '@suite-utils/sentry';
-import { getEnvironment } from '@suite-utils/env';
-import type { Dispatch, GetState } from '@suite-types';
+import { allowSentryReport, setSentryUser } from 'src/utils/suite/sentry';
+import { getEnvironment, getCommitHash } from '@trezor/env-utils';
+import type { Dispatch, GetState } from 'src/types/suite';
 
 import {
     analyticsActions,
@@ -25,7 +25,10 @@ export const enableAnalyticsThunk = () => (dispatch: Dispatch) => {
 };
 
 export const disableAnalyticsThunk = () => (dispatch: Dispatch) => {
-    analytics.report({ type: EventType.SettingsAnalytics, payload: { value: false } }, true);
+    analytics.report(
+        { type: EventType.SettingsAnalytics, payload: { value: false } },
+        { force: true },
+    );
     allowSentryReport(false);
 
     dispatch(analyticsActions.disableAnalytics());
@@ -49,7 +52,7 @@ export const init = () => (dispatch: Dispatch, getState: GetState) => {
         instanceId,
         sessionId,
         environment: getEnvironment(),
-        commitId: process.env.COMMITHASH || '',
+        commitId: getCommitHash(),
         isDev: !process.env.CODESIGN_BUILD,
         callbacks: {
             onEnable: () => dispatch(enableAnalyticsThunk()),
@@ -57,7 +60,7 @@ export const init = () => (dispatch: Dispatch, getState: GetState) => {
         },
     });
 
-    allowSentryReport(userAllowedTracking);
+    allowSentryReport(!!userAllowedTracking);
     setSentryUser(instanceId);
 
     dispatch(

@@ -127,40 +127,6 @@ const fixtures: {
         },
     },
     {
-        description: 'BTC account with invalid addresses',
-        params: {
-            descriptor:
-                'xpub6CVKsQYXc9b2MiuW1HisiJKCEyB8vSqEafi6CP6Qu96YABCKScWtm1gUko1yDRSdmPjYQ8eFUbc9qrvNxBTUq2Z19aenEmCFcUcFUJL1Wpu',
-        },
-        serverFixtures: [
-            {
-                method: 'getAccountInfo',
-                response: {
-                    data: {
-                        address:
-                            'xpub6CVKsQYXc9b2MiuW1HisiJKCEyB8vSqEafi6CP6Qu96YABCKScWtm1gUko1yDRSdmPjYQ8eFUbc9qrvNxBTUq2Z19aenEmCFcUcFUJL1Wpu',
-                        tokens: [
-                            {
-                                // @ts-expect-error
-                                type: 'not-XPUBAddress',
-                                path: "m/44'/0'/100'/1/0",
-                                name: '1J8tVQD9KZZeLhnkMRHHDawsYmwjWAnC5d',
-                                transfers: 0,
-                            },
-                        ],
-                    },
-                },
-            },
-        ],
-        response: {
-            descriptor:
-                'xpub6CVKsQYXc9b2MiuW1HisiJKCEyB8vSqEafi6CP6Qu96YABCKScWtm1gUko1yDRSdmPjYQ8eFUbc9qrvNxBTUq2Z19aenEmCFcUcFUJL1Wpu',
-            empty: false,
-            addresses: undefined,
-            history: {},
-        },
-    },
-    {
         description: 'BTC account with unconfirmed balance (incoming)',
         params: {
             descriptor:
@@ -230,6 +196,7 @@ const fixtures: {
                                 n: 0,
                             },
                         ],
+                        internalTransfers: [],
                         tokens: [],
                         details: {
                             vin: [
@@ -250,6 +217,7 @@ const fixtures: {
                             totalInput: '1',
                             totalOutput: '1',
                         },
+                        hex: expect.any(String),
                     },
                 ],
             },
@@ -353,6 +321,7 @@ const fixtures: {
                                 n: 1,
                             },
                         ],
+                        internalTransfers: [],
                         tokens: [],
                         details: {
                             vin: [
@@ -509,41 +478,11 @@ const fixtures: {
                     type: 'ERC20',
                     name: 'Token name',
                     symbol: 'TKNNME',
-                    address: '0x0',
+                    contract: '0x0',
                     balance: '1',
                     decimals: 0,
                 },
             ],
-        },
-    },
-    {
-        description: 'ETH account with unknown tokens',
-        params: {
-            descriptor: '0x1e6E3708a059aEa1241a81c7aAe84b6CDbC54d59',
-        },
-        serverFixtures: [
-            {
-                method: 'getAccountInfo',
-                response: {
-                    data: {
-                        address: '0x1e6E3708a059aEa1241a81c7aAe84b6CDbC54d59',
-                        tokens: [
-                            {
-                                // @ts-expect-error
-                                type: 'not-ERC20',
-                                path: "m/44'/0'/100'/1/0",
-                                name: '1J8tVQD9KZZeLhnkMRHHDawsYmwjWAnC5d',
-                                transfers: 0,
-                            },
-                        ],
-                    },
-                },
-            },
-        ],
-        response: {
-            descriptor: '0x1e6E3708a059aEa1241a81c7aAe84b6CDbC54d59',
-            empty: false,
-            history: {},
         },
     },
     {
@@ -574,38 +513,12 @@ const fixtures: {
             misc: {
                 erc20Contract: {
                     type: 'ERC20',
-                    address: '0xFc6B5d6af8A13258f7CbD0D39E11b35e01a32F93',
+                    contract: '0xFc6B5d6af8A13258f7CbD0D39E11b35e01a32F93',
                     name: 'Grzegorz Brzęczyszczykiewicz',
                     symbol: 'GRZBRZ',
                     decimals: 3,
                 },
             },
-        },
-    },
-    {
-        description: 'ETH (Ropsten) smart contract type unknown',
-        params: {
-            descriptor: '0xFc6B5d6af8A13258f7CbD0D39E11b35e01a32F93',
-        },
-        serverFixtures: [
-            {
-                method: 'getAccountInfo',
-                response: {
-                    data: {
-                        address: '0xFc6B5d6af8A13258f7CbD0D39E11b35e01a32F93',
-                        erc20Contract: {
-                            // @ts-expect-error
-                            type: 'not-ERC20',
-                        },
-                    },
-                },
-            },
-        ],
-        response: {
-            descriptor: '0xFc6B5d6af8A13258f7CbD0D39E11b35e01a32F93',
-            empty: false,
-            history: {},
-            misc: undefined,
         },
     },
     {
@@ -678,6 +591,7 @@ const fixtures: {
                         vsize: 141,
                         feeRate: '2',
                         targets: [],
+                        internalTransfers: [],
                         tokens: [],
                         details: {
                             vin: [],
@@ -686,6 +600,7 @@ const fixtures: {
                             totalInput: '0',
                             totalOutput: '0',
                         },
+                        hex: expect.any(String),
                     },
                 ],
             },

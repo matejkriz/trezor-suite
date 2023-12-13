@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 
 import { BarCodeEvent, BarCodeScanner, PermissionStatus } from 'expo-barcode-scanner';
@@ -51,21 +51,23 @@ export const QRCodeScanner = ({ onCodeScanned }: QRCodeScannerProps) => {
         );
     }
 
-    if (cameraPermissionStatus === PermissionStatus.GRANTED) {
-        return (
-            <BarCodeScanner
-                onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-                barCodeTypes={barCodeTypes}
-                style={applyStyle(cameraStyle)}
-                type="back"
-            />
-        );
-    }
+    switch (cameraPermissionStatus) {
+        // If the status is "UNDETERMINED" the expo-barcode-scanner library shows a native permission dialog itself.
+        case PermissionStatus.UNDETERMINED:
+            return null;
 
-    return (
-        <CameraPermissionError
-            onPermissionRequest={requestCameraPermission}
-            permissionStatus={cameraPermissionStatus}
-        />
-    );
+        case PermissionStatus.GRANTED:
+            return (
+                <BarCodeScanner
+                    onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+                    barCodeTypes={barCodeTypes}
+                    style={applyStyle(cameraStyle)}
+                    type="back"
+                />
+            );
+
+        case PermissionStatus.DENIED:
+        default:
+            return <CameraPermissionError onPermissionRequest={requestCameraPermission} />;
+    }
 };

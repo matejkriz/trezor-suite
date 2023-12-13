@@ -1,10 +1,15 @@
-export const paramsError = (error: string, code?: string) => ({
-    success: false,
-    payload: {
-        error,
-        code,
-    },
-});
+import { testMocks } from '@suite-common/test-utils';
+
+const { getSuiteDevice } = testMocks;
+
+export const paramsError = (error: string, code?: string) =>
+    ({
+        success: false,
+        payload: {
+            error,
+            code,
+        },
+    }) as const;
 
 export const fixtures = [
     {
@@ -108,7 +113,7 @@ export const fixtures = [
             },
             success: true,
         },
-        device: global.JestMocks.getSuiteDevice({
+        device: getSuiteDevice({
             state: 'device-state',
             connected: true,
             unavailableCapabilities: { taproot: 'update-required' },
@@ -141,7 +146,7 @@ export const fixtures = [
             },
         },
         // this device is used only to cover missing unavailableCapabilities case
-        device: global.JestMocks.getSuiteDevice({
+        device: getSuiteDevice({
             type: 'unacquired',
         }),
     },
@@ -150,7 +155,7 @@ export const fixtures = [
         connect: {
             success: true,
         },
-        device: global.JestMocks.getSuiteDevice({
+        device: getSuiteDevice({
             state: 'device-state',
             connected: true,
             unavailableCapabilities: { xrp: 'no-capability' },
@@ -165,7 +170,7 @@ export const fixtures = [
         connect: {
             success: true,
         },
-        device: global.JestMocks.getSuiteDevice({
+        device: getSuiteDevice({
             state: 'device-state',
             connected: true,
             unavailableCapabilities: { xrp: 'no-capability' },
@@ -191,7 +196,7 @@ export const fixtures = [
 // 8. Second bundle is completed without interruption. Created accounts: ["m/84'/0'/0'", "m/84'/0'/1'", "m/49'/0'/0'", "m/44'/0'/0'"....], Discovery process requests for another bundle.
 // 9. TrezorConnect.getAccountInfo received third bundle. Bundle starts with ["m/84'/0'/2'", "m/49'/0'/1'", "m/44'/0'/1'"...]
 // 10. Account "m/84'/0'/2'" is created in reducer, interruption is triggered from test, TrezorConnect is requested for "m/49'/0'/1'" and throws error...
-// ...and so on, until discovery calls DISCOVERY.COMPLETE action
+// ...and so on, until discovery calls completeDiscovery action
 export const interruptionFixtures = [
     {
         description:
@@ -288,7 +293,7 @@ export const changeNetworksFixtures = [
 export const unavailableCapabilities = [
     {
         description: 'UnavailableCapability: Enable XRP',
-        device: global.JestMocks.getSuiteDevice({
+        device: getSuiteDevice({
             state: 'device-state',
             connected: true,
             unavailableCapabilities: { xrp: 'no-capability', taproot: 'no-support' },
@@ -298,7 +303,7 @@ export const unavailableCapabilities = [
     },
     {
         description: 'UnavailableCapability: Only LTC',
-        device: global.JestMocks.getSuiteDevice({
+        device: getSuiteDevice({
             state: 'device-state',
             connected: true,
             unavailableCapabilities: { ltc: 'no-capability' },
@@ -309,7 +314,7 @@ export const unavailableCapabilities = [
     {
         description: 'UnavailableCapability: Device without features',
         // this device is used only to cover missing unavailableCapabilities case
-        device: global.JestMocks.getSuiteDevice({
+        device: getSuiteDevice({
             type: 'unacquired',
         }),
         networks: ['xrp'],

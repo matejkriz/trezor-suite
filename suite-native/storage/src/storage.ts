@@ -1,18 +1,16 @@
+import { Alert } from 'react-native';
 import { MMKV } from 'react-native-mmkv';
-import { NativeModules } from 'react-native';
+import RNRestart from 'react-native-restart';
 
 import * as Random from 'expo-random';
 import * as SecureStore from 'expo-secure-store';
-import { Persistor, Storage } from 'redux-persist';
+import * as SplashScreen from 'expo-splash-screen';
+import { Storage } from 'redux-persist';
 
-const ENCRYPTION_KEY = 'STORAGE_ENCRYPTION_KEY';
-const ENCRYPTED_STORAGE_ID = 'trezorSuite-app-storage';
+import { unecryptedJotaiStorage } from './atomWithUnecryptedStorage';
 
-export const purgeStorage = async (persistor: Persistor) => {
-    await persistor.purge();
-    await SecureStore.deleteItemAsync(ENCRYPTION_KEY);
-    NativeModules.DevSettings.reload();
-};
+export const ENCRYPTION_KEY = 'STORAGE_ENCRYPTION_KEY';
+export const ENCRYPTED_STORAGE_ID = 'trezorSuite-app-storage';
 
 export const retrieveStorageEncryptionKey = async () => {
     let secureKey = await SecureStore.getItemAsync(ENCRYPTION_KEY);
@@ -25,13 +23,54 @@ export const retrieveStorageEncryptionKey = async () => {
     return secureKey;
 };
 
+// eslint-disable-next-line import/no-mutable-exports
+export let encryptedStorage: MMKV;
+
+export const clearStorage = () => {
+    unecryptedJotaiStorage.clearAll();
+    encryptedStorage?.clearAll();
+    RNRestart.restart();
+};
+
+// Ideally it should never happen but we need to be sure that at least some message is displayed.
+// If someone will mess with encryptionKey it can corrupt storage and app will crash on startup.
+// Then app will hang on splashscreen indefinitely so we at least want to show some error message.
+const tryInitStorage = (encryptionKey: string) => {
+    // storage may be already initialized (for example in dev useEffect fire twice)
+    if (encryptedStorage) return encryptedStorage;
+
+    try {
+        return new MMKV({
+            id: ENCRYPTED_STORAGE_ID,
+            encryptionKey,
+        });
+    } catch (error) {
+        SplashScreen.hideAsync();
+        Alert.alert(
+            'Encrypted storage error',
+            `Storage is corrupted. Please reinstall the app or reset storage. \n Error: ${error.toString()}`,
+            [
+                {
+                    text: 'OK',
+                    onPress: () => {
+                        // do nothing
+                    },
+                },
+                {
+                    text: 'Reset storage',
+                    onPress: clearStorage,
+                },
+            ],
+        );
+        // rethrow error so it can be caught by Sentry
+        throw error;
+    }
+};
+
 export const initMmkvStorage = async (): Promise<Storage> => {
     const encryptionKey = await retrieveStorageEncryptionKey();
 
-    const encryptedStorage = new MMKV({
-        id: ENCRYPTED_STORAGE_ID,
-        encryptionKey,
-    });
+    encryptedStorage = tryInitStorage(encryptionKey);
 
     return {
         setItem: (key, value) => {

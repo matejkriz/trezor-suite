@@ -14,6 +14,7 @@ import type {
     AccountAddresses,
     TokenInfo,
     TokenTransfer,
+    TransferType,
 } from '@trezor/blockchain-link-types/lib/common';
 
 import { enhanceVinVout, filterTargets, sumVinVout, transformTarget } from './utils';
@@ -42,7 +43,7 @@ export const transformUtxos = (utxos: BlockfrostUtxos[]): Utxo[] => {
 const hexToString = (input: string): string => {
     let str = '';
     for (let n = 0; n < input.length; n += 2) {
-        str += String.fromCharCode(parseInt(input.substr(n, 2), 16));
+        str += String.fromCharCode(parseInt(input.substring(n, n + 2), 16));
     }
 
     return str;
@@ -88,15 +89,15 @@ export const transformTokenInfo = (
     tokens: BlockfrostAccountInfo['tokens'],
 ): TokenInfo[] | undefined => {
     if (!tokens || !Array.isArray(tokens)) return undefined;
-    const info = tokens.map(t => {
-        const { assetName } = parseAsset(t.unit);
+    const info = tokens.map(token => {
+        const { assetName } = parseAsset(token.unit);
         return {
             type: 'BLOCKFROST',
-            name: t.fingerprint!, // this is safe as fingerprint is defined for all tokens except lovelace and lovelace is never included in account.tokens
-            address: t.unit,
-            symbol: assetName || t.fingerprint!,
-            balance: t.quantity,
-            decimals: t.decimals,
+            name: token.fingerprint!, // this is safe as fingerprint is defined for all tokens except lovelace and lovelace is never included in account.tokens
+            contract: token.unit,
+            symbol: assetName || token.fingerprint!,
+            balance: token.quantity,
+            decimals: token.decimals,
         };
     });
 
@@ -117,7 +118,7 @@ export const transformInputOutput = (
 export const filterTokenTransfers = (
     accountAddress: AccountAddresses,
     tx: BlockfrostTransaction,
-    type: Exclude<Transaction['type'], 'joint'>,
+    type: TransferType,
 ): TokenTransfer[] => {
     const transfers: TokenTransfer[] = [];
     const myNonChangeAddresses = accountAddress.used.concat(accountAddress.unused);
@@ -157,14 +158,14 @@ export const filterTokenTransfers = (
                     type,
                     name: asset.fingerprint,
                     symbol: assetName || asset.fingerprint,
-                    address: asset.unit,
+                    contract: asset.unit,
                     decimals: asset.decimals,
                     amount: amount.toString(),
                     from:
                         type === 'sent' || type === 'self'
                             ? tx.address
                             : tx.txUtxos.inputs.find(i => i.amount.find(a => a.unit === token))
-                                  ?.address,
+                                  ?.address || '',
                     to: type === 'recv' ? tx.address : output.address,
                 });
             });
@@ -270,6 +271,7 @@ export const transformTransaction = (
         fee,
         targets: targets.map(t => transformTarget(t, incoming)),
         tokens,
+        internalTransfers: [],
         cardanoSpecific: {
             subtype: getSubtype(blockfrostTxData),
             withdrawal,

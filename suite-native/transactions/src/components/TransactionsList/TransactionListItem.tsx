@@ -1,171 +1,110 @@
-import React, { memo } from 'react';
-import { TouchableOpacity } from 'react-native';
 import { useSelector } from 'react-redux';
 
-import { useNavigation } from '@react-navigation/native';
-
-import { Color } from '@trezor/theme';
-import { Box, Text } from '@suite-native/atoms';
-import { AccountKey, TransactionType, WalletAccountTransaction } from '@suite-common/wallet-types';
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
+import { AccountKey, TransactionType } from '@suite-common/wallet-types';
 import {
-    AccountsStackRoutes,
-    RootStackParamList,
-    RootStackRoutes,
-    StackNavigationProps,
-} from '@suite-native/navigation';
-import { useFormatters } from '@suite-common/formatters';
-import {
-    AccountAddressFormatter,
     CryptoAmountFormatter,
     CryptoToFiatAmountFormatter,
+    SignValueFormatter,
 } from '@suite-native/formatters';
-import {
-    selectTransactionBlockTimeById,
-    selectTransactionFirstTargetAddress,
-    TransactionsRootState,
-} from '@suite-common/wallet-core';
+import { SignValue } from '@suite-common/suite-types';
+import { Box } from '@suite-native/atoms';
+import { AccountsRootState, selectIsTestnetAccount } from '@suite-common/wallet-core';
+import { EmptyAmountText } from '@suite-native/formatters/src/components/EmptyAmountText';
+import { WalletAccountTransaction } from '@suite-native/ethereum-tokens';
 
-import { TransactionIcon } from './TransactionIcon';
+import { TransactionListItemContainer } from './TransactionListItemContainer';
+import { TokenTransferListItem } from './TokenTransferListItem';
 
 type TransactionListItemProps = {
     transaction: WalletAccountTransaction;
     accountKey: AccountKey;
+    areTokensIncluded: boolean;
     isFirst?: boolean;
     isLast?: boolean;
 };
 
-type TransactionTypeProperties = {
-    prefix: string;
-    sign?: string;
-    signColor?: Color;
-};
-const transactionTypePropertiesMap = {
-    recv: { prefix: 'From', sign: '+', signColor: 'textSecondaryHighlight' },
-    sent: { prefix: 'To', sign: '-', signColor: 'textAlertRed' },
-    self: { prefix: 'Self', sign: undefined, signColor: undefined },
-    joint: { prefix: 'Joint', sign: undefined, signColor: undefined },
-    failed: { prefix: 'Failed', sign: undefined, signColor: undefined },
-    unknown: { prefix: 'Unknown', sign: undefined, signColor: undefined },
-} as const satisfies Record<TransactionType, TransactionTypeProperties>;
+export const signValueMap = {
+    recv: 'positive',
+    sent: 'negative',
+    self: undefined,
+    joint: undefined,
+    contract: undefined,
+    failed: undefined,
+    unknown: undefined,
+} as const satisfies Record<TransactionType, SignValue | undefined>;
 
-type TransactionListItemStyleProps = {
-    isFirst: boolean;
-    isLast: boolean;
-};
-const transactionListItemStyle = prepareNativeStyle<TransactionListItemStyleProps>(
-    (utils, { isFirst, isLast }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        backgroundColor: utils.colors.backgroundSurfaceElevation1,
-        marginHorizontal: utils.spacings.small,
-        paddingHorizontal: utils.spacings.medium,
-        paddingTop: 12,
-        paddingBottom: 12,
-        extend: [
-            {
-                condition: isFirst,
-                style: {
-                    paddingTop: utils.spacings.medium,
-                    borderTopLeftRadius: utils.borders.radii.large / 2,
-                    borderTopRightRadius: utils.borders.radii.large / 2,
-                },
-            },
-            {
-                condition: isLast,
-                style: {
-                    paddingBottom: utils.spacings.medium,
-                    marginBottom: utils.spacings.extraLarge,
-                    borderBottomLeftRadius: utils.borders.radii.large / 2,
-                    borderBottomRightRadius: utils.borders.radii.large / 2,
-                },
-            },
-        ],
-    }),
-);
+export const TransactionListItemValues = ({
+    accountKey,
+    transaction,
+}: {
+    accountKey: AccountKey;
+    transaction: WalletAccountTransaction;
+}) => {
+    const isTestnetAccount = useSelector((state: AccountsRootState) =>
+        selectIsTestnetAccount(state, accountKey),
+    );
+    return (
+        <>
+            {isTestnetAccount ? (
+                <EmptyAmountText />
+            ) : (
+                <Box flexDirection="row">
+                    <SignValueFormatter value={signValueMap[transaction.type]} />
 
-const descriptionBoxStyle = prepareNativeStyle(_ => ({
-    flexDirection: 'row',
-    alignItems: 'center',
-    maxWidth: '60%',
-}));
-const addressStyle = prepareNativeStyle(utils => ({
-    flex: 1,
-    alignItems: 'center',
-    backgroundColor: utils.colors.backgroundNeutralSubtleOnElevation1,
-    marginLeft: utils.spacings.small,
-    paddingHorizontal: utils.spacings.small,
-    paddingVertical: 2,
-    borderRadius: 10,
-}));
-
-export const TransactionListItem = memo(
-    ({ transaction, accountKey, isFirst = false, isLast = false }: TransactionListItemProps) => {
-        const { applyStyle } = useNativeStyles();
-        const navigation =
-            useNavigation<
-                StackNavigationProps<RootStackParamList, AccountsStackRoutes.AccountDetail>
-            >();
-        const { DateTimeFormatter } = useFormatters();
-        const transactionBlockTime = useSelector((state: TransactionsRootState) =>
-            selectTransactionBlockTimeById(state, transaction.txid, accountKey),
-        );
-        const transactionTargetAddress = useSelector((state: TransactionsRootState) =>
-            selectTransactionFirstTargetAddress(state, transaction.txid, accountKey),
-        );
-
-        const handleNavigateToTransactionDetail = () => {
-            navigation.navigate(RootStackRoutes.TransactionDetail, {
-                txid: transaction.txid,
-                accountKey,
-            });
-        };
-
-        const transactionTypeProperties = transactionTypePropertiesMap[transaction.type];
-
-        return (
-            <TouchableOpacity
-                onPress={() => handleNavigateToTransactionDetail()}
-                style={applyStyle(transactionListItemStyle, { isFirst, isLast })}
-            >
-                <Box style={applyStyle(descriptionBoxStyle)}>
-                    <TransactionIcon
-                        cryptoIconName={transaction.symbol}
-                        transactionType={transaction.type}
-                    />
-                    <Box marginLeft="medium" flex={1}>
-                        <Box flexDirection="row">
-                            <Text>{transactionTypeProperties.prefix}</Text>
-                            {transactionTargetAddress && (
-                                <Box style={applyStyle(addressStyle)}>
-                                    <AccountAddressFormatter
-                                        value={transactionTargetAddress}
-                                        variant="label"
-                                        color="textSubdued"
-                                    />
-                                </Box>
-                            )}
-                        </Box>
-                        <Text variant="hint" color="textSubdued">
-                            <DateTimeFormatter value={transactionBlockTime} />
-                        </Text>
-                    </Box>
-                </Box>
-
-                <Box alignItems="flex-end">
                     <CryptoToFiatAmountFormatter
                         value={transaction.amount}
                         network={transaction.symbol}
                         customRates={transaction.rates}
                     />
-                    <CryptoAmountFormatter
-                        value={transaction.amount}
-                        network={transaction.symbol}
-                        isBalance={false}
-                    />
                 </Box>
-            </TouchableOpacity>
+            )}
+
+            <CryptoAmountFormatter
+                value={transaction.amount}
+                network={transaction.symbol}
+                isBalance={false}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+            />
+        </>
+    );
+};
+
+export const TransactionListItem = ({
+    transaction,
+    accountKey,
+    areTokensIncluded,
+    isFirst = false,
+    isLast = false,
+}: TransactionListItemProps) => {
+    const includedCoinsCount = areTokensIncluded ? transaction.tokens.length : 0;
+
+    const isTokenOnlyTransaction =
+        areTokensIncluded && transaction.amount === '0' && transaction.tokens.length !== 0;
+
+    if (isTokenOnlyTransaction)
+        return (
+            <TokenTransferListItem
+                accountKey={accountKey}
+                txid={transaction.txid}
+                tokenTransfer={transaction.tokens[0]}
+                includedCoinsCount={transaction.tokens.length - 1}
+            />
         );
-    },
-);
+
+    return (
+        <TransactionListItemContainer
+            networkSymbol={transaction.symbol}
+            txid={transaction.txid}
+            transactionType={transaction.type}
+            accountKey={accountKey}
+            includedCoinsCount={includedCoinsCount}
+            isFirst={isFirst}
+            isLast={isLast}
+        >
+            <TransactionListItemValues accountKey={accountKey} transaction={transaction} />
+        </TransactionListItemContainer>
+    );
+};
+
+TransactionListItem.displayName = 'TransactionListItem';

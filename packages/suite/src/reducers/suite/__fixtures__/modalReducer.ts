@@ -1,7 +1,9 @@
+import { testMocks } from '@suite-common/test-utils';
 import { DEVICE, UI } from '@trezor/connect';
-import { MODAL } from '@suite-actions/constants';
 
-const { getConnectDevice, getSuiteDevice } = global.JestMocks;
+import { MODAL } from 'src/actions/suite/constants';
+
+const { getConnectDevice, getSuiteDevice } = testMocks;
 // Default devices
 const CONNECT_DEVICE = getConnectDevice({
     path: '1',

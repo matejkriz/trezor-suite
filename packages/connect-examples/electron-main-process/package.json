@@ -16,7 +16,6 @@
         "productName": "TrezorConnectExample",
         "copyright": "Copyright © year ${author}",
         "asar": false,
-        "electronVersion": "23.1.1",
         "directories": {
             "output": "build-electron"
         },
@@ -53,10 +52,10 @@
         }
     },
     "dependencies": {
-        "@trezor/connect": "workspace:9.0.7"
+        "@trezor/connect": "workspace:*"
     },
     "devDependencies": {
-        "electron": "23.1.1",
-        "electron-builder": "^23.6.0"
+        "electron": "27.0.4",
+        "electron-builder": "24.6.4"
     }
 }

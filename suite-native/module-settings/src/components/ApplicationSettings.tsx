@@ -1,6 +1,5 @@
-import React from 'react';
-
 import { useNavigation } from '@react-navigation/core';
+import { useAtomValue } from 'jotai';
 
 import {
     SettingsStackRoutes,
@@ -9,12 +8,14 @@ import {
     RootStackParamList,
     RootStackRoutes,
 } from '@suite-native/navigation';
-import { isDevelopOrDebugEnv } from '@suite-native/config';
 
 import { SettingsSection } from './SettingsSection';
 import { SettingsSectionItem } from './SettingsSectionItem';
+import { isDevButtonVisibleAtom } from './ProductionDebug';
 
 export const ApplicationSettings = () => {
+    const isDevButtonVisible = useAtomValue(isDevButtonVisibleAtom);
+
     const navigation =
         useNavigation<
             StackToStackCompositeNavigationProps<
@@ -30,7 +31,7 @@ export const ApplicationSettings = () => {
 
     return (
         <SettingsSection title="Application">
-            {isDevelopOrDebugEnv() && (
+            {isDevButtonVisible && (
                 <SettingsSectionItem
                     iconName="placeholder"
                     title="DEV utils"
@@ -40,9 +41,9 @@ export const ApplicationSettings = () => {
             )}
             <SettingsSectionItem
                 iconName="flag"
-                title="Localisation"
+                title="Localization"
                 subtitle="Currency, Bitcoin units"
-                onPress={() => handleNavigation(SettingsStackRoutes.SettingsLocalisation)}
+                onPress={() => handleNavigation(SettingsStackRoutes.SettingsLocalization)}
             />
             <SettingsSectionItem
                 title="Customization"
@@ -53,7 +54,7 @@ export const ApplicationSettings = () => {
             <SettingsSectionItem
                 title="Privacy & Security"
                 iconName="eye"
-                subtitle="Analytics, Discreet mode"
+                subtitle="Analytics, Discreet mode, Biometrics"
                 onPress={() => handleNavigation(SettingsStackRoutes.SettingsPrivacyAndSecurity)}
             />
         </SettingsSection>

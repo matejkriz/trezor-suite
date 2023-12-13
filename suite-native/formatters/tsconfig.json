@@ -6,6 +6,9 @@
             "path": "../../suite-common/formatters"
         },
         {
+            "path": "../../suite-common/suite-types"
+        },
+        {
             "path": "../../suite-common/wallet-config"
         },
         {
@@ -19,9 +22,11 @@
         },
         { "path": "../atoms" },
         { "path": "../ethereum-tokens" },
+        { "path": "../fiat-rates" },
         { "path": "../module-settings" },
         {
             "path": "../../packages/blockchain-link"
-        }
+        },
+        { "path": "../../packages/styles" }
     ]
 }

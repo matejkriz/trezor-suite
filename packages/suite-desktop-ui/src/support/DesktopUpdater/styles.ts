@@ -23,8 +23,8 @@ export const RightCol = styled.div`
 export const Divider = styled.div`
     width: 100%;
     height: 1px;
-    margin: 30px 0px;
-    background: ${props => props.theme.STROKE_GREY};
+    margin: 30px 0;
+    background: ${({ theme }) => theme.STROKE_GREY};
 `;
 
 export const ImageWrapper = styled.div`
@@ -48,5 +48,5 @@ export const Title = styled(H2)`
 
 export const Description = styled(P)`
     font-size: ${variables.FONT_SIZE.SMALL};
-    color: ${props => props.theme.TYPE_LIGHT_GREY};
+    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
 `;

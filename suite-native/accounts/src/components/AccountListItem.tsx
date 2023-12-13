@@ -1,25 +1,26 @@
-import React from 'react';
 import { useSelector } from 'react-redux';
 
-import { AccountsRootState, selectAccountLabel } from '@suite-common/wallet-core';
-import { Box, Text } from '@suite-native/atoms';
+import { AccountsRootState, selectFormattedAccountType } from '@suite-common/wallet-core';
+import { Badge, Box, RoundedIcon, Text } from '@suite-native/atoms';
 import { Account } from '@suite-common/wallet-types';
 import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-import { CryptoIcon } from '@trezor/icons';
 import { CryptoAmountFormatter, CryptoToFiatAmountFormatter } from '@suite-native/formatters';
-import { selectIsEthereumAccountWithTokensWithBalance } from '@suite-native/ethereum-tokens';
+import { FiatRatesRootState } from '@suite-native/fiat-rates';
+import { selectIsEthereumAccountWithTokensWithFiatRates } from '@suite-native/ethereum-tokens';
+import { SettingsSliceRootState } from '@suite-native/module-settings';
 
 export type AccountListItemProps = {
     account: Account;
+    areTokensDisplayed?: boolean;
 };
 
-const accountListItemStyle = prepareNativeStyle<{ isAccountWithTokens: boolean }>(
-    (utils, { isAccountWithTokens }) => ({
-        backgroundColor: utils.colors.backgroundSurfaceElevation1,
-        padding: utils.spacings.medium,
-        borderRadius: utils.borders.radii.medium,
+const accountListItemStyle = prepareNativeStyle<{ isFollowedByTokens: boolean }>(
+    (_, { isFollowedByTokens }) => ({
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItem: 'center',
         extend: {
-            condition: isAccountWithTokens,
+            condition: isFollowedByTokens,
             style: {
                 paddingBottom: 0,
             },
@@ -27,36 +28,59 @@ const accountListItemStyle = prepareNativeStyle<{ isAccountWithTokens: boolean }
     }),
 );
 
-export const AccountListItem = ({ account }: AccountListItemProps) => {
+export const accountDescriptionStyle = prepareNativeStyle(_ => ({
+    flexShrink: 1,
+}));
+
+export const valuesContainerStyle = prepareNativeStyle(utils => ({
+    maxWidth: '40%',
+    flexShrink: 0,
+    alignItems: 'flex-end',
+    paddingLeft: utils.spacings.small,
+}));
+
+export const AccountListItem = ({ account, areTokensDisplayed = false }: AccountListItemProps) => {
     const { applyStyle } = useNativeStyles();
-    const accountLabel = useSelector((state: AccountsRootState) =>
-        selectAccountLabel(state, account.key),
+    const { accountLabel } = account;
+
+    const formattedAccountType = useSelector((state: AccountsRootState) =>
+        selectFormattedAccountType(state, account.key),
     );
-    const isAccountWithTokens = useSelector((state: AccountsRootState) =>
-        selectIsEthereumAccountWithTokensWithBalance(state, account.key),
+
+    const isAccountWithTokens = useSelector((state: FiatRatesRootState & SettingsSliceRootState) =>
+        selectIsEthereumAccountWithTokensWithFiatRates(state, account.key),
     );
 
     return (
         <Box
-            flexDirection="row"
-            justifyContent="space-between"
-            alignItems="center"
             style={applyStyle(accountListItemStyle, {
-                isAccountWithTokens,
+                isFollowedByTokens: areTokensDisplayed && isAccountWithTokens,
             })}
         >
-            <Box flexDirection="row">
-                <Box marginRight="small">
-                    <CryptoIcon name={account.symbol} />
+            <Box flexDirection="row" alignItems="center" flex={1}>
+                <Box marginRight="medium">
+                    <RoundedIcon name={account.symbol} />
                 </Box>
-                <Text>{accountLabel}</Text>
+                <Box style={applyStyle(accountDescriptionStyle)}>
+                    <Text>{accountLabel}</Text>
+                    {formattedAccountType && (
+                        <Badge label={formattedAccountType} size="small" elevation="1" />
+                    )}
+                </Box>
             </Box>
-            <Box alignItems="flex-end">
+
+            <Box style={applyStyle(valuesContainerStyle)}>
                 <CryptoToFiatAmountFormatter
                     value={account.availableBalance}
                     network={account.symbol}
                 />
-                <CryptoAmountFormatter value={account.formattedBalance} network={account.symbol} />
+                <CryptoAmountFormatter
+                    value={account.availableBalance}
+                    network={account.symbol}
+                    isBalance={false}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                />
             </Box>
         </Box>
     );

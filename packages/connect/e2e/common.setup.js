@@ -1,7 +1,9 @@
-import TrezorConnect from '@trezor/connect';
-import * as versionUtils from '@trezor/utils/src/versionUtils'; // NOTE: only this module is required
-import { UI } from '@trezor/connect/src/events'; // NOTE: import UI constants directly from source
-import { toHardened, getHDPath } from '@trezor/connect/src/utils/pathUtils'; // NOTE: import utils directly from source
+/* eslint-disable import/no-named-as-default */
+
+import TrezorConnect from '../src';
+import { versionUtils } from '@trezor/utils';
+import { UI } from '../src/events';
+import { toHardened, getHDPath } from '../src/utils/pathUtils';
 import { TrezorUserEnvLink } from '@trezor/trezor-user-env-link';
 
 const MNEMONICS = {
@@ -29,6 +31,8 @@ const getController = name => {
 const setup = async (TrezorUserEnvLink, options) => {
     const { state } = TrezorUserEnvLink;
 
+    await TrezorUserEnvLink.connect();
+
     if (
         state.mnemonic === options.mnemonic &&
         state.passphrase_protection === options.passphrase_protection &&
@@ -40,7 +44,6 @@ const setup = async (TrezorUserEnvLink, options) => {
 
     if (!options.mnemonic) return true; // skip setup if test is not using the device (composeTransaction)
 
-    await TrezorUserEnvLink.connect();
     await TrezorUserEnvLink.api.stopEmu();
 
     // after bridge is stopped, trezor-user-env automatically resolves to use udp transport.
@@ -83,12 +86,14 @@ const initTrezorConnect = async (TrezorUserEnvLink, options) => {
     TrezorConnect.removeAllListeners();
 
     TrezorConnect.on('device-connect', device => {
-        const { major_version, minor_version, patch_version, model, revision } = device.features;
+        const { major_version, minor_version, patch_version, internal_model, revision } =
+            device.features;
+        // eslint-disable-next-line no-console
         console.log('Device connected: ', {
             major_version,
             minor_version,
             patch_version,
-            model,
+            internal_model,
             revision,
         });
     });
@@ -126,10 +131,10 @@ const initTrezorConnect = async (TrezorUserEnvLink, options) => {
 // "1.9.3-1.9.6" - skip for FW gte 1.9.3 && lte 1.9.6
 const skipTest = rules => {
     if (!rules || !Array.isArray(rules)) return;
-    const fwModel = firmware.substr(0, 1);
-    const fwMaster = firmware.includes('-master');
+    const fwModel = firmware.substring(0, 1);
+    const fwMaster = firmware.includes('-main');
     const rule = rules
-        .filter(skip => skip.substr(0, 1) === fwModel || skip.substr(1, 1) === fwModel) // filter rules only for current model
+        .filter(skip => skip.substring(0, 1) === fwModel || skip.substring(1, 2) === fwModel) // filter rules only for current model
         .find(skip => {
             if (!skip.search('.') && skip === fwModel) {
                 // global model
@@ -151,7 +156,7 @@ const skipTest = rules => {
             if (
                 !fwMaster &&
                 skip.startsWith('<') &&
-                !versionUtils.isNewerOrEqual(firmware, skip.substr(1))
+                !versionUtils.isNewerOrEqual(firmware, skip.substring(1))
             ) {
                 // lower
                 return true;
@@ -160,7 +165,7 @@ const skipTest = rules => {
                 (fwMaster && skip.startsWith('>')) ||
                 (!fwMaster &&
                     skip.startsWith('>') &&
-                    versionUtils.isNewer(firmware, skip.substr(1)))
+                    versionUtils.isNewer(firmware, skip.substring(1)))
             ) {
                 // greater
                 return true;

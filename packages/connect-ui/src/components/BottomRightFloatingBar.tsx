@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 import styled from 'styled-components';
 
@@ -11,6 +11,7 @@ const Wrapper = styled.div`
     position: absolute;
     bottom: 16px;
     right: 16px;
+    z-index: 1;
 `;
 
 enum View {
@@ -28,13 +29,24 @@ const getView = () => {
     return View.Default;
 };
 
-export const BottomRightFloatingBar = () => {
+type BottomRightFloatingBarProps = {
+    onAnalyticsConfirm: (enabled: boolean) => void;
+};
+
+export const BottomRightFloatingBar = ({ onAnalyticsConfirm }: BottomRightFloatingBarProps) => {
     const [view, setView] = useState(getView());
 
     let content;
     switch (view) {
         case View.AnalyticsConsent:
-            content = <AnalyticsConsentWrapper onAnalyticsConfirm={() => setView(View.Default)} />;
+            content = (
+                <AnalyticsConsentWrapper
+                    onAnalyticsConfirm={(enabled: boolean) => {
+                        setView(View.Default);
+                        onAnalyticsConfirm(enabled);
+                    }}
+                />
+            );
             break;
         case View.Default:
         default:

@@ -1,4 +1,3 @@
-import React from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 
 import { useNavigation } from '@react-navigation/native';
@@ -9,15 +8,16 @@ import {
     TransactionsRootState,
     selectTransactionFirstTargetAddress,
     AccountsRootState,
-    selectAccountKeyByDescriptorAndNetworkSymbol,
+    selectDeviceAccountKeyByDescriptorAndNetworkSymbol,
     selectTransactionByTxidAndAccountKey,
+    DeviceRootState,
 } from '@suite-common/wallet-core';
 import {
     RootStackRoutes,
     StackNavigationProps,
     RootStackParamList,
 } from '@suite-native/navigation';
-import { Icon } from '@trezor/icons';
+import { Icon } from '@suite-common/icons';
 import {
     notificationsActions,
     TransactionNotificationType,
@@ -73,8 +73,8 @@ export const TransactionNotification = ({
         selectTransactionNotificationById(state, notificationId),
     );
 
-    const accountKey = useSelector((state: AccountsRootState) =>
-        selectAccountKeyByDescriptorAndNetworkSymbol(
+    const accountKey = useSelector((state: AccountsRootState & DeviceRootState) =>
+        selectDeviceAccountKeyByDescriptorAndNetworkSymbol(
             state,
             notification?.descriptor,
             notification?.symbol,
@@ -123,10 +123,9 @@ export const TransactionNotification = ({
             iconLeft={
                 <TransactionIcon
                     transactionType={transactionType}
-                    cryptoIconName={notification.symbol}
+                    symbol={notification.symbol}
                     isAnimated={isIconAnimated}
                     iconColor={isIconAnimated ? 'iconAlertYellow' : 'iconSubdued'}
-                    backgroundColor="backgroundSurfaceElevation2"
                 />
             }
             iconRight={<Icon name="circleRight" />}

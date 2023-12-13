@@ -1,24 +1,22 @@
-import React from 'react';
-import { withCoinmarket, WithSelectedAccountLoadedProps } from '@wallet-components';
-import { useCoinmarketSavingsSetupWaiting } from '@wallet-hooks/useCoinmarketSavingsSetupWaiting';
-import { Button, Loader } from '@trezor/components';
+import { WithSelectedAccountLoadedProps } from 'src/components/wallet';
+import { useCoinmarketSavingsSetupWaiting } from 'src/hooks/wallet/useCoinmarketSavingsSetupWaiting';
+import { Button, Spinner } from '@trezor/components';
 import styled from 'styled-components';
-import { Translation } from '@suite-components';
+import { Translation } from 'src/components/suite';
+import { withCoinmarket } from '../../withCoinmarket';
 
 const Wrapper = styled.div`
     display: flex;
-    flex-direction: column;
-    flex-wrap: nowrap;
-    justify-content: flex-start;
+    flex-flow: column nowrap;
+    place-content: stretch flex-start;
     align-items: center;
-    align-content: stretch;
 `;
 
 const Message = styled.div`
     color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
 `;
 
-const StyledLoader = styled(Loader)`
+const StyledLoader = styled(Spinner)`
     margin: 32px 0;
 `;
 

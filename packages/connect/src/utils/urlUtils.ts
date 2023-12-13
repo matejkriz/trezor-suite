@@ -1,16 +1,17 @@
 // origin: https://github.com/trezor/connect/blob/develop/src/js/utils/urlUtils.js
 
-export const getOrigin = (url: string) => {
+import { urlToOnion } from '@trezor/utils';
+
+export const getOrigin = (url: unknown) => {
     if (typeof url !== 'string') return 'unknown';
     if (url.indexOf('file://') === 0) return 'file://';
-    // eslint-disable-next-line no-useless-escape
-    const parts = url.match(/^.+\:\/\/[^\/]+/);
-    return Array.isArray(parts) && parts.length > 0 ? parts[0] : 'unknown';
+    const [origin] = url.match(/^https?:\/\/[^/]+/) ?? [];
+    return origin ?? 'unknown';
 };
 
-export const getHost = (url: string) => {
-    const origin = getOrigin(url);
-    const [_, uri] = getOrigin(origin).split('//');
+export const getHost = (url: unknown) => {
+    if (typeof url !== 'string') return;
+    const [, , uri] = url.match(/^(https?):\/\/([^:/]+)?/i) ?? [];
     if (uri) {
         const parts = uri.split('.');
         return parts.length > 2
@@ -20,24 +21,13 @@ export const getHost = (url: string) => {
     }
 };
 
-export const getOnionDomain = <T extends string | string[]>(
-    url: T,
-    dict: { [domain: string]: string },
-): T => {
-    if (Array.isArray(url)) {
-        return url.map(u => getOnionDomain(u, dict)) as T;
-    }
-    if (typeof url === 'string') {
-        const [, protocol, subdomain, domain, rest] =
-            url.match(/^(http|ws)s?:\/\/([^:/]+\.)?([^/.]+\.[^/.]+)(\/.*)?$/i) ?? [];
-        // ^(http|ws)s?:\/\/ - required http(s)/ws(s) protocol
-        // ([^:/]+\.)? - optional subdomains, e.g. 'blog.'
-        // ([^/.]+\.[^/.]+) - required two-part domain name, e.g. 'trezor.io'
-        // (\/.*)?$ - optional path and/or query, e.g. '/api/data?id=1234'
+interface GetOnionDomain {
+    (url: string, dict: { [domain: string]: string }): string;
+    (url: string[], dict: { [domain: string]: string }): string[];
+}
 
-        if (!domain || !dict[domain]) return url;
-
-        return `${protocol}://${subdomain || ''}${dict[domain]}${rest || ''}` as T;
-    }
+export const getOnionDomain: GetOnionDomain = (url, dict): any => {
+    if (Array.isArray(url)) return url.map(u => urlToOnion(u, dict) ?? u);
+    if (typeof url === 'string') return urlToOnion(url, dict) ?? url;
     return url;
 };

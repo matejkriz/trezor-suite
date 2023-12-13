@@ -1,8 +1,8 @@
 import { NavigatorScreenParams } from '@react-navigation/native';
 
-import { AccountKey, XpubAddress } from '@suite-common/wallet-types';
+import { AccountKey, TokenAddress, XpubAddress } from '@suite-common/wallet-types';
 import { NetworkSymbol } from '@suite-common/wallet-config';
-import { AccountInfo } from '@trezor/connect';
+import { AccountInfo, TokenTransfer } from '@trezor/connect';
 
 import {
     AppTabsRoutes,
@@ -10,10 +10,21 @@ import {
     HomeStackRoutes,
     RootStackRoutes,
     SettingsStackRoutes,
-    SendReceiveStackRoutes,
+    ReceiveStackRoutes,
     AccountsStackRoutes,
     DevUtilsStackRoutes,
+    OnboardingStackRoutes,
+    ConnectDeviceStackRoutes,
 } from './routes';
+
+type ReceiveAccountsParams = {
+    accountKey?: AccountKey;
+    tokenContract?: TokenAddress;
+};
+
+export type AccountsStackParamList = {
+    [AccountsStackRoutes.Accounts]: undefined;
+};
 
 export type HomeStackParamList = {
     [HomeStackRoutes.Home]: undefined;
@@ -26,29 +37,30 @@ export type DevUtilsStackParamList = {
 
 export type SettingsStackParamList = {
     [SettingsStackRoutes.Settings]: undefined;
-    [SettingsStackRoutes.SettingsLocalisation]: undefined;
+    [SettingsStackRoutes.SettingsLocalization]: undefined;
     [SettingsStackRoutes.SettingsCustomization]: undefined;
     [SettingsStackRoutes.SettingsPrivacyAndSecurity]: undefined;
     [SettingsStackRoutes.SettingsAbout]: undefined;
     [SettingsStackRoutes.SettingsFAQ]: undefined;
 };
 
-export type AccountsStackParamList = {
-    [AccountsStackRoutes.Accounts]: undefined;
-    [AccountsStackRoutes.AccountDetail]: { accountKey: AccountKey };
-    [AccountsStackRoutes.AccountDetailSettings]: { accountKey: AccountKey };
-};
-
-export type SendReceiveStackParamList = {
-    [SendReceiveStackRoutes.ReceiveAccounts]: undefined;
-    [SendReceiveStackRoutes.Receive]: { accountKey: AccountKey };
+export type ReceiveStackParamList = {
+    [ReceiveStackRoutes.ReceiveAccounts]: undefined;
 };
 
 export type AppTabsParamList = {
     [AppTabsRoutes.HomeStack]: NavigatorScreenParams<HomeStackParamList>;
     [AppTabsRoutes.AccountsStack]: NavigatorScreenParams<AccountsStackParamList>;
-    [AppTabsRoutes.SendReceiveStack]: NavigatorScreenParams<SendReceiveStackParamList>;
+    [AppTabsRoutes.ReceiveStack]: NavigatorScreenParams<ReceiveStackParamList>;
     [AppTabsRoutes.SettingsStack]: NavigatorScreenParams<SettingsStackParamList>;
+};
+
+export type OnboardingStackParamList = {
+    [OnboardingStackRoutes.Welcome]: undefined;
+    [OnboardingStackRoutes.AboutReceiveCoinsFeature]: undefined;
+    [OnboardingStackRoutes.TrackBalances]: undefined;
+    [OnboardingStackRoutes.AnalyticsConsent]: undefined;
+    [OnboardingStackRoutes.ConnectTrezor]: undefined;
 };
 
 export type AccountsImportStackParamList = {
@@ -70,10 +82,28 @@ export type AccountsImportStackParamList = {
     };
 };
 
+export type ConnectDeviceStackParamList = {
+    [ConnectDeviceStackRoutes.ConnectAndUnlockDevice]: undefined;
+    [ConnectDeviceStackRoutes.PinMatrix]: undefined;
+    [ConnectDeviceStackRoutes.ConnectingDevice]: undefined;
+};
+
 export type RootStackParamList = {
     [RootStackRoutes.AppTabs]: NavigatorScreenParams<AppTabsParamList>;
+    [RootStackRoutes.Onboarding]: NavigatorScreenParams<AppTabsParamList>;
+    [RootStackRoutes.ConnectDevice]: NavigatorScreenParams<ConnectDeviceStackParamList>;
     [RootStackRoutes.AccountsImport]: NavigatorScreenParams<AccountsImportStackParamList>;
+    [RootStackRoutes.ReceiveModal]: ReceiveAccountsParams;
     [RootStackRoutes.AccountSettings]: { accountKey: AccountKey };
-    [RootStackRoutes.TransactionDetail]: { txid: string; accountKey: AccountKey };
+    [RootStackRoutes.TransactionDetail]: {
+        txid: string;
+        accountKey: AccountKey;
+        tokenTransfer?: TokenTransfer;
+    };
     [RootStackRoutes.DevUtilsStack]: undefined;
+    [RootStackRoutes.AccountDetail]: {
+        accountKey: AccountKey;
+        tokenContract?: TokenAddress;
+    };
+    [RootStackRoutes.DeviceInfo]: undefined;
 };

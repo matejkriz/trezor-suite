@@ -19,6 +19,7 @@ import ethereumSignTransactionEip155 from './ethereumSignTransactionEip155';
 import ethereumSignTransactionEip1559 from './ethereumSignTransactionEip1559';
 import ethereumSignTypedData from './ethereumSignTypedData';
 import ethereumVerifyMessage from './ethereumVerifyMessage';
+import getAccountDescriptor from './getAccountDescriptor';
 import getAccountInfo from './getAccountInfo';
 import getAddress from './getAddress';
 import getAddressMultisig from './getAddressMultisig';
@@ -54,6 +55,9 @@ import signTransactionReplace from './signTransactionReplace';
 import signTransactionSegwit from './signTransactionSegwit';
 import signTransactionTaproot from './signTransactionTaproot';
 import signTransactionZcash from './signTransactionZcash';
+import solanaGetAddress from './solanaGetAddress';
+import solanaGetPublicKey from './solanaGetPublicKey';
+import solanaSignTransaction from './solanaSignTransaction';
 import stellarGetAddress from './stellarGetAddress';
 import stellarSignTransaction from './stellarSignTransaction';
 import tezosGetAddress from './tezosGetAddress';
@@ -62,12 +66,6 @@ import tezosSignTransaction from './tezosSignTransaction';
 import verifyMessage from './verifyMessage';
 import verifyMessageSegwit from './verifyMessageSegwit';
 import verifyMessageSegwitNative from './verifyMessageSegwitNative';
-
-// todo: this test fixture relies on actual firmware binary being deployed to data.trezor.io
-// this is sometimes the case and sometimes it is not. to fix this we:
-// a] either need more flexibility in selecting which tests should be run based on some env variables
-// b] move this test outside of methods.test.js and create a custom test file for it, possibly with some mocking
-import checkFirmwareAuthenticity from './checkFirmwareAuthenticity';
 
 // TODO: add fixtures for missing dependencies https://github.com/trezor/trezor-suite/issues/5353
 // backupDevice
@@ -118,6 +116,7 @@ let fixtures = [
     ethereumSignTransactionEip1559,
     ethereumSignTypedData,
     ethereumVerifyMessage,
+    getAccountDescriptor,
     getAccountInfo,
     getAddress,
     getAddressMultisig,
@@ -153,6 +152,9 @@ let fixtures = [
     signTransactionSegwit,
     signTransactionTaproot,
     signTransactionZcash,
+    solanaGetAddress,
+    solanaGetPublicKey,
+    solanaSignTransaction,
     stellarGetAddress,
     stellarSignTransaction,
     tezosGetAddress,
@@ -161,7 +163,6 @@ let fixtures = [
     verifyMessage,
     verifyMessageSegwit,
     verifyMessageSegwitNative,
-    checkFirmwareAuthenticity,
 ];
 
 const includedMethods = process.env.TESTS_INCLUDED_METHODS;

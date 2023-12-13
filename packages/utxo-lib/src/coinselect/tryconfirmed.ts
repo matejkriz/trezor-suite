@@ -1,5 +1,5 @@
-import { filterCoinbase } from './utils';
-import type { CoinSelectAlgorithm, CoinSelectOptions, CoinSelectInput } from './index';
+import { filterCoinbase } from './coinselectUtils';
+import { CoinSelectAlgorithm, CoinSelectOptions, CoinSelectInput } from '../types';
 
 function filterUtxos(utxos: CoinSelectInput[], minConfOwn: number, minConfOther: number) {
     const usable: CoinSelectInput[] = [];
@@ -33,13 +33,6 @@ export function tryConfirmed(
     const coinbase = options.coinbase || 100;
 
     return (utxosO, outputs, feeRate, optionsIn) => {
-        // TODO: move this to params validation
-        utxosO.forEach(utxo => {
-            if (utxo.coinbase == null || utxo.own == null || utxo.confirmations == null) {
-                throw new Error('Missing information.');
-            }
-        });
-
         const utxos = filterCoinbase(utxosO, coinbase);
 
         if (utxos.length === 0) {

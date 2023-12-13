@@ -1,3 +1,4 @@
+import { NetworkSymbol } from '@suite-common/wallet-config';
 import { PROTO } from '@trezor/connect';
 
 import { prepareCryptoAmountFormatter } from '../prepareCryptoAmountFormatter';
@@ -55,13 +56,14 @@ describe('CryptoAmountFormatter', () => {
             ).toBe('0.02063870… ETH');
         });
 
-        it('ETH balance with symbol + truncate decimals', () => {
+        it('ETH balance with symbol + truncate decimals + hide ellipsis', () => {
             expect(
                 CryptoAmountFormatter.format('0.020638700284758254', {
                     symbol: 'eth',
                     isBalance: true,
+                    isEllipsisAppended: false,
                 }),
-            ).toBe('0.02063870… ETH');
+            ).toBe('0.02063870 ETH');
         });
 
         it('ETH balance with units', () => {
@@ -71,6 +73,32 @@ describe('CryptoAmountFormatter', () => {
                     isBalance: false,
                 }),
             ).toBe('0.00014898… ETH');
+        });
+
+        it('Unknown network with symbol', () => {
+            expect(
+                CryptoAmountFormatter.format('300', {
+                    symbol: 'unknown' as NetworkSymbol,
+                }),
+            ).toBe('300 UNKNOWN');
+        });
+
+        it('Unknown network without symbol', () => {
+            expect(
+                CryptoAmountFormatter.format('300', {
+                    symbol: 'unknown' as NetworkSymbol,
+                    withSymbol: false,
+                }),
+            ).toBe('300');
+        });
+
+        it('Unknown network balance with symbol', () => {
+            expect(
+                CryptoAmountFormatter.format('300', {
+                    symbol: 'unknown' as NetworkSymbol,
+                    isBalance: true,
+                }),
+            ).toBe('300 UNKNOWN');
         });
     });
 
@@ -116,6 +144,32 @@ describe('CryptoAmountFormatter', () => {
                     isBalance: false,
                 }),
             ).toBe('0.00014898… ETH');
+        });
+
+        it('Unknown network with symbol', () => {
+            expect(
+                CryptoAmountFormatterSats.format('300', {
+                    symbol: 'unknown' as NetworkSymbol,
+                }),
+            ).toBe('300 UNKNOWN');
+        });
+
+        it('Unknown network without symbol', () => {
+            expect(
+                CryptoAmountFormatterSats.format('300', {
+                    symbol: 'unknown' as NetworkSymbol,
+                    withSymbol: false,
+                }),
+            ).toBe('300');
+        });
+
+        it('Unknown network balance with symbol', () => {
+            expect(
+                CryptoAmountFormatterSats.format('300', {
+                    symbol: 'unknown' as NetworkSymbol,
+                    isBalance: true,
+                }),
+            ).toBe('300 UNKNOWN');
         });
     });
 });

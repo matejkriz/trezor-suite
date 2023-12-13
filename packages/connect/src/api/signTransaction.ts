@@ -25,7 +25,7 @@ import {
     verifyTicketTx,
     createPendingTransaction,
 } from './bitcoin';
-import type { BitcoinNetworkInfo, AccountAddresses, AccountUtxo } from '../types';
+import type { BitcoinNetworkInfo, AccountAddresses } from '../types';
 import type { RefTransaction, TransactionOptions } from '../types/api/bitcoin';
 
 type Params = {
@@ -35,7 +35,6 @@ type Params = {
     coinjoinRequest?: PROTO.CoinJoinRequest;
     refTxs?: RefTransaction[];
     addresses?: AccountAddresses;
-    utxo?: AccountUtxo[];
     options: TransactionOptions;
     coinInfo: BitcoinNetworkInfo;
     push: boolean;
@@ -45,7 +44,6 @@ type Params = {
 export default class SignTransaction extends AbstractMethod<'signTransaction', Params> {
     init() {
         this.requiredPermissions = ['read', 'write'];
-        this.info = 'Sign transaction';
 
         const { payload } = this;
 
@@ -71,6 +69,7 @@ export default class SignTransaction extends AbstractMethod<'signTransaction', P
             { name: 'amountUnit', type: ['number', 'string'] },
             { name: 'unlockPath', type: 'object' },
             { name: 'serialize', type: 'boolean' },
+            { name: 'chunkify', type: 'boolean' },
         ]);
 
         if (payload.unlockPath) {
@@ -87,11 +86,22 @@ export default class SignTransaction extends AbstractMethod<'signTransaction', P
         // set required firmware from coinInfo support
         this.firmwareRange = getFirmwareRange(this.name, coinInfo, this.firmwareRange);
         this.preauthorized = payload.preauthorized;
-        this.info = getLabel('Sign #NETWORK transaction', coinInfo);
 
         const inputs = validateTrezorInputs(payload.inputs, coinInfo);
         const outputs = validateTrezorOutputs(payload.outputs, coinInfo);
-        const refTxs = validateReferencedTransactions(payload.refTxs, inputs, outputs);
+
+        if (payload.refTxs && payload.account?.transactions) {
+            console.warn(
+                'two sources of referential transactions were passed. payload.refTxs have precedence',
+            );
+        }
+        const refTxs = validateReferencedTransactions({
+            transactions: payload.refTxs || payload.account?.transactions,
+            inputs,
+            outputs,
+            coinInfo,
+            addresses: payload.account?.addresses,
+        });
 
         const outputsWithAmount = outputs.filter(
             output =>
@@ -103,7 +113,7 @@ export default class SignTransaction extends AbstractMethod<'signTransaction', P
                 (bn, output) => bn.plus(typeof output.amount === 'string' ? output.amount : '0'),
                 new BigNumber(0),
             );
-            if (total.lte(coinInfo.dustLimit)) {
+            if (total.lt(coinInfo.dustLimit)) {
                 throw ERRORS.TypedError(
                     'Method_InvalidParameter',
                     'Total amount is below dust limit.',
@@ -113,11 +123,10 @@ export default class SignTransaction extends AbstractMethod<'signTransaction', P
 
         this.params = {
             inputs,
-            outputs: payload.outputs,
+            outputs,
             paymentRequests: payload.paymentRequests || [],
             refTxs,
             addresses: payload.account ? payload.account.addresses : undefined,
-            utxo: payload.account ? payload.account.utxo : undefined,
             options: {
                 lock_time: payload.locktime,
                 timestamp: payload.timestamp,
@@ -130,6 +139,7 @@ export default class SignTransaction extends AbstractMethod<'signTransaction', P
                 amount_unit: payload.amountUnit,
                 serialize: payload.serialize,
                 coinjoin_request: payload.coinjoinRequest,
+                chunkify: typeof payload.chunkify === 'boolean' ? payload.chunkify : false,
             },
             coinInfo,
             push: typeof payload.push === 'boolean' ? payload.push : false,
@@ -137,6 +147,11 @@ export default class SignTransaction extends AbstractMethod<'signTransaction', P
         };
 
         this.params.options = enhanceSignTx(this.params.options, coinInfo);
+    }
+
+    get info() {
+        const coinInfo = getBitcoinNetwork(this.payload.coin);
+        return getLabel('Sign #NETWORK transaction', coinInfo);
     }
 
     private async fetchAddresses(blockchain: Blockchain) {
@@ -237,15 +252,14 @@ export default class SignTransaction extends AbstractMethod<'signTransaction', P
             );
 
             if (bitcoinTx.hasWitnesses()) {
-                response.witnesses = bitcoinTx.ins.map((_, i) =>
-                    bitcoinTx?.getWitness(i)?.toString('hex'),
+                response.witnesses = bitcoinTx.ins.map(
+                    (_, i) => bitcoinTx?.getWitness(i)?.toString('hex'),
                 );
             }
         }
 
-        if (bitcoinTx && params.addresses && params.utxo) {
+        if (bitcoinTx && params.addresses) {
             response.signedTransaction = createPendingTransaction(bitcoinTx, {
-                utxo: params.utxo,
                 addresses: params.addresses,
                 inputs: params.inputs,
                 outputs: params.outputs,

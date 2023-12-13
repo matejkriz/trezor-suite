@@ -6,34 +6,35 @@ import type {
     EstimateFeeParams,
     AccountInfoParams,
 } from './params';
-import type { AccountBalanceHistory, FiatRates } from './common';
+import type { AccountBalanceHistory, FiatRates, TokenStandard } from './common';
+import type {
+    Vin,
+    Vout,
+    Utxo as BlockbookUtxo,
+    WsInfoRes,
+    WsBlockHashRes,
+    WsBlockFilterReq,
+    WsBlockFiltersBatchReq,
+    MempoolTxidFilterEntries,
+    Token as BlockbookToken,
+    EthereumParsedInputData as BlockbookEthereumParsedInputData,
+    EthereumSpecific as BlockbookEthereumSpecific,
+    TokenTransfer as BlockbookTokenTransfer,
+    AddressAlias,
+} from './blockbook-api';
+
+type OptionalKey<M, K extends keyof M> = Omit<M, K> & Partial<Pick<M, K>>;
+type RequiredKey<M, K extends keyof M> = Omit<M, K> & Required<Pick<M, K>>;
+
+export type AccountUtxo = RequiredKey<BlockbookUtxo, 'address' | 'height' | 'value' | 'path'>[];
 
 export interface Subscribe {
     subscribed: boolean;
 }
 
-export interface ServerInfo {
-    bestHash: string;
-    bestHeight: number;
-    block0Hash: string;
-    decimals: number;
-    name: string;
-    shortcut: string;
-    testnet: boolean;
-    version: string;
-    backend?: {
-        subversion: string;
-        version: string;
-        consensus?: {
-            chaintip: string;
-            nextblock: string;
-        };
-    };
-}
+export type ServerInfo = WsInfoRes;
 
-export interface BlockHash {
-    hash: string;
-}
+export type BlockHash = WsBlockHashRes;
 
 export interface Block {
     page: number;
@@ -45,24 +46,46 @@ export interface Block {
     txs: Transaction[];
 }
 
-export interface XPUBAddress {
-    type: 'XPUBAddress';
-    name: string;
-    path: string;
-    transfers: number;
-    balance: string;
-    totalSent: string;
-    totalReceived: string;
+export interface FilterRequestParams {
+    scriptType: 'taproot' | 'taproot-noordinals';
+    M?: number;
 }
 
-export interface ERC20 {
-    type: 'ERC20';
-    name?: string;
-    symbol?: string;
-    contract: string;
-    balance?: string;
-    decimals?: number;
+export interface MempoolFiltersParams extends FilterRequestParams {
+    fromTimestamp?: number;
 }
+
+export interface FilterResponse {
+    P: number;
+    M: number;
+    zeroedKey: boolean;
+}
+
+type BlockFiltersBatch = `${string}:${string}:${string}`[];
+
+// XPUBAddress, ERC20, ERC721, ERC1155 - blockbook generated type (Token) is not strict enough
+export type XPUBAddress = {
+    type: 'XPUBAddress';
+} & Required<
+    Pick<BlockbookToken, 'path' | 'decimals' | 'balance' | 'totalSent' | 'totalReceived'>
+> &
+    Pick<BlockbookToken, 'name' | 'transfers'>;
+
+type BaseERC = Required<Pick<BlockbookToken, 'contract'>> &
+    Partial<Pick<BlockbookToken, 'transfers'>> & // transfers is optional
+    Pick<BlockbookToken, 'name' | 'symbol' | 'decimals'>;
+
+export type ERC20 = BaseERC & {
+    type: 'ERC20';
+} & Pick<BlockbookToken, 'balance' | 'baseValue' | 'secondaryValue'>;
+
+export type ERC721 = BaseERC & {
+    type: 'ERC721';
+} & Required<Pick<BlockbookToken, 'ids'>>;
+
+export type ERC1155 = BaseERC & {
+    type: 'ERC1155';
+} & Required<Pick<BlockbookToken, 'multiTokenValues'>>;
 
 export interface AccountInfo {
     address: string;
@@ -70,6 +93,7 @@ export interface AccountInfo {
     totalReceived: string;
     totalSent: string;
     txs: number;
+    addrTxCount?: number;
     unconfirmedBalance: string;
     unconfirmedTxs: number;
     page?: number;
@@ -78,7 +102,7 @@ export interface AccountInfo {
     nonTokenTxs?: number;
     transactions?: Transaction[];
     nonce?: string;
-    tokens?: (XPUBAddress | ERC20)[];
+    tokens?: (XPUBAddress | ERC20 | ERC721 | ERC1155)[];
     erc20Contract?: ERC20;
 }
 
@@ -86,28 +110,25 @@ export interface AccountUtxoParams {
     descriptor: string;
 }
 
-export type AccountUtxo = {
-    txid: string;
-    vout: number;
-    value: string;
-    height: number;
-    address: string;
-    path: string;
-    confirmations: number;
-    coinbase?: boolean;
-}[];
+export type VinVout = OptionalKey<Vin & Vout, 'addresses'>;
 
-export interface VinVout {
-    n: number;
-    addresses?: string[];
-    isAddress: boolean;
+type EthereumParsedData = BlockbookEthereumParsedInputData &
+    Partial<Pick<BlockbookEthereumParsedInputData, 'name'>>;
+
+export interface EthereumInternalTransfer {
+    type: number;
+    from: string;
+    to: string;
     value?: string;
-    coinbase?: string;
-    txid?: string;
-    vout?: number;
-    sequence?: number;
-    hex?: string;
 }
+
+type EthereumSpecific = BlockbookEthereumSpecific & {
+    parsedData?: EthereumParsedData;
+};
+
+type TokenTransfer = BlockbookTokenTransfer & {
+    type: TokenStandard;
+};
 
 export interface Transaction {
     txid: string;
@@ -118,30 +139,20 @@ export interface Transaction {
     blockHash?: string;
     confirmations: number;
     blockTime: number;
-    value: string;
-    valueIn: string;
-    fees: string;
-    hex: string;
+    value: string; // optional
+    valueIn: string; // optional
+    fees: string; // optional
+    hex?: string;
     lockTime?: number;
     vsize?: number;
     size?: number;
-    ethereumSpecific?: {
-        status: number;
-        nonce: number;
-        data?: string;
-        gasLimit: number;
-        gasUsed?: number;
-        gasPrice: string;
-    };
-    tokenTransfers?: {
-        from?: string;
-        to?: string;
-        value: string;
-        token: string;
-        name: string;
-        symbol: string;
-        decimals?: number;
-    }[];
+    ethereumSpecific?: EthereumSpecific;
+    tokenTransfers?: TokenTransfer[];
+    confirmationETABlocks?: number;
+    confirmationETASeconds?: number;
+    rbf?: boolean;
+    coinSpecificData?: any;
+    addressAliases?: { [key: string]: AddressAlias };
 }
 
 export interface Push {
@@ -190,6 +201,18 @@ export interface AvailableCurrencies {
 declare function FSend(method: 'getInfo'): Promise<ServerInfo>;
 declare function FSend(method: 'getBlockHash', params: { height: number }): Promise<BlockHash>;
 declare function FSend(method: 'getBlock', params: { id: string }): Promise<Block>;
+declare function FSend(
+    method: 'getBlockFilter',
+    params: WsBlockFilterReq & FilterRequestParams,
+): Promise<FilterResponse & { blockFilter: string }>;
+declare function FSend(
+    method: 'getBlockFiltersBatch',
+    params: WsBlockFiltersBatchReq & FilterRequestParams,
+): Promise<FilterResponse & { blockFiltersBatch: BlockFiltersBatch }>;
+declare function FSend(
+    method: 'getMempoolFilters',
+    params: MempoolFiltersParams,
+): Promise<FilterResponse & MempoolTxidFilterEntries>;
 declare function FSend(method: 'getAccountInfo', params: AccountInfoParams): Promise<AccountInfo>;
 declare function FSend(method: 'getAccountUtxo', params: AccountUtxoParams): Promise<AccountUtxo>;
 declare function FSend(method: 'getTransaction', params: { txid: string }): Promise<Transaction>;

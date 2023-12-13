@@ -1,10 +1,11 @@
-import React from 'react';
 import styled from 'styled-components';
 import { variables } from '@trezor/components';
-import { useLayout } from '@suite-hooks';
+import { useLayout } from 'src/hooks/suite';
 import AssetsCard from './components/AssetsCard';
 import PortfolioCard from './components/PortfolioCard';
 import SecurityFeatures from './components/SecurityFeatures';
+import { PromoBanner } from './components/PromoBanner';
+import { T2B1PromoBanner } from './components/T2B1PromoBanner';
 
 const Wrapper = styled.div`
     width: 100%;
@@ -13,7 +14,7 @@ const Wrapper = styled.div`
 
     @media (max-width: ${variables.SCREEN_SIZE.SM}) {
         margin-top: 10px;
-        margin-bottom: 0px;
+        margin-bottom: 0;
     }
 `;
 
@@ -28,11 +29,13 @@ const Dashboard = () => {
     return (
         <Wrapper data-test="@dashboard/index">
             <PortfolioCard />
+            <T2B1PromoBanner />
             <Divider />
             <AssetsCard />
             <Divider />
             <SecurityFeatures />
             <Divider />
+            <PromoBanner />
         </Wrapper>
     );
 };

@@ -99,6 +99,7 @@ export default [
                         amount: '0',
                         fee: '0',
                         targets: [],
+                        internalTransfers: [],
                         tokens: [],
                         details: {
                             vin: [],
@@ -179,7 +180,7 @@ export default [
                         type: 'sent',
                         txid: '33F2085B0EF572376335716521E412CF611C4124B1088E5CCED48A7901CAF95E',
                         blockHeight: 47570158,
-                        blockTime: 612363551,
+                        blockTime: 1559048351,
                         blockHash:
                             '33F2085B0EF572376335716521E412CF611C4124B1088E5CCED48A7901CAF95E',
                         amount: '5718112',
@@ -193,6 +194,7 @@ export default [
                             },
                         ],
                         tokens: [],
+                        internalTransfers: [],
                         details: {
                             vin: [],
                             vout: [],
@@ -205,7 +207,7 @@ export default [
                         type: 'recv',
                         txid: '533A8A2EDBCE914159C5491429763FD39A1F0F19E0F82800C3B7909B67B166A7',
                         blockHeight: 47455208,
-                        blockTime: 611932692,
+                        blockTime: 1558617492,
                         blockHash:
                             '533A8A2EDBCE914159C5491429763FD39A1F0F19E0F82800C3B7909B67B166A7',
                         amount: '25718124',
@@ -219,6 +221,7 @@ export default [
                             },
                         ],
                         tokens: [],
+                        internalTransfers: [],
                         details: {
                             vin: [],
                             vout: [],

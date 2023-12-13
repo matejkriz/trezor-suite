@@ -1,7 +1,7 @@
-import { versionCompare } from './versionUtils';
+import { versionUtils } from '@trezor/utils';
 import { PROTO } from '../constants';
 import { config } from '../data/config';
-import type { Features, CoinInfo, UnavailableCapabilities } from '../types';
+import { Features, CoinInfo, UnavailableCapabilities, DeviceModelInternal } from '../types';
 
 const DEFAULT_CAPABILITIES_T1: PROTO.Capability[] = [
     'Capability_Bitcoin',
@@ -38,17 +38,20 @@ export const parseCapabilities = (features?: Features): PROTO.Capability[] => {
     return features.capabilities;
 };
 
-// TODO: support type
 export const getUnavailableCapabilities = (features: Features, coins: CoinInfo[]) => {
     const { capabilities } = features;
     const list: UnavailableCapabilities = {};
     if (!capabilities) return list;
-    const fw = [features.major_version, features.minor_version, features.patch_version];
-    const key = `trezor${features.major_version}` as 'trezor1' | 'trezor2';
+    const fw = [features.major_version, features.minor_version, features.patch_version].join('.');
+    const key = features.internal_model;
 
     // 1. check if firmware version is supported by CoinInfo.support
     const supported = coins.filter(info => {
-        if (!info.support || typeof info.support[key] !== 'string') {
+        // info.support[key] possible types:
+        // - undefined for unknown models (specified in coins.json)
+        // - boolean for unsupported models (false)
+        // - string for supported models (version)
+        if (!info.support || info.support[key] === false) {
             list[info.shortcut.toLowerCase()] = 'no-support';
             return false;
         }
@@ -75,6 +78,8 @@ export const getUnavailableCapabilities = (features: Features, coins: CoinInfo[]
             return !capabilities.includes('Capability_Cardano');
         if (info.shortcut === 'XRP' || info.shortcut === 'tXRP')
             return !capabilities.includes('Capability_Ripple');
+        if (info.shortcut === 'SOL' || info.shortcut === 'DSOL')
+            return !capabilities.includes('Capability_Solana');
         return !capabilities.includes(`Capability_${info.name}` as PROTO.Capability);
     });
 
@@ -87,7 +92,8 @@ export const getUnavailableCapabilities = (features: Features, coins: CoinInfo[]
     supported
         .filter(info => !unavailable.includes(info))
         .forEach(info => {
-            if (versionCompare(info.support[key], fw) > 0) {
+            const supportVersion = info.support[key];
+            if (typeof supportVersion === 'string' && versionUtils.isNewer(supportVersion, fw)) {
                 list[info.shortcut.toLowerCase()] = 'update-required';
                 unavailable.push(info);
             }
@@ -96,27 +102,28 @@ export const getUnavailableCapabilities = (features: Features, coins: CoinInfo[]
     // 4. check if firmware version is in range of capabilities in "config.supportedFirmware"
     config.supportedFirmware.forEach(s => {
         if (!s.capabilities) return;
-        const min = s.min ? s.min[fw[0] - 1] : null;
-        const max = s.max ? s.max[fw[0] - 1] : null;
-        if (min && (min === '0' || versionCompare(min, fw) > 0)) {
+        const min = s.min ? s.min[key] : null;
+        const max = s.max ? s.max[key] : null;
+        if (min && (min === '0' || versionUtils.isNewer(min, fw))) {
             const value = min === '0' ? 'no-support' : 'update-required';
             s.capabilities.forEach(m => {
                 list[m] = value;
             });
         }
-        if (max && versionCompare(max, fw) < 0) {
+        if (max && !versionUtils.isNewerOrEqual(max, fw)) {
             s.capabilities.forEach(m => {
                 list[m] = 'trezor-connect-outdated';
             });
         }
     });
+
     return list;
 };
 
 /**
  * Fixes an inconsistency in representation of device feature revision attribute (git commit of specific release).
- * - T1 uses standard hexadecimal notation. (df0963ec48f01f3d07ffca556e21ff0070cab099)
- * - T2 uses hexadecimal raw bytes notation. (6466303936336563)
+ * - T1B1 uses standard hexadecimal notation. (df0963ec48f01f3d07ffca556e21ff0070cab099)
+ * - T2T1 old fw <2.2.4 uses hexadecimal raw bytes notation. (6466303936336563)
  * To avoid being model specific, in case the inconsistency is fixed, it is required to reliably detect what encoding is used.
  * @param {Features} features
  * @returns revision - standard hexadecimal notation or null
@@ -138,4 +145,14 @@ export const parseRevision = (features: Features) => {
      * So, if it contains characters different from a-f and numbers, it was in hexadecimal notation before encoding.
      */
     return /^([a-f0-9])*$/gi.test(revisionUtf8) ? revisionUtf8 : revision;
+};
+
+export const ensureInternalModelFeature = (model: Features['model']): DeviceModelInternal => {
+    switch (model.toUpperCase()) {
+        case 'T':
+            return DeviceModelInternal.T2T1;
+        case '1':
+        default:
+            return DeviceModelInternal.T1B1;
+    }
 };

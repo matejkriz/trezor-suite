@@ -1,12 +1,10 @@
-import React from 'react';
 import styled from 'styled-components';
 
-import { ConfirmKey, toggleCheckboxByKey } from '@suite/actions/backup/backupActions';
-import { Translation } from '@suite-components/Translation';
+import { ConfirmKey, toggleCheckboxByKey } from 'src/actions/backup/backupActions';
+import { Translation } from 'src/components/suite/Translation';
 import { variables } from '@trezor/components';
-import { useSelector } from '@suite/hooks/suite';
+import { useSelector, useDispatch } from 'src/hooks/suite';
 import { BackupSeedCard } from './BackupSeedCard';
-import { useDispatch } from '@suite-hooks';
 
 const Wrapper = styled.div`
     display: flex;
@@ -16,7 +14,7 @@ const Wrapper = styled.div`
 
 const Instructions = styled.div`
     text-align: center;
-    margin: 16px 0px 26px;
+    margin: 16px 0 26px;
     color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
     font-weight: ${variables.FONT_WEIGHT.MEDIUM};
     font-size: ${variables.FONT_SIZE.TINY};
@@ -38,6 +36,7 @@ const StyledBackupSeedCard = styled(BackupSeedCard)`
 
     ${variables.SCREEN_QUERY.BELOW_TABLET} {
         width: 100%;
+
         & + & {
             margin-top: 10px;
         }

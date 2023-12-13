@@ -1,17 +1,22 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import styled from 'styled-components';
+
 import { AccountAddress } from '@trezor/connect';
 import { variables, Button } from '@trezor/components';
-import { Card, Translation, MetadataLabeling, FormattedCryptoAmount } from '@suite-components';
+import { Card, Translation, MetadataLabeling, FormattedCryptoAmount } from 'src/components/suite';
 import { formatNetworkAmount } from '@suite-common/wallet-utils';
-import { Network } from '@wallet-types';
-import { AppState } from '@suite-types';
-import { MetadataAddPayload } from '@suite-types/metadata';
+import { Network } from 'src/types/wallet';
+import { AppState } from 'src/types/suite';
+import { MetadataAddPayload } from 'src/types/suite/metadata';
+import { showAddress } from 'src/actions/wallet/receiveActions';
+import { useDispatch } from 'src/hooks/suite/';
+import { useSelector } from 'src/hooks/suite/useSelector';
+import { selectLabelingDataForSelectedAccount } from 'src/reducers/suite/metadataReducer';
 
 const StyledCard = styled(Card)`
     flex-direction: column;
     margin-bottom: 40px;
-    padding: 0px;
+    padding: 0;
     overflow: hidden;
 `;
 
@@ -29,7 +34,7 @@ const GridItem = styled.div<{ revealed?: boolean; onClick?: () => void }>`
     align-items: center;
     justify-content: space-between;
     white-space: nowrap;
-    padding: 16px 0px 12px 0px;
+    padding: 16px 0 12px;
     border-bottom: 1px solid ${({ theme }) => theme.STROKE_GREY};
     font-variant-numeric: tabular-nums;
     color: ${({ theme }) => theme.TYPE_DARK_GREY};
@@ -39,9 +44,11 @@ const GridItem = styled.div<{ revealed?: boolean; onClick?: () => void }>`
     :nth-child(1n) {
         padding-left: 25px;
     }
+
     :nth-child(3n) {
         padding-right: 25px;
     }
+
     :nth-last-child(-n + 3) {
         border: 0;
     }
@@ -68,14 +75,14 @@ const HeaderItem = styled(GridItem)`
     top: 0;
     color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
     font-weight: 500;
-    padding: 12px 0px;
+    padding: 12px 0;
     background: ${({ theme }) => theme.BG_WHITE};
 `;
 
 const Actions = styled.div`
     display: flex;
     justify-content: center;
-    margin: 16px 0px;
+    margin: 16px 0;
 
     button + button {
         margin-left: 16px;
@@ -89,14 +96,11 @@ const AddressWrapper = styled.span`
 `;
 
 const Overlay = styled.div`
-    top: 0px;
-    right: 0px;
-    bottom: 0px;
-    left: 0px;
+    inset: 0;
     position: absolute;
     background-image: linear-gradient(
         to right,
-        rgba(0, 0, 0, 0) 0%,
+        rgb(0 0 0 / 0%) 0%,
         ${({ theme }) => theme.BG_WHITE} 120px
     );
 `;
@@ -106,15 +110,16 @@ const DEFAULT_LIMIT = 10;
 interface ItemProps {
     index: number;
     addr: AccountAddress;
+    locked: boolean;
     symbol: Network['symbol'];
     metadataPayload: MetadataAddPayload;
     onClick: () => void;
 }
 
-const Item = ({ addr, symbol, onClick, metadataPayload, index }: ItemProps) => {
+const Item = ({ addr, locked, symbol, onClick, metadataPayload, index }: ItemProps) => {
     // Currently used addresses are always partially hidden
     // The only place where full address is shown is confirm-addr modal
-    const [isHovered, setIsHovered] = React.useState(false);
+    const [isHovered, setIsHovered] = useState(false);
     const amount = formatNetworkAmount(addr.received || '0', symbol);
     const fresh = !addr.transfers;
     const address = addr.address.substring(0, 20);
@@ -161,6 +166,8 @@ const Item = ({ addr, symbol, onClick, metadataPayload, index }: ItemProps) => {
                     <Button
                         data-test={`@wallet/receive/reveal-address-button/${index}`}
                         variant="tertiary"
+                        disabled={locked}
+                        isLoading={locked}
                         onClick={onClick}
                     >
                         <Translation id="TR_REVEAL_ADDRESS" />
@@ -174,7 +181,6 @@ const Item = ({ addr, symbol, onClick, metadataPayload, index }: ItemProps) => {
 interface UsedAddressesProps {
     account: AppState['wallet']['selectedAccount']['account'];
     addresses: AppState['wallet']['receive'];
-    showAddress: (path: string, address: string) => void;
     locked: boolean;
     pendingAddresses: string[];
 }
@@ -183,10 +189,11 @@ export const UsedAddresses = ({
     account,
     addresses,
     pendingAddresses,
-    showAddress,
     locked,
 }: UsedAddressesProps) => {
     const [limit, setLimit] = useState(DEFAULT_LIMIT);
+    const dispatch = useDispatch();
+    const { addressLabels } = useSelector(selectLabelingDataForSelectedAccount);
 
     if (!account) {
         return null;
@@ -200,14 +207,16 @@ export const UsedAddresses = ({
     }
 
     const { used, unused } = account.addresses;
-    const { addressLabels } = account.metadata;
     // find revealed addresses in `unused` list
-    const revealed = unused.reduce((result, addr) => {
-        const r = addresses.find(u => u.path === addr.path);
-        const p = pendingAddresses.find(u => u === addr.address);
-        const f = r || p;
-        return f ? result.concat(addr) : result;
-    }, [] as typeof unused);
+    const revealed = unused.reduce(
+        (result, addr) => {
+            const r = addresses.find(u => u.path === addr.path);
+            const p = pendingAddresses.find(u => u === addr.address);
+            const f = r || p;
+            return f ? result.concat(addr) : result;
+        },
+        [] as typeof unused,
+    );
     // TODO: add skipped addresses?
     // add revealed addresses to `used` list
     const list = revealed.concat(used.slice().reverse());
@@ -238,13 +247,14 @@ export const UsedAddresses = ({
                         key={addr.path}
                         addr={addr}
                         symbol={account.symbol}
+                        locked={locked}
                         metadataPayload={{
                             type: 'addressLabel',
-                            accountKey: account.key,
+                            entityKey: account.key,
                             defaultValue: addr.address,
                             value: addressLabels[addr.address],
                         }}
-                        onClick={() => (!locked ? showAddress(addr.path, addr.address) : undefined)}
+                        onClick={() => dispatch(showAddress(addr.path, addr.address))}
                     />
                 ))}
             </GridTable>

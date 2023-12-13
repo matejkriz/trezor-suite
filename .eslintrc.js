@@ -12,7 +12,7 @@ module.exports = {
             jsx: true,
         },
     },
-    plugins: ['import', '@typescript-eslint', 'react-hooks', 'prettier', 'jest'],
+    plugins: ['import', '@typescript-eslint', 'react-hooks', 'prettier', 'jest', 'chai-friendly'],
     extends: [
         'airbnb',
         'plugin:@typescript-eslint/recommended',
@@ -37,7 +37,7 @@ module.exports = {
         '**/build-electron/*',
         '**/node_modules/*',
         'packages/suite-data/files/*',
-        'packages/transport/scripts/protobuf-patches/*',
+        'packages/protobuf/scripts/protobuf-patches/*',
     ],
     rules: {
         '@typescript-eslint/prefer-ts-expect-error': 'error',
@@ -64,10 +64,15 @@ module.exports = {
             {
                 groups: [['builtin', 'external'], 'internal', ['sibling', 'parent']],
                 pathGroups: [
+                    {
+                        pattern: 'react*',
+                        group: 'external',
+                        position: 'before',
+                    },
                     { pattern: '@trezor/**', group: 'internal' }, // Translates to /packages/** */
                     { pattern: '@suite-native/**', group: 'internal' },
                     { pattern: '@suite-common/**', group: 'internal' },
-                    { pattern: 'react*', group: 'external', position: 'before' },
+                    { pattern: 'src/**', group: 'internal', position: 'after' },
                 ],
                 pathGroupsExcludedImportTypes: ['internal', 'react'],
                 'newlines-between': 'always',
@@ -77,9 +82,17 @@ module.exports = {
             'error',
             {
                 devDependencies: [
+                    '**/*fixtures*/**',
                     '**/*.test.{tsx,ts,js}',
-                    '**/suite-desktop/scripts/**',
-                    '**/suite-desktop/e2e/**',
+                    '**/blockchain-link/tests/**',
+                    '**/blockchain-link/webpack/**',
+                    '**/suite-desktop-core/**',
+                    '**/*e2e/**',
+                    '**/suite/src/support/tests/**',
+                    '**/suite-data/**',
+                    '**/*.stories.*',
+                    '**/*webpack.config*',
+                    '**/webpack/**',
                 ],
                 includeTypes: true,
             },
@@ -127,6 +140,7 @@ module.exports = {
         // TSC checks it.
         'no-undef': 'off',
         'react/jsx-no-undef': 'off',
+        'react/react-in-jsx-scope': 'off',
         // React Hooks.
         'react-hooks/rules-of-hooks': 'error',
         'react-hooks/exhaustive-deps': 'error',
@@ -171,7 +185,6 @@ module.exports = {
 
         // Variables
         // These rules have to do with variable declarations.
-        'no-catch-shadow': 'warn', // disallow the catch clause parameter name being the same as a variable in the outer scope (off by default in the node environment)
         'no-label-var': 'error', // disallow labels that share a name with a variable
         'no-shadow': 'off',
         '@typescript-eslint/no-shadow': [
@@ -182,6 +195,8 @@ module.exports = {
         'no-undefined': 'off', // disallow use of undefined variable (off by default)
         'no-undef-init': 'error', // disallow use of undefined when initializing variables
         'no-unused-vars': 'off',
+        'no-unused-expressions': 0,
+        'chai-friendly/no-unused-expressions': 2,
         '@typescript-eslint/no-unused-vars': [
             'error',
             { vars: 'all', args: 'none', ignoreRestSiblings: true, varsIgnorePattern: '^_' },
@@ -245,14 +260,12 @@ module.exports = {
                 'packages/connect-examples/**/*',
                 'packages/connect-plugin-ethereum/**/*',
                 'packages/connect-plugin-stellar/**/*',
-                'packages/integration-tests/**/*',
                 'packages/request-manager/**/*',
                 'packages/suite/**/*',
                 'packages/suite-build/**/*',
                 'packages/suite-data/**/*',
                 'packages/suite-desktop-api/**/*',
                 'packages/suite-storage/**/*',
-                'packages/suite-web-landing/**/*',
                 'packages/suite-web/**/*',
                 'packages/transport/**/*',
                 'packages/utxo-lib/**/*',
@@ -264,15 +277,19 @@ module.exports = {
                 '@typescript-eslint/no-shadow': 'off',
                 'import/no-default-export': 'off',
                 'import/order': 'off',
-                'import/no-unresolved': 'off',
-                'import/no-extraneous-dependencies': 'off',
                 '@typescript-eslint/no-unused-vars': 'off',
-                'no-undef': 'off',
                 'no-console': 'off',
                 'react/jsx-no-undef': 'off',
                 'no-catch-shadow': 'off',
                 '@typescript-eslint/no-restricted-imports': 'off',
                 'no-restricted-syntax': airbnbRules['no-restricted-syntax'],
+            },
+        },
+        {
+            files: ['suite-native/**/*'],
+            rules: {
+                '@typescript-eslint/no-var-requires': 'off',
+                'global-require': 'off',
             },
         },
     ],

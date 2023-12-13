@@ -1,22 +1,21 @@
-import React, { useMemo } from 'react';
-import { useSelector } from 'react-redux';
+import { useMemo } from 'react';
 
 import styled from 'styled-components';
-import { Translation, QuestionTooltip, ReadMoreLink } from '@suite-components';
-import { AppState } from '@suite-types';
+import { Translation, QuestionTooltip, ReadMoreLink } from 'src/components/suite';
+import { AppState } from 'src/types/suite';
+import { showAddress } from 'src/actions/wallet/receiveActions';
+import { useDispatch, useSelector } from 'src/hooks/suite/';
 
-import { AccountAddress } from '@trezor/connect';
-import { Button, Card, variables, H2 } from '@trezor/components';
+import { Button, Card, variables, H2, Tooltip } from '@trezor/components';
 import { getFirstFreshAddress } from '@suite-common/wallet-utils';
 import { AccountsRootState, selectIsAccountUtxoBased } from '@suite-common/wallet-core';
 
 const StyledCard = styled(Card)`
     width: 100%;
-    flex-direction: row;
+    flex-flow: row wrap;
     margin-bottom: 16px;
     align-items: center;
     justify-content: space-between;
-    flex-wrap: wrap;
     padding: 32px 42px;
 
     @media (max-width: ${variables.SCREEN_SIZE.SM}) {
@@ -49,12 +48,12 @@ const FreshAddressWrapper = styled.div`
 `;
 
 const StyledFreshAddress = styled(H2)`
-    color: ${props => props.theme.TYPE_DARK_GREY};
+    color: ${({ theme }) => theme.TYPE_DARK_GREY};
     font-weight: ${variables.FONT_WEIGHT.REGULAR};
 `;
 const AddressLabel = styled.span`
     font-weight: 600;
-    color: ${props => props.theme.TYPE_LIGHT_GREY};
+    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
     font-size: ${variables.FONT_SIZE.TINY};
     letter-spacing: 0.2px;
     text-transform: uppercase;
@@ -62,15 +61,12 @@ const AddressLabel = styled.span`
 `;
 
 const Overlay = styled.div`
-    top: 0px;
-    right: 0px;
-    bottom: 0px;
-    left: 0px;
+    inset: 0;
     position: absolute;
     background-image: linear-gradient(
         to right,
-        rgba(0, 0, 0, 0) 0%,
-        ${props => props.theme.BG_WHITE} 220px
+        rgb(0 0 0 / 0%) 0%,
+        ${({ theme }) => theme.BG_WHITE} 220px
     );
 `;
 
@@ -115,7 +111,6 @@ const TooltipLabel = ({
 interface FreshAddressProps {
     account: AppState['wallet']['selectedAccount']['account'];
     addresses: AppState['wallet']['receive'];
-    showAddress: (path: string, address: string) => void;
     disabled: boolean;
     locked: boolean;
     pendingAddresses: string[];
@@ -124,7 +119,6 @@ interface FreshAddressProps {
 export const FreshAddress = ({
     account,
     addresses,
-    showAddress,
     disabled,
     pendingAddresses,
     locked,
@@ -132,6 +126,7 @@ export const FreshAddress = ({
     const isAccountUtxoBased = useSelector((state: AccountsRootState) =>
         selectIsAccountUtxoBased(state, account?.key ?? ''),
     );
+    const dispatch = useDispatch();
 
     const firstFreshAddress = useMemo(() => {
         if (account) {
@@ -139,17 +134,31 @@ export const FreshAddress = ({
         }
     }, [account, addresses, pendingAddresses, isAccountUtxoBased]);
 
-    if (!account || !firstFreshAddress) return null;
+    if (!account) return null;
 
-    const getAddressValue = (address?: AccountAddress) => {
-        if (!address) {
-            return <Translation id="RECEIVE_ADDRESS_LIMIT_EXCEEDED" />;
-        }
+    const addressValue = firstFreshAddress?.address?.substring(0, 20);
 
-        return `${address.address.substring(0, 20)}`;
+    // On coinjoin account, disallow to reveal more than the first receive address until it is used,
+    // because discovery of coinjoin account relies on assumption that user uses his first address first.
+    const coinjoinDisallowReveal =
+        account.accountType === 'coinjoin' &&
+        !account.addresses?.used.length &&
+        firstFreshAddress?.address !== account.addresses?.unused[0]?.address;
+
+    const handleAddressReveal = () => {
+        if (firstFreshAddress)
+            dispatch(showAddress(firstFreshAddress.path, firstFreshAddress.address));
     };
 
-    const addressValue = getAddressValue(firstFreshAddress);
+    const buttonTooltipContent = () => {
+        if (coinjoinDisallowReveal) {
+            return <Translation id="RECEIVE_ADDRESS_COINJOIN_DISALLOW" />;
+        }
+        if (!firstFreshAddress) {
+            return <Translation id="RECEIVE_ADDRESS_LIMIT_REACHED" />;
+        }
+        return null;
+    };
 
     return (
         <StyledCard>
@@ -160,19 +169,23 @@ export const FreshAddress = ({
                     accountType={account.accountType}
                 />
                 <FreshAddressWrapper>
-                    <Overlay />
-                    <StyledFreshAddress>{addressValue}</StyledFreshAddress>
+                    {addressValue && <Overlay />}
+                    <StyledFreshAddress>
+                        {addressValue ?? <Translation id="RECEIVE_ADDRESS_UNAVAILABLE" />}
+                    </StyledFreshAddress>
                 </FreshAddressWrapper>
             </AddressContainer>
-            <StyledButton
-                data-test="@wallet/receive/reveal-address-button"
-                icon="TREZOR_LOGO"
-                onClick={() => showAddress(firstFreshAddress.path, firstFreshAddress.address)}
-                isDisabled={disabled || locked || !firstFreshAddress}
-                isLoading={locked}
-            >
-                <Translation id="RECEIVE_ADDRESS_REVEAL" />
-            </StyledButton>
+            <Tooltip content={buttonTooltipContent()}>
+                <StyledButton
+                    data-test="@wallet/receive/reveal-address-button"
+                    icon="TREZOR_LOGO"
+                    onClick={handleAddressReveal}
+                    isDisabled={disabled || locked || coinjoinDisallowReveal || !firstFreshAddress}
+                    isLoading={locked}
+                >
+                    <Translation id="RECEIVE_ADDRESS_REVEAL" />
+                </StyledButton>
+            </Tooltip>
         </StyledCard>
     );
 };

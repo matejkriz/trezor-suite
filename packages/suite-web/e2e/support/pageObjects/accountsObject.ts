@@ -84,7 +84,7 @@ class AccountsPage {
 
     clickOnDesiredAccount(coinName: NetworkSymbol) {
         cy.getTestElement(`@account-menu/${coinName}/normal/0`)
-            .click()
+            .click('left')
             .parent()
             .should('have.class', 'selected');
     }
@@ -96,7 +96,7 @@ class AccountsPage {
         cy.getTestElement(`@wallet/accounts/export-transactions/${typeOfExport}`)
             .should('be.visible')
             .click({
-                scrollBehavior: false,
+                scrollBehavior: 'center',
             });
     }
 }

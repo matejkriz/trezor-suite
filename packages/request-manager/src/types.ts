@@ -5,6 +5,16 @@ export interface TorConnectionOptions {
     torDataDir: string;
 }
 
+export type TorCommandResponse =
+    | {
+          success: true;
+          payload: string;
+      }
+    | {
+          success: false;
+          payload: string;
+      };
+
 export type BootstrapEvent =
     | {
           type: 'slow';
@@ -22,6 +32,11 @@ export type InterceptedEvent =
           details: string;
       }
     | {
+          type: 'INTERCEPTED_HEADERS';
+          method: string;
+          details: string;
+      }
+    | {
           type: 'INTERCEPTED_RESPONSE';
           host: string;
           time: number;
@@ -31,13 +46,25 @@ export type InterceptedEvent =
           type: 'NETWORK_MISBEHAVING';
       }
     | {
-          type: 'ERROR' | 'ERROR_PROXY_TIMEOUT' | 'ERROR_PROXY_REJECTED';
+          type: 'CIRCUIT_MISBEHAVING';
+          identity?: string;
+      }
+    | {
+          type: 'ERROR';
+          error: Error;
       };
+
+export type TorSettings = {
+    host?: string;
+    port?: number;
+    running: boolean;
+};
 
 export type InterceptorOptions = {
     handler: (event: InterceptedEvent) => void;
-    getIsTorEnabled: () => boolean;
-    isDevEnv?: boolean;
+    getTorSettings: () => TorSettings;
+    allowTorBypass?: boolean;
+    whitelistedHosts?: string[];
 };
 
 export const TOR_CONTROLLER_STATUS = {

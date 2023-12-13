@@ -1,13 +1,13 @@
-import type { PROTO } from '../../../constants';
 import type { AccountAddresses } from '@trezor/blockchain-link';
 import type { Transaction as BlockbookTransaction } from '@trezor/blockchain-link-types/lib/blockbook';
-
-import { AccountUtxo } from '../../account';
+import type { PROTO } from '../../../constants';
+import type { AccountTransaction } from '../../account';
+import type { DerivationPath, ProtoWithDerivationPath } from '../../params';
 
 // signMessage
 
 export interface SignMessage {
-    path: string | number[];
+    path: DerivationPath;
     coin: string;
     message: string;
     hex?: boolean;
@@ -60,16 +60,17 @@ export interface TransactionOptions {
     amount_unit?: PROTO.AmountUnit;
     serialize?: boolean;
     coinjoin_request?: PROTO.CoinJoinRequest;
+    chunkify?: boolean;
 }
 
 export interface SignTransaction {
-    inputs: PROTO.TxInputType[];
-    outputs: PROTO.TxOutputType[];
+    inputs: ProtoWithDerivationPath<PROTO.TxInputType>[];
+    outputs: ProtoWithDerivationPath<PROTO.TxOutputType>[];
     paymentRequests?: PROTO.TxAckPaymentRequest[];
     refTxs?: RefTransaction[];
     account?: {
         addresses: AccountAddresses;
-        utxo: AccountUtxo[];
+        transactions?: AccountTransaction[]; // refTxs in different format. see refTxs/validateReferencedTransactions
     };
     coin: string;
     locktime?: number;
@@ -86,6 +87,7 @@ export interface SignTransaction {
     unlockPath?: PROTO.UnlockPath;
     serialize?: boolean;
     coinjoinRequest?: PROTO.CoinJoinRequest;
+    chunkify?: boolean;
 }
 
 export type SignedTransaction = {

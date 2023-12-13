@@ -17,6 +17,16 @@ const followDevice = {
     },
 };
 
+const confirmOutput = {
+    selector: '.confirm-output >> visible=true',
+    screenshot: {
+        name: 'confirm-output-on-device',
+    },
+    nextEmu: {
+        type: 'emulator-press-yes',
+    },
+};
+
 const confirmExportAddressScreen = {
     selector: '.export-address >> visible=true',
     screenshot: {
@@ -174,7 +184,7 @@ const composeTransaction = [
                 screenshot: {
                     name: 'select-fee-default-screen',
                 },
-                next: 'text=Custom >> visible=true',
+                next: '.custom-fee >> visible=true',
             },
             {
                 selector: '.send-button >> visible=true',
@@ -183,16 +193,8 @@ const composeTransaction = [
                 },
                 next: '.send-button >> visible=true',
             },
-            {
-                selector:
-                    'text=Check recipient address on your device and follow further instructions. >> visible=true',
-                screenshot: {
-                    name: 'check-on-device',
-                },
-                nextEmu: {
-                    type: 'emulator-press-yes',
-                },
-            },
+            confirmOutput,
+            confirmOutput,
             followDevice,
         ],
     },
@@ -203,15 +205,8 @@ const signTransaction = [
         device: initializedDevice,
         url: 'signTransaction-paytoaddress',
         views: [
-            {
-                selector: '.confirm-output >> visible=true',
-                screenshot: {
-                    name: 'confirm-output-on-device',
-                },
-                nextEmu: {
-                    type: 'emulator-press-yes',
-                },
-            },
+            confirmOutput,
+            confirmOutput,
             followDevice,
             followDevice, // will end with Failure_DataError, inputs do not belong to this seed
         ],
@@ -222,7 +217,7 @@ const ethereumSignTransaction = [
     {
         device: initializedDevice,
         url: 'ethereumSignTransaction',
-        views: [followDevice, followDevice],
+        views: [followDevice, followDevice, followDevice],
     },
 ];
 
@@ -348,15 +343,6 @@ const recoverDevice = [
             {
                 selector: '.follow-device >> visible=true',
                 screenshot: {
-                    name: 'follow-device-confirm-select-number-of-words',
-                },
-                nextEmu: {
-                    type: 'emulator-press-yes',
-                },
-            },
-            {
-                selector: '.follow-device >> visible=true',
-                screenshot: {
                     name: 'follow-device-select-number-of-words',
                 },
                 nextEmu: {
@@ -414,6 +400,24 @@ const ethereumGetAddress = [
     },
 ];
 
+const ethereumGetAddressGoChain = [
+    {
+        ...getAddress[0],
+        url: 'ethereumGetAddress-gochain',
+        views: [
+            {
+                // Tests that definition was correctly loaded, decoded and displayed in the "main section of screen"
+                selector: 'text=Export GoChain address',
+                screenshot: {
+                    name: 'export-address-go-chain',
+                },
+                next: 'button.confirm >> visible=true',
+            },
+            getConfirmAddressOnDeviceScreen('0x2cfd36BE875fd9cF203Ad1BD90C96e085a7839DB'),
+        ],
+    },
+];
+
 const ethereumSignMessage = [
     {
         ...signMessage[0],
@@ -432,32 +436,7 @@ const ethereumSignTypedData = [
     {
         url: 'ethereumSignTypedData',
         device: initializedDevice,
-        views: [
-            {
-                selector: '[data-test="@info-panel"]',
-                screenshot: {
-                    name: 'sign-message',
-                },
-                nextEmu: {
-                    type: 'emulator-press-yes',
-                },
-            },
-            {
-                selector: '[data-test="@info-panel"]',
-                screenshot: {
-                    name: 'sign-message',
-                },
-                nextEmu: {
-                    type: 'emulator-press-yes',
-                },
-            },
-            {
-                selector: '[data-test="@info-panel"]',
-                nextEmu: {
-                    type: 'emulator-press-yes',
-                },
-            },
-        ],
+        views: [followDevice, followDevice, followDevice, followDevice],
     },
 ];
 
@@ -485,7 +464,7 @@ const cardanoSignTransaction = [
     {
         device: initializedDevice,
         url: 'cardanoSignTransaction',
-        views: [followDevice, followDevice, followDevice],
+        views: [followDevice, followDevice, followDevice, followDevice],
     },
 ];
 
@@ -520,7 +499,7 @@ const tezosSignTransaction = [
     {
         device: initializedDevice,
         url: 'tezosSignTransaction',
-        views: [followDevice, followDevice],
+        views: [followDevice, followDevice, followDevice],
     },
 ];
 
@@ -563,29 +542,7 @@ const binanceSignTransaction = [
     {
         device: initializedDevice,
         url: 'binanceSignTransaction-transfer',
-        views: [
-            {
-                selector:
-                    'text=Check recipient address on your device and follow further instructions. >> visible=true',
-                screenshot: {
-                    name: 'check-on-device',
-                },
-                nextEmu: {
-                    type: 'emulator-swipe',
-                    direction: 'up',
-                },
-            },
-            {
-                selector:
-                    'text=Check recipient address on your device and follow further instructions. >> visible=true',
-                screenshot: {
-                    name: 'check-on-device-confirm',
-                },
-                nextEmu: {
-                    type: 'emulator-press-yes',
-                },
-            },
-        ],
+        views: [confirmOutput, confirmOutput, confirmOutput, confirmOutput],
     },
 ];
 
@@ -626,19 +583,7 @@ const rippleSignTransaction = [
     {
         device: initializedDevice,
         url: 'rippleSignTransaction',
-        views: [
-            {
-                selector:
-                    'text=Check recipient address on your device and follow further instructions. >> visible=true',
-                screenshot: {
-                    name: 'check-on-device',
-                },
-                nextEmu: {
-                    type: 'emulator-press-yes',
-                },
-            },
-            followDevice,
-        ],
+        views: [confirmOutput, confirmOutput, followDevice],
     },
 ];
 
@@ -657,29 +602,7 @@ const nemSignTransaction = [
     {
         device: initializedDevice,
         url: 'nemSignTransaction',
-        views: [
-            {
-                selector:
-                    'text=Check recipient address on your device and follow further instructions. >> visible=true',
-                screenshot: {
-                    name: 'check-on-device-1',
-                },
-                nextEmu: {
-                    type: 'emulator-press-yes',
-                },
-            },
-            {
-                selector:
-                    'text=Check recipient address on your device and follow further instructions. >> visible=true',
-                screenshot: {
-                    name: 'check-on-device-2',
-                },
-                nextEmu: {
-                    type: 'emulator-press-yes',
-                },
-            },
-            followDevice,
-        ],
+        views: [confirmOutput, confirmOutput, confirmOutput, followDevice],
     },
 ];
 
@@ -701,6 +624,7 @@ export const fixtures = [
     ...recoverDevice,
     ...ethereumGetPublicKey,
     ...ethereumGetAddress,
+    ...ethereumGetAddressGoChain,
     ...ethereumSignTransaction,
     ...ethereumSignMessage,
     ...ethereumVerifyMessage,

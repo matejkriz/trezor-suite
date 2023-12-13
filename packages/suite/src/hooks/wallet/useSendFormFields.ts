@@ -1,16 +1,16 @@
 import { useCallback } from 'react';
-import { UseFormMethods } from 'react-hook-form';
+import { FieldPath, UseFormReturn } from 'react-hook-form';
 import { formatNetworkAmount, toFiatCurrency } from '@suite-common/wallet-utils';
 import {
     FormState,
     FormOptions,
     UseSendFormState,
     SendContextValues,
-} from '@wallet-types/sendForm';
+} from 'src/types/wallet/sendForm';
 import { isFeatureFlagEnabled } from '@suite-common/suite-utils';
 import { useBitcoinAmountUnit } from './useBitcoinAmountUnit';
 
-type Props = UseFormMethods<FormState> & {
+type Props = UseFormReturn<FormState> & {
     fiatRates: UseSendFormState['fiatRates'];
     network: UseSendFormState['network'];
 };
@@ -18,23 +18,30 @@ type Props = UseFormMethods<FormState> & {
 // This hook should be used only as a sub-hook of `useSendForm`
 
 export const useSendFormFields = ({
-    control,
     getValues,
     setValue,
     clearErrors,
     fiatRates,
     network,
+    formState: { errors },
 }: Props) => {
     const { shouldSendInSats } = useBitcoinAmountUnit(network.symbol);
 
     const calculateFiat = useCallback(
         (outputIndex: number, amount?: string) => {
+            const outputError = errors.outputs ? errors.outputs[outputIndex] : undefined;
+            const error = outputError ? outputError.amount : undefined;
+
+            if (error) {
+                amount = undefined;
+            }
+
             const { outputs } = getValues();
             const output = outputs ? outputs[outputIndex] : undefined;
             if (!output || output.type !== 'payment') return;
             const { fiat, currency } = output;
             if (typeof fiat !== 'string') return; // fiat input not registered (testnet or fiat not available)
-            const inputName = `outputs[${outputIndex}].fiat`;
+            const inputName = `outputs.${outputIndex}.fiat` as const;
             if (!amount) {
                 // reset fiat value (Amount field has error)
                 if (fiat.length > 0) {
@@ -58,12 +65,12 @@ export const useSendFormFields = ({
                 setValue(inputName, fiatValue, { shouldValidate: true });
             }
         },
-        [getValues, setValue, fiatRates, shouldSendInSats, network.symbol],
+        [getValues, setValue, fiatRates, shouldSendInSats, network.symbol, errors],
     );
 
     const setAmount = useCallback(
         (outputIndex: number, amount: string) => {
-            setValue(`outputs[${outputIndex}].amount`, amount, {
+            setValue(`outputs.${outputIndex}.amount`, amount, {
                 shouldValidate: amount.length > 0,
                 shouldDirty: true,
             });
@@ -74,10 +81,10 @@ export const useSendFormFields = ({
 
     const setMax = useCallback(
         (outputIndex: number, active: boolean) => {
-            clearErrors([`outputs[${outputIndex}].amount`, `outputs[${outputIndex}].fiat`]);
+            clearErrors([`outputs.${outputIndex}.amount`, `outputs.${outputIndex}.fiat`]);
             if (!active) {
-                setValue(`outputs[${outputIndex}].amount`, '');
-                setValue(`outputs[${outputIndex}].fiat`, '');
+                setValue(`outputs.${outputIndex}.amount`, '');
+                setValue(`outputs.${outputIndex}.fiat`, '');
             }
             setValue('setMaxOutputId', active ? undefined : outputIndex);
         },
@@ -85,34 +92,28 @@ export const useSendFormFields = ({
     );
 
     const resetDefaultValue = useCallback(
-        (fieldName: string) => {
-            // Since some fields are registered conditionally (locktime, rippleDestinationTag etc..)
-            // they will set defaultValue from draft on every mount
-            // to prevent that behavior reset defaultValue in `react-hook-form.control.defaultValuesRef`
-            const { current } = control.defaultValuesRef;
-            // @ts-expect-error: react-hook-form type returns "unknown" (bug?)
-            if (current && current[fieldName]) current[fieldName] = '';
+        (fieldName: FieldPath<FormState>) => {
             // reset current value
             setValue(fieldName, '');
             // clear error
             clearErrors(fieldName);
         },
-        [control, setValue, clearErrors],
+        [setValue, clearErrors],
     );
 
-    // `outputs[x].fieldName` should be a regular `formState` value from `getValues()` method
+    // `outputs.x.fieldName` should be a regular `formState` value from `getValues()` method
     // however `useFieldArray` doesn't provide it BEFORE input is registered (it will be undefined on first render)
     // use fallbackValue from useFieldArray.fields if so, because `useFieldArray` architecture requires `defaultValue` to be provided for registered inputs
-    const getDefaultValue: SendContextValues['getDefaultValue'] = <K extends string, T = undefined>(
-        fieldName: K,
-        fallbackValue?: T,
+    const getDefaultValue: SendContextValues['getDefaultValue'] = (
+        fieldName: FieldPath<FormState>,
+        fallbackValue?: FieldPath<FormState>,
     ) => {
         if (fallbackValue !== undefined) {
-            const stateValue = getValues<K, T>(fieldName);
+            const stateValue = getValues(fieldName);
             if (stateValue !== undefined) return stateValue;
             return fallbackValue;
         }
-        return getValues<K, T>(fieldName);
+        return getValues(fieldName);
     };
 
     const toggleOption = (option: FormOptions) => {

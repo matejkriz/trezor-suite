@@ -1,8 +1,10 @@
-import React, { Fragment } from 'react';
+import { useMemo, Fragment } from 'react';
 import styled, { css } from 'styled-components';
 import { variables, useTheme, Icon, Card } from '@trezor/components';
-import { FiatValue, FormattedCryptoAmount, TrezorLink } from '@suite-components';
-import { Account } from '@wallet-types';
+import { FiatValue, FormattedCryptoAmount, TrezorLink } from 'src/components/suite';
+import { Account } from 'src/types/wallet';
+import { useSelector } from 'src/hooks/suite';
+import { enhanceTokensWithRates, sortTokensWithRates } from '@suite-common/wallet-utils';
 
 const Wrapper = styled(Card)<{ isTestnet?: boolean }>`
     display: grid;
@@ -24,7 +26,7 @@ interface ColProps {
 }
 
 const Col = styled.div<ColProps>`
-    padding: 10px 12px 10px 0px;
+    padding: 10px 12px 10px 0;
     color: ${({ theme }) => theme.TYPE_DARK_GREY};
     font-size: ${variables.FONT_SIZE.SMALL};
     border-top: 1px solid ${({ theme }) => theme.STROKE_GREY};
@@ -64,16 +66,31 @@ interface TokenListProps {
     tokens: Account['tokens'];
     networkType: Account['networkType'];
     explorerUrl: string;
+    explorerUrlQueryString: string;
     isTestnet?: boolean;
 }
 
-export const TokenList = ({ tokens, explorerUrl, isTestnet, networkType }: TokenListProps) => {
+export const TokenList = ({
+    tokens,
+    explorerUrl,
+    explorerUrlQueryString,
+    isTestnet,
+    networkType,
+}: TokenListProps) => {
     const theme = useTheme();
+    const coins = useSelector(state => state.wallet.fiat.coins);
+
+    const sortedTokens = useMemo(() => {
+        const tokensWithRates = enhanceTokensWithRates(tokens, coins);
+
+        return tokensWithRates.sort(sortTokensWithRates);
+    }, [tokens, coins]);
+
     if (!tokens || tokens.length === 0) return null;
 
     return (
         <Wrapper isTestnet={isTestnet} noPadding>
-            {tokens.map(t => {
+            {sortedTokens.map(t => {
                 // In Cardano token name is optional and in there is no symbol.
                 // However, if Cardano token doesn't have a name on blockchain, its TokenInfo has both name
                 // and symbol props set to a token fingerprint (done in blockchain-link) and we
@@ -84,7 +101,7 @@ export const TokenList = ({ tokens, explorerUrl, isTestnet, networkType }: Token
                 const noSymbol = !t.symbol || symbolMatchesName;
 
                 return (
-                    <Fragment key={t.address}>
+                    <Fragment key={t.contract}>
                         <Col isTestnet={isTestnet}>
                             {!noSymbol && <TokenSymbol>{t.symbol}</TokenSymbol>}
                             <TokenName>
@@ -107,14 +124,16 @@ export const TokenList = ({ tokens, explorerUrl, isTestnet, networkType }: Token
                                         <FiatValue
                                             amount={t.balance}
                                             symbol={t.symbol}
-                                            tokenAddress={t.address}
+                                            tokenAddress={t.contract}
                                         />
                                     )}
                                 </FiatWrapper>
                             </Col>
                         )}
                         <Col isTestnet={isTestnet} justify="right">
-                            <TrezorLink href={`${explorerUrl}${t.address}`}>
+                            <TrezorLink
+                                href={`${explorerUrl}${t.contract}${explorerUrlQueryString}`}
+                            >
                                 <Icon
                                     icon="EXTERNAL_LINK"
                                     size={16}

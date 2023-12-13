@@ -1,3 +1,5 @@
+import { RoundPhase, SessionPhase } from '@trezor/coinjoin';
+import { ANONYMITY_GAINS_HINDSIGHT_COUNT } from 'src/services/coinjoin';
 import * as coinjoinUtils from '../coinjoinUtils';
 
 const baseUtxo = {
@@ -152,4 +154,45 @@ export const calculateProgressParams: Array<{
         },
         result: 100,
     },
+];
+
+export const getRoundPhaseFromSessionPhase: {
+    sessionPhase: SessionPhase;
+    result?: RoundPhase | 'error';
+}[] = [
+    { sessionPhase: 101, result: 0 },
+    { sessionPhase: 451, result: 3 },
+];
+
+export const getFirstSessionPhaseFromRoundPhase: {
+    roundPhase: RoundPhase;
+    result: SessionPhase | 'error';
+}[] = [
+    { roundPhase: 0, result: 101 },
+    { roundPhase: 1, result: 201 },
+    { roundPhase: 4, result: 'error' },
+];
+
+export const cleanAnonymityGains: Array<{
+    params: Parameters<typeof coinjoinUtils.cleanAnonymityGains>[0];
+    resultLength: number;
+}> = [
+    {
+        params: new Array(ANONYMITY_GAINS_HINDSIGHT_COUNT + 1).fill({
+            level: 3,
+            timestamp: Date.now(),
+        }),
+        resultLength: ANONYMITY_GAINS_HINDSIGHT_COUNT,
+    },
+    { params: [{ level: 3, timestamp: 0 }], resultLength: 0 },
+];
+
+export const averageAnonymityGainsParams: Array<{
+    params: Parameters<typeof coinjoinUtils.calculateAverageAnonymityGainPerRound>;
+    checkResult: (average: number) => boolean;
+}> = [
+    { params: [2, [{ level: 3, timestamp: Date.now() }]], checkResult: x => x > 2 },
+    { params: [2, [{ level: 1, timestamp: Date.now() }]], checkResult: x => x < 2 },
+    { params: [2, [{ level: 2, timestamp: Date.now() }]], checkResult: x => x === 2 },
+    { params: [2, undefined], checkResult: x => x === 2 },
 ];

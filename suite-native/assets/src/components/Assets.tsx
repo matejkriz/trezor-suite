@@ -1,72 +1,59 @@
-import React, { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 
 import { useNavigation } from '@react-navigation/native';
 
-import { Button, Card, VStack } from '@suite-native/atoms';
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
+import { AccountKey, TokenAddress } from '@suite-common/wallet-types';
+import { Card, VStack } from '@suite-native/atoms';
 import {
     AppTabsParamList,
     AppTabsRoutes,
-    AccountsImportStackRoutes,
     RootStackParamList,
     RootStackRoutes,
     TabToStackCompositeNavigationProp,
-    AccountsStackRoutes,
-    SendReceiveStackRoutes,
 } from '@suite-native/navigation';
-import { networks } from '@suite-common/wallet-config';
-import { selectFiatCurrency } from '@suite-native/module-settings';
+import { networks, NetworkSymbol } from '@suite-common/wallet-config';
+import { selectIsDeviceDiscoveryActive } from '@suite-common/wallet-core';
 
-import { AssetItem } from './AssetItem';
-import { selectAssetsWithBalances } from '../assetsSelectors';
+import { DiscoveryAssetsLoader } from './DiscoveryAssetsLoader';
+import { selectDeviceAssetsWithBalances } from '../assetsSelectors';
 import { calculateAssetsPercentage } from '../utils';
+import { AssetItem } from './AssetItem';
+import { NetworkAssetsBottomSheet } from './NetworkAssetsBottomSheet';
 
-const importStyle = prepareNativeStyle(_ => ({
-    marginTop: 12,
-}));
-
-type HomeAssetsNavigationProp = TabToStackCompositeNavigationProp<
+type NavigationProp = TabToStackCompositeNavigationProp<
     AppTabsParamList,
     AppTabsRoutes.HomeStack,
     RootStackParamList
 >;
 
 export const Assets = () => {
-    const navigation = useNavigation<HomeAssetsNavigationProp>();
-    const { applyStyle } = useNativeStyles();
-    const fiatCurrency = useSelector(selectFiatCurrency);
-    const assetsData = useSelector((state: any) =>
-        selectAssetsWithBalances(fiatCurrency.label, state),
-    );
+    const navigation = useNavigation<NavigationProp>();
+
+    const deviceAssetsData = useSelector(selectDeviceAssetsWithBalances);
+    const isDiscoveryActive = useSelector(selectIsDeviceDiscoveryActive);
+
+    const [selectedAssetSymbol, setSelectedAssetSymbol] = useState<NetworkSymbol | null>(null);
 
     const assetsDataWithPercentage = useMemo(
-        () => calculateAssetsPercentage(assetsData),
-        [assetsData],
+        () => calculateAssetsPercentage(deviceAssetsData),
+        [deviceAssetsData],
     );
 
-    const handleReceive = () => {
-        navigation.navigate(AppTabsRoutes.SendReceiveStack, {
-            screen: SendReceiveStackRoutes.ReceiveAccounts,
-        });
-    };
+    const handleSelectAssetsAccount = useCallback(
+        (accountKey: AccountKey, tokenContract?: TokenAddress) => {
+            navigation.navigate(RootStackRoutes.AccountDetail, {
+                accountKey,
+                tokenContract,
+            });
+            setSelectedAssetSymbol(null);
+        },
+        [navigation, setSelectedAssetSymbol],
+    );
 
-    const handleImportAssets = () => {
-        // TODO: move this to Dashboard screen directly
-        navigation.navigate(RootStackRoutes.AccountsImport, {
-            screen: AccountsImportStackRoutes.SelectNetwork,
-        });
-    };
-
-    const handleShowAssetsAccounts = () => {
-        // TODO: move this to Dashboard screen directly
-        navigation.navigate(RootStackRoutes.AppTabs, {
-            screen: AppTabsRoutes.AccountsStack,
-            params: {
-                screen: AccountsStackRoutes.Accounts,
-            },
-        });
-    };
+    const handleCloseBottomSheet = useCallback(() => {
+        setSelectedAssetSymbol(null);
+    }, [setSelectedAssetSymbol]);
 
     return (
         <>
@@ -82,19 +69,19 @@ export const Assets = () => {
                             fiatPercentage={asset.fiatPercentage}
                             fiatPercentageOffset={asset.fiatPercentageOffset}
                             cryptoCurrencyValue={asset.assetBalance.toFixed()}
-                            onPress={handleShowAssetsAccounts}
+                            onPress={setSelectedAssetSymbol}
                         />
                     ))}
+                    {isDiscoveryActive && <DiscoveryAssetsLoader />}
                 </VStack>
             </Card>
-            <VStack style={applyStyle(importStyle)} spacing="small">
-                <Button colorScheme="tertiaryElevation0" size="large" onPress={handleImportAssets}>
-                    Sync my coins
-                </Button>
-                <Button size="large" onPress={handleReceive} iconLeft="receive">
-                    Receive
-                </Button>
-            </VStack>
+            {selectedAssetSymbol && (
+                <NetworkAssetsBottomSheet
+                    networkSymbol={selectedAssetSymbol}
+                    onSelectAccount={handleSelectAssetsAccount}
+                    onClose={handleCloseBottomSheet}
+                />
+            )}
         </>
     );
 };

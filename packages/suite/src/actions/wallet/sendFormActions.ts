@@ -1,18 +1,15 @@
-import TrezorConnect, { PROTO, SignedTransaction } from '@trezor/connect';
 import BigNumber from 'bignumber.js';
 
+import TrezorConnect, { PROTO, SignedTransaction } from '@trezor/connect';
 import {
     accountsActions,
     addFakePendingCardanoTxThunk,
     addFakePendingTxThunk,
     replaceTransactionThunk,
     syncAccountsWithBlockchainThunk,
+    selectDevice,
 } from '@suite-common/wallet-core';
-import * as suiteActions from '@suite-actions/suiteActions';
 import { notificationsActions } from '@suite-common/toast-notifications';
-import * as modalActions from '@suite-actions/modalActions';
-import * as metadataActions from '@suite-actions/metadataActions';
-import { SEND } from '@wallet-actions/constants';
 import {
     formatNetworkAmount,
     getPendingAccount,
@@ -21,20 +18,27 @@ import {
     formatAmount,
     getAccountDecimals,
     hasNetworkFeatures,
+    isCardanoTx,
 } from '@suite-common/wallet-utils';
-import { isCardanoTx } from '@wallet-utils/cardanoUtils';
-import { Dispatch, GetState } from '@suite-types';
-import { Account } from '@wallet-types';
 import {
     FormState,
     ComposeActionContext,
     PrecomposedTransactionFinal,
     PrecomposedTransactionFinalCardano,
 } from '@suite-common/wallet-types';
+import { cloneObject } from '@trezor/utils';
+
+import * as modalActions from 'src/actions/suite/modalActions';
+import * as metadataActions from 'src/actions/suite/metadataActions';
+import { SEND } from 'src/actions/wallet/constants';
+import { Dispatch, GetState } from 'src/types/suite';
+import { Account } from 'src/types/wallet';
+import { MetadataAddPayload } from 'src/types/suite/metadata';
+
 import * as sendFormBitcoinActions from './send/sendFormBitcoinActions';
 import * as sendFormEthereumActions from './send/sendFormEthereumActions';
 import * as sendFormRippleActions from './send/sendFormRippleActions';
-import { MetadataAddPayload } from '@suite/types/suite/metadata';
+import * as sendFormSolanaActions from './send/sendFormSolanaActions';
 import * as sendFormCardanoActions from './send/sendFormCardanoActions';
 
 export type SendFormAction =
@@ -104,19 +108,6 @@ export const removeDraft = () => (dispatch: Dispatch, getState: GetState) => {
     }
 };
 
-// TODO: replace by structuredClone() after updating TS
-const clone = <T>(info: T): T => {
-    const jsonString = JSON.stringify(info);
-
-    if (jsonString === undefined) {
-        // jsonString === undefined IF and only IF obj === undefined
-        // therefore no need to clone
-        return info;
-    }
-
-    return JSON.parse(jsonString);
-};
-
 export const convertDrafts = () => (dispatch: Dispatch, getState: GetState) => {
     const { route } = getState().router;
 
@@ -151,7 +142,7 @@ export const convertDrafts = () => (dispatch: Dispatch, getState: GetState) => {
         const conversionToUse =
             areSatsSelected && areSatsSupported ? amountToSatoshi : formatAmount;
 
-        const updatedDraft = clone(draft);
+        const updatedDraft = cloneObject(draft);
         const decimals = getAccountDecimals(relatedAccount.symbol)!;
 
         updatedDraft.outputs.forEach(output => {
@@ -183,6 +174,10 @@ export const composeTransaction =
         if (account.networkType === 'cardano') {
             return dispatch(sendFormCardanoActions.composeTransaction(formValues, formState));
         }
+        if (account.networkType === 'solana') {
+            return dispatch(sendFormSolanaActions.composeTransaction(formValues, formState));
+        }
+        return Promise.resolve(undefined);
     };
 
 // this is only a wrapper for `openDeferredModal` since it doesn't work with `bindActionCreators`
@@ -195,7 +190,7 @@ export const scanQrRequest = () => (dispatch: Dispatch) =>
 export const importRequest = () => (dispatch: Dispatch) =>
     dispatch(modalActions.openDeferredModal({ type: 'import-transaction' }));
 
-// this could be called at any time during signTransaction or pushTransaction process (from ReviewTransaction modal)
+// this could be called at any time during signTransaction or pushTransaction process (from TransactionReviewModal)
 export const cancelSignTx = () => (dispatch: Dispatch, getState: GetState) => {
     const { signedTx } = getState().wallet.send;
     dispatch({ type: SEND.REQUEST_SIGN_TRANSACTION });
@@ -215,7 +210,7 @@ const pushTransaction =
     async (dispatch: Dispatch, getState: GetState) => {
         const { signedTx, precomposedTx } = getState().wallet.send;
         const { account } = getState().wallet.selectedAccount;
-        const { device } = getState().suite;
+        const device = selectDevice(getState());
         if (!signedTx || !precomposedTx || !account) return;
 
         const sentTx = await TrezorConnect.pushTransaction(signedTx);
@@ -259,7 +254,13 @@ const pushTransaction =
                 // notification from the backend may be delayed.
                 // modify affected transaction(s) in the reducer until the real account update occurs.
                 // this will update transaction details (like time, fee etc.)
-                dispatch(replaceTransactionThunk({ tx: precomposedTx, newTxid: txid }));
+                dispatch(
+                    replaceTransactionThunk({
+                        precomposedTx,
+                        newTxid: txid,
+                        signedTransaction,
+                    }),
+                );
             }
 
             // notification from the backend may be delayed.
@@ -311,9 +312,9 @@ const pushTransaction =
                 let outputsPermutation: number[];
                 if (isCardanoTx(account, precomposedTx)) {
                     // cardano preserves order of outputs
-                    outputsPermutation = precomposedTx?.transaction.outputs.map((_o, i) => i);
+                    outputsPermutation = precomposedTx?.outputs.map((_o, i) => i);
                 } else {
-                    outputsPermutation = precomposedTx?.transaction.outputsPermutation;
+                    outputsPermutation = precomposedTx?.outputsPermutation;
                 }
 
                 precomposedForm?.outputs
@@ -326,7 +327,7 @@ const pushTransaction =
                         const outputIndex = outputsPermutation.findIndex(p => p === index);
                         const metadata: Extract<MetadataAddPayload, { type: 'outputLabel' }> = {
                             type: 'outputLabel',
-                            accountKey: account.key,
+                            entityKey: account.key,
                             txid, // txid becomes available, use it
                             outputIndex,
                             value: label,
@@ -363,8 +364,8 @@ export const signTransaction =
         transactionInfo: PrecomposedTransactionFinal | PrecomposedTransactionFinalCardano,
     ) =>
     async (dispatch: Dispatch, getState: GetState) => {
-        const { device } = getState().suite;
-        const { account } = getState().wallet.selectedAccount;
+        const device = selectDevice(getState());
+        const { account, network } = getState().wallet.selectedAccount;
 
         if (!device || !account) return;
 
@@ -382,7 +383,7 @@ export const signTransaction =
             formValues.rbfParams && typeof formValues.setMaxOutputId === 'number';
         // in case where native RBF is NOT available fallback to "legacy" way of signing (regular signing):
         // - do not enhance inputs/outputs in signFormBitcoinActions
-        // - do not display "rbf mode" in ReviewTransaction modal
+        // - do not display "rbf mode" in TransactionReviewModal
         const useNativeRbf =
             (!hasDecreasedOutput && nativeRbfAvailable) ||
             (hasDecreasedOutput && decreaseOutputAvailable);
@@ -401,7 +402,24 @@ export const signTransaction =
             enhancedTxInfo.useDecreaseOutput = hasDecreasedOutput;
         }
 
-        // store formValues and transactionInfo in send reducer to be used by ReviewTransaction modal
+        if (
+            account.networkType === 'ethereum' &&
+            !isCardanoTx(account, enhancedTxInfo) &&
+            enhancedTxInfo.token?.contract &&
+            network?.chainId
+        ) {
+            const isTokenKnown = await fetch(
+                `https://data.trezor.io/firmware/eth-definitions/chain-id/${
+                    network.chainId
+                }/token-${enhancedTxInfo.token.contract.substring(2).toLowerCase()}.dat`,
+            )
+                .then(response => response.ok)
+                .catch(() => false);
+
+            enhancedTxInfo.isTokenKnown = isTokenKnown;
+        }
+
+        // store formValues and transactionInfo in send reducer to be used by TransactionReviewModal
         dispatch({
             type: SEND.REQUEST_SIGN_TRANSACTION,
             payload: {
@@ -410,10 +428,10 @@ export const signTransaction =
             },
         });
 
-        // ReviewTransaction modal has 2 steps: signing and pushing
+        // TransactionReviewModal has 2 steps: signing and pushing
         // TrezorConnect emits UI.CLOSE_UI.WINDOW after the signing process
-        // this action is blocked by actionBlockerMiddleware
-        dispatch(suiteActions.setProcessMode(device, 'sign-tx'));
+        // this action is blocked by modalActions.preserve()
+        dispatch(modalActions.preserve());
 
         // signTransaction by Trezor
         let serializedTx: string | undefined;
@@ -441,9 +459,12 @@ export const signTransaction =
                     sendFormRippleActions.signTransaction(formValues, enhancedTxInfo),
                 );
             }
+            if (account.networkType === 'solana') {
+                serializedTx = await dispatch(
+                    sendFormSolanaActions.signTransaction(formValues, enhancedTxInfo),
+                );
+            }
         }
-
-        dispatch(suiteActions.setProcessMode(device, undefined));
 
         if (!serializedTx) {
             // close modal manually since UI.CLOSE_UI.WINDOW was blocked
@@ -451,7 +472,7 @@ export const signTransaction =
             return;
         }
 
-        // store serializedTx in reducer (TrezorConnect.pushTransaction params) to be used in ReviewTransaction modal and pushTransaction method
+        // store serializedTx in reducer (TrezorConnect.pushTransaction params) to be used in TransactionReviewModal and pushTransaction method
         dispatch({
             type: SEND.REQUEST_PUSH_TRANSACTION,
             payload: {

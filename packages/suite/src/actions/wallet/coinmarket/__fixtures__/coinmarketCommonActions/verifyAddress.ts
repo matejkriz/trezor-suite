@@ -1,8 +1,12 @@
-import { MODAL } from '@suite-actions/constants';
-import { BTC_ACCOUNT, ETH_ACCOUNT, XRP_ACCOUNT } from './accounts';
-import { COINMARKET_BUY, COINMARKET_EXCHANGE } from '@wallet-actions/constants';
+import { testMocks } from '@suite-common/test-utils';
 
-const { getSuiteDevice } = global.JestMocks;
+import { MODAL } from 'src/actions/suite/constants';
+import { COINMARKET_BUY, COINMARKET_EXCHANGE } from 'src/actions/wallet/constants';
+import { AddressDisplayOptions } from 'src/reducers/suite/suiteReducer';
+
+import { BTC_ACCOUNT, ETH_ACCOUNT, XRP_ACCOUNT } from './accounts';
+
+const { getSuiteDevice } = testMocks;
 const UNAVAILABLE_DEVICE = getSuiteDevice({ available: false });
 const AVAILABLE_DEVICE = getSuiteDevice({ available: true, connected: true });
 
@@ -10,8 +14,16 @@ export const VERIFY_BUY_ADDRESS_FIXTURES = [
     {
         description: 'verifyAddress, bitcoin account',
         initialState: {
+            device: {
+                selectedDevice: AVAILABLE_DEVICE,
+            },
             suite: {
-                device: AVAILABLE_DEVICE,
+                settings: {
+                    addressDisplayType: AddressDisplayOptions.CHUNKED,
+                },
+            },
+            wallet: {
+                accounts: [BTC_ACCOUNT],
             },
         },
         params: {
@@ -22,64 +34,25 @@ export const VERIFY_BUY_ADDRESS_FIXTURES = [
         },
         result: {
             value: BTC_ACCOUNT.addresses?.unused[0].address,
-            actions: [
-                {
-                    type: MODAL.OPEN_USER_CONTEXT,
-                    payload: {
-                        type: 'address',
-                        device: AVAILABLE_DEVICE,
-                        address: BTC_ACCOUNT.addresses?.unused[0].address,
-                        networkType: BTC_ACCOUNT.networkType,
-                        symbol: BTC_ACCOUNT.symbol,
-                        addressPath: BTC_ACCOUNT.addresses?.unused[0].path,
-                    },
-                },
-                {
-                    type: COINMARKET_BUY.VERIFY_ADDRESS,
-                    addressVerified: BTC_ACCOUNT.addresses?.unused[0].address,
-                },
-            ],
-        },
-    },
-    {
-        description: 'verifyAddress, bitcoin account',
-        initialState: {
-            suite: {
-                device: AVAILABLE_DEVICE,
+            action: {
+                type: COINMARKET_BUY.VERIFY_ADDRESS,
+                addressVerified: BTC_ACCOUNT.addresses?.unused[0].address,
             },
-        },
-        params: {
-            account: BTC_ACCOUNT,
-            address: BTC_ACCOUNT.addresses?.unused[0].address,
-            path: BTC_ACCOUNT.addresses?.unused[0].path,
-            coinmarketAction: COINMARKET_BUY.VERIFY_ADDRESS as typeof COINMARKET_BUY.VERIFY_ADDRESS,
-        },
-        result: {
-            value: BTC_ACCOUNT.addresses?.unused[0].address,
-            actions: [
-                {
-                    type: MODAL.OPEN_USER_CONTEXT,
-                    payload: {
-                        type: 'address',
-                        device: AVAILABLE_DEVICE,
-                        address: BTC_ACCOUNT.addresses?.unused[0].address,
-                        networkType: BTC_ACCOUNT.networkType,
-                        symbol: BTC_ACCOUNT.symbol,
-                        addressPath: BTC_ACCOUNT.addresses?.unused[0].path,
-                    },
-                },
-                {
-                    type: COINMARKET_BUY.VERIFY_ADDRESS,
-                    addressVerified: BTC_ACCOUNT.addresses?.unused[0].address,
-                },
-            ],
         },
     },
     {
         description: 'verifyAddress, ethereum account',
         initialState: {
+            device: {
+                selectedDevice: AVAILABLE_DEVICE,
+            },
             suite: {
-                device: AVAILABLE_DEVICE,
+                settings: {
+                    addressDisplayType: AddressDisplayOptions.CHUNKED,
+                },
+            },
+            wallet: {
+                accounts: [ETH_ACCOUNT],
             },
         },
         params: {
@@ -90,30 +63,25 @@ export const VERIFY_BUY_ADDRESS_FIXTURES = [
         },
         result: {
             value: ETH_ACCOUNT.descriptor,
-            actions: [
-                {
-                    type: MODAL.OPEN_USER_CONTEXT,
-                    payload: {
-                        type: 'address',
-                        device: AVAILABLE_DEVICE,
-                        address: ETH_ACCOUNT.descriptor,
-                        networkType: ETH_ACCOUNT.networkType,
-                        symbol: ETH_ACCOUNT.symbol,
-                        addressPath: ETH_ACCOUNT.path,
-                    },
-                },
-                {
-                    type: COINMARKET_BUY.VERIFY_ADDRESS,
-                    addressVerified: ETH_ACCOUNT.descriptor,
-                },
-            ],
+            action: {
+                type: COINMARKET_BUY.VERIFY_ADDRESS,
+                addressVerified: ETH_ACCOUNT.descriptor,
+            },
         },
     },
     {
         description: 'verifyAddress, ripple account',
         initialState: {
+            device: {
+                selectedDevice: AVAILABLE_DEVICE,
+            },
             suite: {
-                device: AVAILABLE_DEVICE,
+                settings: {
+                    addressDisplayType: AddressDisplayOptions.CHUNKED,
+                },
+            },
+            wallet: {
+                accounts: [XRP_ACCOUNT],
             },
         },
         params: {
@@ -124,30 +92,25 @@ export const VERIFY_BUY_ADDRESS_FIXTURES = [
         },
         result: {
             value: XRP_ACCOUNT.descriptor,
-            actions: [
-                {
-                    type: MODAL.OPEN_USER_CONTEXT,
-                    payload: {
-                        type: 'address',
-                        device: AVAILABLE_DEVICE,
-                        address: XRP_ACCOUNT.descriptor,
-                        networkType: XRP_ACCOUNT.networkType,
-                        symbol: XRP_ACCOUNT.symbol,
-                        addressPath: XRP_ACCOUNT.path,
-                    },
-                },
-                {
-                    type: COINMARKET_BUY.VERIFY_ADDRESS,
-                    addressVerified: XRP_ACCOUNT.descriptor,
-                },
-            ],
+            action: {
+                type: COINMARKET_BUY.VERIFY_ADDRESS,
+                addressVerified: XRP_ACCOUNT.descriptor,
+            },
         },
     },
     {
         description: 'verifyAddress, ripple account, unavailable device',
         initialState: {
+            device: {
+                selectedDevice: UNAVAILABLE_DEVICE,
+            },
             suite: {
-                device: UNAVAILABLE_DEVICE,
+                settings: {
+                    addressDisplayType: AddressDisplayOptions.CHUNKED,
+                },
+            },
+            wallet: {
+                accounts: [XRP_ACCOUNT],
             },
         },
         params: {
@@ -158,19 +121,14 @@ export const VERIFY_BUY_ADDRESS_FIXTURES = [
         },
         result: {
             value: undefined,
-            actions: [
-                {
-                    type: MODAL.OPEN_USER_CONTEXT,
-                    payload: {
-                        type: 'unverified-address',
-                        device: UNAVAILABLE_DEVICE,
-                        address: XRP_ACCOUNT.descriptor,
-                        networkType: XRP_ACCOUNT.networkType,
-                        symbol: XRP_ACCOUNT.symbol,
-                        addressPath: XRP_ACCOUNT.path,
-                    },
+            action: {
+                type: MODAL.OPEN_USER_CONTEXT,
+                payload: {
+                    type: 'unverified-address',
+                    value: XRP_ACCOUNT.descriptor,
+                    addressPath: XRP_ACCOUNT.path,
                 },
-            ],
+            },
         },
     },
 ];
@@ -179,8 +137,16 @@ export const VERIFY_EXCHANGE_ADDRESS_FIXTURES = [
     {
         description: 'verifyAddress, bitcoin account, in exchange',
         initialState: {
+            device: {
+                selectedDevice: AVAILABLE_DEVICE,
+            },
             suite: {
-                device: AVAILABLE_DEVICE,
+                settings: {
+                    addressDisplayType: AddressDisplayOptions.CHUNKED,
+                },
+            },
+            wallet: {
+                accounts: [BTC_ACCOUNT],
             },
         },
         params: {
@@ -192,23 +158,10 @@ export const VERIFY_EXCHANGE_ADDRESS_FIXTURES = [
         },
         result: {
             value: BTC_ACCOUNT.addresses?.unused[0].address,
-            actions: [
-                {
-                    type: MODAL.OPEN_USER_CONTEXT,
-                    payload: {
-                        type: 'address',
-                        device: AVAILABLE_DEVICE,
-                        address: BTC_ACCOUNT.addresses?.unused[0].address,
-                        networkType: BTC_ACCOUNT.networkType,
-                        symbol: BTC_ACCOUNT.symbol,
-                        addressPath: BTC_ACCOUNT.addresses?.unused[0].path,
-                    },
-                },
-                {
-                    type: COINMARKET_EXCHANGE.VERIFY_ADDRESS,
-                    addressVerified: BTC_ACCOUNT.addresses?.unused[0].address,
-                },
-            ],
+            action: {
+                type: COINMARKET_EXCHANGE.VERIFY_ADDRESS,
+                addressVerified: BTC_ACCOUNT.addresses?.unused[0].address,
+            },
         },
     },
 ];

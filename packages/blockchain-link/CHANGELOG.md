@@ -1,6 +1,65 @@
-# 2.1.9 [not released]
+# 2.1.19
+
+-   chore(repo): Upgrade TS 5.3 (#10017) (7277f9d0f)
+-   chore(repo): upgrade to TS 5.2 (#9989) (bf8d0fe80)
+-   fix(blockchain-link): PR review fixes (08d84dfe6)
+-   chore(suite): update lockfile (761aea82b)
+-   feat(blockchain-link): Solana tx history (9dff5e509)
+-   feat(blockchain-link): Solana pushTx (e63813bb6)
+-   feat(blockchain-link): Solana tokens (9adc115ce)
+-   feat(blockchain-link): Solana getAccountInfo (248913743)
+-   feat(blockchain-link): Solana estimateFee (34a2f28a0)
+-   feat(blockchain-link): Solana worker setup (662bc092a)
+-   feat(blockchain-link): Solana ui config (98407f35a)
+-   chore(tests): cleanup jets configs (#9869) (7b68bab05)
+-   feat(deps): update deps without breaking changes (7e0584c51)
+-   chore: update prettier to v3 and reformat (4229fd483)
+-   chore(connect): bl workers dynamic import (74fd08389)
+-   chore(build): update deps related to suite app build (6ab9e6322)
+-   chore(desktop): update deps related to desktop packages (af412cfb5)
+-   fix(blockchain-link): multiple workers initialization (#9766) (3208ea280)
+
+# 2.1.17
+
+-   feat(blockchain-link): add block filter methods (66606afc6)
+-   chore: adjust/unify createDeferred usage (4d724a451)
+
+# 2.1.16
+
+-   feat(blockchain-link): ipv6 electrum support (1d4b5471c)
+-   fix(blockchain-link): WsWrapper default export (0c5297e56)
+-   feat(blockchain-link): return tx hex in blockbook transactions (6aba6f094)
+-   feat(blockchain-link): add baseWebsocket options (951bd3e29)
+
+# 2.1.14
+
+-   fix(coinjoin): pending ws message closing recovery (0171cf3ef)
+-   chore(deps): update (a21a081ba)
+-   chore(blockchain-link): remove ts-loader from blockchain-link (3b117830a)
+-   fix(blockchain-link): browser and native Websocket error message (e160101f5)
+-   fix(blockchain-link): handle Websocket ping rejection (b9940b6e9)
+-   chore(blockchain-link): define missing extraneous dependencies (83230e063)
+
+# 2.1.12
+
+-   5711aa998 feat(blockchain-link): add getMempoolFilters method
+-   819c019d1 chore: use workspace:\* everywhere
+-   3e072b11f chore(blockchain-link): use `@trezor/e2e-utils` in tests
+
+# 2.1.11
+
+-   chore(blockchain-link): fix ripple blocktime
+
+# 2.1.10
+
+-   fix: remove workspace: from dependencies
+
+# 2.1.9
 
 -   feat: add `token` param to to `GetCurrentFiatRates`, `GetFiatRatesForTimestamps` and `GetFiatRatesTickersList` methods
+-   chore: parts of this packages split into @trezor/blockchain-link-types and @trezor/blockchain-link-utils
+-   chore: token.address to token.contract, ethereum improvements
+-   feat: add token param to blockbook fiat methods
 
 # 2.1.8
 

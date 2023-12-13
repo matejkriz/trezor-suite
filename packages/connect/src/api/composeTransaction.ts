@@ -24,14 +24,15 @@ import {
     signTxLegacy,
     verifyTx,
 } from './bitcoin';
-import type { ComposeOutput, ComposeResult } from '@trezor/utxo-lib';
+import type { ComposeOutput } from '@trezor/utxo-lib';
 import type { BitcoinNetworkInfo, DiscoveryAccount, AccountUtxo } from '../types';
 import type {
     SignedTransaction,
     PrecomposeParams,
-    PrecomposedTransaction,
+    ComposeResult,
+    PrecomposedResult,
 } from '../types/api/composeTransaction';
-import type { RefTransaction, TransactionOptions } from '../types/api/bitcoin';
+import type { RefTransaction } from '../types/api/bitcoin';
 
 type Params = {
     outputs: ComposeOutput[];
@@ -43,6 +44,7 @@ type Params = {
     floorBaseFee?: PrecomposeParams['floorBaseFee'];
     sequence?: PrecomposeParams['sequence'];
     skipPermutation?: PrecomposeParams['skipPermutation'];
+    total: BigNumber;
 };
 
 export default class ComposeTransaction extends AbstractMethod<'composeTransaction', Params> {
@@ -86,8 +88,6 @@ export default class ComposeTransaction extends AbstractMethod<'composeTransacti
             outputs.push(output);
         });
 
-        const sendMax = outputs.find(o => o.type === 'send-max') !== undefined;
-
         // there should be only one output when using send-max option
         // if (sendMax && outputs.length > 1) {
         //     throw ERRORS.TypedError('Method_InvalidParameter', 'Only one output allowed when using "send-max" option');
@@ -95,15 +95,9 @@ export default class ComposeTransaction extends AbstractMethod<'composeTransacti
 
         // if outputs contains regular items
         // check if total amount is not lower than dust limit
-        // if (outputs.find(o => o.type === 'complete') !== undefined && total.lte(coinInfo.dustLimit)) {
+        // if (outputs.find(o => o.type === 'payment') !== undefined && total.lt(coinInfo.dustLimit)) {
         //     throw error 'Total amount is too low';
         // }
-
-        if (sendMax) {
-            this.info = 'Send maximum amount';
-        } else {
-            this.info = `Send ${formatAmount(total.toString(), coinInfo)}`;
-        }
 
         this.useDevice = !payload.account && !payload.feeLevels;
 
@@ -119,13 +113,23 @@ export default class ComposeTransaction extends AbstractMethod<'composeTransacti
             sequence: payload.sequence,
             skipPermutation: payload.skipPermutation,
             push: typeof payload.push === 'boolean' ? payload.push : false,
+            total,
         };
+    }
+
+    get info() {
+        const sendMax = this.params?.outputs.find(o => o.type === 'send-max') !== undefined;
+
+        if (sendMax) {
+            return 'Send maximum amount';
+        }
+        return `Send ${formatAmount(this.params.total.toString(), this.params.coinInfo)}`;
     }
 
     async precompose(
         account: PrecomposeParams['account'],
         feeLevels: PrecomposeParams['feeLevels'],
-    ): Promise<PrecomposedTransaction[]> {
+    ): Promise<PrecomposedResult[]> {
         const { coinInfo, outputs, baseFee, skipPermutation } = this.params;
         const address_n = pathUtils.validatePath(account.path);
         const composer = new TransactionComposer({
@@ -136,7 +140,7 @@ export default class ComposeTransaction extends AbstractMethod<'composeTransacti
                 address_n,
                 addresses: account.addresses,
             },
-            utxo: account.utxo,
+            utxos: account.utxo,
             coinInfo,
             outputs,
             baseFee,
@@ -151,31 +155,23 @@ export default class ComposeTransaction extends AbstractMethod<'composeTransacti
             composer.composeCustomFee(level.feePerUnit);
             const tx = { ...composer.composed.custom }; // needs to spread otherwise flow has a problem with ComposeResult vs PrecomposedTransaction (max could be undefined)
             if (tx.type === 'final') {
-                const inputs = tx.transaction.inputs.map(inp =>
-                    inputToTrezor(inp, this.params.sequence || 0xffffffff),
-                );
-                const { sorted, permutation } = tx.transaction.outputs;
-                const txOutputs = sorted.map(out => outputToTrezor(out, coinInfo));
-
                 return {
-                    type: 'final',
-                    max: tx.max,
-                    totalSpent: tx.totalSpent,
-                    fee: tx.fee,
-                    feePerByte: tx.feePerByte,
-                    bytes: tx.bytes,
-                    transaction: {
-                        inputs,
-                        outputs: txOutputs,
-                        outputsPermutation: permutation,
-                    },
+                    ...tx,
+                    inputs: tx.inputs.map(inp => inputToTrezor(inp, this.params.sequence)),
+                    outputs: tx.outputs.map(outputToTrezor),
+                };
+            }
+            if (tx.type === 'nonfinal') {
+                return {
+                    ...tx,
+                    inputs: tx.inputs.map(inp => inputToTrezor(inp, this.params.sequence)),
                 };
             }
             return tx;
         });
     }
 
-    async run(): Promise<SignedTransaction | PrecomposedTransaction[]> {
+    async run(): Promise<SignedTransaction | PrecomposedResult[]> {
         if (this.params.account && this.params.feeLevels) {
             return this.precompose(this.params.account, this.params.feeLevels);
         }
@@ -274,7 +270,7 @@ export default class ComposeTransaction extends AbstractMethod<'composeTransacti
         discovery.stop();
 
         if (!discovery.completed) {
-            await resolveAfter(501); // temporary solution, TODO: immediately resolve will cause "device call in progress"
+            await resolveAfter(501).promise; // temporary solution, TODO: immediately resolve will cause "device call in progress"
         }
 
         const account = discovery.accounts[uiResp.payload];
@@ -286,14 +282,14 @@ export default class ComposeTransaction extends AbstractMethod<'composeTransacti
         };
     }
 
-    async selectFee(account: DiscoveryAccount, utxo: AccountUtxo[]) {
+    async selectFee(account: DiscoveryAccount, utxos: AccountUtxo[]) {
         const { coinInfo, outputs } = this.params;
 
         // get backend instance (it should be initialized before)
         const blockchain = await initBlockchain(coinInfo, this.postMessage);
         const composer = new TransactionComposer({
             account,
-            utxo,
+            utxos,
             coinInfo,
             outputs,
         });
@@ -306,7 +302,7 @@ export default class ComposeTransaction extends AbstractMethod<'composeTransacti
             // show error view
             this.postMessage(createUiMessage(UI.INSUFFICIENT_FUNDS));
             // wait few seconds...
-            await resolveAfter(2000, null);
+            await resolveAfter(2000, null).promise;
             // and go back to discovery
             return 'change-account';
         }
@@ -356,11 +352,9 @@ export default class ComposeTransaction extends AbstractMethod<'composeTransacti
 
         const { coinInfo } = this.params;
 
-        const options: TransactionOptions = enhanceSignTx({}, coinInfo);
-        const inputs = tx.transaction.inputs.map(inp =>
-            inputToTrezor(inp, this.params.sequence || 0xffffffff),
-        );
-        const outputs = tx.transaction.outputs.sorted.map(out => outputToTrezor(out, coinInfo));
+        const options = enhanceSignTx({}, coinInfo);
+        const inputs = tx.inputs.map(inp => inputToTrezor(inp, this.params.sequence));
+        const outputs = tx.outputs.map(outputToTrezor);
 
         let refTxs: RefTransaction[] = [];
         const requiredRefTxs = requireReferencedTransactions(inputs, options, coinInfo);

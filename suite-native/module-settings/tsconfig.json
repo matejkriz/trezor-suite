@@ -5,17 +5,26 @@
         {
             "path": "../../suite-common/analytics"
         },
+        { "path": "../../suite-common/icons" },
         {
             "path": "../../suite-common/suite-config"
         },
+        {
+            "path": "../../suite-common/suite-constants"
+        },
         { "path": "../analytics" },
         { "path": "../atoms" },
+        { "path": "../biometrics" },
         { "path": "../config" },
+        { "path": "../device-manager" },
+        { "path": "../feature-flags" },
+        { "path": "../intl" },
         { "path": "../link" },
         { "path": "../navigation" },
+        { "path": "../storage" },
         { "path": "../theme" },
         { "path": "../../packages/connect" },
-        { "path": "../../packages/icons" },
+        { "path": "../../packages/env-utils" },
         { "path": "../../packages/styles" },
         { "path": "../../packages/theme" }
     ]

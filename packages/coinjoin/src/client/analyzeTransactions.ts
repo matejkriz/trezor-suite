@@ -19,24 +19,23 @@ export interface AnalyzeTransactionsResult {
 }
 
 const transformVinVout = (vinvout: EnhancedVinVout, network: Network) => {
-    if (!vinvout.addresses || vinvout.addresses.length > 1) {
-        throw new Error(`Unsupported address ${vinvout.addresses?.join('')}`);
-    }
-    const address = vinvout.addresses[0];
-    const value = Number(vinvout.value);
+    if (!vinvout.isAddress || !vinvout.addresses || vinvout.addresses.length > 1) return [];
 
-    if (vinvout.isAccountOwned) return { address, value } as AnalyzeInternalVinVout;
+    const Address = vinvout.addresses[0];
+    const Value = Number(vinvout.value);
 
-    const scriptPubKey = addressBjs.toOutputScript(address, network).toString('hex');
+    if (vinvout.isAccountOwned) return { Address, Value } as AnalyzeInternalVinVout;
+
+    const ScriptPubKey = addressBjs.toOutputScript(Address, network).toString('hex');
     return {
-        scriptPubKey,
-        value,
+        ScriptPubKey,
+        Value,
     } as AnalyzeExternalVinVout;
 };
 
 const isInternal = (
     vinvout: AnalyzeInternalVinVout | AnalyzeExternalVinVout,
-): vinvout is AnalyzeInternalVinVout => 'address' in vinvout;
+): vinvout is AnalyzeInternalVinVout => 'Address' in vinvout;
 
 export const getRawLiquidityClue = (
     transactions: Transaction[],
@@ -46,9 +45,9 @@ export const getRawLiquidityClue = (
     const cjTx = transactions.find(tx => tx.type === 'joint');
     if (!cjTx) return Promise.resolve(null);
     const externalAmounts = cjTx.details.vout
-        .map(vout => transformVinVout(vout, options.network))
+        .flatMap(vout => transformVinVout(vout, options.network))
         .filter(vout => !('address' in vout))
-        .map(o => Number(o.value));
+        .map(o => Number(o.Value));
     return middleware.initLiquidityClue(externalAmounts, {
         baseUrl: options.middlewareUrl,
         signal: options.signal,
@@ -64,21 +63,21 @@ export const getAnonymityScores = async (
     options: AnalyzeTransactionsOptions,
 ) => {
     const formattedTransactions = transactions.map(tx => {
-        const [internalInputs, externalInputs] = arrayPartition(
-            tx.details.vin.map(vin => transformVinVout(vin, options.network)),
+        const [InternalInputs, ExternalInputs] = arrayPartition(
+            tx.details.vin.flatMap(vin => transformVinVout(vin, options.network)),
             isInternal,
         );
 
-        const [internalOutputs, externalOutputs] = arrayPartition(
-            tx.details.vout.map(vout => transformVinVout(vout, options.network)),
+        const [InternalOutputs, ExternalOutputs] = arrayPartition(
+            tx.details.vout.flatMap(vout => transformVinVout(vout, options.network)),
             isInternal,
         );
 
         return {
-            internalInputs,
-            externalInputs,
-            internalOutputs,
-            externalOutputs,
+            InternalInputs,
+            ExternalInputs,
+            InternalOutputs,
+            ExternalOutputs,
         };
     });
 
@@ -88,12 +87,15 @@ export const getAnonymityScores = async (
             signal: options.signal,
         });
 
-        return scores.reduce((dict, { address, anonymitySet }) => {
-            dict[address] = anonymitySet;
-            return dict;
-        }, {} as Record<string, number>);
-    } catch {
-        options.logger.error(`Error calculating anonymity levels`);
+        return scores.reduce(
+            (dict, { Address, AnonymitySet }) => {
+                dict[Address] = AnonymitySet;
+                return dict;
+            },
+            {} as Record<string, number>,
+        );
+    } catch (error) {
+        options.logger.error(`Error calculating anonymity levels. ${error}`);
     }
 };
 
@@ -111,4 +113,4 @@ export const analyzeTransactions = async <T extends keyof AnalyzeTransactionsRes
             !sections || sections.includes('rawLiquidityClue' as T)
                 ? await getRawLiquidityClue(transactions, options)
                 : undefined,
-    } as AnalyzeTransactionsResult);
+    }) as AnalyzeTransactionsResult;

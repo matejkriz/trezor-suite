@@ -1,46 +1,76 @@
-import React from 'react';
 import { useSelector } from 'react-redux';
 
-import { Box, Card, Divider, Text, VStack } from '@suite-native/atoms';
-import { AccountKey, WalletAccountTransaction } from '@suite-common/wallet-types';
-import { Icon } from '@trezor/icons';
-import { isPending } from '@suite-common/wallet-utils';
+import { AlertBox, Box, Card, Text, VStack } from '@suite-native/atoms';
+import { AccountKey } from '@suite-common/wallet-types';
+import { Icon } from '@suite-common/icons';
 import { useFormatters } from '@suite-common/formatters';
 import { CryptoAmountFormatter, CryptoToFiatAmountFormatter } from '@suite-native/formatters';
 import {
     selectTransactionBlockTimeById,
-    selectTransactionFirstInputAddress,
-    selectTransactionFirstOutputAddress,
+    selectIsTransactionZeroValuePhishing,
     TransactionsRootState,
 } from '@suite-common/wallet-core';
+import { EthereumTokenTransfer, WalletAccountTransaction } from '@suite-native/ethereum-tokens';
+import { Translation } from '@suite-native/intl';
+import { Link } from '@suite-native/link';
 
 import { TransactionDetailSummary } from './TransactionDetailSummary';
 import { TransactionDetailRow } from './TransactionDetailRow';
+import { TransactionDetailIncludedCoins } from './TransactionDetailIncludedCoins';
 
 type TransactionDetailDataProps = {
     transaction: WalletAccountTransaction;
     accountKey: AccountKey;
+    tokenTransfer?: EthereumTokenTransfer;
 };
 
-export const TransactionDetailData = ({ transaction, accountKey }: TransactionDetailDataProps) => {
+export const TransactionDetailData = ({
+    transaction,
+    accountKey,
+    tokenTransfer,
+}: TransactionDetailDataProps) => {
     const { DateTimeFormatter } = useFormatters();
+
     const transactionBlockTime = useSelector((state: TransactionsRootState) =>
         selectTransactionBlockTimeById(state, transaction.txid, accountKey),
     );
 
-    // Only one input and output address for now until UX comes up with design to support multiple inputs/outputs.
-    const transactionInputAddress = useSelector((state: TransactionsRootState) =>
-        selectTransactionFirstInputAddress(state, transaction.txid, accountKey),
-    );
-    const transactionOutputAddress = useSelector((state: TransactionsRootState) =>
-        selectTransactionFirstOutputAddress(state, transaction.txid, accountKey),
+    const isZeroValuePhishing = useSelector((state: TransactionsRootState) =>
+        selectIsTransactionZeroValuePhishing(state, transaction.txid, accountKey),
     );
 
-    const isTransactionPending = isPending(transaction);
+    const transactionTokensCount = transaction.tokens.length;
+
+    const isTokenTransaction = !!tokenTransfer;
+    const isMultiTokenTransaction = isTokenTransaction && transactionTokensCount - 1 > 0;
+    const isNetworkTransactionWithTokens = !isTokenTransaction && transactionTokensCount > 0;
+
+    const hasIncludedCoins = isMultiTokenTransaction || isNetworkTransactionWithTokens;
 
     return (
         <>
             <VStack>
+                {isZeroValuePhishing && (
+                    <AlertBox
+                        variant="error"
+                        isStandalone
+                        title={
+                            <Translation
+                                id="transactions.phishing.warning"
+                                values={{
+                                    blogLink: chunks => (
+                                        <Link
+                                            href="https://trezor.io/support/a/address-poisoning-attacks"
+                                            label={chunks}
+                                            textColor="textDefault"
+                                            isUnderlined
+                                        />
+                                    ),
+                                }}
+                            />
+                        }
+                    />
+                )}
                 <Card>
                     <TransactionDetailRow title="Date">
                         <Text variant="hint">
@@ -52,10 +82,17 @@ export const TransactionDetailData = ({ transaction, accountKey }: TransactionDe
                     </TransactionDetailRow>
                 </Card>
                 <TransactionDetailSummary
-                    origin={transactionInputAddress}
-                    target={transactionOutputAddress}
-                    transactionStatus={isTransactionPending ? 'pending' : 'confirmed'}
+                    txid={transaction.txid}
+                    accountKey={accountKey}
+                    tokenTransfer={tokenTransfer}
                 />
+                {hasIncludedCoins && (
+                    <TransactionDetailIncludedCoins
+                        accountKey={accountKey}
+                        transaction={transaction}
+                        tokenTransfer={tokenTransfer}
+                    />
+                )}
                 <Card>
                     <TransactionDetailRow title="Fee">
                         <Box alignItems="flex-end">
@@ -84,9 +121,6 @@ export const TransactionDetailData = ({ transaction, accountKey }: TransactionDe
                     </TransactionDetailRow>
                 </Card>
             </VStack>
-            <Box marginVertical="medium">
-                <Divider />
-            </Box>
         </>
     );
 };

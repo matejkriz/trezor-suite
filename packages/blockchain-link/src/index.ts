@@ -1,4 +1,4 @@
-import { EventEmitter } from 'events';
+import { TypedEmitter } from '@trezor/utils/lib/typedEventEmitter';
 import { createDeferred, Deferred } from '@trezor/utils/lib/createDeferred';
 import { CustomError } from '@trezor/blockchain-link-types/lib/constants/errors';
 import { MESSAGES, RESPONSES } from '@trezor/blockchain-link-types/lib/constants';
@@ -8,7 +8,7 @@ import type * as ResponseTypes from '@trezor/blockchain-link-types/lib/responses
 import type * as MessageTypes from '@trezor/blockchain-link-types/lib/messages';
 import type { Events } from '@trezor/blockchain-link-types/lib/events';
 
-const workerWrapper = (factory: BlockchainSettings['worker']): Worker => {
+const workerWrapper = (factory: BlockchainSettings['worker']): Worker | Promise<Worker> => {
     if (typeof factory === 'function') return factory();
     if (typeof factory === 'string' && typeof Worker !== 'undefined') return new Worker(factory);
     // use custom worker
@@ -16,9 +16,9 @@ const workerWrapper = (factory: BlockchainSettings['worker']): Worker => {
 };
 
 // initialize worker communication, raise error if worker not found
-const initWorker = (settings: BlockchainSettings) => {
-    const dfd: Deferred<Worker> = createDeferred(-1);
-    const worker = workerWrapper(settings.worker);
+const initWorker = async (settings: BlockchainSettings) => {
+    const dfd = createDeferred<Worker>(-1);
+    const worker = await workerWrapper(settings.worker);
 
     if (typeof worker !== 'object' || typeof worker.postMessage !== 'function') {
         throw new CustomError('worker_invalid');
@@ -59,13 +59,7 @@ const initWorker = (settings: BlockchainSettings) => {
     return dfd.promise;
 };
 
-declare interface BlockchainLink {
-    on<K extends keyof Events>(type: K, listener: (event: Events[K]) => void): this;
-    off<K extends keyof Events>(type: K, listener: (event: Events[K]) => void): this;
-    emit<K extends keyof Events>(type: K, ...args: Events[K][]): boolean;
-}
-
-class BlockchainLink extends EventEmitter {
+class BlockchainLink extends TypedEmitter<Events> {
     settings: BlockchainSettings;
 
     messageId = 0;
@@ -76,6 +70,9 @@ class BlockchainLink extends EventEmitter {
 
     private throttler: Throttler;
 
+    // worker promise is used to prevent multiple workers initialization when multiple methods are called at called parallel before worker is initialized
+    private workerPromise: Promise<Worker> | undefined;
+
     constructor(settings: BlockchainSettings) {
         super();
         this.settings = settings;
@@ -85,8 +82,15 @@ class BlockchainLink extends EventEmitter {
     }
 
     async getWorker(): Promise<Worker> {
+        if (this.workerPromise) {
+            // Worker is being initialized, return that instance instead of creating new one
+            return this.workerPromise;
+        }
         if (!this.worker) {
-            this.worker = await initWorker(this.settings);
+            this.workerPromise = initWorker(this.settings);
+            this.worker = await this.workerPromise;
+            delete this.workerPromise;
+
             this.worker.onmessage = this.onMessage.bind(this);
             this.worker.onerror = this.onError.bind(this);
         }
@@ -374,6 +378,7 @@ export type {
     Target,
     TokenInfo,
     TokenTransfer,
+    InternalTransfer,
     Transaction,
     TransactionDetail,
     TypedRawTransaction,

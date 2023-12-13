@@ -20,7 +20,13 @@ export const transformServerInfo = (payload: any) => ({
 //     return txs.concat(unique);
 // };
 
+// https://bitcoin.stackexchange.com/questions/23061/ripple-ledger-time-format/23065#23065
+const BLOCKTIME_OFFSET = 946684800;
+
 export const transformTransaction = (descriptor: string, tx: any): Transaction => {
+    const blockTime =
+        typeof tx.date === 'number' && tx.date > 0 ? tx.date + BLOCKTIME_OFFSET : tx.date;
+
     if (tx.TransactionType !== 'Payment') {
         // TODO: https://github.com/ripple/ripple-lib/blob/develop/docs/index.md#transaction-types
         return {
@@ -28,11 +34,12 @@ export const transformTransaction = (descriptor: string, tx: any): Transaction =
             txid: tx.hash,
             amount: '0',
             fee: '0',
-            blockTime: tx.date,
+            blockTime,
             blockHeight: tx.ledger_index,
             blockHash: tx.hash,
             targets: [],
             tokens: [],
+            internalTransfers: [],
             feeRate: undefined,
             details: {
                 vin: [],
@@ -52,7 +59,7 @@ export const transformTransaction = (descriptor: string, tx: any): Transaction =
         type,
 
         txid: tx.hash,
-        blockTime: tx.date,
+        blockTime,
         blockHeight: tx.ledger_index,
         blockHash: tx.hash,
 
@@ -67,6 +74,7 @@ export const transformTransaction = (descriptor: string, tx: any): Transaction =
             },
         ],
         tokens: [],
+        internalTransfers: [],
         feeRate: undefined,
         details: {
             vin: [],

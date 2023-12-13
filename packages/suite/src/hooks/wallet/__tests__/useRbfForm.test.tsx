@@ -1,24 +1,31 @@
 import TrezorConnect from '@trezor/connect';
-import React from 'react';
-import { configureStore } from '@suite/support/tests/configureStore';
+import { screen } from '@testing-library/react';
+import { configureMockStore, initPreloadedState } from '@suite-common/test-utils';
 import * as fixtures from '../__fixtures__/useRbfForm';
-import sendFormReducer from '@wallet-reducers/sendFormReducer';
-import resizeReducer from '@suite-reducers/resizeReducer';
-
 import {
     renderWithProviders,
     waitForLoader,
-    waitForRender,
     actionSequence,
-} from '@suite/support/tests/hooksHelper';
-import { ChangeFee } from '@suite-components/modals/TransactionDetail/components/ChangeFee';
+    findByTestId,
+} from 'src/support/tests/hooksHelper';
+import { ChangeFee } from 'src/components/suite/modals/ReduxModal/UserContextModal/TxDetailModal/ChangeFee/ChangeFee';
 import { useRbfContext } from '../useRbfForm';
 
-jest.mock('@suite-actions/routerActions', () => ({
+// do not mock
+jest.unmock('@trezor/connect');
+
+jest.mock('src/actions/suite/routerActions', () => ({
     goto: () => ({ type: 'mock-redirect' }),
 }));
 
-jest.mock('react-svg', () => ({ ReactSVG: () => 'SVG' }));
+// render only Translation['id']
+jest.mock('src/components/suite/Translation', () => ({ Translation: ({ id }: any) => id }));
+
+// since we are NOT(!) mocking @trezor/connect it fetch real bridge at init
+jest.mock('cross-fetch', () => ({
+    __esModule: true,
+    default: () => Promise.resolve({ ok: false }),
+}));
 
 // TrezorConnect.composeTransaction is trying to connect to blockchain, to get current block height.
 // Mock whole module to avoid internet connection.
@@ -26,16 +33,20 @@ jest.mock('@trezor/blockchain-link', () => ({
     __esModule: true,
     default: class BlockchainLink {
         name = 'jest-mocked-module';
+        listeners: Record<string, () => void> = {};
         constructor(args: any) {
             this.name = args.name;
         }
-
-        on() {}
-
-        connect() {}
-
+        on(...args: any[]) {
+            const [type, fn] = args;
+            this.listeners[type] = fn;
+        }
+        connect() {
+            this.listeners.connected();
+        }
+        disconnect() {}
+        removeAllListeners() {}
         dispose() {}
-
         getInfo() {
             return {
                 url: this,
@@ -47,40 +58,32 @@ jest.mock('@trezor/blockchain-link', () => ({
                 blockHash: 'abcd',
             };
         }
+        estimateFee(params: { blocks: number[] }) {
+            return params.blocks.map(() => ({ feePerUnit: '-1' }));
+        }
     },
 }));
 
-export const getInitialState = ({ send, fees, selectedAccount }: any = {}) => ({
-    ...fixtures.DEFAULT_STORE,
-    wallet: {
-        ...fixtures.DEFAULT_STORE.wallet,
-        send: {
-            ...sendFormReducer(undefined, { type: 'foo' } as any),
-            ...send,
-        },
-        fees: {
-            ...fixtures.DEFAULT_STORE.wallet.fees,
-            ...fees,
-        },
-        selectedAccount: selectedAccount ?? fixtures.DEFAULT_STORE.wallet.selectedAccount,
-    },
-    devices: [],
-    resize: resizeReducer(undefined, { type: 'foo' } as any),
-});
+type RootReducerState = ReturnType<ReturnType<typeof fixtures.getRootReducer>>;
+interface Args {
+    send?: Partial<RootReducerState['wallet']['send']>;
+    fees?: any;
+    selectedAccount?: any;
+    coinjoin?: any;
+}
 
-type State = ReturnType<typeof getInitialState>;
-const mockStore = configureStore<State, any>();
+const initStore = ({ send, fees, selectedAccount, coinjoin }: Args = {}) => {
+    const rootReducer = fixtures.getRootReducer(selectedAccount, fees);
 
-const initStore = (state: State) => {
-    const store = mockStore(state);
-    store.subscribe(() => {
-        const action = store.getActions().pop();
-        const prevState = store.getState();
-        store.getState().wallet.send = sendFormReducer(prevState.wallet.send, action);
-        // add action back to stack
-        store.getActions().push(action);
+    return configureMockStore({
+        reducer: rootReducer,
+        preloadedState: initPreloadedState({
+            rootReducer,
+            partialState: {
+                wallet: { send, coinjoin },
+            },
+        }),
     });
-    return store;
 };
 
 interface TestCallback {
@@ -92,12 +95,8 @@ interface TestCallback {
 const Component = ({ callback }: { callback: TestCallback }) => {
     const values = useRbfContext();
     callback.getContextValues = () => values;
-    const [loading, setLoading] = React.useState(false);
-    React.useEffect(() => {
-        setLoading(values.isLoading);
-    }, [loading, values.isLoading]);
 
-    return loading ? <div>Loading</div> : null;
+    return values.isLoading ? <div>Loading</div> : null;
 };
 
 describe('useRbfForm hook', () => {
@@ -110,12 +109,10 @@ describe('useRbfForm hook', () => {
                 appUrl: '@trezor/suite',
             },
         });
+        jest.spyOn(window, 'scrollTo').mockImplementation(() => {});
     });
     afterAll(async () => {
         await TrezorConnect.dispose();
-    });
-    beforeEach(() => {
-        jest.setTimeout(30000); // action sequences takes time
     });
     afterEach(() => {
         jest.clearAllMocks();
@@ -123,15 +120,17 @@ describe('useRbfForm hook', () => {
 
     fixtures.composeAndSign.forEach(f => {
         it(`composeAndSign: ${f.description}`, async () => {
-            const store = initStore(getInitialState(f.store));
+            const store = initStore(f.store);
             const callback: TestCallback = {};
             const { unmount } = renderWithProviders(
                 store,
                 // @ts-expect-error f.tx is not exact
-                <ChangeFee tx={f.tx} finalize={false} chainedTxs={[]} showChained={() => {}}>
+                <ChangeFee tx={f.tx} chainedTxs={f.chainedTxs} showChained={() => {}}>
                     <Component callback={callback} />
                 </ChangeFee>,
             );
+
+            const composeTransactionSpy = jest.spyOn(TrezorConnect, 'composeTransaction');
 
             // mock responses from 'signTransaction'.
             // response doesn't matter. parameters are tested.
@@ -149,17 +148,27 @@ describe('useRbfForm hook', () => {
 
             if (!callback.getContextValues) throw Error('callback.getContextValues missing');
 
-            if (f.expectRerender) {
-                await waitForRender();
-
-                // wait for possible second render (decrease, set-max calculation)
-                await waitForLoader();
-            }
-
             const { composedLevels } = callback.getContextValues();
 
             // check composeTransaction result
             expect(composedLevels).toMatchObject(f.composedLevels);
+
+            // validate number of calls to '@trezor/connect'
+            if (typeof f.composeTransactionCalls === 'number') {
+                expect(composeTransactionSpy).toBeCalledTimes(f.composeTransactionCalls);
+            }
+
+            if (f.decreasedOutputs) {
+                if (typeof f.decreasedOutputs === 'string') {
+                    expect(() => screen.getByText(f.decreasedOutputs)).not.toThrow();
+                } else {
+                    expect(() => findByTestId('@send/decreased-outputs')).not.toThrow();
+                }
+            } else {
+                expect(() => findByTestId('@send/decreased-outputs')).toThrow(
+                    'Unable to find an element',
+                );
+            }
 
             const sendAction = () =>
                 actionSequence([

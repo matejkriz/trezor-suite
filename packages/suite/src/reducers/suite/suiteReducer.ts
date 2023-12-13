@@ -1,22 +1,21 @@
 import produce from 'immer';
-import { memoizeWithArgs, memoize } from 'proxy-memoize';
-import { TRANSPORT, TransportInfo, ConnectSettings } from '@trezor/connect';
-import { SuiteThemeVariant } from '@trezor/suite-desktop-api';
-import { Action, TrezorDevice, Lock, TorBootstrap, TorStatus } from '@suite-types';
 
-import { variables } from '@trezor/components';
-import { SUITE, STORAGE } from '@suite-actions/constants';
-import { DISCOVERY } from '@wallet-actions/constants';
-import type { Locale } from '@suite-config/languages';
-import { isWeb } from '@suite-utils/env';
-import { getWindowWidth } from '@trezor/env-utils';
-import { ensureLocale } from '@suite-utils/l10n';
-import { getNumberFromPixelString } from '@trezor/utils';
-import type { OAuthServerEnvironment } from '@suite-types/metadata';
+import { discoveryActions, DeviceRootState, selectDevice } from '@suite-common/wallet-core';
 import type { InvityServerEnvironment } from '@suite-common/invity';
-import { getDeviceModel } from '@trezor/device-utils';
-import { getStatus } from '@suite-utils/device';
-import { getIsTorEnabled, getIsTorLoading } from '@suite-utils/tor';
+import { getNumberFromPixelString, versionUtils } from '@trezor/utils';
+import { isWeb, getWindowWidth } from '@trezor/env-utils';
+import { variables } from '@trezor/components';
+import { SuiteThemeVariant } from '@trezor/suite-desktop-api';
+import { TRANSPORT, TransportInfo, ConnectSettings } from '@trezor/connect';
+
+import { getIsTorEnabled, getIsTorLoading } from 'src/utils/suite/tor';
+import type { OAuthServerEnvironment } from 'src/types/suite/metadata';
+import { ensureLocale } from 'src/utils/suite/l10n';
+import type { Locale } from 'src/config/suite/languages';
+import { SUITE, STORAGE } from 'src/actions/suite/constants';
+import { Action, Lock, TorBootstrap, TorStatus } from 'src/types/suite';
+import { getExcludedPrerequisites, getPrerequisiteName } from 'src/utils/suite/prerequisites';
+import { RouterRootState, selectRouter } from './routerReducer';
 
 export interface SuiteRootState {
     suite: SuiteState;
@@ -28,11 +27,17 @@ export interface DebugModeOptions {
     showDebugMenu: boolean;
     checkFirmwareAuthenticity: boolean;
     transports: Extract<NonNullable<ConnectSettings['transports']>[number], string>[];
+    isUnlockedBootloaderAllowed: boolean;
 }
 
 export interface AutodetectSettings {
     language: boolean;
     theme: boolean;
+}
+
+export enum AddressDisplayOptions {
+    ORIGINAL = 'original',
+    CHUNKED = 'chunked',
 }
 
 export type SuiteLifecycle =
@@ -57,6 +62,8 @@ export interface Flags {
     securityStepsHidden: boolean; // dashboard UI
     dashboardGraphHidden: boolean; // dashboard UI
     dashboardAssetsGridMode: boolean; // dashboard UI
+    showDashboardT2B1PromoBanner: boolean;
+    showSettingsDesktopAppPromoBanner: boolean;
 }
 
 export interface SuiteSettings {
@@ -66,8 +73,11 @@ export interface SuiteSettings {
     language: Locale;
     torOnionLinks: boolean;
     isCoinjoinReceiveWarningHidden: boolean;
+    isDesktopSuitePromoHidden: boolean;
     debug: DebugModeOptions;
     autodetect: AutodetectSettings;
+    isDeviceAuthenticityCheckDisabled: boolean;
+    addressDisplayType: AddressDisplayOptions;
 }
 
 export interface SuiteState {
@@ -76,7 +86,6 @@ export interface SuiteState {
     torBootstrap: TorBootstrap | null;
     lifecycle: SuiteLifecycle;
     transport?: Partial<TransportInfo>;
-    device?: TrezorDevice;
     locks: Lock[];
     flags: Flags;
     settings: SuiteSettings;
@@ -100,6 +109,8 @@ const initialState: SuiteState = {
         dashboardGraphHidden: false,
         dashboardAssetsGridMode:
             getWindowWidth() < getNumberFromPixelString(variables.SCREEN_SIZE.SM),
+        showDashboardT2B1PromoBanner: true,
+        showSettingsDesktopAppPromoBanner: true,
     },
     settings: {
         theme: {
@@ -108,16 +119,20 @@ const initialState: SuiteState = {
         language: ensureLocale('en'),
         torOnionLinks: isWeb(),
         isCoinjoinReceiveWarningHidden: false,
+        isDesktopSuitePromoHidden: false,
+        isDeviceAuthenticityCheckDisabled: false,
         debug: {
             invityServerEnvironment: undefined,
             showDebugMenu: false,
             checkFirmwareAuthenticity: false,
             transports: [],
+            isUnlockedBootloaderAllowed: false,
         },
         autodetect: {
             language: true,
             theme: true,
         },
+        addressDisplayType: AddressDisplayOptions.CHUNKED,
     },
 };
 
@@ -161,11 +176,6 @@ const suiteReducer = (state: SuiteState = initialState, action: Action): SuiteSt
                 draft.lifecycle = { status: 'error', error: action.error };
                 break;
 
-            case SUITE.SELECT_DEVICE:
-            case SUITE.UPDATE_SELECTED_DEVICE:
-                draft.device = action.payload;
-                break;
-
             case SUITE.SET_LANGUAGE:
                 draft.settings.language = action.locale;
                 break;
@@ -180,6 +190,10 @@ const suiteReducer = (state: SuiteState = initialState, action: Action): SuiteSt
 
             case SUITE.SET_THEME:
                 draft.settings.theme.variant = action.variant;
+                break;
+
+            case SUITE.SET_ADDRESS_DISPLAY_TYPE:
+                draft.settings.addressDisplayType = action.option;
                 break;
 
             case SUITE.SET_AUTODETECT:
@@ -219,7 +233,9 @@ const suiteReducer = (state: SuiteState = initialState, action: Action): SuiteSt
             case SUITE.COINJOIN_RECEIVE_WARNING:
                 draft.settings.isCoinjoinReceiveWarningHidden = action.payload;
                 break;
-
+            case SUITE.DEVICE_AUTHENTICITY_OPT_OUT:
+                draft.settings.isDeviceAuthenticityCheckDisabled = action.payload;
+                break;
             case SUITE.LOCK_UI:
                 changeLock(draft, SUITE.LOCK_TYPE.UI, action.payload);
                 break;
@@ -232,25 +248,20 @@ const suiteReducer = (state: SuiteState = initialState, action: Action): SuiteSt
                 changeLock(draft, SUITE.LOCK_TYPE.ROUTER, action.payload);
                 break;
 
-            case DISCOVERY.START:
+            case discoveryActions.startDiscovery.type:
                 changeLock(draft, SUITE.LOCK_TYPE.DEVICE, true);
                 break;
-            case DISCOVERY.STOP:
-            case DISCOVERY.COMPLETE:
-                changeLock(draft, SUITE.LOCK_TYPE.DEVICE, false);
-                break;
 
-            case SUITE.REQUEST_DEVICE_RECONNECT:
-                if (draft.device) {
-                    draft.device.reconnectRequested = true;
-                }
+            case discoveryActions.completeDiscovery.type:
+            case discoveryActions.stopDiscovery.type:
+                changeLock(draft, SUITE.LOCK_TYPE.DEVICE, false);
                 break;
 
             // no default
         }
     });
 
-export const selectTorState = memoize((state: SuiteRootState) => {
+export const selectTorState = (state: SuiteRootState) => {
     const { torStatus, torBootstrap } = state.suite;
     return {
         isTorEnabled: getIsTorEnabled(torStatus),
@@ -261,32 +272,49 @@ export const selectTorState = memoize((state: SuiteRootState) => {
         isTorEnabling: torStatus === TorStatus.Enabling,
         torBootstrap,
     };
-});
+};
 
-export const selectDeviceState = memoize((state: SuiteRootState) => {
-    const { device } = state.suite;
-    return device && getStatus(device);
-});
-
-export const selectDebug = (state: SuiteRootState) => state.suite.settings.debug;
-
-export const selectDevice = (state: SuiteRootState) => state.suite.device;
-
-export const selectDeviceModel = memoizeWithArgs(
-    (state: SuiteRootState, overrideDevice?: TrezorDevice) => {
-        const device = selectDevice(state);
-        return getDeviceModel(overrideDevice || device);
-    },
-);
+// TODO: use this selector in all places where we need to check if debug mode is active
+export const selectIsDebugModeActive = (state: SuiteRootState) =>
+    state.suite.settings.debug.showDebugMenu;
 
 export const selectLanguage = (state: SuiteRootState) => state.suite.settings.language;
 
+export const selectAddressDisplayType = (state: SuiteRootState) =>
+    state.suite.settings.addressDisplayType;
+
 export const selectLocks = (state: SuiteRootState) => state.suite.locks;
 
-export const selectIsDeviceLocked = memoize(
-    (state: SuiteRootState) =>
-        state.suite.locks.includes(SUITE.LOCK_TYPE.DEVICE) ||
-        state.suite.locks.includes(SUITE.LOCK_TYPE.UI),
-);
+export const selectIsDeviceLocked = (state: SuiteRootState) =>
+    state.suite.locks.includes(SUITE.LOCK_TYPE.DEVICE) ||
+    state.suite.locks.includes(SUITE.LOCK_TYPE.UI);
+
+export const selectIsActionAbortable = (state: SuiteRootState) =>
+    state.suite.transport?.type === 'BridgeTransport'
+        ? versionUtils.isNewerOrEqual(state.suite.transport?.version as string, '2.0.31')
+        : true; // WebUSB
+
+export const selectPrerequisite = (state: SuiteRootState & RouterRootState & DeviceRootState) => {
+    const { transport } = state.suite;
+    const device = selectDevice(state);
+    const router = selectRouter(state);
+
+    const excluded = getExcludedPrerequisites(router);
+    const prerequisite = getPrerequisiteName({ router, device, transport });
+
+    if (prerequisite === undefined) return;
+
+    if (excluded.includes(prerequisite)) {
+        return;
+    }
+
+    return prerequisite;
+};
+
+export const selectIsDashboardT2B1PromoBannerShown = (state: SuiteRootState) =>
+    state.suite.flags.showDashboardT2B1PromoBanner;
+
+export const selectIsSettingsDesktopAppPromoBannerShown = (state: SuiteRootState) =>
+    state.suite.flags.showSettingsDesktopAppPromoBanner;
 
 export default suiteReducer;

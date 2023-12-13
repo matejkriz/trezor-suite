@@ -1,60 +1,46 @@
-import React from 'react';
-
-import { S } from '@mobily/ts-belt';
-
-import { Screen, ScreenHeader } from '@suite-native/navigation';
-import { VStack, Card, Text, Box, Divider, ListItem } from '@suite-native/atoms';
-import { getAppVersion, getBuildVersionNumber, getCommitHash } from '@suite-native/config';
+import { Screen, ScreenSubHeader } from '@suite-native/navigation';
+import { VStack, Divider } from '@suite-native/atoms';
 import { useOpenLink } from '@suite-native/link';
+import { useTranslate } from '@suite-native/intl';
 
 import { AboutUsBanners } from '../components/AboutUsBanners';
+import { SettingsSection } from '../components/SettingsSection';
+import { SettingsSectionItem } from '../components/SettingsSectionItem';
+import { AppVersion } from '../components/AppVersion';
 
 export const SettingsAboutUsScreen = () => {
     const openLink = useOpenLink();
-    const hasVerionAndBuildInfo =
-        S.isNotEmpty(getAppVersion()) && S.isNotEmpty(getBuildVersionNumber());
-    const hasCommitHash = S.isNotEmpty(getCommitHash());
+
+    const { translate } = useTranslate();
+
+    const handleOpenTermsAndConditions = () => {
+        openLink('https://data.trezor.io/legal/mobile-wallet-terms.pdf');
+    };
+
+    const handleOpenPrivacyPolicy = () => {
+        openLink('https://data.trezor.io/legal/privacy-policy.html');
+    };
 
     return (
-        <Screen header={<ScreenHeader title="About Trezor Suite Lite" />}>
-            <VStack spacing="small">
+        <Screen
+            screenHeader={<ScreenSubHeader content={translate('moduleSettings.aboutUs.title')} />}
+        >
+            <VStack spacing="large">
                 <AboutUsBanners />
                 <Divider marginVertical="medium" />
-                <VStack spacing="medium">
-                    <Text variant="titleSmall">Legal</Text>
-                    <Card>
-                        <VStack spacing="medium">
-                            <ListItem
-                                onPress={() =>
-                                    openLink('https://data.trezor.io/legal/mobile-wallet-terms.pdf')
-                                }
-                                title="Terms & conditions"
-                                iconName="pdf"
-                            />
-                            <ListItem
-                                onPress={() =>
-                                    openLink(
-                                        'https://trezor.io/content/wysiwyg/ToU/privacy-policy.pdf',
-                                    )
-                                }
-                                title="Privacy policy"
-                                iconName="pdf"
-                            />
-                        </VStack>
-                    </Card>
-                </VStack>
-                <Box flexDirection="row" justifyContent="space-between">
-                    {hasVerionAndBuildInfo && (
-                        <Text variant="hint" color="textDisabled">
-                            Version: {`${getAppVersion()} (${getBuildVersionNumber()})`}
-                        </Text>
-                    )}
-                    {hasCommitHash && (
-                        <Text variant="hint" color="textDisabled">
-                            Commit hash: {getCommitHash()}
-                        </Text>
-                    )}
-                </Box>
+                <SettingsSection title="Legal">
+                    <SettingsSectionItem
+                        title="Terms & conditions"
+                        iconName="pdf"
+                        onPress={handleOpenTermsAndConditions}
+                    />
+                    <SettingsSectionItem
+                        title="Privacy policy"
+                        iconName="pdf"
+                        onPress={handleOpenPrivacyPolicy}
+                    />
+                </SettingsSection>
+                <AppVersion />
             </VStack>
         </Screen>
     );

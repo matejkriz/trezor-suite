@@ -1,19 +1,18 @@
-import React from 'react';
 import styled from 'styled-components';
-import { Option, OptionsWrapper, OptionsDivider } from '@onboarding-components';
 
-import { WordCount } from '@recovery-types';
-import { Translation } from '@suite-components';
+import { OnboardingOption, OptionsWrapper, OptionsDivider } from 'src/components/onboarding';
+import { WordCount } from 'src/types/recovery';
+import { Translation } from 'src/components/suite';
 
-const StyledOption = styled(Option)`
+const StyledOption = styled(OnboardingOption)`
     justify-content: center;
 `;
 
-interface Props {
+interface SelectWordCountProps {
     onSelect: (number: WordCount) => void;
 }
 
-const SelectWordCount = ({ onSelect }: Props) => (
+export const SelectWordCount = ({ onSelect }: SelectWordCountProps) => (
     <OptionsWrapper>
         <StyledOption
             onClick={() => {
@@ -40,5 +39,3 @@ const SelectWordCount = ({ onSelect }: Props) => (
         />
     </OptionsWrapper>
 );
-
-export default SelectWordCount;

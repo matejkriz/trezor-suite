@@ -1,14 +1,19 @@
 {
     "extends": "../../tsconfig.json",
-    "compilerOptions": { "outDir": "libDev" },
-    "include": ["../../submodules/trezor-common"],
+    "compilerOptions": {
+        "outDir": "libDev",
+        "composite": true
+    },
     "references": [
         { "path": "../blockchain-link" },
+        { "path": "../blockchain-link-types" },
+        { "path": "../connect-analytics" },
         { "path": "../connect-common" },
+        { "path": "../protobuf" },
+        { "path": "../protocol" },
         { "path": "../transport" },
         { "path": "../utils" },
         { "path": "../utxo-lib" },
-        { "path": "../connect-analytics" },
         { "path": "../trezor-user-env-link" }
     ]
 }

@@ -1,83 +1,47 @@
-/* eslint-disable @typescript-eslint/no-var-requires */
-/* eslint-disable global-require */
+import { testMocks } from '@suite-common/test-utils';
+import { prepareFirmwareReducer, State as DeviceState } from '@suite-common/wallet-core';
+import { DeviceModelInternal } from '@trezor/connect';
 
-import { configureStore } from '@suite/support/tests/configureStore';
+import { configureStore, filterThunkActionTypes } from 'src/support/tests/configureStore';
+import suiteReducer from 'src/reducers/suite/suiteReducer';
+import { extraDependencies } from 'src/support/extraDependencies';
 
-import firmwareReducer from '@firmware-reducers/firmwareReducer';
-import suiteReducer from '@suite-reducers/suiteReducer';
-import { ArrayElement } from '@trezor/type-utils';
 import { actions, reducerActions } from '../__fixtures__/firmwareActions';
-import { TrezorDevice } from '@suite-types';
-import { DeviceModel } from '@trezor/device-utils';
 
-type Fixture = ArrayElement<typeof actions>;
+const firmwareReducer = prepareFirmwareReducer(extraDependencies);
 
 type SuiteState = ReturnType<typeof suiteReducer>;
 type FirmwareState = ReturnType<typeof firmwareReducer>;
 interface InitialState {
     suite?: Partial<SuiteState>;
     firmware?: Partial<FirmwareState>;
-    devices?: TrezorDevice[];
+    device?: Partial<DeviceState>;
 }
 
-jest.mock('@trezor/connect', () => {
-    let fixture: Fixture;
-
-    // mocked function
-    const firmwareUpdate = () => {
-        // this error applies only for tests
-        if (typeof fixture === 'undefined' || !fixture.mocks || !fixture.mocks.connect) {
-            return 'Default error. Fixtures not set';
-        }
-
-        return Promise.resolve(fixture.mocks.connect);
-    };
-
-    const { PROTO } = jest.requireActual('@trezor/connect');
-
-    return {
-        __esModule: true, // this property makes it work
-        default: {
-            getFeatures: () => {},
-            firmwareUpdate,
-            blockchainSetCustomBackend: () => {},
-        },
-        DEVICE: {
-            DISCONNECT: 'device-disconnect',
-        },
-        TRANSPORT: {},
-        BLOCKCHAIN: {},
-        UI: {
-            REQUEST_BUTTON: 'ui-button',
-            FIRMWARE_PROGRESS: 'ui-firmware-progress',
-        },
-        setTestFixtures: (f: Fixture) => {
-            fixture = f;
-        },
-        PROTO,
-    };
-});
+jest.doMock('@trezor/suite-analytics', () => testMocks.getAnalytics());
 
 export const getInitialState = (override?: InitialState): any => {
     const suite = override ? override.suite : undefined;
-    const devices = override ? override.devices : [];
+    const device = override ? override.device : undefined;
 
     return {
         suite: {
-            device: {
-                connected: true,
-                type: 'acquired',
-                features: {
-                    major_version: 2,
-                    model: DeviceModel.TT,
-                },
-            },
             locks: [],
             flags: {},
             ...suite,
         },
         firmware: firmwareReducer(undefined, { type: 'foo' } as any),
-        devices,
+        device: {
+            selectedDevice: {
+                connected: true,
+                type: 'acquired',
+                features: {
+                    major_version: 2,
+                    internal_model: DeviceModelInternal.T2T1,
+                },
+            },
+            ...device,
+        },
         analytics: {
             enabled: false,
         },
@@ -112,7 +76,7 @@ describe('Firmware Actions', () => {
     actions.forEach(f => {
         it(f.description, async () => {
             // set fixtures
-            require('@trezor/connect').setTestFixtures(f);
+            testMocks.setTrezorConnectFixtures(f.mocks?.connect);
 
             const state = getInitialState(f.initialState);
             const store = mockStore(state);
@@ -128,7 +92,9 @@ describe('Firmware Actions', () => {
                     expect(result).toMatchObject(f.result.state);
                 }
                 if (f.result.actions) {
-                    expect(store.getActions()).toMatchObject(f.result.actions);
+                    expect(filterThunkActionTypes(store.getActions())).toMatchObject(
+                        f.result.actions,
+                    );
                 }
             }
         });

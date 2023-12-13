@@ -1,16 +1,23 @@
 import BigNumber from 'bignumber.js';
-import { fromWei } from 'web3-utils';
+import { fromWei, toWei } from 'web3-utils';
 import { addDays, startOfMonth } from 'date-fns';
 
 import {
     Account,
     RbfTransactionParams,
     WalletAccountTransaction,
+    ChainedTransactions,
+    PrecomposedTransactionFinal,
 } from '@suite-common/wallet-types';
-import { AccountMetadata } from '@suite-common/metadata-types';
-import { AccountAddress, AccountTransaction } from '@trezor/connect';
+import {
+    AccountAddress,
+    AccountTransaction,
+    TokenTransfer,
+    InternalTransfer,
+} from '@trezor/connect';
 import { SignOperator } from '@suite-common/suite-types';
 import { arrayPartition } from '@trezor/utils';
+import { AccountLabels } from '@suite-common/metadata-types';
 
 import { formatAmount, formatNetworkAmount } from './accountUtils';
 import { toFiatCurrency } from './fiatConverterUtils';
@@ -36,8 +43,13 @@ export const getAccountTransactions = (
     transactions: Record<string, WalletAccountTransaction[]>,
 ) => transactions[accountKey] || [];
 
-export const isPending = (tx: WalletAccountTransaction | AccountTransaction) =>
-    !!tx && (!tx.blockHeight || tx.blockHeight < 0);
+export const isPending = (tx: WalletAccountTransaction | AccountTransaction) => {
+    if (tx && tx.solanaSpecific?.status === 'confirmed') {
+        return false;
+    }
+
+    return !!tx && (!tx.blockHeight || tx.blockHeight < 0);
+};
 
 /* Convert date to string in YYYY-MM-DD format */
 const generateTransactionDateKey = (d: Date) =>
@@ -76,8 +88,9 @@ export const groupTransactionsByDate = (
             .filter(transaction => !!transaction)
             .sort(sortByBlockHeight)
             .reduce<{ [key: string]: WalletAccountTransaction[] }>((r, item) => {
+                const isTxPending = isPending(item);
                 const key =
-                    item.blockHeight && item.blockHeight > 0 && item.blockTime && item.blockTime > 0
+                    !isTxPending && item.blockTime && item.blockTime > 0
                         ? keyFormatter(new Date(item.blockTime * 1000))
                         : 'pending';
                 const prev = r[key] ?? [];
@@ -114,6 +127,9 @@ export const formatCardanoDeposit = (tx: WalletAccountTransaction) =>
         ? formatNetworkAmount(tx.cardanoSpecific.deposit, tx.symbol)
         : undefined;
 
+export const isTxFeePaid = (tx: WalletAccountTransaction) =>
+    !!tx.details.vin.find(vin => vin.isOwn || vin.isAccountOwned) && tx.type !== 'joint';
+
 /**
  * Returns a sum of sent/recv txs amounts as a BigNumber.
  * Amounts of sent transactions are added, amounts of recv transactions are subtracted
@@ -127,10 +143,6 @@ export const sumTransactions = (transactions: WalletAccountTransaction[]) => {
         const fee = formatNetworkAmount(tx.fee, tx.symbol);
 
         if (tx.type === 'self') {
-            // in sent to self tx all we spent is just a fee
-            // (tx.amount is set to the fee in blockchain-link)
-            totalAmount = totalAmount.minus(fee);
-
             const cardanoWithdrawal = formatCardanoWithdrawal(tx);
             if (cardanoWithdrawal) {
                 totalAmount = totalAmount.plus(cardanoWithdrawal);
@@ -142,16 +154,29 @@ export const sumTransactions = (transactions: WalletAccountTransaction[]) => {
             }
         }
 
-        if (tx.type === 'sent') {
+        // count in only if Inputs/Outputs includes my account (EVM does not need to)
+        if (tx.targets.length && tx.type === 'sent') {
             totalAmount = totalAmount.minus(amount);
-            totalAmount = totalAmount.minus(fee);
         }
+
         if (tx.type === 'recv' || tx.type === 'joint') {
             totalAmount = totalAmount.plus(amount);
         }
-        if (tx.type === 'failed') {
+
+        if (isTxFeePaid(tx)) {
             totalAmount = totalAmount.minus(fee);
         }
+
+        tx.internalTransfers.forEach(internalTx => {
+            const amountInternal = formatNetworkAmount(internalTx.amount, tx.symbol);
+
+            if (internalTx.type === 'sent') {
+                totalAmount = totalAmount.minus(amountInternal);
+            }
+            if (internalTx.type === 'recv') {
+                totalAmount = totalAmount.plus(amountInternal);
+            }
+        });
     });
     return totalAmount;
 };
@@ -166,10 +191,6 @@ export const sumTransactionsFiat = (
         const fee = formatNetworkAmount(tx.fee, tx.symbol);
 
         if (tx.type === 'self') {
-            // in sent to self tx all we spent is just a fee
-            // (tx.amount is set to the fee in blockchain-link)
-            totalAmount = totalAmount.minus(toFiatCurrency(fee, fiatCurrency, tx.rates, -1) ?? 0);
-
             const cardanoWithdrawal = formatCardanoWithdrawal(tx);
             if (cardanoWithdrawal) {
                 totalAmount = totalAmount.plus(
@@ -184,18 +205,34 @@ export const sumTransactionsFiat = (
                 );
             }
         }
-        if (tx.type === 'sent') {
+
+        // count in only if Inputs/Outputs includes my account (EVM does not need to)
+        if (tx.targets.length && tx.type === 'sent') {
             totalAmount = totalAmount.minus(
                 toFiatCurrency(amount, fiatCurrency, tx.rates, -1) ?? 0,
             );
-            totalAmount = totalAmount.minus(toFiatCurrency(fee, fiatCurrency, tx.rates, -1) ?? 0);
         }
+
         if (tx.type === 'recv' || tx.type === 'joint') {
             totalAmount = totalAmount.plus(toFiatCurrency(amount, fiatCurrency, tx.rates, -1) ?? 0);
         }
-        if (tx.type === 'failed') {
+
+        if (isTxFeePaid(tx)) {
             totalAmount = totalAmount.minus(toFiatCurrency(fee, fiatCurrency, tx.rates, -1) ?? 0);
         }
+
+        tx.internalTransfers.forEach(internalTx => {
+            const amountInternal = formatNetworkAmount(internalTx.amount, tx.symbol);
+            const amountInternalFiat =
+                toFiatCurrency(amountInternal, fiatCurrency, tx.rates, -1) ?? 0;
+
+            if (internalTx.type === 'sent') {
+                totalAmount = totalAmount.minus(amountInternalFiat);
+            }
+            if (internalTx.type === 'recv') {
+                totalAmount = totalAmount.plus(amountInternalFiat);
+            }
+        });
     });
     return totalAmount;
 };
@@ -215,35 +252,43 @@ export const findTransactions = (
 
 // Find chained pending transactions
 export const findChainedTransactions = (
+    descriptor: string,
     txid: string,
-    transactions: { [key: string]: WalletAccountTransaction[] },
-) =>
-    Object.keys(transactions).flatMap(key => {
+    transactions: Record<string, WalletAccountTransaction[]>,
+    result: ChainedTransactions = { own: [], others: [] },
+) => {
+    Object.keys(transactions).forEach(key => {
+        const ownTxs = result.own.map(tx => tx.txid);
+        const othersTxs = result.others.map(tx => tx.txid);
         // check if any pending transaction is using the utxo/vin with requested txid
-        const txs = transactions[key]
-            .filter(isPending)
-            .filter(tx => tx.details.vin.find(i => i.txid === txid));
-        if (!txs.length) return [];
+        const txs = transactions[key].filter(tx => {
+            if (!isPending(tx) || !tx.details.vin.find(i => i.txid === txid)) {
+                return false;
+            }
 
-        const result = [{ key, txs }];
+            if (tx.descriptor === descriptor && !ownTxs.includes(tx.txid)) {
+                if (othersTxs.includes(tx.txid)) {
+                    result.others = result.others.filter(t => t.txid !== tx.txid);
+                }
+                result.own.push(tx);
+                return true;
+            }
+            if (!ownTxs.includes(tx.txid) && !othersTxs.includes(tx.txid)) {
+                result.others.push(tx);
+                return true;
+            }
+            return false;
+        });
+
         // each affected tx.vout can be used in another tx.vin
         // find recursively
         txs.forEach(tx => {
-            const deep = findChainedTransactions(tx.txid, transactions);
-            deep.forEach(dt => result.push(dt));
+            findChainedTransactions(descriptor, tx.txid, transactions, result);
         });
-        // merge result by key
-        return result.reduce((res, item) => {
-            const index = res.findIndex(t => t.key === item.key);
-            if (index >= 0) {
-                // remove duplicates
-                const unique = item.txs.filter(t => !res[index].txs.find(tt => tt.txid === t.txid));
-                res[index].txs = res[index].txs.concat(unique);
-                return res;
-            }
-            return res.concat(item);
-        }, [] as typeof result);
     });
+
+    return result.own.concat(result.others).length > 0 ? result : undefined;
+};
 
 export const getConfirmations = (
     tx: WalletAccountTransaction | AccountTransaction,
@@ -294,15 +339,10 @@ export const analyzeTransactions = (
         };
     }
 
-    const [knownPrepending, knownRest] = arrayPartition(known, tx => {
-        if ('deadline' in tx) return true;
-        return false;
-    });
+    const [knownPrepending, knownRest] = arrayPartition(known, tx => 'deadline' in tx);
 
     const removePrepending = knownPrepending.filter(
-        tx =>
-            ('deadline' in tx && tx.deadline && tx?.deadline < blockHeight) ||
-            fresh.find(fTx => fTx.txid === tx.txid),
+        tx => (tx.deadline && tx.deadline < blockHeight) || fresh.find(fTx => fTx.txid === tx.txid),
     );
     // If there are no known confirmed txs
     // remove all known and add all fresh
@@ -369,25 +409,34 @@ export const analyzeTransactions = (
     });
 };
 
-// getTxOperation is used with types WalletAccountTransaction and ArrayElement<WalletAccountTransaction['tokens']
-// the only interesting field is 'type', which has compatible string literal union in both types
-export const getTxOperation = (tx: {
-    type: WalletAccountTransaction['type'];
-}): SignOperator | null => {
-    if (tx.type === 'sent' || tx.type === 'self' || tx.type === 'failed') {
+export const getTxOperation = (
+    type: WalletAccountTransaction['type'] | TokenTransfer['type'] | InternalTransfer['type'],
+    ignoreSelf = false,
+): SignOperator | null => {
+    if (type === 'sent' || (!ignoreSelf && type === 'self')) {
         return 'negative';
     }
-    if (tx.type === 'recv') {
+    if (type === 'recv') {
         return 'positive';
     }
     return null;
 };
+
+export const isNftTokenTransfer = (transfer: TokenTransfer) =>
+    ['ERC1155', 'ERC721'].includes(transfer.standard || '');
+
+export const getNftTokenId = (transfer: TokenTransfer) =>
+    // use 0 index, haven't found an example where multiTokenValues.length > 1
+    transfer.standard === 'ERC1155' && transfer.multiTokenValues?.length
+        ? transfer.multiTokenValues[0].id
+        : transfer.amount;
 
 export const getTxIcon = (txType: WalletAccountTransaction['type']) => {
     switch (txType) {
         case 'recv':
             return 'RECEIVE';
         case 'sent':
+        case 'contract':
         case 'self':
             return 'SEND';
         case 'failed':
@@ -432,25 +481,22 @@ export const getTargetAmount = (
     return null;
 };
 
-export const isTxUnknown = (transaction: WalletAccountTransaction) => {
-    // blockbook cannot parse some txs
-    // eg. tx with eth smart contract that creates a new token has no valid target
-    const isTokenTransaction = transaction.tokens.length > 0;
-    return (
-        (!isTokenTransaction &&
-            transaction.type !== 'joint' && // coinjoin txs don't have any target
-            !transaction.cardanoSpecific && // cardano staking txs (de/registration of staking key, stake delegation) don't need to have any target
-            !transaction.targets.find(t => t.addresses)) ||
-        transaction.type === 'unknown'
-    );
-};
-
-export const isTxFailed = (tx: AccountTransaction | WalletAccountTransaction) =>
-    !isPending(tx) && tx.ethereumSpecific?.status === 0;
-
 export const getFeeRate = (tx: AccountTransaction) =>
     // calculate fee rate, TODO: add this to blockchain-link tx details
     new BigNumber(tx.fee).div(tx.details.size).integerValue(BigNumber.ROUND_CEIL).toString();
+
+// used by replaceTransactionThunk
+export const replaceEthereumSpecific = (
+    tx: AccountTransaction,
+    precomposedTx: PrecomposedTransactionFinal,
+) => {
+    if (!tx.ethereumSpecific) return;
+    return {
+        ...tx.ethereumSpecific,
+        gasLimit: Number(precomposedTx.feeLimit),
+        gasPrice: toWei(precomposedTx.feePerByte, 'gwei'),
+    };
+};
 
 const getEthereumRbfParams = (
     tx: AccountTransaction,
@@ -465,7 +511,7 @@ const getEthereumRbfParams = (
     const output = token
         ? {
               address: token.to!,
-              token: token.address,
+              token: token.contract,
               amount: token.amount,
               formattedAmount: formatAmount(token.amount, token.decimals),
           }
@@ -586,24 +632,14 @@ export const getRbfParams = (
 export const enhanceTransaction = (
     origTx: AccountTransaction,
     account: Account,
-): WalletAccountTransaction => {
-    const tx = {
-        ...origTx,
-        type: isTxFailed(origTx) ? 'failed' : origTx.type,
-    };
-    return {
-        descriptor: account.descriptor,
-        deviceState: account.deviceState,
-        symbol: account.symbol,
-        ...tx,
-        // https://bitcoin.stackexchange.com/questions/23061/ripple-ledger-time-format/23065#23065
-        blockTime:
-            account.networkType === 'ripple' && tx.blockTime
-                ? tx.blockTime + 946684800
-                : tx.blockTime,
-        rbfParams: getRbfParams(tx, account),
-    };
-};
+): WalletAccountTransaction => ({
+    descriptor: account.descriptor,
+    deviceState: account.deviceState,
+    symbol: account.symbol,
+    ...origTx,
+    rbfParams: getRbfParams(origTx, account),
+    hex: (origTx.blockHeight ?? 0) <= 0 && origTx.rbf ? origTx.hex : undefined, // store tx hex **only** for pending transactions (used by rbf)
+});
 
 export const getOriginalTransaction = ({
     descriptor,
@@ -644,7 +680,7 @@ const groupTransactionIdsByAddress = (transactions: WalletAccountTransaction[]) 
     return addresses;
 };
 
-const groupTransactionsByLabel = (accountMetadata: AccountMetadata) => {
+const groupTransactionsByLabel = (accountMetadata: AccountLabels) => {
     const labels: { [label: string]: string[] } = {};
     const { outputLabels } = accountMetadata;
 
@@ -661,7 +697,7 @@ const groupTransactionsByLabel = (accountMetadata: AccountMetadata) => {
     return labels;
 };
 
-const groupAddressesByLabel = (accountMetadata: AccountMetadata) => {
+const groupAddressesByLabel = (accountMetadata: AccountLabels) => {
     const labels: { [label: string]: string[] } = {};
     const { addressLabels } = accountMetadata;
 
@@ -690,7 +726,7 @@ const numberSearchFilter = (
     operator: (typeof searchOperators)[number],
 ) => {
     const targetAmounts = getTargetAmounts(transaction);
-    const op = getTxOperation(transaction);
+    const op = getTxOperation(transaction.type);
     if (!op) {
         return false;
     }
@@ -721,7 +757,7 @@ const numberSearchFilter = (
 const searchDateRegex = new RegExp(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/);
 export const simpleSearchTransactions = (
     transactions: WalletAccountTransaction[],
-    accountMetadata: AccountMetadata,
+    accountMetadata: AccountLabels,
     search: string,
 ) => {
     // Trim
@@ -838,7 +874,7 @@ export const simpleSearchTransactions = (
 
 export const advancedSearchTransactions = (
     transactions: WalletAccountTransaction[],
-    accountMetadata: AccountMetadata,
+    accountMetadata: AccountLabels,
     search: string,
 ) => {
     // No AND/OR operators, just run a simple search
@@ -887,7 +923,7 @@ export const advancedSearchTransactions = (
 
 export const isTxFinal = (tx: WalletAccountTransaction, confirmations: number) =>
     // checks RBF status
-    !tx.rbf || confirmations > 0;
+    !tx.rbf || confirmations > 0 || tx.solanaSpecific?.status === 'confirmed';
 
 export const getTxHeaderSymbol = (transaction: WalletAccountTransaction) => {
     const isSingleTokenTransaction = transaction.tokens.length === 1;
