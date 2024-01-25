@@ -1,12 +1,11 @@
-import { A, flow } from '@mobily/ts-belt';
+import { A } from '@mobily/ts-belt';
 
 import { createThunk } from '@suite-common/redux-utils';
 import {
     accountsActions,
     DISCOVERY_MODULE_PREFIX,
-    filterUnavailableNetworks,
     selectDeviceAccountsLengthPerNetwork,
-    selectDiscoveryForDevice,
+    selectDeviceDiscovery,
     updateDiscovery,
     createDiscovery,
     removeDiscovery,
@@ -17,19 +16,19 @@ import { selectIsAccountAlreadyDiscovered } from '@suite-native/accounts';
 import TrezorConnect from '@trezor/connect';
 import { DiscoveryItem } from '@suite-common/wallet-types';
 import { getDerivationType } from '@suite-common/wallet-utils';
-import { Network, NetworkSymbol } from '@suite-common/wallet-config';
+import { Network, NetworkSymbol, getNetworkType } from '@suite-common/wallet-config';
 import { DiscoveryStatus } from '@suite-common/wallet-constants';
-import {
-    supportedMainnetSymbols,
-    supportedNetworkSymbols,
-    filterBlacklistedNetworks,
-    sortNetworks,
-} from '@suite-native/config';
 import { requestDeviceAccess } from '@suite-native/device-mutex';
 import { analytics, EventType } from '@suite-native/analytics';
+import { isDebugEnv } from '@suite-native/config';
 
 import { fetchBundleDescriptors } from './utils';
-import { selectDiscoveryStartTimeStamp, setDiscoveryStartTimestamp } from './discoveryConfigSlice';
+import {
+    selectDisabledDiscoveryNetworkSymbolsForDevelopment,
+    selectDiscoveryStartTimeStamp,
+    selectDiscoverySupportedNetworks,
+    setDiscoveryStartTimestamp,
+} from './discoveryConfigSlice';
 
 const DISCOVERY_DEFAULT_BATCH_SIZE = 2;
 
@@ -44,8 +43,6 @@ const DISCOVERY_BATCH_SIZE_PER_COIN: Partial<Record<NetworkSymbol, number>> = {
     etc: 1,
 };
 
-const getAvailableNetworks = flow(filterUnavailableNetworks, filterBlacklistedNetworks);
-
 const getBatchSizeByCoin = (coin: NetworkSymbol): number => {
     if (coin in DISCOVERY_BATCH_SIZE_PER_COIN) {
         return DISCOVERY_BATCH_SIZE_PER_COIN[coin]!;
@@ -58,7 +55,7 @@ type DiscoveryDescriptorItem = DiscoveryItem & { descriptor: string };
 const finishNetworkTypeDiscoveryThunk = createThunk(
     `${DISCOVERY_MODULE_PREFIX}/finishNetworkTypeDiscoveryThunk`,
     (_, { dispatch, getState }) => {
-        const discovery = selectDiscoveryForDevice(getState());
+        const discovery = selectDeviceDiscovery(getState());
 
         if (!discovery) {
             return;
@@ -92,6 +89,15 @@ const finishNetworkTypeDiscoveryThunk = createThunk(
     },
 );
 
+const getAccountInfoDetailsLevel = (coin: NetworkSymbol) => {
+    const networkType = getNetworkType(coin);
+    // For Cardano we need to fetch at least one tx otherwise it will not generate correctly new receive addresses (xpub instead of address)
+    if (networkType === 'cardano') return { details: 'txs', pageSize: 1 } as const;
+
+    // CAUTION: the detail level has to be set to "tokenBalances" or higher. In other case we won't get account receive addresses from the backend.
+    return { details: 'tokenBalances' } as const;
+};
+
 const discoverAccountsByDescriptorThunk = createThunk(
     `${DISCOVERY_MODULE_PREFIX}/discoverAccountsByDescriptorThunk`,
     async (
@@ -117,7 +123,8 @@ const discoverAccountsByDescriptorThunk = createThunk(
                 coin: bundleItem.coin,
                 descriptor: bundleItem.descriptor,
                 useEmptyPassphrase: true,
-                details: 'txs',
+                skipFinalReload: true,
+                ...getAccountInfoDetailsLevel(bundleItem.coin),
             });
 
             if (success) {
@@ -154,7 +161,7 @@ const discoverNetworkBatchThunk = createThunk(
         },
         { dispatch, getState },
     ) => {
-        const discovery = selectDiscoveryForDevice(getState());
+        const discovery = selectDeviceDiscovery(getState());
         const batchSize = getBatchSizeByCoin(network.symbol);
 
         if (!discovery || !deviceState) {
@@ -178,11 +185,9 @@ const discoverNetworkBatchThunk = createThunk(
 
         const chunkBundle: Array<DiscoveryItem> = [];
 
-        A.makeWithIndex(batchSize, index => {
-            const accountPath = network.bip43Path.replace(
-                'i',
-                (lastDiscoveredAccountIndex + index).toString(),
-            );
+        A.makeWithIndex(batchSize, batchIndex => {
+            const index = lastDiscoveredAccountIndex + batchIndex;
+            const accountPath = network.bip43Path.replace('i', index.toString());
 
             const isAccountAlreadyDiscovered = selectIsAccountAlreadyDiscovered(getState(), {
                 deviceState,
@@ -199,6 +204,7 @@ const discoverNetworkBatchThunk = createThunk(
                     networkType: network.networkType,
                     derivationType: getDerivationType(accountType),
                     suppressBackupWarning: true,
+                    skipFinalReload: true,
                 });
             }
         });
@@ -248,10 +254,10 @@ export const createDescriptorPreloadedDiscoveryThunk = createThunk(
     async (
         {
             deviceState,
-            areTestnetsEnabled,
+            supportedNetworks,
         }: {
             deviceState: string;
-            areTestnetsEnabled: boolean;
+            supportedNetworks: readonly Network[];
         },
         { dispatch, getState },
     ) => {
@@ -260,15 +266,18 @@ export const createDescriptorPreloadedDiscoveryThunk = createThunk(
         if (!device) {
             return;
         }
-        const networks = areTestnetsEnabled ? supportedNetworkSymbols : supportedMainnetSymbols;
 
-        const deviceAccessResponse = await requestDeviceAccess(() =>
-            dispatch(getAvailableCardanoDerivationsThunk({ deviceState, device })).unwrap(),
-        );
+        const supportedNetworksSymbols = supportedNetworks.map(network => network.symbol);
+        const discoveryNetworksTotalCount = supportedNetworksSymbols.length;
 
-        if (!deviceAccessResponse.success) return false;
+        let availableCardanoDerivationsResponse;
+        if (supportedNetworks.some(network => network.networkType === 'cardano')) {
+            availableCardanoDerivationsResponse = await requestDeviceAccess(() =>
+                dispatch(getAvailableCardanoDerivationsThunk({ deviceState, device })).unwrap(),
+            );
 
-        const discoveryNetworksTotalCount = getAvailableNetworks(networks, device).length;
+            if (!availableCardanoDerivationsResponse.success) return false;
+        }
 
         dispatch(
             createDiscovery({
@@ -280,8 +289,8 @@ export const createDescriptorPreloadedDiscoveryThunk = createThunk(
                 bundleSize: 0,
                 loaded: 0,
                 failed: [],
-                availableCardanoDerivations: deviceAccessResponse.payload,
-                networks,
+                availableCardanoDerivations: availableCardanoDerivationsResponse?.payload,
+                networks: supportedNetworksSymbols,
             }),
         );
     },
@@ -295,8 +304,28 @@ export const startDescriptorPreloadedDiscoveryThunk = createThunk(
     ) => {
         const device = selectDeviceByState(getState(), deviceState);
 
+        const discovery1 = selectDeviceDiscovery(getState());
+        if (discovery1) {
+            console.warn(
+                `Warning discovery for device ${deviceState} already exists. Skipping discovery.`,
+            );
+            return;
+        }
+
         if (!device) {
             return;
+        }
+
+        let supportedNetworks = selectDiscoverySupportedNetworks(getState(), areTestnetsEnabled);
+
+        // For development purposes, you can disable some networks to have quicker discovery in dev utils
+        if (isDebugEnv()) {
+            const disabledNetworkSymbols = selectDisabledDiscoveryNetworkSymbolsForDevelopment(
+                getState(),
+            );
+            supportedNetworks = supportedNetworks.filter(
+                n => !disabledNetworkSymbols.includes(n.symbol),
+            );
         }
 
         // Start tracking duration for analytics purposes
@@ -305,20 +334,18 @@ export const startDescriptorPreloadedDiscoveryThunk = createThunk(
         await dispatch(
             createDescriptorPreloadedDiscoveryThunk({
                 deviceState,
-                areTestnetsEnabled,
+                supportedNetworks,
             }),
         );
-        const discovery = selectDiscoveryForDevice(getState());
 
-        if (!discovery) {
+        // We need to check again here because it's possible that things changed in the meantime because async thunks
+        const discovery2 = selectDeviceDiscovery(getState());
+        if (!discovery2) {
             return;
         }
 
-        // Get only device supported networks that are not blacklisted.
-        const networks = sortNetworks(getAvailableNetworks(discovery.networks, device));
-
         // Start discovery for every network account type.
-        networks.forEach(network => {
+        supportedNetworks.forEach(network => {
             dispatch(discoverNetworkBatchThunk({ deviceState, network }));
         });
     },

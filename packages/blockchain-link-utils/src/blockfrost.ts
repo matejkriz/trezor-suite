@@ -49,7 +49,7 @@ const hexToString = (input: string): string => {
     return str;
 };
 
-export const getSubtype = (tx: BlockfrostTransaction) => {
+const getSubtype = (tx: Pick<BlockfrostTransaction, 'txData'>) => {
     const withdrawal = tx.txData.withdrawal_count > 0;
     if (withdrawal) {
         return 'withdrawal';
@@ -57,7 +57,7 @@ export const getSubtype = (tx: BlockfrostTransaction) => {
 
     const registrations = tx.txData.stake_cert_count;
     const delegations = tx.txData.delegation_count;
-    if (registrations === 0 && delegations === 0) return null;
+    if (registrations === 0 && delegations === 0) return;
 
     if (registrations > 0) {
         if (new BigNumber(tx.txData.deposit).gt(0)) {
@@ -70,7 +70,6 @@ export const getSubtype = (tx: BlockfrostTransaction) => {
     if (delegations > 0) {
         return 'stake_delegation';
     }
-    return null;
 };
 
 export const parseAsset = (hex: string): ParseAssetResult => {
@@ -175,15 +174,23 @@ export const filterTokenTransfers = (
 };
 
 export const transformTransaction = (
-    descriptor: string,
-    accountAddress: AccountAddresses | undefined,
-    blockfrostTxData: BlockfrostTransaction,
+    blockfrostTxData: BlockfrostTransaction | Pick<BlockfrostTransaction, 'txData'>,
+    // TODO does 'descriptor' branch make sense for Cardano or was it just copypaste from blockbook?
+    addressesOrDescriptor?: AccountAddresses | string,
 ): Transaction => {
+    const fullData = ((data: typeof blockfrostTxData): data is BlockfrostTransaction =>
+        'txUtxos' in data)(blockfrostTxData);
+
+    const [accountAddress, descriptor] =
+        typeof addressesOrDescriptor === 'object'
+            ? [addressesOrDescriptor, undefined]
+            : [undefined, addressesOrDescriptor];
+
     const myAddresses = accountAddress
         ? accountAddress.change
               .concat(accountAddress.used, accountAddress.unused)
               .map(a => a.address)
-        : [descriptor];
+        : (descriptor && [descriptor]) || [];
 
     let type: Transaction['type'];
     let targets: VinVout[] = [];
@@ -197,8 +204,8 @@ export const transformTransaction = (
     // refundable fee for registering staking address (sent to self tx with stake registration cert)
     let deposit: string | undefined;
 
-    const inputs = transformInputOutput(blockfrostTxData.txUtxos.inputs);
-    const outputs = transformInputOutput(blockfrostTxData.txUtxos.outputs);
+    const inputs = fullData ? transformInputOutput(blockfrostTxData.txUtxos.inputs) : [];
+    const outputs = fullData ? transformInputOutput(blockfrostTxData.txUtxos.outputs) : [];
     const vinLength = Array.isArray(inputs) ? inputs.length : 0;
     const voutLength = Array.isArray(outputs) ? outputs.length : 0;
     const outgoing = filterTargets(myAddresses, inputs);
@@ -257,13 +264,14 @@ export const transformTransaction = (
         }
     }
 
-    const tokens = accountAddress
-        ? filterTokenTransfers(accountAddress, blockfrostTxData, type)
-        : [];
+    const tokens =
+        accountAddress && fullData
+            ? filterTokenTransfers(accountAddress, blockfrostTxData, type)
+            : [];
 
     return {
         type,
-        txid: blockfrostTxData.txHash,
+        txid: blockfrostTxData.txData.hash,
         blockTime: blockfrostTxData.txData.block_time,
         blockHeight: blockfrostTxData.txData.block_height || undefined,
         blockHash: blockfrostTxData.txData.block,
@@ -299,7 +307,7 @@ export const transformAccountInfo = (info: BlockfrostAccountInfo): AccountInfo =
             transactions: !blockfrostTxs
                 ? []
                 : blockfrostTxs?.map(tx =>
-                      transformTransaction(info.descriptor, info.addresses, tx),
+                      transformTransaction(tx, info.addresses ?? info.descriptor),
                   ),
         },
     };

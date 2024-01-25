@@ -1,3 +1,20 @@
+# 1.0.6
+
+-   chore(protobuf): lint fix (cebcf0256)
+-   fix(protobuf): inaccuracy in `TxOutputType` (c78cd9ad2)
+-   refactor(connect): validation in API methods (0c035c26a)
+-   feat(protobuf): support sint in proto codegen (4fd7808ac)
+-   feat(connect): assert message schema in every typedCall (44430e47f)
+-   test(protobuf): check equivalence of generated Protobuf messages types (25420c4e8)
+-   feat(protobuf): use protobuf messages based on schema chore(protobuf): remove `bytebuffer` dependency fix(connect): use assert, update TS references, lint issue fix(connect-explorer): remove old references in tsconfig fix: update yarn, schema after rebase fix: update yarn lock after rebase (ad086e462)
+
+# 1.0.4
+
+-   chore: remove `bytebuffer` dependency (9b2f9def0)
+-   chore(connect): use `tslib` as dependency in all public libs (606ecc63b)
+-   chore(repo): update tsx (53de3e3a8)
+-   feat(suite): add Solana support (f2a89b34f)
+
 # 1.0.3
 
 -   feat(connect): add support for solana FW interactions (3d9c703a5)

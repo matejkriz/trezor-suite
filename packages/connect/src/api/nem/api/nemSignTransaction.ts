@@ -1,11 +1,13 @@
 // origin: https://github.com/trezor/connect/blob/develop/src/js/core/methods/NEMSignTransaction.js
 
 import { AbstractMethod } from '../../../core/AbstractMethod';
-import { validateParams, getFirmwareRange } from '../../common/paramsValidator';
+import { getFirmwareRange } from '../../common/paramsValidator';
 import { getMiscNetwork } from '../../../data/coinInfo';
 import { validatePath } from '../../../utils/pathUtils';
 import * as helper from '../nemSignTx';
 import type { PROTO } from '../../../constants';
+import { Assert } from '@trezor/schema-utils';
+import { NEMSignTransaction as NEMSignTransactionSchema } from '../../../types/api/nem';
 
 export default class NEMSignTransaction extends AbstractMethod<
     'nemSignTransaction',
@@ -17,11 +19,12 @@ export default class NEMSignTransaction extends AbstractMethod<
 
         const { payload } = this;
         // validate incoming parameters
-        validateParams(payload, [
-            { name: 'path', required: true },
-            { name: 'transaction', required: true },
-            { name: 'chunkify', type: 'boolean' },
-        ]);
+
+        // Workaround for NEM timestamp case-sensitivity issue (issue #10793)
+        if ((payload?.transaction as any)?.timestamp) {
+            payload.transaction.timeStamp = (payload.transaction as any).timestamp;
+        }
+        Assert(NEMSignTransactionSchema, payload);
 
         const path = validatePath(payload.path, 3);
         // incoming data should be in nem-sdk format

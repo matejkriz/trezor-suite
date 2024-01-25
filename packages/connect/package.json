@@ -1,6 +1,6 @@
 {
     "name": "@trezor/connect",
-    "version": "9.1.6",
+    "version": "9.1.10",
     "author": "Trezor <info@trezor.io>",
     "homepage": "https://github.com/trezor/trezor-suite/tree/develop/packages/connect",
     "description": "High-level javascript interface for Trezor hardware wallet.",
@@ -58,6 +58,7 @@
         "@trezor/connect-common": "workspace:*",
         "@trezor/protobuf": "workspace:*",
         "@trezor/protocol": "workspace:*",
+        "@trezor/schema-utils": "workspace:*",
         "@trezor/transport": "workspace:*",
         "@trezor/utils": "workspace:*",
         "@trezor/utxo-lib": "workspace:*",
@@ -86,7 +87,7 @@
         "tsx": "^4.6.2",
         "typescript": "5.3.2",
         "webpack": "^5.89.0",
-        "ws": "7.5.9"
+        "ws": "^8.16.0"
     },
     "peerDependencies": {
         "tslib": "^2.6.2"

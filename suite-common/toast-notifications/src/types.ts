@@ -41,6 +41,8 @@ export type ToastPayload = (
           type:
               | 'settings-applied'
               | 'pin-changed'
+              | 'wipe-code-changed'
+              | 'wipe-code-removed'
               | 'device-wiped'
               | 'backup-success'
               | 'backup-failed'

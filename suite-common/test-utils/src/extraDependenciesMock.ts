@@ -61,7 +61,6 @@ export const extraDependenciesMock: ExtraDependencies = {
         selectFeeInfo: (networkSymbol: any) =>
             mockSelector('selectFeeInfo', testMocks.fee, { networkSymbol }),
         selectDevices: mockSelector('selectDevices', []),
-        selectCurrentDevice: mockSelector('selectCurrentDevice', testMocks.getSuiteDevice()),
         selectBitcoinAmountUnit: mockSelector('selectBitcoinAmountUnit', PROTO.AmountUnit.BITCOIN),
         selectEnabledNetworks: mockSelector('selectEnabledNetworks', ['btc', 'test']),
         selectLocalCurrency: mockSelector('selectLocalCurrency', 'usd'),
@@ -78,13 +77,12 @@ export const extraDependenciesMock: ExtraDependencies = {
         selectDevice: mockSelector('selectDevice', {
             ...testMocks.getSuiteDevice(),
         }),
-        selectDiscoveryForDevice: mockSelector('selectDiscoveryForDevice', undefined),
+        selectDeviceDiscovery: mockSelector('selectDeviceDiscovery', undefined),
         selectCheckFirmwareAuthenticity: mockSelector('selectCheckFirmwareAuthenticity', false),
     },
     actions: {
         setAccountAddMetadata: mockAction('setAccountAddMetadata'),
         setWalletSettingsLocalCurrency: mockAction('setWalletSettingsLocalCurrency'),
-        changeWalletSettingsNetworks: mockAction('changeWalletSettingsNetworks'),
         lockDevice: mockAction('lockDevice'),
         appChanged: mockAction('appChanged'),
         setSelectedDevice: mockAction('setSelectedDevice'),
@@ -102,7 +100,6 @@ export const extraDependenciesMock: ExtraDependencies = {
         storageLoadBlockchain: mockReducer('storageLoadBlockchain'),
         storageLoadAccounts: mockReducer('storageLoadAccounts'),
         storageLoadTransactions: mockReducer('storageLoadTransactions'),
-        storageLoadFiatRates: mockReducer('storageLoadAccounts'),
         storageLoadFirmware: mockReducer('storageLoadFirmware'),
         storageLoadDiscovery: mockReducer('storageLoadDiscovery'),
         addButtonRequestFirmware: mockReducer('addButtonRequestFirmware'),

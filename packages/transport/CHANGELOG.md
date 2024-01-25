@@ -1,3 +1,28 @@
+# 1.1.21
+
+-   chore(transport): remove unused files (b69076a80)
+-   chore(transport): remove custom eslint no-underscore-dangle rule (049e42d18)
+-   chore(transport): remove custom eslint no-await-in-loop rule (be90dcd2a)
+-   chore(transport): remove custom eslint no-restricted-syntax rule (8b4910209)
+-   chore(transport): remove custom eslint ban-types rule (44da16615)
+-   fix(transport): add missing await (aaecf9440)
+-   chore(transport): move node-bridge logic to transport-bridge package (0f2882af4)
+-   fix(mobile): fix Cardano receive (#10580) (3c5e253e0)
+-   feat(transport): add node-bridge module (acf5056f7)
+-   chore(transport): separate receive util (d1d964c1d)
+-   fix(connect): check custom Transport instance (018ef646d)
+
+# 1.1.19
+
+-   chore: remove `bytebuffer` dependency (9b2f9def0)
+-   chore(connect): use `tslib` as dependency in all public libs (606ecc63b)
+-   chore: update `jest` and related dependency (b8a321c83)
+-   feat(transport): allow custom chunkSize in protocol-v1.encode (ba855c980)
+-   feat(transport): accept encoding protocols as parameter of send, receive and call methods (b64af958e)
+-   feat(transport): unify protocol encode/decode functions (b4f08409c)
+-   chore(repo): update tsx (53de3e3a8)
+-   tests: switch to fw main branch (91c450631)
+
 # 1.1.18
 
 -   chore(repo): Upgrade TS 5.3 (#10017) (7277f9d0f)

@@ -1,5 +1,7 @@
 // API params
 
+import { Type, TSchema, Static } from '@trezor/schema-utils';
+
 export interface CommonParams {
     device?: {
         path?: string;
@@ -21,6 +23,8 @@ export type Params<T> = CommonParams & T & { bundle?: undefined };
 interface Bundle<T> {
     bundle: T[];
 }
+export const Bundle = <T extends TSchema>(type: T) =>
+    Type.Object({ bundle: Type.Array(type, { minItems: 1 }) });
 
 export type BundledParams<T> = CommonParams & Bundle<T>;
 
@@ -41,6 +45,7 @@ export interface Success<T> {
 export type Response<T> = Promise<Success<T> | Unsuccessful>;
 
 export type DerivationPath = string | number[];
+export const DerivationPath = Type.Union([Type.String(), Type.Array(Type.Number())]);
 
 // replace type `T` address_n field type `A` with address_n type `R`
 type ProtoWithExtendedAddressN<T, A, R> = Omit<Extract<T, { address_n: A }>, 'address_n'> & {
@@ -58,12 +63,14 @@ export type ProtoWithAddressN<P extends ProtoWithDerivationPath<any>> =
     P extends ProtoWithDerivationPath<infer T> ? T : unknown;
 
 // Common fields for all *.getAddress methods
-export interface GetAddress {
-    path: DerivationPath;
-    address?: string;
-    showOnTrezor?: boolean;
-    chunkify?: boolean;
-}
+export type GetAddress = Static<typeof GetAddress>;
+export const GetAddress = Type.Object({
+    path: DerivationPath,
+    address: Type.Optional(Type.String()),
+    showOnTrezor: Type.Optional(Type.Boolean()),
+    chunkify: Type.Optional(Type.Boolean()),
+    useEventListener: Type.Optional(Type.Boolean()),
+});
 
 export interface Address {
     address: string;
@@ -72,15 +79,17 @@ export interface Address {
 }
 
 // Common fields for all *.getPublicKey methods
-export interface GetPublicKey {
-    path: DerivationPath;
-    showOnTrezor?: boolean;
-    suppressBackupWarning?: boolean;
-    chunkify?: boolean;
-}
+export type GetPublicKey = Static<typeof GetPublicKey>;
+export const GetPublicKey = Type.Object({
+    path: DerivationPath,
+    showOnTrezor: Type.Optional(Type.Boolean()),
+    suppressBackupWarning: Type.Optional(Type.Boolean()),
+    chunkify: Type.Optional(Type.Boolean()),
+});
 
-export interface PublicKey {
-    publicKey: string;
-    path: number[];
-    serializedPath: string;
-}
+export type PublicKey = Static<typeof PublicKey>;
+export const PublicKey = Type.Object({
+    publicKey: Type.String(),
+    path: Type.Array(Type.Number()),
+    serializedPath: Type.String(),
+});

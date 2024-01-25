@@ -17,9 +17,12 @@ import { AuthenticatorProvider } from '@suite-native/biometrics';
 import { FeatureMessageScreen, MessageSystemBannerRenderer } from '@suite-native/message-system';
 import { IntlProvider } from '@suite-native/intl';
 import { useTransactionCache } from '@suite-native/accounts';
+import { isDebugEnv } from '@suite-native/config';
+import { PassphraseModalRenderer } from '@suite-native/passphrase';
 
 import { RootStackNavigator } from './navigation/RootStackNavigator';
 import { StylesProvider } from './StylesProvider';
+import { Snow } from './snow/Snow';
 import { useFormattersConfig } from './hooks/useFormattersConfig';
 import { applicationInit } from './initActions';
 import { useReportAppInitToAnalytics } from './hooks/useReportAppInitToAnalytics';
@@ -41,10 +44,19 @@ const wrappedMethods = [
     'blockchainSetCustomBackend',
     'blockchainSubscribeFiatRates',
     'blockchainGetCurrentFiatRates',
+    'blockchainSubscribe',
     'blockchainUnsubscribe',
     'cardanoGetPublicKey',
     'getDeviceState',
+    'cardanoGetAddress',
+    'getAddress',
+    'rippleGetAddress',
+    'ethereumGetAddress',
+    'solanaGetAddress',
+    'blockchainGetFiatRatesForTimestamps',
     'getAccountDescriptor',
+    'blockchainGetAccountBalanceHistory',
+    'blockchainUnsubscribeFiatRates',
 ];
 
 wrappedMethods.forEach(key => {
@@ -87,15 +99,18 @@ const AppComponent = () => {
             <FormatterProvider config={formattersConfig}>
                 <AuthenticatorProvider>
                     <AlertRenderer>
-                        {/* Notifications are disabled until the problem with after-import notifications flooding is solved. */}
-                        {/* More here: https://github.com/trezor/trezor-suite/issues/7721  */}
-                        {/* <NotificationRenderer> */}
-                        <ToastRenderer>
-                            <MessageSystemBannerRenderer />
-                            <RootStackNavigator />
-                        </ToastRenderer>
-                        {/* </NotificationRenderer> */}
+                        <PassphraseModalRenderer>
+                            {/* Notifications are disabled until the problem with after-import notifications flooding is solved. */}
+                            {/* More here: https://github.com/trezor/trezor-suite/issues/7721  */}
+                            {/* <NotificationRenderer> */}
+                            <ToastRenderer>
+                                <MessageSystemBannerRenderer />
+                                <RootStackNavigator />
+                            </ToastRenderer>
+                            {/* </NotificationRenderer> */}
+                        </PassphraseModalRenderer>
                     </AlertRenderer>
+                    <Snow />
                 </AuthenticatorProvider>
             </FormatterProvider>
             {/* NOTE: Rendered as last item so that it covers the whole app screen */}
@@ -122,4 +137,4 @@ const PureApp = () => (
     </GestureHandlerRootView>
 );
 
-export const App = Sentry.wrap(PureApp);
+export const App = isDebugEnv() ? PureApp : Sentry.wrap(PureApp);

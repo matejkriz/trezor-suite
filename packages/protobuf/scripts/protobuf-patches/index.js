@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const UINT_TYPE = 'UintType';
+const SINT_TYPE = 'SintType';
 const DeviceModelInternal = 'DeviceModelInternal';
 
 // type rule fixes, ideally it should not be here
@@ -130,7 +131,7 @@ const TYPE_PATCH = {
     'CardanoSignTxInit.ttl': UINT_TYPE,
     'CardanoSignTxInit.validity_interval_start': UINT_TYPE,
     'CardanoSignTxInit.total_collateral': UINT_TYPE,
-    'CardanoToken.mint_amount': UINT_TYPE,
+    'CardanoToken.mint_amount': SINT_TYPE,
     'CardanoNativeScript.invalid_before': UINT_TYPE,
     'CardanoNativeScript.invalid_hereafter': UINT_TYPE,
     'EosAsset.symbol': 'string',
@@ -169,9 +170,9 @@ const TYPE_PATCH = {
     'EosActionNewAccount.creator': 'string',
     'EosActionNewAccount.name': 'string',
     'ResetDevice.backup_type': 'string | number', // BackupType is a enum. in Features displayed as string, in resetDevice method param accepted as number
-    'StellarAssetType.type': '0 | 1 | 2',
+    'StellarAsset.type': '0 | 1 | 2  | "NATIVE" | "ALPHANUM4" | "ALPHANUM12"', // StellarAssetType is a enum, accepted as both number and string
     'StellarSignTx.sequence_number': UINT_TYPE,
-    'StellarSignTx.memo_id': 'string',
+    'StellarSignTx.memo_id': UINT_TYPE,
     'StellarSignTx.memo_hash': 'Buffer | string',
     'StellarCreateAccountOp.starting_balance': UINT_TYPE,
     'StellarPathPaymentStrictReceiveOp.send_max': UINT_TYPE,
@@ -312,4 +313,5 @@ module.exports = {
     DEFINITION_PATCH,
     SKIP,
     UINT_TYPE,
+    SINT_TYPE,
 };

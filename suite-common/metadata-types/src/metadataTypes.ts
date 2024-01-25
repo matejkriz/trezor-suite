@@ -50,7 +50,7 @@ export type MetadataAddPayload =
 // }
 export type MetadataItem = string;
 
-export type MetadataProviderType = 'dropbox' | 'google' | 'fileSystem' | 'sdCard';
+export type MetadataProviderType = 'dropbox' | 'google' | 'fileSystem' | 'inMemoryTest'; // Todo: | 'sdCard'
 
 export type Tokens = {
     accessToken?: string;
@@ -176,9 +176,11 @@ export abstract class AbstractMetadataProvider {
     }
 }
 
+export type AccountOutputLabels = { [index: string]: MetadataItem };
+
 export interface AccountLabels {
     accountLabel?: MetadataItem;
-    outputLabels: { [txid: string]: { [index: string]: MetadataItem } };
+    outputLabels: { [txid: string]: AccountOutputLabels };
     addressLabels: { [address: string]: MetadataItem };
 }
 
@@ -192,7 +194,7 @@ export type DeviceMetadata = DeviceEntityKeys;
 
 type Data = Record<
     LabelableEntityKeys['fileName'], // unique "id" for mapping with labelable entitties
-    Labels
+    Labels | PasswordManagerState
 >;
 
 /**
@@ -200,7 +202,7 @@ type Data = Record<
  * in the future, it could be
  * 'labels' | 'passwords' | 'contacts'...
  */
-export type DataType = 'labels';
+export type DataType = 'labels' | 'passwords';
 
 /**
  * Representation of provider data stored in reducer
@@ -239,3 +241,32 @@ export interface MetadataState {
 
 export type OAuthServerEnvironment = 'production' | 'staging' | 'localhost';
 export type MetadataEncryptionVersion = 1 | 2;
+
+type Password = {
+    type: 'Buffer';
+    data: Buffer;
+};
+
+export type PasswordEntry = {
+    export: boolean;
+    key_value: string;
+    nonce: string;
+    note?: string;
+    password: Password;
+    safe_note?: Password;
+    success: boolean;
+    title: string;
+    username: string;
+    tags: number[];
+};
+
+export type PasswordTag = { title: string; icon: string };
+
+export type PasswordManagerState = {
+    config: {
+        orderType: string;
+    };
+    entries: Record<number, PasswordEntry>;
+    extVersion: string;
+    tags: Record<number, PasswordTag>;
+};

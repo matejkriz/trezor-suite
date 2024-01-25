@@ -3,6 +3,9 @@
 // custom type uint32/64 may be represented as string
 export type UintType = string | number;
 
+// custom type sint32/64
+export type SintType = string | number;
+
 export enum DeviceModelInternal {
     T1B1 = 'T1B1',
     T2T1 = 'T2T1',
@@ -373,9 +376,19 @@ export type TxOutputType =
           payment_req_index?: number;
       }
     | {
+          address: string;
+          address_n?: typeof undefined;
+          script_type?: ChangeOutputScriptType;
+          amount: UintType;
+          multisig?: MultisigRedeemScriptType;
+          orig_hash?: string;
+          orig_index?: number;
+          payment_req_index?: number;
+      }
+    | {
           address?: typeof undefined;
           address_n?: typeof undefined;
-          amount: '0';
+          amount: '0' | 0;
           op_return_data: string;
           script_type: 'PAYTOOPRETURN';
           orig_hash?: string;
@@ -783,7 +796,7 @@ export type CardanoAssetGroup = {
 export type CardanoToken = {
     asset_name_bytes: string;
     amount?: UintType;
-    mint_amount?: UintType;
+    mint_amount?: SintType;
 };
 
 // CardanoTxInlineDatumChunk
@@ -2042,7 +2055,7 @@ export enum StellarAssetType {
 
 // StellarAsset
 export type StellarAsset = {
-    type: StellarAssetType;
+    type: 0 | 1 | 2 | 'NATIVE' | 'ALPHANUM4' | 'ALPHANUM12';
     code?: string;
     issuer?: string;
 };
@@ -2078,7 +2091,7 @@ export type StellarSignTx = {
     timebounds_end: number;
     memo_type: StellarMemoType;
     memo_text?: string;
-    memo_id?: string;
+    memo_id?: UintType;
     memo_hash?: Buffer | string;
     num_operations: number;
 };

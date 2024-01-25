@@ -5,14 +5,14 @@ import { useNavigation } from '@react-navigation/native';
 
 import { Box, Button, Divider, VStack } from '@suite-native/atoms';
 import { Assets } from '@suite-native/assets';
-import { useIsUsbDeviceConnectFeatureEnabled } from '@suite-native/feature-flags';
+import { FeatureFlag, useFeatureFlag } from '@suite-native/feature-flags';
 import {
     AccountsImportStackRoutes,
     RootStackParamList,
     RootStackRoutes,
     StackNavigationProps,
 } from '@suite-native/navigation';
-import { selectIsSelectedDeviceImported } from '@suite-common/wallet-core';
+import { selectIsPortfolioTrackerDevice } from '@suite-common/wallet-core';
 import { useTranslate } from '@suite-native/intl';
 
 import { PortfolioGraph, PortfolioGraphRef } from './PortfolioGraph';
@@ -27,9 +27,9 @@ export const PortfolioContent = forwardRef<PortfolioContentRef>((_props, ref) =>
 
     const navigation = useNavigation<StackNavigationProps<RootStackParamList, RootStackRoutes>>();
 
-    const isDeviceImported = useSelector(selectIsSelectedDeviceImported);
+    const isPortfolioTrackerDevice = useSelector(selectIsPortfolioTrackerDevice);
 
-    const { isUsbDeviceConnectFeatureEnabled } = useIsUsbDeviceConnectFeatureEnabled();
+    const [isUsbDeviceConnectFeatureEnabled] = useFeatureFlag(FeatureFlag.IsDeviceConnectEnabled);
 
     const handleImportAssets = () => {
         navigation.navigate(RootStackRoutes.AccountsImport, {
@@ -52,34 +52,38 @@ export const PortfolioContent = forwardRef<PortfolioContentRef>((_props, ref) =>
     return (
         <VStack spacing="large" marginTop="small">
             <PortfolioGraph ref={graphRef} />
-            <Assets />
-            {isDeviceImported && (
-                <Box marginHorizontal="medium">
-                    <Button
-                        data-testID="@home/portfolio/sync-coins-button"
-                        colorScheme="tertiaryElevation0"
-                        size="large"
-                        onPress={handleImportAssets}
-                    >
-                        {translate('moduleHome.buttons.syncMyCoins')}
-                    </Button>
+            <VStack spacing="large" marginHorizontal="small">
+                <Box>
+                    <Assets />
                 </Box>
-            )}
-            {!isUsbDeviceConnectFeatureEnabled && (
-                <>
-                    <Divider />
-                    <Box marginHorizontal="medium">
+                {isPortfolioTrackerDevice && (
+                    <Box>
                         <Button
-                            data-testID="@home/portolio/recieve-button"
+                            data-testID="@home/portfolio/sync-coins-button"
+                            colorScheme="tertiaryElevation0"
                             size="large"
-                            onPress={handleReceive}
-                            iconLeft="receive"
+                            onPress={handleImportAssets}
                         >
-                            {translate('moduleHome.buttons.receive')}
+                            {translate('moduleHome.buttons.syncMyCoins')}
                         </Button>
                     </Box>
-                </>
-            )}
+                )}
+                {!isUsbDeviceConnectFeatureEnabled && (
+                    <>
+                        <Divider />
+                        <Box>
+                            <Button
+                                data-testID="@home/portolio/recieve-button"
+                                size="large"
+                                onPress={handleReceive}
+                                iconLeft="receive"
+                            >
+                                {translate('moduleHome.buttons.receive')}
+                            </Button>
+                        </Box>
+                    </>
+                )}
+            </VStack>
         </VStack>
     );
 });

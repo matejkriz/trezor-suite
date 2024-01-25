@@ -1,8 +1,9 @@
 // original file https://github.com/trezor/connect/blob/develop/src/js/device/DeviceCommands.js
 
 import { randomBytes } from 'crypto';
-import { Transport, Messages } from '@trezor/transport';
-import { versionUtils } from '@trezor/utils';
+import { Transport } from '@trezor/transport';
+import * as Messages from '@trezor/protobuf/lib/messages-schema';
+import * as versionUtils from '@trezor/utils/lib/versionUtils';
 import { ERRORS, NETWORK } from '../constants';
 import { DEVICE } from '../events';
 import * as hdnodeUtils from '../utils/hdnodeUtils';
@@ -21,6 +22,7 @@ import { initLog } from '../utils/debug';
 import type { Device } from './Device';
 import type { CoinInfo, BitcoinNetworkInfo, Network } from '../types';
 import type { HDNodeResponse } from '../types/api/getPublicKey';
+import { Assert } from '@trezor/schema-utils';
 
 type MessageType = Messages.MessageType;
 type MessageKey = keyof MessageType;
@@ -41,7 +43,7 @@ export type PassphrasePromptResponse = {
 
 const logger = initLog('DeviceCommands');
 
-const assertType = (res: DefaultMessageResponse, resType: string | string[]) => {
+const assertType = (res: DefaultMessageResponse, resType: MessageKey | MessageKey[]) => {
     const splitResTypes = Array.isArray(resType) ? resType : resType.split('|');
     if (!splitResTypes.includes(res.type)) {
         throw ERRORS.TypedError(
@@ -418,6 +420,9 @@ export class DeviceCommands {
         if (this.disposed) {
             throw ERRORS.TypedError('Runtime', 'typedCall: DeviceCommands already disposed');
         }
+        // Assert message type
+        // msg is allowed to be undefined for some calls, in that case the schema is an empty object
+        Assert(Messages.MessageType.properties[type], msg ?? {});
         const response = await this._commonCall(type, msg);
         try {
             assertType(response, resType);

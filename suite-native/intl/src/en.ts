@@ -62,12 +62,29 @@ export const en = {
         },
         biometricsModal: {
             title: {
-                faceId: 'Enable FaceID',
-                fingerprint: 'Enable fingerprint',
-                touchId: 'Enable TouchID',
+                ios: {
+                    faceId: 'Enable FaceID',
+                    touchId: 'Enable TouchID',
+                },
+                android: {
+                    fingerprint: 'Enable fingerprint',
+                    facial: 'Enable facial recognition',
+                    combined: 'Enable biometrics',
+                },
                 unknown: 'Enable biometrics',
             },
-            description: 'Use biometricts verification \nto unlock the app.',
+            description: {
+                ios: {
+                    faceId: 'Use FaceID to unlock the app.',
+                    touchId: 'Use TouchID to unlock the app.',
+                },
+                android: {
+                    fingerprint: 'Use your fingerprint to unlock the app.',
+                    facial: 'Use facial recognition to unlock the app.',
+                    combined: 'Use facial recognition or fingerprint to unlock the app.',
+                },
+                unknown: 'Use biometrics to unlock the app.',
+            },
             button: {
                 later: 'I’ll do that later in Settings',
                 enable: 'Enable',
@@ -204,21 +221,11 @@ export const en = {
             },
             showAddress: {
                 button: 'Show full address',
+                buttonTracker: 'Show address',
                 learnMore: 'Learn more about verifying addresses',
             },
         },
         bottomSheets: {
-            verificationWalkthrough: {
-                title: {
-                    step1: 'What should I do next?',
-                    step2: 'Why is it important?',
-                },
-                description: {
-                    step1: 'Confirm that the address on your Trezor display matches the one on the following screen.',
-                    step2: 'No one can hack the Trezor device and change what the display is showing you.',
-                },
-                dontShowAgainButton: 'Don’t show again and continue',
-            },
             confirmOnTrezor: {
                 title: 'Confirm on Trezor',
                 description:
@@ -347,23 +354,23 @@ export const en = {
                 'Manage your portfolio with your Trezor hardware wallet connected directly to your mobile device.',
         },
         featureReceiveScreen: {
-            noUsb: {
+            portfolioTracker: {
                 title: 'Receive coins',
                 subtitle: 'Generate addresses and QR codes to receive crypto on the go.',
             },
-            usb: {
+            device: {
                 title: 'Receive',
                 subtitle:
                     'Generate and verify addresses directly on your Trezor to get paid and receive crypto on the go.',
             },
         },
         trackBalancesScreen: {
-            noUsb: {
+            portfolioTracker: {
                 title: 'Track balances',
                 subtitle:
                     'Easily sync your coin addresses and keep up with the crypto on your hardware wallet.',
             },
-            usb: {
+            device: {
                 title: 'Track balances',
                 subtitle:
                     'Keep up with your favorite coins even without your Trezor connected. Simply sync and track your crypto from anywhere.',
@@ -392,6 +399,12 @@ export const en = {
         accountDetail: {
             accountLabelBadge: 'Run on {accountLabel}',
         },
+        emptyState: {
+            title: 'No assets',
+            subtitle: 'Connect your Trezor or sync coins to view and track assets.',
+            receiveSubtitle: 'Connect your Trezor or sync coins to view and receive assets.',
+            searchAgain: 'Search again',
+        },
     },
     transactions: {
         phishing: {
@@ -404,6 +417,7 @@ export const en = {
         deviceButtons: {
             eject: 'Eject',
             deviceInfo: 'Device info',
+            addHiddenWallet: 'Add hidden wallet',
         },
         deviceList: {
             sectionTitle: 'Open',
@@ -452,6 +466,11 @@ export const en = {
         retrievingData: 'Retrieving data...',
         retrievengTakesLongerThanExpected:
             'Retrieving balances takes longer than usual. \n It may be caused by unstable internet connection.',
+    },
+    passphrase: {
+        modal: {
+            enterWallet: 'Enter passphrase',
+        },
     },
 };
 

@@ -2,12 +2,11 @@ import * as http from 'http';
 import * as net from 'net';
 import * as url from 'url';
 
+import type { RequiredKey } from '@trezor/type-utils';
 import { xssFilters } from '@trezor/utils';
 import { TypedEmitter } from '@trezor/utils/lib/typedEventEmitter';
 
 import { HTTP_ORIGINS_DEFAULT } from './constants';
-
-export type RequiredKey<M, K extends keyof M> = Omit<M, K> & Required<Pick<M, K>>;
 
 type Request = RequiredKey<http.IncomingMessage, 'url'>;
 
@@ -98,7 +97,7 @@ export class HttpReceiver extends TypedEmitter<Events> {
         return address;
     }
 
-    getRouteAddress(pathname: any) {
+    getRouteAddress(pathname: string) {
         const address = this.getServerAddress();
         const route = this.routes.find(r => r.pathname === pathname);
         if (!route) return;

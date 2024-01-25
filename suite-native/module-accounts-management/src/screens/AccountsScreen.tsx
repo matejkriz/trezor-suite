@@ -12,7 +12,10 @@ import {
 } from '@suite-native/navigation';
 import { AccountsList, SearchableAccountsListScreenHeader } from '@suite-native/accounts';
 import { AccountKey, TokenAddress } from '@suite-common/wallet-types';
-import { selectIsSelectedDeviceImported } from '@suite-common/wallet-core';
+import {
+    selectAreAllDevicesDisconnectedOrAccountless,
+    selectIsPortfolioTrackerDevice,
+} from '@suite-common/wallet-core';
 
 import { AddAccountButton } from '../components/AddAccountsButton';
 
@@ -20,7 +23,10 @@ export const AccountsScreen = () => {
     const navigation =
         useNavigation<StackNavigationProps<RootStackParamList, RootStackRoutes.AccountDetail>>();
 
-    const isSelectedDevicePortfolioTracker = useSelector(selectIsSelectedDeviceImported);
+    const isPortfolioTrackerDevice = useSelector(selectIsPortfolioTrackerDevice);
+    const areAllDevicesDisconnectedOrAccountless = useSelector(
+        selectAreAllDevicesDisconnectedOrAccountless,
+    );
 
     const [accountsFilterValue, setAccountsFilterValue] = useState<string>('');
 
@@ -42,7 +48,10 @@ export const AccountsScreen = () => {
                 <SearchableAccountsListScreenHeader
                     title="My assets"
                     onSearchInputChange={handleFilterChange}
-                    rightIcon={isSelectedDevicePortfolioTracker && <AddAccountButton />}
+                    rightIcon={
+                        isPortfolioTrackerDevice &&
+                        !areAllDevicesDisconnectedOrAccountless && <AddAccountButton />
+                    }
                 />
             }
         >

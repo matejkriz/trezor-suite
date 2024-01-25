@@ -1,29 +1,16 @@
-import { G } from '@mobily/ts-belt';
-
-import { Box } from '@suite-native/atoms';
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
+import { Card, VStack } from '@suite-native/atoms';
 import { Account, AccountKey, TokenAddress } from '@suite-common/wallet-types';
 
 import { AccountListItemInteractive } from './AccountListItemInteractive';
 
 type AccountsListGroupProps = {
-    accounts: readonly Account[] | null;
+    accounts: Account[];
     onSelectAccount: (accountKey: AccountKey, tokenContract?: TokenAddress) => void;
 };
 
-const accountListGroupStyle = prepareNativeStyle(utils => ({
-    backgroundColor: utils.colors.backgroundSurfaceElevation1,
-    borderRadius: 12,
-    marginBottom: utils.spacings.small,
-}));
-
-export const AccountsListGroup = ({ accounts, onSelectAccount }: AccountsListGroupProps) => {
-    const { applyStyle } = useNativeStyles();
-
-    if (G.isNull(accounts)) return null;
-
-    return (
-        <Box style={applyStyle(accountListGroupStyle)}>
+export const AccountsListGroup = ({ accounts, onSelectAccount }: AccountsListGroupProps) => (
+    <Card>
+        <VStack spacing="medium">
             {accounts.map(account => (
                 <AccountListItemInteractive
                     key={account.key}
@@ -31,6 +18,6 @@ export const AccountsListGroup = ({ accounts, onSelectAccount }: AccountsListGro
                     onSelectAccount={onSelectAccount}
                 />
             ))}
-        </Box>
-    );
-};
+        </VStack>
+    </Card>
+);

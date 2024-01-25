@@ -191,8 +191,10 @@ export abstract class AbstractApiTransport extends AbstractTransport {
                 try {
                     const { encode, decode } = protocol || v1Protocol;
                     const buffers = buildBuffers(this.messages, name, data, encode);
-                    for (const chunk of buffers) {
-                        this.api.write(path, chunk).then(result => {
+                    for (let i = 0; i < buffers.length; i++) {
+                        const chunk = buffers[i];
+                        // eslint-disable-next-line no-await-in-loop
+                        await this.api.write(path, chunk).then(result => {
                             if (!result.success) {
                                 throw new Error(result.error);
                             }
@@ -243,8 +245,10 @@ export abstract class AbstractApiTransport extends AbstractTransport {
             try {
                 const { encode } = protocol || v1Protocol;
                 const buffers = buildBuffers(this.messages, name, data, encode);
-                for (const chunk of buffers) {
-                    this.api.write(path, chunk).then(result => {
+                for (let i = 0; i < buffers.length; i++) {
+                    const chunk = buffers[i];
+                    // eslint-disable-next-line no-await-in-loop
+                    await this.api.write(path, chunk).then(result => {
                         if (!result.success) {
                             throw new Error(result.error);
                         }

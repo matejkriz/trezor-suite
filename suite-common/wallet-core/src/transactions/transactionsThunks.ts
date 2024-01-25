@@ -17,7 +17,9 @@ import {
     enhanceTransaction,
     getRbfParams,
     replaceEthereumSpecific,
+    advancedSearchTransactions,
 } from '@suite-common/wallet-utils';
+import { AccountLabels } from '@suite-common/metadata-types';
 import TrezorConnect from '@trezor/connect';
 import { blockbookUtils } from '@trezor/blockchain-link-utils';
 import { Transaction } from '@trezor/blockchain-link-types/lib/blockbook';
@@ -25,7 +27,7 @@ import { createThunk } from '@suite-common/redux-utils';
 
 import { accountsActions } from '../accounts/accountsActions';
 import { selectTransactions } from './transactionsReducer';
-import { transactionsActions, modulePrefix } from './transactionsActions';
+import { transactionsActionsPrefix, transactionsActions } from './transactionsActions';
 import { selectAccountByKey, selectAccounts } from '../accounts/accountsReducer';
 import { selectBlockchainHeightBySymbol } from '../blockchain/blockchainReducer';
 
@@ -41,7 +43,7 @@ interface ReplaceTransactionThunkParams {
 }
 
 export const replaceTransactionThunk = createThunk<ReplaceTransactionThunkParams>(
-    `${modulePrefix}/replaceTransactionThunk`,
+    `${transactionsActionsPrefix}/replaceTransactionThunk`,
     ({ precomposedTx, newTxid, signedTransaction }, { getState, dispatch }) => {
         if (!precomposedTx.prevTxid) return; // ignore if it's not a replacement tx
 
@@ -60,9 +62,8 @@ export const replaceTransactionThunk = createThunk<ReplaceTransactionThunkParams
                 // bitcoin-like: profile transaction for affected account
                 newTx = enhanceTransaction(
                     blockbookUtils.transformTransaction(
-                        affectedAccount.descriptor,
-                        affectedAccount.addresses,
                         signedTransaction,
+                        affectedAccount.addresses,
                     ),
                     affectedAccount,
                 );
@@ -108,7 +109,7 @@ interface AddFakePendingTransactionParams {
 }
 
 export const addFakePendingTxThunk = createThunk<AddFakePendingTransactionParams>(
-    `${modulePrefix}/addFakePendingTransaction`,
+    `${transactionsActionsPrefix}/addFakePendingTransaction`,
     ({ transaction, precomposedTx, account }, { dispatch, getState }) => {
         const blockHeight = selectBlockchainHeightBySymbol(getState(), account.symbol);
         const accounts = selectAccounts(getState());
@@ -141,9 +142,8 @@ export const addFakePendingTxThunk = createThunk<AddFakePendingTransactionParams
             if (!precomposedTx.prevTxid) {
                 // create and profile pending transaction for affected account if it's not a replacement tx
                 const affectedAccountTransaction = blockbookUtils.transformTransaction(
-                    affectedAccount.descriptor,
-                    affectedAccount.addresses,
                     transaction,
+                    affectedAccount.addresses ?? affectedAccount.descriptor,
                 );
                 const prependingTx = { ...affectedAccountTransaction, deadline: blockHeight + 2 };
                 dispatch(
@@ -174,7 +174,7 @@ export const addFakePendingTxThunk = createThunk<AddFakePendingTransactionParams
 );
 
 export const addFakePendingCardanoTxThunk = createThunk(
-    `${modulePrefix}/addFakePendingTransaction`,
+    `${transactionsActionsPrefix}/addFakePendingTransaction`,
     (
         {
             precomposedTx,
@@ -204,9 +204,7 @@ export const addFakePendingCardanoTxThunk = createThunk(
             targets: [],
             tokens: [],
             internalTransfers: [],
-            cardanoSpecific: {
-                subtype: null,
-            },
+            cardanoSpecific: {},
             details: {
                 vin: [],
                 vout: [],
@@ -221,16 +219,20 @@ export const addFakePendingCardanoTxThunk = createThunk(
 );
 
 export const exportTransactionsThunk = createThunk(
-    `${modulePrefix}/exportTransactions`,
+    `${transactionsActionsPrefix}/exportTransactions`,
     async (
         {
             account,
             accountName,
             type,
+            searchQuery,
+            accountMetadata,
         }: {
             account: Account;
             accountName: string;
             type: ExportFileType;
+            searchQuery: string;
+            accountMetadata: AccountLabels;
         },
         { getState, extra },
     ) => {
@@ -267,12 +269,17 @@ export const exportTransactionsThunk = createThunk(
                 })),
             }));
 
+        const filteredTransaction =
+            searchQuery.trim() !== ''
+                ? advancedSearchTransactions(transactions, accountMetadata, searchQuery)
+                : transactions;
+
         // Prepare data in right format
         const data = await formatData({
             coin: account.symbol,
             accountName,
             type,
-            transactions,
+            transactions: filteredTransaction,
             localCurrency,
         });
 
@@ -284,7 +291,7 @@ export const exportTransactionsThunk = createThunk(
 );
 
 export const fetchTransactionsThunk = createThunk(
-    `${modulePrefix}/fetchTransactionsThunk`,
+    `${transactionsActionsPrefix}/fetchTransactionsThunk`,
     async (
         {
             accountKey,

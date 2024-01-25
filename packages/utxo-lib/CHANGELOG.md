@@ -1,3 +1,23 @@
+# 2.0.4
+
+-   chore(utxo-lib): replace global.d.ts with global.ts (57b9b4fee)
+
+# 2.0.3
+
+-   refactor(utxo-lib): use spread instead of Object.assign (55eecd28b)
+-   refactor(utxo-lib): coinselect VinVout values/amounts as BN (ab1dae3fd)
+
+# 2.0.2
+
+-   refactor(utxo-lib): composeTx merge `coinselect` modules (7a8dff467)
+-   refactor(utxo-lib): composeTx result in one place (831d31688)
+-   refactor(utxo-lib): composeTx request validation in one place (ecb87bccd)
+-   chore(connect): use `tslib` as dependency in all public libs (606ecc63b)
+-   chore: update `jest` and related dependency (b8a321c83)
+-   chore(utxo-lib): use default imports from commonjs dependencies (466e10e4c)
+-   refactor(utxo-lib): do not use direct `typeforce` import (96d97c312)
+-   chore(repo): update tsx (53de3e3a8)
+
 # 2.0.1
 
 BREAKING CHANGES in `composeTx` module.

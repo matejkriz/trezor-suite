@@ -8,6 +8,8 @@ import type {
 import type {
     SolanaValidParsedTxWithMeta,
     ParsedTransactionWithMeta,
+    SolanaTokenAccountInfo,
+    TokenDetailByMint,
 } from '@trezor/blockchain-link-types/lib/solana';
 import type * as MessageTypes from '@trezor/blockchain-link-types/lib/messages';
 import { CustomError } from '@trezor/blockchain-link-types/lib/constants/errors';
@@ -20,7 +22,7 @@ import {
     transformTokenInfo,
     TOKEN_PROGRAM_PUBLIC_KEY,
 } from '@trezor/blockchain-link-utils/lib/solana';
-import { TOKEN_ACCOUNT_LAYOUT } from './tokenUtils';
+import { TOKEN_ACCOUNT_LAYOUT, fetchCoingeckoTokenDetailByMint } from './tokenUtils';
 
 export type SolanaAPI = Connection;
 
@@ -108,14 +110,25 @@ const getAccountInfo = async (request: Request<MessageTypes.GetAccountInfo>) => 
 
     const accountInfo = await api.getAccountInfo(publicKey);
 
-    const getTransactionPage = async (txIds: string[]) => {
+    const getTransactionPage = async (
+        txIds: string[],
+        tokenAccountsInfos: SolanaTokenAccountInfo[],
+        tokenDetailByMint: TokenDetailByMint,
+    ) => {
         const transactionsPage = await fetchTransactionPage(api, txIds);
 
         return (
             await Promise.all(
                 transactionsPage
                     .filter(isValidTransaction)
-                    .map(tx => solanaUtils.transformTransaction(tx, payload.descriptor)),
+                    .map(tx =>
+                        solanaUtils.transformTransaction(
+                            tx,
+                            payload.descriptor,
+                            tokenAccountsInfos,
+                            tokenDetailByMint,
+                        ),
+                    ),
             )
         ).filter((tx): tx is Transaction => !!tx);
     };
@@ -144,15 +157,30 @@ const getAccountInfo = async (request: Request<MessageTypes.GetAccountInfo>) => 
 
     const txIdPage = allTxIds.slice(pageStartIndex, pageEndIndex);
 
-    const transactionPage = details === 'txs' ? await getTransactionPage(txIdPage) : undefined;
+    const tokenAccountsInfos = tokenAccounts.value.map(a => ({
+        address: a.pubkey.toString(),
+        mint: a.account.data.parsed?.info?.mint as string | undefined,
+        decimals: a.account.data.parsed?.info?.tokenAmount?.decimals as number | undefined,
+    }));
 
     // Fetch token info only if the account owns tokens
+    const shouldFetchTokens =
+        tokenAccounts.value.length > 0 &&
+        (details === 'tokens' || details === 'txs' || details === 'tokenBalances');
     let tokens: TokenInfo[] = [];
-    if (tokenAccounts.value.length > 0) {
-        const tokenMetadata = await solanaUtils.getTokenMetadata();
+    let tokenDetailByMint: TokenDetailByMint = {};
+    if (shouldFetchTokens) {
+        tokenDetailByMint = await fetchCoingeckoTokenDetailByMint(
+            tokenAccountsInfos.map(a => a.mint).filter((mint): mint is string => !!mint),
+        );
 
-        tokens = transformTokenInfo(tokenAccounts.value, tokenMetadata);
+        tokens = transformTokenInfo(tokenAccounts.value, tokenDetailByMint);
     }
+
+    const transactionPage =
+        details === 'txs'
+            ? await getTransactionPage(txIdPage, tokenAccountsInfos, tokenDetailByMint)
+            : undefined;
 
     const balance = await api.getBalance(publicKey);
 
@@ -183,6 +211,15 @@ const getAccountInfo = async (request: Request<MessageTypes.GetAccountInfo>) => 
               }
             : {}),
     };
+
+    // Update token accounts of account stored by the worker since new accounts
+    // might have been created. We otherwise would not get proper updates for new
+    // token accounts.
+    const workerAccount = request.state.getAccount(payload.descriptor);
+    if (workerAccount) {
+        request.state.addAccounts([{ ...workerAccount, tokens }]);
+    }
+
     return {
         type: RESPONSES.GET_ACCOUNT_INFO,
         payload: account,
@@ -248,12 +285,12 @@ const estimateFee = async (request: Request<MessageTypes.EstimateFee>) => {
 
 const BLOCK_SUBSCRIBE_INTERVAL_MS = 10000;
 const subscribeBlock = async ({ state, connect, post }: Context) => {
-    if (state.getSubscription('block')) return;
+    if (state.getSubscription('block')) return { subscribed: true };
     const api = await connect();
 
     // the solana RPC api has subscribe method, see here: https://www.quicknode.com/docs/solana/rootSubscribe
     // but solana block height is updated so often that it slows down the whole application and overloads the the api
-    // so we instead use setInterval to check for new blocks every 10 seconds
+    // so we instead use setInterval to check for new blocks every `BLOCK_SUBSCRIBE_INTERVAL_MS`
     const interval = setInterval(async () => {
         const { blockhash: blockHash, lastValidBlockHeight: blockHeight } =
             await api.getLatestBlockhash('finalized');
@@ -273,6 +310,8 @@ const subscribeBlock = async ({ state, connect, post }: Context) => {
     }, BLOCK_SUBSCRIBE_INTERVAL_MS);
     // we save the interval in the state so we can clear it later
     state.addSubscription('block', interval);
+
+    return { subscribed: true };
 };
 
 const unsubscribeBlock = ({ state }: Context) => {
@@ -282,17 +321,46 @@ const unsubscribeBlock = ({ state }: Context) => {
     state.removeSubscription('block');
 };
 
-// @ts-expect-error
+const extractTokenAccounts = (accounts: SubscriptionAccountInfo[]): SubscriptionAccountInfo[] =>
+    accounts
+        .map(account =>
+            (
+                account.tokens?.map(
+                    token =>
+                        token.accounts?.map(tokenAccount => ({
+                            descriptor: tokenAccount.publicKey.toString(),
+                        })) || [],
+                ) || []
+            ).flat(),
+        )
+        .flat();
+
+const findTokenAccountOwner = (
+    accounts: SubscriptionAccountInfo[],
+    accountDescriptor: string,
+): SubscriptionAccountInfo | undefined =>
+    accounts.find(
+        account =>
+            account.tokens?.find(
+                token =>
+                    token.accounts?.find(
+                        tokenAccount => tokenAccount.publicKey.toString() === accountDescriptor,
+                    ),
+            ),
+    );
+
 const subscribeAccounts = async (
     { connect, state, post }: Context,
     accounts: SubscriptionAccountInfo[],
 ) => {
     const api = await connect();
     const subscribedAccounts = state.getAccounts();
-    const newAccounts = accounts.filter(
+    const tokenAccounts = extractTokenAccounts(accounts);
+    // we have to subscribe to both system and token accounts
+    const newAccounts = [...accounts, ...tokenAccounts].filter(
         account =>
             !subscribedAccounts.some(
-                subscribeAccount => account.descriptor === subscribeAccount.descriptor,
+                subscribedAccount => account.descriptor === subscribedAccount.descriptor,
             ),
     );
     newAccounts.forEach(a => {
@@ -318,14 +386,21 @@ const subscribeAccounts = async (
                 return;
             }
 
-            const tx = await solanaUtils.transformTransaction(lastTx, a.descriptor);
+            const tx = await solanaUtils.transformTransaction(lastTx, a.descriptor, [], {});
+
+            // For token accounts we need to emit an event with the owner account's descriptor
+            // since we don't store token accounts in the user's accounts.
+            const descriptor =
+                findTokenAccountOwner(state.getAccounts(), a.descriptor)?.descriptor ||
+                a.descriptor;
+
             post({
                 id: -1,
                 type: RESPONSES.NOTIFICATION,
                 payload: {
                     type: 'notification',
                     payload: {
-                        descriptor: a.descriptor,
+                        descriptor,
                         tx,
                     },
                 },
@@ -333,38 +408,53 @@ const subscribeAccounts = async (
         });
         state.addAccounts([{ ...a, subscriptionId }]);
     });
-    return { subscribed: true };
+    return { subscribed: newAccounts.length > 0 };
 };
 
-// @ts-expect-error
 const unsubscribeAccounts = async (
     { state, connect }: Context,
     accounts: SubscriptionAccountInfo[] | undefined = [],
 ) => {
     const api = await connect();
+
+    const subscribedAccounts = state.getAccounts();
+
     accounts.forEach(a => {
         if (a.subscriptionId) {
             api.removeAccountChangeListener(a.subscriptionId);
             state.removeAccounts([a]);
         }
+
+        // unsubscribe token accounts as well
+        a.tokens?.forEach(t => {
+            t.accounts?.forEach(ta => {
+                const tokenAccount = subscribedAccounts.find(
+                    sa => sa.descriptor === ta.publicKey.toString(),
+                );
+                if (tokenAccount?.subscriptionId) {
+                    api.removeAccountChangeListener(tokenAccount.subscriptionId);
+                    state.removeAccounts([tokenAccount]);
+                }
+            });
+        });
     });
 };
 
-const subscribe = (request: Request<MessageTypes.Subscribe>) => {
+const subscribe = async (request: Request<MessageTypes.Subscribe>) => {
+    let response: { subscribed: boolean };
     switch (request.payload.type) {
         case 'block':
-            subscribeBlock(request);
+            response = await subscribeBlock(request);
             break;
         case 'accounts':
-            // accounts subscription is currently disabled due to it possibly causing crashes
-            // subscribeAccounts(request, request.payload.accounts);
+            response = await subscribeAccounts(request, request.payload.accounts);
             break;
         default:
             throw new CustomError('worker_unknown_request', `+${request.type}`);
     }
     return {
         type: RESPONSES.SUBSCRIBE,
-        payload: { subscribed: true },
+        payload: response,
     } as const;
 };
 
@@ -374,8 +464,7 @@ const unsubscribe = (request: Request<MessageTypes.Unsubscribe>) => {
             unsubscribeBlock(request);
             break;
         case 'accounts': {
-            // accounts subscription is currently disabled due to it possibly causing crashes
-            // unsubscribeAccounts(request, request.payload.accounts);
+            unsubscribeAccounts(request, request.payload.accounts);
             break;
         }
         default:
@@ -383,7 +472,7 @@ const unsubscribe = (request: Request<MessageTypes.Unsubscribe>) => {
     }
     return {
         type: RESPONSES.UNSUBSCRIBE,
-        payload: { subscribed: false },
+        payload: { subscribed: request.state.getAccounts().length > 0 },
     } as const;
 };
 
@@ -412,8 +501,7 @@ class SolanaWorker extends BaseWorker<SolanaAPI> {
     }
 
     tryConnect(url: string): Promise<SolanaAPI> {
-        // websocket connection is currently disabled due to it possibly causing crashes
-        const api = new Connection(url /* , { wsEndpoint: url.replace('https', 'wss') } */);
+        const api = new Connection(url, { wsEndpoint: url.replace('https', 'wss') });
         this.post({ id: -1, type: RESPONSES.CONNECTED });
         return Promise.resolve(api);
     }
@@ -442,10 +530,11 @@ class SolanaWorker extends BaseWorker<SolanaAPI> {
             return;
         }
 
-        // accounts subscription is currently disabled due to it possibly causing crashes
-        // this.state.accounts.forEach(
-        //     a => a.subscriptionId && this.api?.removeAccountChangeListener(a.subscriptionId),
-        // );
+        this.state
+            .getAccounts()
+            .forEach(
+                a => a.subscriptionId && this.api?.removeAccountChangeListener(a.subscriptionId),
+            );
 
         if (this.state.getSubscription('block')) {
             const interval = this.state.getSubscription('block') as NodeJS.Timer;

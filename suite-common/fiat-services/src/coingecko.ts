@@ -11,11 +11,11 @@ interface HistoricalResponse extends LastWeekRates {
     symbol: string;
 }
 
-const rateLimiter = new RateLimiter(1000);
+const rateLimiter = new RateLimiter(1_000, 15_000);
 
 const fetchCoinGecko = async (url: string) => {
     try {
-        const res = await rateLimiter.limit(() => fetchUrl(url));
+        const res = await rateLimiter.limit(signal => fetchUrl(url, { signal }));
         if (!res.ok) {
             console.warn(`Coingecko: Fiat rates failed to fetch: ${res.status}`);
             return;
@@ -28,10 +28,7 @@ const fetchCoinGecko = async (url: string) => {
 };
 
 export const getTickerConfig = (ticker: TickerId) =>
-    // for token find its main network
-    FIAT_CONFIG.tickers.find(t =>
-        ticker.tokenAddress ? t.symbol === ticker.mainNetworkSymbol : t.symbol === ticker.symbol,
-    );
+    FIAT_CONFIG.tickers.find(t => t.symbol === ticker.symbol);
 
 /**
  * Build coinUrl using defined coin ids
@@ -46,7 +43,8 @@ const buildCoinUrl = (ticker: TickerId) => {
         return null;
     }
 
-    return `${COINGECKO_API_BASE_URL}/coins/${config.coingeckoId}`;
+    const baseUrl = `${COINGECKO_API_BASE_URL}/coins/${config.coingeckoId}`;
+    return ticker.tokenAddress ? `${baseUrl}/contract/${ticker.tokenAddress}` : baseUrl;
 };
 
 /**

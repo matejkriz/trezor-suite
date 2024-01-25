@@ -1,3 +1,35 @@
+# 2.1.22
+
+-   fix(suite): subscribe to Solana token accounts as well (b2f85ac9e)
+-   fix(suite): re-enable Solana account subscriptions (still without token accounts support) (e05f8c9ed)
+-   fix(suite): fix subscription return values (149903f8e)
+-   fix(blockchain-link): no throw from ws.close (7e6e79b1c)
+-   chore: bump `ws` to 8.16.0 (bd1e5ec81)
+
+# 2.1.21
+
+-   fix(blockchain-link): fix solana txs when sending to associated token account (5cb682078)
+-   feat(electrum): support non-batching servers (e06b9375a)
+-   test(blockchain-link): remove `TypedRawTransaction` (d3354fdf2)
+-   feat(blockchain-link): remove `TypedRawTransaction` (34d405d12)
+-   feat(blockchain-link): add `getTransactionHex` method (cbca5dbfd)
+-   refactor(blockchain-link): adjust `transformTransaction` params (2d669d72e)
+-   chore(blockchain-link): remove ADA `null` subtype (07161b141)
+-   test(blockchain-link): smaller timeouts (cd83adc61)
+-   test(blockchain-link): fix error testing (7995e957e)
+
+# 2.1.20
+
+-   chore(connect): use `tslib` as dependency in all public libs (606ecc63b)
+-   chore(blockchain-link): use extended top-level tsconfig (d17da1f35)
+-   chore: update `jest` and related dependency (b8a321c83)
+-   fix(blockchain-link): use timeout field of RippleApi.APIOptions (eafa4f308)
+-   chore(blockchain-link): use default imports from commonjs dependencies (9a81b0459)
+-   chore: Throttler throttling instead of debouncing in `@trezor/blockchain-link` (#10288) (f7ff0cf9f)
+-   fix(blockchain-link): consider only unique solana signatures when paginating (e00cf70ac)
+-   chore(repo): update tsx (53de3e3a8)
+-   feat(suite): add Solana support (f2a89b34f)
+
 # 2.1.19
 
 -   chore(repo): Upgrade TS 5.3 (#10017) (7277f9d0f)

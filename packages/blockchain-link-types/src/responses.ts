@@ -6,7 +6,6 @@ import type {
     Utxo,
     FiatRates,
     Transaction,
-    TypedRawTransaction,
     AccountBalanceHistory,
     ChannelMessage,
 } from './common';
@@ -54,7 +53,12 @@ export interface GetAccountUtxo {
 
 export interface GetTransaction {
     type: typeof RESPONSES.GET_TRANSACTION;
-    payload: TypedRawTransaction;
+    payload: Transaction;
+}
+
+export interface GetTransactionHex {
+    type: typeof RESPONSES.GET_TRANSACTION_HEX;
+    payload: string;
 }
 
 export interface GetAccountBalanceHistory {
@@ -163,6 +167,7 @@ export type Response =
     | ChannelMessage<GetAccountInfo>
     | ChannelMessage<GetAccountUtxo>
     | ChannelMessage<GetTransaction>
+    | ChannelMessage<GetTransactionHex>
     | ChannelMessage<GetAccountBalanceHistory>
     | ChannelMessage<GetCurrentFiatRates>
     | ChannelMessage<GetFiatRatesForTimestamps>

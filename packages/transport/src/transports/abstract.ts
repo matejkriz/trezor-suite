@@ -50,6 +50,24 @@ export interface AbstractTransportParams {
     logger?: Logger;
 }
 
+export const isTransportInstance = (transport?: AbstractTransport) => {
+    const requiredMethods = [
+        'init',
+        'enumerate',
+        'listen',
+        'acquire',
+        'release',
+        'send',
+        'receive',
+        'call',
+    ] as const;
+
+    if (transport && typeof transport === 'object') {
+        return !requiredMethods.some(m => typeof transport[m] !== 'function');
+    }
+    return false;
+};
+
 export abstract class AbstractTransport extends TypedEmitter<{
     [TRANSPORT.UPDATE]: DeviceDescriptorDiff;
     [TRANSPORT.ERROR]:
@@ -322,7 +340,7 @@ export abstract class AbstractTransport extends TypedEmitter<{
      */
     abstract stop(): void;
 
-    private _getDiff(nextDescriptors: Descriptor[]): DeviceDescriptorDiff {
+    private getDiff(nextDescriptors: Descriptor[]): DeviceDescriptorDiff {
         const connected = nextDescriptors.filter(
             nextDescriptor =>
                 !this.descriptors.find(descriptor => descriptor.path === nextDescriptor.path),
@@ -388,7 +406,7 @@ export abstract class AbstractTransport extends TypedEmitter<{
         if (this.stopped) {
             return;
         }
-        const diff = this._getDiff(nextDescriptors);
+        const diff = this.getDiff(nextDescriptors);
         this.logger.debug('nextDescriptors', nextDescriptors, 'diff', diff);
 
         if (!diff.didUpdate) {

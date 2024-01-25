@@ -1,6 +1,8 @@
 import { saveAs } from 'file-saver';
 import { PayloadAction } from '@reduxjs/toolkit';
 
+import { resolveStaticPath } from '@suite-common/suite-utils';
+import { getAccountKey } from '@suite-common/wallet-utils';
 import {
     DeviceRootState,
     selectIsPendingTransportEvent,
@@ -10,13 +12,11 @@ import {
     selectDiscoveryByDeviceState,
     deviceActions,
 } from '@suite-common/wallet-core';
-import { resolveStaticPath } from '@suite-common/suite-utils';
-import { getAccountKey } from '@suite-common/wallet-utils';
-import type { FiatRatesState } from '@suite-common/wallet-core';
 import { NetworkSymbol } from '@suite-common/wallet-config';
 import { ExtraDependencies } from '@suite-common/redux-utils';
 
 import { StorageLoadAction } from 'src/actions/suite/storageActions';
+import * as metadataLabelingActions from 'src/actions/suite/metadataLabelingActions';
 import * as metadataActions from 'src/actions/suite/metadataActions';
 import * as cardanoStakingActions from 'src/actions/wallet/cardanoStakingActions';
 import * as walletSettingsActions from 'src/actions/settings/walletSettingsActions';
@@ -47,14 +47,13 @@ export const extraDependencies: ExtraDependencies = {
     thunks: {
         cardanoValidatePendingTxOnBlock: cardanoStakingActions.validatePendingTxOnBlock,
         cardanoFetchTrezorPools: cardanoStakingActions.fetchTrezorPools,
-        initMetadata: metadataActions.init,
-        fetchAndSaveMetadata: metadataActions.fetchAndSaveMetadata,
+        initMetadata: metadataLabelingActions.init,
+        fetchAndSaveMetadata: metadataLabelingActions.fetchAndSaveMetadata,
     },
     selectors: {
         selectFeeInfo: (networkSymbol: NetworkSymbol) => (state: AppState) =>
             state.wallet.fees[networkSymbol],
         selectDevices: (state: AppState) => state.device.devices,
-        selectCurrentDevice: (state: AppState) => state.device.selectedDevice,
         selectBitcoinAmountUnit: (state: AppState) => state.wallet.settings.bitcoinAmountUnit,
         selectEnabledNetworks: (state: AppState) => state.wallet.settings.enabledNetworks,
         selectLocalCurrency: (state: AppState) => state.wallet.settings.localCurrency,
@@ -63,7 +62,7 @@ export const extraDependencies: ExtraDependencies = {
         selectDesktopBinDir: (state: AppState) => state.desktop?.paths?.binDir,
         selectDevice: (state: AppState) => state.device.selectedDevice,
         selectMetadata: (state: AppState) => state.metadata,
-        selectDiscoveryForDevice: (state: DiscoveryRootState & DeviceRootState) =>
+        selectDeviceDiscovery: (state: DiscoveryRootState & DeviceRootState) =>
             selectDiscoveryByDeviceState(state, state.device.selectedDevice?.state),
         selectRouterApp: (state: AppState) => state.router.app,
         selectCheckFirmwareAuthenticity: (state: AppState) =>
@@ -72,7 +71,6 @@ export const extraDependencies: ExtraDependencies = {
     actions: {
         setAccountAddMetadata: metadataActions.setAccountAdd,
         setWalletSettingsLocalCurrency: walletSettingsActions.setLocalCurrency,
-        changeWalletSettingsNetworks: walletSettingsActions.changeNetworks,
         lockDevice: suiteActions.lockDevice,
         appChanged: suiteActions.appChanged,
         setSelectedDevice: deviceActions.selectDevice,
@@ -109,9 +107,6 @@ export const extraDependencies: ExtraDependencies = {
             payload.accounts.map(acc =>
                 acc.backendType === 'coinjoin' ? fixLoadedCoinjoinAccount(acc) : acc,
             ),
-        storageLoadFiatRates: (state: FiatRatesState, { payload }: StorageLoadAction) => {
-            state.coins = payload.fiatRates;
-        },
         storageLoadFirmware: (state, { payload }: StorageLoadAction) => {
             if (payload.firmware?.firmwareHashInvalid) {
                 state.firmwareHashInvalid = payload.firmware.firmwareHashInvalid;

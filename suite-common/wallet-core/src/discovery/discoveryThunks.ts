@@ -11,10 +11,10 @@ import { getFirmwareVersion } from '@trezor/device-utils';
 import { versionUtils } from '@trezor/utils';
 
 import {
+    DISCOVERY_MODULE_PREFIX,
     completeDiscovery,
     createDiscovery,
     interruptDiscovery,
-    DISCOVERY_MODULE_PREFIX,
     startDiscovery,
     stopDiscovery,
     updateDiscovery,
@@ -22,7 +22,7 @@ import {
 import {
     selectDiscoveryByDeviceState,
     selectDiscovery,
-    selectDiscoveryForDevice,
+    selectDeviceDiscovery,
 } from './discoveryReducer';
 import { selectAccounts } from '../accounts/accountsReducer';
 import { accountsActions } from '../accounts/accountsActions';
@@ -160,7 +160,7 @@ const handleProgressThunk = createThunk(
 export const stopDiscoveryThunk = createThunk(
     `${DISCOVERY_MODULE_PREFIX}/stop`,
     (_, { dispatch, getState }) => {
-        const discovery = selectDiscoveryForDevice(getState());
+        const discovery = selectDeviceDiscovery(getState());
         if (discovery && discovery.running) {
             dispatch(
                 interruptDiscovery({
@@ -253,6 +253,7 @@ export const getAvailableCardanoDerivationsThunk = createThunk(
             device,
             useEmptyPassphrase: device.useEmptyPassphrase,
             keepSession: true,
+            skipFinalReload: true,
             path: "m/1852'/1815'/0'",
         };
         const icarusPubKeyResult = await TrezorConnect.cardanoGetPublicKey({
@@ -328,7 +329,7 @@ export const startDiscoveryThunk = createThunk(
         } = extra;
         const device = selectDevice(getState());
         const metadata = selectMetadata(getState());
-        const discovery = selectDiscoveryForDevice(getState());
+        const discovery = selectDeviceDiscovery(getState());
 
         if (!device) {
             dispatch(
@@ -653,7 +654,7 @@ export const updateNetworkSettingsThunk = createThunk(
 export const restartDiscoveryThunk = createThunk(
     `${DISCOVERY_MODULE_PREFIX}/restart`,
     async (_, { dispatch, getState }) => {
-        const discovery = selectDiscoveryForDevice(getState());
+        const discovery = selectDeviceDiscovery(getState());
         if (!discovery) return;
         const progress = dispatch(
             calculateProgress({

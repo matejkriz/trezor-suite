@@ -1,5 +1,11 @@
 import { createThunk } from '@suite-common/redux-utils';
-import TrezorConnect, { Device } from '@trezor/connect';
+import TrezorConnect, {
+    Device,
+    CardanoAddress,
+    Address,
+    Response as ConnectResponse,
+    UI,
+} from '@trezor/connect';
 import { TrezorDevice } from '@suite-common/suite-types';
 import { analytics, EventType } from '@trezor/suite-analytics';
 import { notificationsActions } from '@suite-common/toast-notifications';
@@ -456,7 +462,7 @@ export const confirmAddressOnDeviceThunk = createThunk(
             chunkify,
         }: { accountKey: AccountKey; addressPath: string; chunkify: boolean },
         { getState },
-    ) => {
+    ): Promise<ConnectResponse<Address | CardanoAddress>> => {
         const device = selectDevice(getState());
         const account = selectAccountByKey(getState(), accountKey);
 
@@ -511,8 +517,38 @@ export const confirmAddressOnDeviceThunk = createThunk(
                 response = {
                     success: false,
                     payload: { error: 'Method for getAddress not defined', code: undefined },
-                };
+                } as const;
         }
         return response;
+    },
+);
+
+export const onPassphraseSubmit = createThunk(
+    `${MODULE_PREFIX}/onPassphraseSubmit`,
+    (
+        { value, passphraseOnDevice }: { value: string; passphraseOnDevice: boolean },
+        { dispatch, getState },
+    ) => {
+        const device = selectDevice(getState());
+        if (!device) return;
+
+        if (!device.state) {
+            dispatch(
+                deviceActions.updatePassphraseMode({
+                    device,
+                    hidden: passphraseOnDevice || !!value,
+                    alwaysOnDevice: passphraseOnDevice,
+                }),
+            );
+        }
+
+        TrezorConnect.uiResponse({
+            type: UI.RECEIVE_PASSPHRASE,
+            payload: {
+                value,
+                save: true,
+                passphraseOnDevice,
+            },
+        });
     },
 );

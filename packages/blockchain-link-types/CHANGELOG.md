@@ -1,3 +1,21 @@
+# 1.0.11
+
+-   fix(suite): subscribe to Solana token accounts as well (b2f85ac9e)
+-   chore(blokchain-link-types): import type from @trezor/type-utils (a2087ebf7)
+
+# 1.0.10
+
+-   fix(blockchain-link): fix solana txs when sending to associated token account (5cb682078)
+-   feat(blockchain-link): remove `TypedRawTransaction` (34d405d12)
+-   feat(blockchain-link): add `getTransactionHex` method (cbca5dbfd)
+-   chore(blockchain-link): remove ADA `null` subtype (07161b141)
+-   fix(blockchain-link-types): ADA getTransaction type (02e6194ef)
+
+# 1.0.9
+
+-   chore(repo): update tsx (53de3e3a8)
+-   feat(suite): add Solana support (f2a89b34f)
+
 # 1.0.8
 
 -   chore(repo): Upgrade TS 5.3 (#10017) (7277f9d0f)

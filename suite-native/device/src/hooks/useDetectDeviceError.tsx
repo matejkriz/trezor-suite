@@ -10,12 +10,13 @@ import {
     selectIsNoPhysicalDeviceConnected,
     selectIsDeviceInBootloader,
     selectIsUnacquiredDevice,
-    selectIsSelectedDeviceImported,
+    selectIsPortfolioTrackerDevice,
+    selectHasDeviceFirmwareInstalled,
 } from '@suite-common/wallet-core';
 import { useAlert } from '@suite-native/alerts';
 import { useTranslate } from '@suite-native/intl';
 
-import { selectIsFirmwareSupported } from '../selectors';
+import { selectIsDeviceFirmwareSupported } from '../selectors';
 import { IncompatibleDeviceModalAppendix } from '../components/IncompatibleDeviceModalAppendix';
 import { BootloaderModalAppendix } from '../components/BootloaderModalAppendix';
 import { UnacquiredDeviceModalAppendix } from '../components/UnacquiredDeviceModalAppendix';
@@ -30,11 +31,12 @@ export const useDetectDeviceError = () => {
     const selectedDevice = useSelector(selectDevice);
     const isUnacquiredDevice = useSelector(selectIsUnacquiredDevice);
     const isConnectedDeviceUninitialized = useSelector(selectIsConnectedDeviceUninitialized);
-    const isSelectedDeviceImported = useSelector(selectIsSelectedDeviceImported);
+    const isPortfolioTrackerDevice = useSelector(selectIsPortfolioTrackerDevice);
     const isNoPhysicalDeviceConnected = useSelector(selectIsNoPhysicalDeviceConnected);
     const isDeviceInBootloader = useSelector(selectIsDeviceInBootloader);
+    const hasDeviceFirmwareInstalled = useSelector(selectHasDeviceFirmwareInstalled);
 
-    const isFirmwareSupported = useSelector(selectIsFirmwareSupported);
+    const isDeviceFirmwareSupported = useSelector(selectIsDeviceFirmwareSupported);
 
     const handleDisconnect = useCallback(() => {
         if (selectedDevice) {
@@ -70,7 +72,7 @@ export const useDetectDeviceError = () => {
     }, [isUnacquiredDevice, translate, dispatch, hideAlert, showAlert]);
 
     useEffect(() => {
-        if (!isFirmwareSupported && !isSelectedDeviceImported && !wasDeviceEjectedByUser) {
+        if (!isDeviceFirmwareSupported && !isPortfolioTrackerDevice && !wasDeviceEjectedByUser) {
             showAlert({
                 title: translate('moduleDevice.unsupportedFirmwareModal.title'),
                 description: translate('moduleDevice.unsupportedFirmwareModal.description'),
@@ -89,8 +91,8 @@ export const useDetectDeviceError = () => {
             });
         }
     }, [
-        isFirmwareSupported,
-        isSelectedDeviceImported,
+        isDeviceFirmwareSupported,
+        isPortfolioTrackerDevice,
         wasDeviceEjectedByUser,
         dispatch,
         showAlert,
@@ -127,7 +129,7 @@ export const useDetectDeviceError = () => {
     ]);
 
     useEffect(() => {
-        if (isDeviceInBootloader && !wasDeviceEjectedByUser) {
+        if (isDeviceInBootloader && hasDeviceFirmwareInstalled && !wasDeviceEjectedByUser) {
             showAlert({
                 title: translate('moduleDevice.bootloaderModal.title'),
                 description: translate('moduleDevice.bootloaderModal.description'),
@@ -145,7 +147,14 @@ export const useDetectDeviceError = () => {
                 },
             });
         }
-    }, [isDeviceInBootloader, wasDeviceEjectedByUser, showAlert, translate, handleDisconnect]);
+    }, [
+        isDeviceInBootloader,
+        hasDeviceFirmwareInstalled,
+        wasDeviceEjectedByUser,
+        showAlert,
+        translate,
+        handleDisconnect,
+    ]);
 
     useEffect(() => {
         // Hide the error alert on disconnect of the device

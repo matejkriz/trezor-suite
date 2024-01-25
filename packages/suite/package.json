@@ -1,6 +1,6 @@
 {
     "name": "@trezor/suite",
-    "suiteVersion": "24.1.0",
+    "suiteVersion": "24.2.0",
     "version": "1.0.0",
     "private": true,
     "scripts": {
@@ -20,10 +20,10 @@
     },
     "dependencies": {
         "@formatjs/intl": "2.9.6",
-        "@hookform/resolvers": "3.1.0",
+        "@hookform/resolvers": "3.3.2",
         "@mobily/ts-belt": "^3.13.1",
         "@reduxjs/toolkit": "1.9.5",
-        "@sentry/core": "^7.77.0",
+        "@sentry/core": "7.81.1",
         "@solana/buffer-layout": "^4.0.1",
         "@solana/web3.js": "^1.87.6",
         "@suite-common/analytics": "workspace:*",
@@ -44,6 +44,7 @@
         "@suite-common/suite-utils": "workspace:*",
         "@suite-common/test-utils": "workspace:*",
         "@suite-common/toast-notifications": "workspace:*",
+        "@suite-common/validators": "workspace:*",
         "@suite-common/wallet-config": "workspace:*",
         "@suite-common/wallet-constants": "workspace:*",
         "@suite-common/wallet-core": "workspace:*",
@@ -69,7 +70,6 @@
         "@trezor/type-utils": "workspace:*",
         "@trezor/urls": "workspace:*",
         "@trezor/utils": "workspace:*",
-        "@trezor/validation": "workspace:*",
         "bignumber.js": "^9.1.1",
         "bs58check": "^3.0.1",
         "date-fns": "^2.30.0",

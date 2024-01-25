@@ -15,7 +15,12 @@ import {
 import { goto } from 'src/actions/suite/routerActions';
 import { fillSendForm } from 'src/actions/suite/protocolActions';
 import { AppState } from 'src/types/suite';
-import { FormState, SendContextValues, UseSendFormState } from '@suite-common/wallet-types';
+import {
+    CoinFiatRates,
+    FormState,
+    SendContextValues,
+    UseSendFormState,
+} from '@suite-common/wallet-types';
 import {
     getFeeLevels,
     getDefaultValues,
@@ -38,10 +43,10 @@ SendContext.displayName = 'SendContext';
 // Props of @wallet-views/send/index
 export interface SendFormProps {
     selectedAccount: AppState['wallet']['selectedAccount'];
-    fiat: AppState['wallet']['fiat'];
     localCurrency: AppState['wallet']['settings']['localCurrency'];
     fees: AppState['wallet']['fees'];
     online: boolean;
+    coins: CoinFiatRates[];
     sendRaw?: boolean;
     metadataEnabled: boolean;
     targetAnonymity?: number;
@@ -59,7 +64,6 @@ const getStateFromProps = (props: UseSendFormProps) => {
     const coinFees = props.fees[symbol];
     const levels = getFeeLevels(networkType, coinFees);
     const feeInfo = { ...coinFees, levels };
-    const fiatRates = props.fiat.coins.find(item => item.symbol === symbol);
     const localCurrencyOption = {
         value: props.localCurrency,
         label: props.localCurrency.toUpperCase(),
@@ -70,7 +74,6 @@ const getStateFromProps = (props: UseSendFormProps) => {
         network,
         coinFees,
         feeInfo,
-        fiatRates,
         localCurrencyOption,
         online: props.online,
         metadataEnabled: props.metadataEnabled,
@@ -85,6 +88,10 @@ const getStateFromProps = (props: UseSendFormProps) => {
 export const useSendForm = (props: UseSendFormProps): SendContextValues => {
     // public variables, exported to SendFormContext
     const [isLoading, setLoading] = useState(false);
+    const fiatRates = props.coins.find(
+        item => item.symbol === props.selectedAccount.account.symbol,
+    );
+
     const [state, setState] = useState<UseSendFormState>(getStateFromProps(props));
     // private variables, used inside sendForm hook
     const draft = useRef<FormState | undefined>(undefined);
@@ -150,7 +157,7 @@ export const useSendForm = (props: UseSendFormProps): SendContextValues => {
     // declare sendFormUtils, sub-hook of useSendForm
     const sendFormUtils = useSendFormFields({
         ...useFormMethods,
-        fiatRates: state.fiatRates,
+        fiatRates,
         network: state.network,
     });
 
@@ -212,10 +219,10 @@ export const useSendForm = (props: UseSendFormProps): SendContextValues => {
     }, [dispatch, props, setComposedLevels]);
 
     // declare useSendFormImport, sub-hook of useSendForm
-    const { importTransaction } = useSendFormImport({
+    const { importTransaction, validateImportedTransaction } = useSendFormImport({
         network: state.network,
         tokens: state.account.tokens,
-        fiatRates: state.fiatRates,
+        fiatRates,
         localCurrencyOption,
     });
 
@@ -227,10 +234,12 @@ export const useSendForm = (props: UseSendFormProps): SendContextValues => {
         // keepDefaultValues will set `isDirty` flag to true
         reset(values, { keepDefaultValues: true });
         setLoading(false);
-        const valid = await trigger();
-        if (valid) {
-            composeRequest();
-        }
+        validateImportedTransaction(async () => {
+            const valid = await trigger();
+            if (valid) {
+                composeRequest();
+            }
+        });
     };
 
     // get response from TransactionReviewModal
@@ -354,6 +363,7 @@ export const useSendForm = (props: UseSendFormProps): SendContextValues => {
         ...useFormMethods,
         isLoading,
         register,
+        fiatRates,
         outputs: outputsFieldArray.fields,
         composedLevels,
         updateContext,

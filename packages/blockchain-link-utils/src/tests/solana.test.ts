@@ -1,7 +1,6 @@
 import { ParsedTransactionWithMeta } from '@solana/web3.js';
-import { TokenTransfer } from 'packages/blockchain-link-types/lib';
 
-import { Transaction } from '@trezor/blockchain-link-types';
+import { TokenTransfer, Transaction } from '@trezor/blockchain-link-types/lib';
 import { SolanaValidParsedTxWithMeta } from '@trezor/blockchain-link-types/lib/solana';
 
 import {
@@ -107,6 +106,7 @@ describe('solana/utils', () => {
                     input.transaction as ParsedTransactionWithMeta,
                     input.accountAddress,
                     input.map,
+                    input.tokenAccountsInfos,
                 );
                 expect(result).toEqual(expectedOutput);
             });
@@ -119,6 +119,8 @@ describe('solana/utils', () => {
                 const result = await transformTransaction(
                     input.transaction as SolanaValidParsedTxWithMeta,
                     input.accountAddress,
+                    input.tokenAccountsInfos,
+                    {},
                 );
                 expect(result).toEqual(expectedOutput);
             });

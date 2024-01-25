@@ -13,7 +13,7 @@ import { useDiscovery, useDispatch, useSelector } from 'src/hooks/suite';
 import { useFastAccounts, useFiatValue } from 'src/hooks/wallet';
 import { goto } from 'src/actions/suite/routerActions';
 import { setFlag } from 'src/actions/suite/suiteActions';
-import * as accountUtils from '@suite-common/wallet-utils';
+import { getTotalFiatBalance } from '@suite-common/wallet-utils';
 
 import { Header } from './components/Header';
 import { Exception } from './components/Exception';
@@ -44,16 +44,14 @@ const Wrapper = styled.div`
 `;
 
 const PortfolioCard = memo(() => {
-    const { fiat, localCurrency } = useFiatValue();
+    const { coins, localCurrency } = useFiatValue();
     const { discovery, getDiscoveryStatus, isDiscoveryRunning } = useDiscovery();
     const accounts = useFastAccounts();
     const { dashboardGraphHidden } = useSelector(s => s.suite.flags);
     const dispatch = useDispatch();
 
     const isDeviceEmpty = useMemo(() => accounts.every(a => a.empty), [accounts]);
-    const portfolioValue = accountUtils
-        .getTotalFiatBalance(accounts, localCurrency, fiat.coins)
-        .toString();
+    const portfolioValue = getTotalFiatBalance(accounts, localCurrency, coins).toString();
 
     const discoveryStatus = getDiscoveryStatus();
 
@@ -87,7 +85,11 @@ const PortfolioCard = memo(() => {
 
     const showMissingDataTooltip =
         showGraphControls &&
-        !!accounts.find(a => a.networkType === 'ethereum' || a.networkType === 'ripple');
+        !!accounts.some(
+            account =>
+                account.history &&
+                (account.tokens?.length || ['ripple', 'solana'].includes(account.networkType)),
+        );
 
     const goToReceive = () => dispatch(goto('wallet-receive'));
     const goToBuy = () => dispatch(goto('wallet-coinmarket-buy'));
@@ -141,19 +143,20 @@ const PortfolioCard = memo(() => {
             }
         >
             <StyledCard noPadding>
-                <Header
-                    showGraphControls={showGraphControls}
-                    hideBorder={!body}
-                    portfolioValue={portfolioValue}
-                    localCurrency={localCurrency}
-                    isWalletEmpty={isWalletEmpty}
-                    isWalletLoading={isWalletLoading}
-                    isWalletError={isWalletError}
-                    isDiscoveryRunning={isDiscoveryRunning}
-                    receiveClickHandler={goToReceive}
-                    buyClickHandler={goToBuy}
-                />
-
+                {discoveryStatus && discoveryStatus.status === 'exception' ? null : (
+                    <Header
+                        showGraphControls={showGraphControls}
+                        hideBorder={!body}
+                        portfolioValue={portfolioValue}
+                        localCurrency={localCurrency}
+                        isWalletEmpty={isWalletEmpty}
+                        isWalletLoading={isWalletLoading}
+                        isWalletError={isWalletError}
+                        isDiscoveryRunning={isDiscoveryRunning}
+                        receiveClickHandler={goToReceive}
+                        buyClickHandler={goToBuy}
+                    />
+                )}
                 {body && <Body>{body}</Body>}
             </StyledCard>
         </DashboardSection>

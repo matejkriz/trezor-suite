@@ -1,16 +1,42 @@
-import { Text as RNText, TextProps as RNTextProps, TextStyle, PixelRatio } from 'react-native';
+import {
+    TextProps as RNTextProps,
+    Text as RNText,
+    TextStyle,
+    PixelRatio,
+    Platform,
+} from 'react-native';
+
+// @ts-expect-error This is not public RN API but I will make Text noticeable faster https://twitter.com/FernandoTheRojo/status/1707769877493121420
+import { NativeText } from 'react-native/Libraries/Text/TextNativeComponent';
 
 import { useNativeStyles, prepareNativeStyle, NativeStyleObject } from '@trezor/styles';
 import { Color, TypographyStyle } from '@trezor/theme';
 
 import { TestProps } from './types';
 
-export interface TextProps extends Omit<RNTextProps, 'style'>, TestProps {
+// NativeText improves the performance of the text rendering, but unfortunately it does not support iOS Accessibility font enlarging.
+// Since iOS devices have enough computational power and the text optimization is not crucial, the NativeText is used only for Android.
+const DefaultTextComponent: typeof RNText = Platform.select({
+    android: NativeText,
+    ios: RNText,
+});
+
+export interface PressableTextProps extends Omit<RNTextProps, 'style'>, TestProps {
     variant?: TypographyStyle;
     color?: Color;
     textAlign?: TextStyle['textAlign'];
     style?: NativeStyleObject;
 }
+
+// NativeText does not support all the props that are supported by the standard `react-native` Text.
+type UnsupportedNativeTextProps =
+    | 'pressRetentionOffset'
+    | 'onLongPress'
+    | 'onPress'
+    | 'onPressIn'
+    | 'onPressOut';
+
+export type TextProps = Omit<PressableTextProps, UnsupportedNativeTextProps>;
 
 type TextStyleProps = {
     variant: TypographyStyle;
@@ -52,23 +78,29 @@ const textStyle = prepareNativeStyle<TextStyleProps>((utils, { variant, color, t
     textAlign,
 }));
 
-export const Text = ({
+export const BaseText = ({
     variant = 'body',
     color = 'textDefault',
     textAlign = 'left',
+    TextComponent = DefaultTextComponent,
     style,
     children,
     ...otherProps
-}: TextProps) => {
+}: TextProps & { TextComponent: typeof RNText }) => {
     const { applyStyle } = useNativeStyles();
     const maxFontSizeMultiplier = variantToMaxFontSizeMultiplier[variant];
     return (
-        <RNText
+        <DefaultTextComponent
             style={[applyStyle(textStyle, { variant, color, textAlign }), style]}
             maxFontSizeMultiplier={maxFontSizeMultiplier}
             {...otherProps}
         >
             {children}
-        </RNText>
+        </DefaultTextComponent>
     );
 };
+
+export const Text = (props: TextProps) => (
+    <BaseText {...props} TextComponent={DefaultTextComponent} />
+);
+Text.Pressable = (props: PressableTextProps) => <BaseText {...props} TextComponent={RNText} />;

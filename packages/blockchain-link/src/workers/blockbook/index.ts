@@ -114,13 +114,21 @@ const getFiatRatesTickersList = async (request: Request<MessageTypes.GetFiatRate
 
 const getTransaction = async (request: Request<MessageTypes.GetTransaction>) => {
     const api = await request.connect();
-    const tx = await api.getTransaction(request.payload);
+    const rawtx = await api.getTransaction(request.payload);
+    const tx = utils.transformTransaction(rawtx);
     return {
         type: RESPONSES.GET_TRANSACTION,
-        payload: {
-            type: 'blockbook',
-            tx,
-        },
+        payload: tx,
+    } as const;
+};
+
+const getTransactionHex = async (request: Request<MessageTypes.GetTransactionHex>) => {
+    const api = await request.connect();
+    const { hex } = await api.getTransaction(request.payload);
+    if (!hex) throw new CustomError(`Missing hex of ${request.payload}`);
+    return {
+        type: RESPONSES.GET_TRANSACTION_HEX,
+        payload: hex,
     } as const;
 };
 
@@ -180,8 +188,8 @@ const onTransaction = ({ state, post }: Context, event: AddressNotification) => 
             payload: {
                 descriptor: account ? account.descriptor : descriptor,
                 tx: account
-                    ? utils.transformTransaction(account.descriptor, account.addresses, event.tx)
-                    : utils.transformTransaction(descriptor, undefined, event.tx),
+                    ? utils.transformTransaction(event.tx, account.addresses ?? account.descriptor)
+                    : utils.transformTransaction(event.tx, descriptor),
             },
         },
     });
@@ -372,6 +380,8 @@ const onRequest = (request: Request<MessageTypes.Message>) => {
             return getAccountUtxo(request);
         case MESSAGES.GET_TRANSACTION:
             return getTransaction(request);
+        case MESSAGES.GET_TRANSACTION_HEX:
+            return getTransactionHex(request);
         case MESSAGES.GET_ACCOUNT_BALANCE_HISTORY:
             return getAccountBalanceHistory(request);
         case MESSAGES.GET_CURRENT_FIAT_RATES:

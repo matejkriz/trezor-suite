@@ -11,7 +11,6 @@ import {
     CheckBox,
     Switch,
     ListItem,
-    SelectableListItem,
     IconButton,
     InputWrapper,
     Input,
@@ -33,7 +32,6 @@ import {
 import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
 import { Screen, ScreenSubHeader } from '@suite-native/navigation';
 import { CryptoIcon, tokenIcons, Icon, IconName, icons } from '@suite-common/icons';
-import { CoinsSettings } from '@suite-native/module-settings';
 import { isDevelopOrDebugEnv } from '@suite-native/config';
 import { TypographyStyle } from '@trezor/theme';
 import { TokenAddress } from '@suite-common/wallet-types';
@@ -267,27 +265,16 @@ export const DemoScreen = () => {
                             <Radio
                                 key="first"
                                 value="first"
+                                accessibilityLabel="First"
                                 onPress={handleRadioPress}
                                 isChecked={radioChecked === 'first'}
                             />
                             <Radio
                                 key="second"
                                 value="second"
+                                accessibilityLabel="Second"
                                 onPress={handleRadioPress}
                                 isChecked={radioChecked === 'second'}
-                            />
-                            <Radio
-                                key="third"
-                                value="third"
-                                onPress={handleRadioPress}
-                                isDisabled
-                            />
-                            <Radio
-                                key="fourth"
-                                value="fourth"
-                                onPress={handleRadioPress}
-                                isChecked
-                                isDisabled
                             />
                         </Box>
                     </Box>
@@ -330,16 +317,6 @@ export const DemoScreen = () => {
                             subtitle="Description of that not wrapped example with long and I mean really long Headline"
                             hasRightArrow
                             isTextTruncated
-                        />
-                    </Box>
-                    <Box marginVertical="medium">
-                        <SelectableListItem
-                            iconName="placeholder"
-                            title="Headline"
-                            subtitle="Description of that headline"
-                            onPress={handleRadioPress}
-                            value="firstSelectable"
-                            isChecked={radioChecked === 'firstSelectable'}
                         />
                     </Box>
                     <Box marginTop="medium" marginBottom="medium">
@@ -409,7 +386,6 @@ export const DemoScreen = () => {
                             <ListItemSkeleton />
                         </Card>
                     </VStack>
-                    <CoinsSettings />
                 </Box>
             </VStack>
         </Screen>

@@ -2,7 +2,7 @@ import { useSelector } from 'react-redux';
 import { useEffect, useState } from 'react';
 
 import { G } from '@mobily/ts-belt';
-import { CommonActions, useNavigation } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 
 import { DeviceModelInternal } from '@trezor/connect';
 import {
@@ -16,13 +16,20 @@ import {
     ScreenHeaderWrapper,
     Text,
 } from '@suite-native/atoms';
-import { HomeStackRoutes, RootStackRoutes, Screen } from '@suite-native/navigation';
+import {
+    AppTabsRoutes,
+    HomeStackRoutes,
+    RootStackParamList,
+    RootStackRoutes,
+    Screen,
+    StackNavigationProps,
+} from '@suite-native/navigation';
 import {
     selectDevice,
     selectDeviceModel,
     selectDeviceReleaseInfo,
-    selectIsSelectedDeviceImported,
-    selectSelectedDeviceLabel,
+    selectIsPortfolioTrackerDevice,
+    selectDeviceLabel,
 } from '@suite-common/wallet-core';
 import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
 import { useTranslate } from '@suite-native/intl';
@@ -51,15 +58,17 @@ const contentStyle = prepareNativeStyle(() => ({
     flexGrow: 1,
 }));
 
+type NavigationProp = StackNavigationProps<RootStackParamList, RootStackRoutes.DeviceInfo>;
+
 export const DeviceInfoModalScreen = () => {
-    const navigation = useNavigation();
+    const navigation = useNavigation<NavigationProp>();
     const { translate } = useTranslate();
     const openLink = useOpenLink();
 
     const deviceModel = useSelector(selectDeviceModel);
-    const deviceLabel = useSelector(selectSelectedDeviceLabel);
+    const deviceLabel = useSelector(selectDeviceLabel);
     const device = useSelector(selectDevice);
-    const isPortfolioTrackerDevice = useSelector(selectIsSelectedDeviceImported);
+    const isPortfolioTrackerDevice = useSelector(selectIsPortfolioTrackerDevice);
     const deviceReleaseInfo = useSelector(selectDeviceReleaseInfo);
     const { applyStyle } = useNativeStyles();
 
@@ -87,21 +96,12 @@ export const DeviceInfoModalScreen = () => {
 
     useEffect(() => {
         if (isPortfolioTrackerDevice) {
-            //  Should be part of useDeviceConnect hook
-            //  once https://github.com/trezor/trezor-suite/issues/9747 is finished
-            navigation.dispatch(
-                CommonActions.reset({
-                    index: 0,
-                    routes: [
-                        {
-                            name: RootStackRoutes.AppTabs,
-                            params: {
-                                screen: HomeStackRoutes.Home,
-                            },
-                        },
-                    ],
-                }),
-            );
+            navigation.navigate(RootStackRoutes.AppTabs, {
+                screen: AppTabsRoutes.HomeStack,
+                params: {
+                    screen: HomeStackRoutes.Home,
+                },
+            });
         }
     }, [isPortfolioTrackerDevice, navigation]);
 

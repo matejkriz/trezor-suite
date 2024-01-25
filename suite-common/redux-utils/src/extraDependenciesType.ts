@@ -34,7 +34,6 @@ export type ExtraDependencies = {
     selectors: {
         selectFeeInfo: (networkSymbol: NetworkSymbol) => SuiteCompatibleSelector<FeeInfo>;
         selectDevices: SuiteCompatibleSelector<TrezorDevice[]>;
-        selectCurrentDevice: SuiteCompatibleSelector<TrezorDevice | undefined>;
         selectBitcoinAmountUnit: SuiteCompatibleSelector<PROTO.AmountUnit>;
         selectEnabledNetworks: SuiteCompatibleSelector<NetworkSymbol[]>;
         selectLocalCurrency: SuiteCompatibleSelector<FiatCurrencyCode>;
@@ -46,7 +45,7 @@ export type ExtraDependencies = {
         selectDevice: SuiteCompatibleSelector<TrezorDevice | undefined>;
         selectRouterApp: SuiteCompatibleSelector<string>;
         selectMetadata: SuiteCompatibleSelector<any>;
-        selectDiscoveryForDevice: SuiteCompatibleSelector<Discovery | undefined>;
+        selectDeviceDiscovery: SuiteCompatibleSelector<Discovery | undefined>;
         selectCheckFirmwareAuthenticity: SuiteCompatibleSelector<boolean>;
     };
     // You should only use ActionCreatorWithPayload from redux-toolkit!
@@ -64,10 +63,6 @@ export type ExtraDependencies = {
             | ActionCreatorWithPayload<{
                   localCurrency: FiatCurrencyCode;
               }>;
-        changeWalletSettingsNetworks: ActionCreatorWithPreparedPayload<
-            [payload: NetworkSymbol[]],
-            NetworkSymbol[]
-        >;
         lockDevice: ActionCreatorWithPreparedPayload<[payload: boolean], boolean>;
         appChanged: ActionCreatorWithPayload<unknown>;
         setSelectedDevice: ActionCreatorWithPayload<TrezorDevice | undefined>;
@@ -89,7 +84,6 @@ export type ExtraDependencies = {
         storageLoadBlockchain: StorageLoadReducer;
         storageLoadAccounts: StorageLoadReducer;
         storageLoadTransactions: StorageLoadTransactionsReducer;
-        storageLoadFiatRates: StorageLoadReducer;
         storageLoadFirmware: StorageLoadReducer;
         storageLoadDiscovery: StorageLoadReducer;
         addButtonRequestFirmware: AddButtonRequestReducer;

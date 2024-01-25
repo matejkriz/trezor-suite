@@ -15,7 +15,7 @@ import {
     isBech32AddressUppercase,
     getInputState,
 } from '@suite-common/wallet-utils';
-import { MAX_LENGTH } from 'src/constants/suite/inputs';
+import { formInputsMaxLength } from '@suite-common/validators';
 import { PROTOCOL_TO_NETWORK } from 'src/constants/suite/protocol';
 import { notificationsActions } from '@suite-common/toast-notifications';
 
@@ -33,6 +33,10 @@ const Text = styled.span`
 
 const StyledIcon = styled(Icon)`
     display: flex;
+`;
+
+const MetadataLabelingWrapper = styled.div`
+    max-width: 200px;
 `;
 
 interface AddressProps {
@@ -206,24 +210,26 @@ export const Address = ({ output, outputId, outputsCount }: AddressProps) => {
             isMonospace
             innerAddon={
                 metadataEnabled && broadcastEnabled ? (
-                    <MetadataLabeling
-                        defaultVisibleValue=""
-                        payload={{
-                            type: 'outputLabel',
-                            entityKey: account.key,
-                            // txid is not known at this moment. metadata is only saved
-                            // along with other sendForm data and processed in sendFormActions
-                            txid: 'will-be-replaced',
-                            outputIndex: outputId,
-                            defaultValue: `${outputId}`,
-                            value: label,
-                        }}
-                        onSubmit={(value: string | undefined) => {
-                            setValue(`outputs.${outputId}.label`, value || '');
-                            setDraftSaveRequest(true);
-                        }}
-                        visible
-                    />
+                    <MetadataLabelingWrapper>
+                        <MetadataLabeling
+                            defaultVisibleValue=""
+                            payload={{
+                                type: 'outputLabel',
+                                entityKey: account.key,
+                                // txid is not known at this moment. metadata is only saved
+                                // along with other sendForm data and processed in sendFormActions
+                                txid: 'will-be-replaced',
+                                outputIndex: outputId,
+                                defaultValue: `${outputId}`,
+                                value: label,
+                            }}
+                            onSubmit={(value: string | undefined) => {
+                                setValue(`outputs.${outputId}.label`, value || '');
+                                setDraftSaveRequest(true);
+                            }}
+                            visible
+                        />
+                    </MetadataLabelingWrapper>
                 ) : undefined
             }
             label={
@@ -270,7 +276,7 @@ export const Address = ({ output, outputId, outputsCount }: AddressProps) => {
             }
             data-test={inputName}
             defaultValue={addressValue}
-            maxLength={MAX_LENGTH.ADDRESS}
+            maxLength={formInputsMaxLength.address}
             innerRef={inputRef}
             {...inputField}
         />

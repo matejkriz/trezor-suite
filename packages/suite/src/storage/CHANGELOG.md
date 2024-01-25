@@ -1,5 +1,13 @@
 # Storage changelog
 
+## 42
+
+-   remove fiatRates table
+
+## 41
+
+-   adds `metadata.selectedProvider.passwords` key
+
 ## 40
 
 -   `device.metadata.status` does not exist anymore. this information is derivable from `device.metadata[key]` and `metadata.error[deviceState]`

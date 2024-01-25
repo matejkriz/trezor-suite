@@ -1,38 +1,56 @@
 import { useNavigation } from '@react-navigation/native';
-import { CommonActions } from '@react-navigation/core';
 
-import { HomeStackRoutes, RootStackRoutes } from '@suite-native/navigation';
-import { IconButton, ScreenHeaderWrapper } from '@suite-native/atoms';
+import {
+    AppTabsRoutes,
+    ConnectDeviceStackParamList,
+    ConnectDeviceStackRoutes,
+    HomeStackRoutes,
+    RootStackParamList,
+    RootStackRoutes,
+    StackToTabCompositeProps,
+} from '@suite-native/navigation';
+import { Box, IconButton, ScreenHeaderWrapper } from '@suite-native/atoms';
 
 import { ConnectingTrezorHelp } from './ConnectingTrezorHelp';
 
-export const ConnectDeviceScreenHeader = () => {
-    const navigation = useNavigation<any>();
+type ConnectDeviceScreenHeaderProps = {
+    shouldDisplayCancelButton?: boolean;
+};
+
+type NavigationProp = StackToTabCompositeProps<
+    ConnectDeviceStackParamList,
+    ConnectDeviceStackRoutes.ConnectingDevice,
+    RootStackParamList
+>;
+
+export const ConnectDeviceScreenHeader = ({
+    shouldDisplayCancelButton = true,
+}: ConnectDeviceScreenHeaderProps) => {
+    const navigation = useNavigation<NavigationProp>();
 
     const handleCancel = () => {
-        navigation.dispatch(
-            CommonActions.reset({
-                index: 0,
-                routes: [
-                    {
-                        name: RootStackRoutes.AppTabs,
-                        params: {
-                            screen: HomeStackRoutes.Home,
-                        },
-                    },
-                ],
-            }),
-        );
+        navigation.navigate(RootStackRoutes.AppTabs, {
+            screen: AppTabsRoutes.HomeStack,
+            params: {
+                screen: HomeStackRoutes.Home,
+            },
+        });
     };
 
     return (
         <ScreenHeaderWrapper>
-            <IconButton
-                iconName="close"
-                size="medium"
-                colorScheme="tertiaryElevation1"
-                onPress={handleCancel}
-            />
+            <Box>
+                {shouldDisplayCancelButton && (
+                    <IconButton
+                        iconName="close"
+                        size="medium"
+                        colorScheme="tertiaryElevation1"
+                        accessibilityRole="button"
+                        accessibilityLabel="close"
+                        onPress={handleCancel}
+                    />
+                )}
+            </Box>
             <ConnectingTrezorHelp />
         </ScreenHeaderWrapper>
     );

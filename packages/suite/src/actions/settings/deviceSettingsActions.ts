@@ -62,6 +62,32 @@ export const changePin =
         }
     };
 
+export const changeWipeCode =
+    ({ remove }: Parameters<typeof TrezorConnect.changeWipeCode>[0] = {}) =>
+    async (dispatch: Dispatch, getState: GetState) => {
+        const device = selectDevice(getState());
+
+        if (!device) return;
+
+        const result = await TrezorConnect.changeWipeCode({
+            device: {
+                path: device.path,
+            },
+            remove,
+        });
+        if (result.success) {
+            dispatch(
+                notificationsActions.addToast({
+                    type: remove ? 'wipe-code-removed' : 'wipe-code-changed',
+                }),
+            );
+        } else if (result.payload.code === 'Failure_WipeCodeMismatch') {
+            dispatch(modalActions.openModal({ type: 'pin-mismatch' }));
+        } else {
+            dispatch(notificationsActions.addToast({ type: 'error', error: result.payload.error }));
+        }
+    };
+
 export const wipeDevice = () => async (dispatch: Dispatch, getState: GetState) => {
     const device = selectDevice(getState());
     if (!device) return;

@@ -4,7 +4,7 @@ import { memoize, memoizeWithArgs } from 'proxy-memoize';
 import { FiatCurrencyCode } from '@suite-common/suite-config';
 import {
     AccountsRootState,
-    FiatRatesState as FiatRatesStateLegacy,
+    FiatRatesStateLegacy,
     selectAccountByKey,
     selectDeviceAccounts,
     selectTransactions,
@@ -123,7 +123,9 @@ export const selectCoinsLegacy = memoize(
         const coins: FiatRatesStateLegacy['coins'] = [];
 
         Object.values(state.wallet.fiat.current).forEach(rate => {
-            const coin = coins.find(c => c.symbol === rate.ticker.symbol);
+            const coin = coins.find(
+                c => c.symbol === rate.ticker.symbol && c.tokenAddress === rate.ticker.tokenAddress,
+            );
             if (coin && coin.current) {
                 coin.current.rates[rate.locale] = rate.rate;
             } else {
@@ -141,7 +143,9 @@ export const selectCoinsLegacy = memoize(
         });
 
         Object.values(state.wallet.fiat.lastWeek).forEach(rate => {
-            const coin = coins.find(c => c.symbol === rate.ticker.symbol);
+            const coin = coins.find(
+                c => c.symbol === rate.ticker.symbol && c.tokenAddress === rate.ticker.tokenAddress,
+            );
             if (coin) {
                 const ticker = coin.lastWeek?.tickers.find(
                     t => t.ts === rate.lastSuccessfulFetchTimestamp,

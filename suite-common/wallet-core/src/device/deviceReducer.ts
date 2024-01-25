@@ -407,6 +407,8 @@ const forget = (draft: State, device: TrezorDevice) => {
     const others = deviceUtils.getDeviceInstances(device, draft.devices, true);
     if (device.connected && others.length < 1) {
         // do not forget the last instance, just reset state
+        draft.devices[index].authConfirm = false;
+        delete draft.devices[index].authFailed;
         draft.devices[index].state = undefined;
         draft.devices[index].walletNumber = undefined;
         draft.devices[index].useEmptyPassphrase = !device.features.passphrase_protection;
@@ -532,6 +534,11 @@ export const selectIsDeviceProtectedByPin = (state: DeviceRootState) => {
     return !!features?.pin_protection;
 };
 
+export const selectIsDeviceProtectedByWipeCode = (state: DeviceRootState) => {
+    const features = selectDeviceFeatures(state);
+    return !!features?.wipe_code_protection;
+};
+
 export const selectDeviceButtonRequests = (state: DeviceRootState) =>
     state.device.selectedDevice?.buttonRequests ?? [];
 
@@ -578,13 +585,13 @@ export const selectIsConnectedDeviceUninitialized = (state: DeviceRootState) => 
     return device && !isDeviceInitialized;
 };
 
-export const selectIsSelectedDeviceAuthorized = (state: DeviceRootState) => {
+export const selectIsDeviceAuthorized = (state: DeviceRootState) => {
     const device = selectDevice(state);
     return !!device?.state;
 };
 
 export const selectIsDeviceConnectedAndAuthorized = (state: DeviceRootState) => {
-    const isDeviceAuthorized = selectIsSelectedDeviceAuthorized(state);
+    const isDeviceAuthorized = selectIsDeviceAuthorized(state);
     const deviceFeatures = selectDeviceFeatures(state);
 
     return isDeviceAuthorized && !!deviceFeatures;
@@ -603,7 +610,7 @@ export const selectDeviceStatus = (state: DeviceRootState) => {
     return device && getStatus(device);
 };
 
-export const selectSupportedNetworks = (state: DeviceRootState) => {
+export const selectDeviceSupportedNetworks = (state: DeviceRootState) => {
     const device = selectDevice(state);
     const deviceModelInternal = device?.features?.internal_model;
     const firmwareVersion = getFirmwareVersion(device);
@@ -649,7 +656,7 @@ export const selectDeviceAuthenticity = (state: DeviceRootState) => {
     return device?.id ? state.device.deviceAuthenticity?.[device.id] : undefined;
 };
 
-export const selectIsSelectedDeviceImported = (state: DeviceRootState) => {
+export const selectIsPortfolioTrackerDevice = (state: DeviceRootState) => {
     const device = selectDevice(state);
     return device?.id === PORTFOLIO_TRACKER_DEVICE_ID;
 };
@@ -667,7 +674,7 @@ export const selectDeviceNameById = (
     return device?.name ?? null;
 };
 
-export const selectSelectedDeviceLabel = (state: DeviceRootState) => {
+export const selectDeviceLabel = (state: DeviceRootState) => {
     const selectedDevice = selectDevice(state);
     return selectDeviceLabelById(state, selectedDevice?.id);
 };
@@ -697,9 +704,9 @@ export const selectDeviceFirmwareVersion = memoize((state: DeviceRootState) => {
     return getFirmwareVersionArray(device);
 });
 
-export const selectPersistedDevicesStates = (state: DeviceRootState) => {
+export const selectPersistedDeviceStates = (state: DeviceRootState) => {
     const devices = selectDevices(state);
-    return [...devices.map(d => d.id), PORTFOLIO_TRACKER_DEVICE_STATE];
+    return [...devices.map(d => d.state), PORTFOLIO_TRACKER_DEVICE_STATE];
 };
 
 export const selectIsNoPhysicalDeviceConnected = (state: DeviceRootState) => {
@@ -715,4 +722,10 @@ export const selectIsDeviceBitcoinOnly = (state: DeviceRootState) => {
 export const selectDeviceLanguage = (state: DeviceRootState) => {
     const features = selectDeviceFeatures(state);
     return features?.language ?? null;
+};
+
+export const selectHasDeviceFirmwareInstalled = (state: DeviceRootState) => {
+    const device = selectDevice(state);
+
+    return !!device && device.firmware !== 'none';
 };

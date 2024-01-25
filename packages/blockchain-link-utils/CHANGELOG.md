@@ -1,3 +1,27 @@
+# 1.0.12
+
+-   fix(blockchain-link-utils): support `multisigAuthority` in solana txs (dfd96d23b)
+-   fix(blockchain-link-utils): use `some` instead of `find` in solana tx type predcicates (1d58f980d)
+-   fix(blockchain-link-utils): parse solana transfers originating from exchanges (58b125fb2)
+-   fix(blockchain-link): correct import in solana using @trezor/ prefix (3a4895d6b)
+
+# 1.0.11
+
+-   fix(blockchain-link): gasPrice null fallback (34d612a06)
+-   fix(blockchain-link): fix solana txs when sending to associated token account (5cb682078)
+-   feat(blockchain-link-utils): add meta for solana BONK token (c8e1762ed)
+-   fix(blockchain-link): filter out non-spl tokens (de631248e)
+-   feat(blockchain-link): remove `TypedRawTransaction` (34d405d12)
+-   refactor(blockchain-link-utils): improve `transformTransaction` params (a28a90142)
+-   chore(blockchain-link): remove ADA `null` subtype (07161b141)
+
+# 1.0.10
+
+-   fix(blockchain-link): add solana vout for self txs (ab6f0acf0)
+-   chore(connect): use `tslib` as dependency in all public libs (606ecc63b)
+-   chore(repo): update tsx (53de3e3a8)
+-   feat(suite): add Solana support (f2a89b34f)
+
 # 1.0.9
 
 -   chore(repo): Upgrade TS 5.3 (#10017) (7277f9d0f)

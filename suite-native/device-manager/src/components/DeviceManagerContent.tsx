@@ -8,7 +8,7 @@ import { analytics, EventType } from '@suite-native/analytics';
 import { Button, Text, VStack } from '@suite-native/atoms';
 import {
     selectDevices,
-    selectIsSelectedDeviceImported,
+    selectIsPortfolioTrackerDevice,
     selectDeviceId,
     selectIsNoPhysicalDeviceConnected,
 } from '@suite-common/wallet-core';
@@ -19,11 +19,13 @@ import {
     StackToStackCompositeNavigationProps,
 } from '@suite-native/navigation';
 import { Translation, useTranslate } from '@suite-native/intl';
+import { FeatureFlag, useFeatureFlag } from '@suite-native/feature-flags';
 
 import { DeviceManagerModal } from './DeviceManagerModal';
 import { DeviceItem } from './DeviceItem';
 import { DeviceControlButtons } from './DeviceControlButtons';
 import { useDeviceManager } from '../hooks/useDeviceManager';
+import { AddHiddenWalletButton } from './AddHiddenWalletButton';
 
 type NavigationProp = StackToStackCompositeNavigationProps<
     RootStackParamList,
@@ -38,10 +40,12 @@ export const DeviceManagerContent = () => {
 
     const devices = useSelector(selectDevices);
     const selectedDeviceId = useSelector(selectDeviceId);
-    const isPortfolioTrackerDevice = useSelector(selectIsSelectedDeviceImported);
+    const isPortfolioTrackerDevice = useSelector(selectIsPortfolioTrackerDevice);
     const isNoPhysicalDeviceConnected = useSelector(selectIsNoPhysicalDeviceConnected);
 
     const { setIsDeviceManagerVisible } = useDeviceManager();
+
+    const [isPassphraseFeatureEnabled] = useFeatureFlag(FeatureFlag.IsPassphraseEnabled);
 
     const handleConnectDevice = () => {
         setIsDeviceManagerVisible(false);
@@ -62,6 +66,7 @@ export const DeviceManagerContent = () => {
     return (
         <DeviceManagerModal>
             {!isPortfolioTrackerDevice && <DeviceControlButtons />}
+            {!isPortfolioTrackerDevice && isPassphraseFeatureEnabled && <AddHiddenWalletButton />}
             {A.isNotEmpty(listedDevice) && (
                 <VStack>
                     <Text variant="callout">

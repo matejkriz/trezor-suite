@@ -1,114 +1,116 @@
 {
     "version": 1,
-    "timestamp": "2023-12-11T00:00:00+00:00",
-    "sequence": 48,
+    "timestamp": "2024-01-25T00:00:00+00:00",
+    "sequence": 52,
     "actions": [
         {
-            "conditions": [
-                {
-                    "environment": {
-                        "desktop": "!",
-                        "mobile": "23.12.1",
-                        "web": "!"
-                    }
-                }
-            ],
+            "conditions": [],
             "message": {
-                "id": "8231c0f4-c778-4838-bc50-5c29d9532f06",
-                "priority": 98,
+                "id": "88ce29be-f797-4274-82dc-9c5e9696fa4d",
+                "priority": 99,
                 "dismissible": true,
                 "variant": "critical",
-                "category": "feature",
+                "category": "banner",
                 "content": {
-                    "en-GB": "Keep your backup safe",
-                    "en": "Keep your backup safe",
-                    "es": "Keep your backup safe",
-                    "cs": "Keep your backup safe",
-                    "ru": "Keep your backup safe",
-                    "ja": "Keep your backup safe",
-                    "hu": "Keep your backup safe",
-                    "it": "Keep your backup safe",
-                    "fr": "Keep your backup safe",
-                    "de": "Keep your backup safe"
-                },
-                "headline": {
-                    "en-GB": "Check out Trezor accessories",
-                    "en": "Check out Trezor accessories",
-                    "es": "Check out Trezor accessories",
-                    "cs": "Check out Trezor accessories",
-                    "ru": "Check out Trezor accessories",
-                    "ja": "Check out Trezor accessories",
-                    "hu": "Check out Trezor accessories",
-                    "it": "Check out Trezor accessories",
-                    "fr": "Check out Trezor accessories",
-                    "de": "Check out Trezor accessories"
+                    "en-GB": "Stay alert for unexpected emails asking for sensitive info. Never share your 12, 24, or other word-count backup with anyone, not even Trezor Support.",
+                    "en": "Stay alert for unexpected emails asking for sensitive info. Never share your 12, 24, or other word-count backup with anyone, not even Trezor Support.",
+                    "es": "Mantente alerta ante correos electrónicos no solicitados que buscan información sensible, nunca compartas tu semilla de recuperación.",
+                    "cs": "Dávejte si pozor na nevyžádané e-maily, které požadují citlivé informace, a nikdy nesdělujte svůj recovery seed.",
+                    "ru": "Будьте бдительны при получении нежелательных писем с просьбой предоставить конфиденциальную информацию, никогда не сообщайте свои данные для восстановления.",
+                    "ja": "機密情報を求める迷惑メールに注意し、決してリカバリーシードを共有しないこと",
+                    "hu": "Legyen résen az érzékeny információkat kérő kéretlen e-mailekkel szemben, és soha ne ossza meg a helyreállító seed.",
+                    "it": "State attenti alle e-mail non richieste che richiedono informazioni sensibili, non condividete mai il vostro seed di ripristino.",
+                    "fr": "Restez vigilant face aux courriels non sollicités qui vous demandent des informations sensibles, ne communiquez jamais vos seed de récupération.",
+                    "de": "Seien Sie auf der Hut vor unaufgeforderten E-Mails, die nach sensiblen Informationen fragen, und geben Sie niemals Ihren Recovery Seed weiter."
                 },
                 "cta": {
                     "action": "external-link",
-                    "link": "https://trezor.io/accessories",
+                    "link": "https://blog.trezor.io/trezor-security-alert-stay-vigilant-against-an-unauthorized-email-and-continued-phishing-attacks-1b4982c2f53c",
                     "label": {
-                        "en-GB": "Go to trezor.io",
-                        "en": "Go to trezor.io",
-                        "es": "Ir a trezor.io",
-                        "cs": "Přejít na trezor.io",
-                        "ru": "Перейти на trezor.io",
-                        "ja": "trezor.io に移動",
-                        "hu": "Tovább a trezor.io oldalra",
-                        "it": "Vai a trezor.io",
-                        "fr": "Accédez à trezor.io",
-                        "de": "Gehe zu trezor.io"
+                        "en-GB": "Read more",
+                        "en": "Read more",
+                        "es": "Seguir leyendo",
+                        "cs": "Přečtěte si více",
+                        "ru": "Читать далее",
+                        "ja": "もっと読む",
+                        "hu": "Bővebben",
+                        "it": "Per saperne di più",
+                        "fr": "En savoir plus",
+                        "de": "Mehr lesen"
                     }
-                },
-                "feature": [
-                    {
-                        "domain": "killswitch",
-                        "flag": true
-                    }
-                ]
+                }
             }
         },
         {
             "conditions": [
                 {
+                    "duration": {
+                        "from": "2024-01-05T00:00:00+00:00",
+                        "to": "2024-01-18T00:00:00+00:00"
+                    },
                     "environment": {
-                        "desktop": "!",
-                        "mobile": "23.12.1",
+                        "desktop": "23.12.3",
+                        "mobile": "!",
                         "web": "!"
-                    }
+                    },
+                    "devices": [
+                        {
+                            "model": "T2B1",
+                            "firmware": ">=2.6.4",
+                            "bootloader": "*",
+                            "variant": "regular",
+                            "firmwareRevision": "*",
+                            "vendor": "*"
+                        },
+                        {
+                            "model": "T2T1",
+                            "firmware": ">=2.6.4",
+                            "bootloader": "*",
+                            "variant": "regular",
+                            "firmwareRevision": "*",
+                            "vendor": "*"
+                        }
+                    ],
+                    "settings": [
+                        {
+                            "sol": true
+                        }
+                    ]
                 }
             ],
             "message": {
-                "id": "8231c0f4-e778-4838-bd40-5d28d9633f06",
-                "priority": 94,
+                "id": "5e2f8b7e-1ca6-4e7e-a125-a9ec0acc8e06",
+                "priority": 90,
                 "dismissible": true,
                 "variant": "info",
                 "category": "banner",
                 "content": {
-                    "en-GB": "Check out Trezor accessories",
-                    "en": "Check out Trezor accessories",
-                    "es": "Check out Trezor accessories",
-                    "cs": "Check out Trezor accessories",
-                    "ru": "Check out Trezor accessories",
-                    "ja": "Check out Trezor accessories",
-                    "hu": "Check out Trezor accessories",
-                    "it": "Check out Trezor accessories",
-                    "fr": "Check out Trezor accessories",
-                    "de": "Check out Trezor accessories"
+                    "en-GB": "If you encounter any Solana discovery errors, we recommend updating to the Early Access Program version in Settings.",
+                    "en": "If you encounter any Solana discovery errors, we recommend updating to the Early Access Program version in Settings.",
+                    "es": "Si encuentra algún error de descubrimiento de Solana, le recomendamos que actualice a la versión del Programa de acceso anticipado en Configuración.",
+                    "cs": "Pokud se setkáte s chybami při detekci Solany, doporučujeme v Nastavení aktualizovat na verzi Early Access Program.",
+                    "ru": "Если вы столкнулись с ошибками при обнаружения Solana, рекомендуем обновить версию Программа раннего доступа в Настройках.",
+                    "ja": "Solanaの検出エラーが発生した場合は、設定から早期アクセスプログラムのバージョンに更新することをお勧めします   。",
+                    "hu": "Ha a Solana felderítési hibákkal találkozik, javasoljuk, hogy a Beállításokban frissítsen a Korai Hozzáférés Program verziójára.",
+                    "it": "Se si verificano errori di rilevamento di Solana, si consiglia di aggiornare la versione Programma di Accesso Anticipato in Impostazioni.",
+                    "fr": "Si vous rencontrez des erreurs de découverte de Solana, nous vous recommandons de mettre à jour la version du Programme Early Access dans les paramètres.",
+                    "de": "Wenn Sie Kontoentdeckungsfehler bei Solana feststellen, empfehlen wir Ihnen, in den Einstellungen auf die Version des Early Access-Program zu aktualisieren."
                 },
                 "cta": {
-                    "action": "external-link",
-                    "link": "https://trezor.io/accessories",
+                    "action": "internal-link",
+                    "link": "settings-index",
+                    "anchor": "@general-settings/early-access",
                     "label": {
-                        "en-GB": "Go to trezor.io",
-                        "en": "Go to trezor.io",
-                        "es": "Ir a trezor.io",
-                        "cs": "Přejít na trezor.io",
-                        "ru": "Перейти на trezor.io",
-                        "ja": "trezor.io に移動",
-                        "hu": "Tovább a trezor.io oldalra",
-                        "it": "Vai a trezor.io",
-                        "fr": "Accédez à trezor.io",
-                        "de": "Gehe zu trezor.io"
+                        "en-GB": "Go to Settings",
+                        "en": "Go to Settings",
+                        "es": "Ir a Configuración",
+                        "cs": "Přejít do nastavení",
+                        "ru": "Перейти к настройкам",
+                        "ja": "設定に移動",
+                        "hu": "Ugrás a Beállításokhoz",
+                        "it": "Vai alle impostazioni",
+                        "fr": "Accéder aux paramètres",
+                        "de": "Zu den Einstellungen"
                     }
                 }
             }

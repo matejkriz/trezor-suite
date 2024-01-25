@@ -1,8 +1,6 @@
 import type { SocksProxyAgentOptions } from 'socks-proxy-agent';
-import type { FormattedTransactionType as RippleTransaction } from 'ripple-lib';
 
 import type { Transaction as BlockbookTransaction, VinVout } from './blockbook';
-import type { BlockfrostTransaction } from './blockfrost';
 import type { TokenTransfer as BlockbookTokenTransfer } from './blockbook-api';
 
 /* Common types used in both params and responses */
@@ -58,20 +56,6 @@ export interface Target {
     isAccountTarget?: boolean;
 }
 
-export type TypedRawTransaction =
-    | {
-          type: 'blockbook';
-          tx: BlockbookTransaction;
-      }
-    | {
-          type: 'ripple';
-          tx: RippleTransaction;
-      }
-    | {
-          type: 'blockfrost';
-          tx: BlockfrostTransaction;
-      };
-
 export type EnhancedVinVout = VinVout & {
     isAccountOwned?: boolean;
 };
@@ -115,12 +99,7 @@ export interface Transaction {
     ethereumSpecific?: BlockbookTransaction['ethereumSpecific'];
     internalTransfers: InternalTransfer[];
     cardanoSpecific?: {
-        subtype:
-            | 'withdrawal'
-            | 'stake_delegation'
-            | 'stake_registration'
-            | 'stake_deregistration'
-            | null;
+        subtype?: 'withdrawal' | 'stake_delegation' | 'stake_registration' | 'stake_deregistration';
         withdrawal?: string;
         deposit?: string;
     };
@@ -236,6 +215,7 @@ export interface SubscriptionAccountInfo {
     descriptor: string;
     addresses?: AccountAddresses; // bitcoin addresses
     subscriptionId?: number;
+    tokens?: TokenInfo[]; // solana tokens
 }
 
 export type ChannelMessage<T> = T & { id: number };
