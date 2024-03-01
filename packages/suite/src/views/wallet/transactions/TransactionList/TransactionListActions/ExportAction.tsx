@@ -29,6 +29,7 @@ export const ExportAction = ({ account, searchQuery, accountMetadata }: ExportAc
         if (account.accountType === 'coinjoin') {
             return translationString(getTitleForCoinjoinAccount(account.symbol));
         }
+
         return translationString('LABELING_ACCOUNT', {
             networkName: translationString(getTitleForNetwork(account.symbol)),
             index: account.index + 1,
@@ -108,7 +109,7 @@ export const ExportAction = ({ account, searchQuery, accountMetadata }: ExportAc
 
     return (
         <Dropdown
-            alignMenu="right"
+            alignMenu="bottom-right"
             items={[
                 {
                     key: 'export',
@@ -116,19 +117,19 @@ export const ExportAction = ({ account, searchQuery, accountMetadata }: ExportAc
                         {
                             key: 'export-csv',
                             label: <Translation id="TR_EXPORT_AS" values={{ as: 'CSV' }} />,
-                            callback: () => runExport('csv'),
+                            onClick: () => runExport('csv'),
                             'data-test': `${dataTest}/csv`,
                         },
                         {
                             key: 'export-pdf',
                             label: <Translation id="TR_EXPORT_AS" values={{ as: 'PDF' }} />,
-                            callback: () => runExport('pdf'),
+                            onClick: () => runExport('pdf'),
                             'data-test': `${dataTest}/pdf`,
                         },
                         {
                             key: 'export-json',
                             label: <Translation id="TR_EXPORT_AS" values={{ as: 'JSON' }} />,
-                            callback: () => runExport('json'),
+                            onClick: () => runExport('json'),
                             'data-test': `${dataTest}/json`,
                         },
                     ],

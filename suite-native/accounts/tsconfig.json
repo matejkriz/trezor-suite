@@ -1,5 +1,5 @@
 {
-    "extends": "../../tsconfig.json",
+    "extends": "../../tsconfig.base.json",
     "compilerOptions": { "outDir": "libDev" },
     "references": [
         {
@@ -29,6 +29,7 @@
         },
         { "path": "../atoms" },
         { "path": "../ethereum-tokens" },
+        { "path": "../feature-flags" },
         { "path": "../fiat-rates" },
         { "path": "../formatters" },
         { "path": "../forms" },

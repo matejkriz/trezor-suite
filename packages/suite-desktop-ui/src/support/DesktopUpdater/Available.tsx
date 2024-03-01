@@ -4,6 +4,7 @@ import styled from 'styled-components';
 
 import { Button, H2, variables, Link } from '@trezor/components';
 import { desktopApi, UpdateInfo } from '@trezor/suite-desktop-api';
+import { borders } from '@trezor/theme';
 
 import { Translation, Modal } from 'src/components/suite';
 import { useDispatch } from 'src/hooks/suite';
@@ -18,7 +19,7 @@ const GreenH2 = styled(H2)`
 const ChangelogWrapper = styled.div`
     margin: 20px 0;
     background: ${({ theme }) => theme.BG_GREY};
-    border-radius: 8px;
+    border-radius: ${borders.radii.xs};
     max-height: 400px;
     overflow-y: auto;
     padding: 16px 20px;
@@ -95,6 +96,7 @@ const getVersionName = ({ latestVersion, prerelease }: VersionNameProps): string
         // add beta label for pre-releases, but prevent versions like '21.10.1-alpha-beta'
         return `${latestVersion}-beta`;
     }
+
     // fallback for pre-release versions already including some pre-release components
     return latestVersion;
 };
@@ -118,9 +120,9 @@ export const Available = ({ hideWindow, isCancelable, latest }: AvailableProps) 
             heading={<Translation id="TR_UPDATE_MODAL_AVAILABLE_HEADING" />}
             isCancelable={isCancelable}
             onCancel={hideWindow}
-            bottomBar={
+            bottomBarComponents={
                 <>
-                    <Button onClick={hideWindow} variant="secondary">
+                    <Button onClick={hideWindow} variant="tertiary">
                         <Translation id="TR_UPDATE_MODAL_NOT_NOW" />
                     </Button>
                     <Button onClick={downloadUpdate} variant="primary">

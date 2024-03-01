@@ -1,7 +1,7 @@
 // @group:metadata
 // @retry=2
 
-import * as METADATA from '@trezor/suite/src/actions/suite/constants/metadataConstants';
+import * as METADATA_LABELING from '@trezor/suite/src/actions/suite/constants/metadataLabelingConstants';
 
 import { rerouteMetadataToMockProvider, stubOpen } from '../../stubs/metadata';
 
@@ -22,7 +22,7 @@ const fixtures = [
 
 describe('Metadata - suite is watching cloud provider and syncs periodically', () => {
     beforeEach(() => {
-        cy.viewport(1080, 1440).resetDb();
+        cy.viewport(1440, 2560).resetDb();
     });
     fixtures.forEach(f => {
         it(`${f.provider}-${f.desc}`, () => {
@@ -58,7 +58,7 @@ describe('Metadata - suite is watching cloud provider and syncs periodically', (
                 'Wait for discovery to finish. There is "add label" button, but no actual metadata appeared',
             );
             cy.discoveryShouldFinish();
-            cy.getTestElement('@suite/menu/wallet-index').click();
+            cy.getTestElement('@account-menu/btc/normal/0').click();
 
             cy.getTestElement("@metadata/accountLabel/m/84'/0'/0'/add-label-button").click({
                 force: true,
@@ -70,8 +70,7 @@ describe('Metadata - suite is watching cloud provider and syncs periodically', (
                 'contain',
                 'already existing label',
             );
-            cy.get('body').type('{enter}');
-
+            // now change data in provider and fast forward time, see if it updated
             cy.task('metadataSetFileContent', {
                 provider: f.provider,
                 file: f.file,
@@ -85,7 +84,7 @@ describe('Metadata - suite is watching cloud provider and syncs periodically', (
             });
 
             // and this does the time travel to trigger fetch
-            cy.tick(METADATA.FETCH_INTERVAL);
+            cy.tick(METADATA_LABELING.FETCH_INTERVAL);
             cy.getTestElement('@account-menu/btc/normal/0/label').should('contain', f.content);
         });
     });

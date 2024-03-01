@@ -104,11 +104,13 @@ class CommonDB<TDBStructure> {
                 console.warn("Couldn't get an access to IndexedDB.");
             }
         }
+
         return this.supported;
     };
 
     isAccessible = async () => {
         const isSupported = await this.isSupported();
+
         // if the instance is blocking db upgrade, db connection will be closed
         return isSupported && !this.blocking && !this.blocked;
     };
@@ -164,6 +166,7 @@ class CommonDB<TDBStructure> {
             })
                 .then(db => {
                     this.db = db;
+
                     return db;
                 })
                 .catch(error => {
@@ -222,6 +225,7 @@ class CommonDB<TDBStructure> {
                 console.error(error);
             }
         });
+
         return p;
     };
 
@@ -247,6 +251,7 @@ class CommonDB<TDBStructure> {
                             keys.push(result);
                         });
                     }
+
                     return tx.store.add(item).then(result => {
                         keys.push(result);
                     });
@@ -269,6 +274,7 @@ class CommonDB<TDBStructure> {
         const db = await this.getDB();
         const tx = db.transaction(store);
         const item = await tx.store.get(primaryKey);
+
         return item;
     };
 
@@ -286,6 +292,7 @@ class CommonDB<TDBStructure> {
         const tx = db.transaction(store);
         const index = tx.store.index(indexName);
         const item = await index.get(IDBKeyRange.only(key));
+
         return item;
     };
 
@@ -306,6 +313,7 @@ class CommonDB<TDBStructure> {
         if (result) {
             Object.assign(result, updateObject);
             this.notify(store, [result]);
+
             return tx.store.put(result);
         }
     };
@@ -320,6 +328,7 @@ class CommonDB<TDBStructure> {
         const db = await this.getDB();
         const tx = db.transaction(store, 'readwrite');
         const res = await tx.store.delete(key);
+
         return res;
         // TODO: needs to differentiate between PKs, Index keys...
         // if (res) {
@@ -343,7 +352,7 @@ class CommonDB<TDBStructure> {
         while (cursor) {
             cursor.delete();
             this.notify(store, cursor.value ? [cursor.value] : []);
-            // eslint-disable-next-line no-await-in-loop
+
             cursor = await cursor.continue();
         }
     };
@@ -374,17 +383,19 @@ class CommonDB<TDBStructure> {
                         while (cursor && (!filters.count || counter < filters.count)) {
                             // iterate unless cursor returns null or we have enough items (count param)
                             items.push(cursor.value);
-                            // eslint-disable-next-line no-await-in-loop
+
                             cursor = await cursor.continue();
                             counter++;
                         }
                     }
+
                     return items;
                 }
                 // if offset and count params are undefined just use getAll on index instead of cursor.
                 // all txs for given accountId
                 // bound([accountId, undefined], [accountId, '']) should cover all timestamps
                 const keyRange = IDBKeyRange.bound([filters.key], [filters.key, '']);
+
                 return index.getAll(keyRange);
             }
 
@@ -394,13 +405,16 @@ class CommonDB<TDBStructure> {
                 const items = [];
                 while (cursor) {
                     items.push(cursor.value);
-                    // eslint-disable-next-line no-await-in-loop
+
                     cursor = await cursor.continue();
                 }
+
                 return items;
             }
+
             return index.getAll();
         }
+
         // no accountId, return all txs
         return tx.store.getAll();
     };
@@ -414,9 +428,10 @@ class CommonDB<TDBStructure> {
                 key: cursor.key,
                 value: cursor.value,
             });
-            // eslint-disable-next-line no-await-in-loop
+
             cursor = await cursor.continue();
         }
+
         return resp;
     };
 
@@ -435,6 +450,7 @@ class CommonDB<TDBStructure> {
                     names.push(storeName);
                 }
             }
+
             return names;
         };
 
@@ -442,6 +458,7 @@ class CommonDB<TDBStructure> {
         const promises = list.map(storeName => {
             const transaction = db.transaction(storeName, 'readwrite');
             const objectStore = transaction.objectStore(storeName);
+
             return objectStore.clear();
         });
         await Promise.all(promises);
@@ -451,6 +468,7 @@ class CommonDB<TDBStructure> {
         if (this.db) {
             this.db.close();
         }
+
         return deleteDB(this.dbName);
     };
 

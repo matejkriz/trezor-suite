@@ -1,12 +1,12 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import styled from 'styled-components';
 
-import { Button, Icon, useTheme } from '@trezor/components';
+import { Button, DropdownMenuItemProps } from '@trezor/components';
 import { useDiscovery, useDispatch, useSelector } from 'src/hooks/suite';
 import { addMetadata, init, setEditing } from 'src/actions/suite/metadataLabelingActions';
 import { MetadataAddPayload } from 'src/types/suite/metadata';
 import { Translation } from 'src/components/suite';
-import { Props, ExtendedProps, DropdownMenuItem } from './definitions';
+import { Props, ExtendedProps } from './definitions';
 import { withEditable } from './withEditable';
 import { withDropdown } from './withDropdown';
 import {
@@ -21,7 +21,7 @@ const LabelValue = styled.div`
 `;
 
 const LabelDefaultValue = styled(LabelValue)`
-    /* do not shrink when the expanded label does not fit the contener - shrink only the label value */
+    /* do not shrink when the expanded label does not fit the container - shrink only the label value */
     flex-shrink: 0;
     max-width: 0;
 
@@ -45,7 +45,6 @@ const Label = styled.div`
     cursor: pointer;
     display: flex;
     overflow: hidden;
-    padding-left: 1px;
     position: relative;
 `;
 
@@ -55,23 +54,24 @@ const LabelButton = styled(Button)`
 
 const ActionButton = styled(Button)<{ isValueVisible?: boolean; isVisible?: boolean }>`
     margin-left: ${({ isValueVisible, isVisible, isLoading }) =>
-        (isValueVisible || !isVisible || isLoading) && '12px'};
+        isValueVisible || !isVisible || isLoading ? '12px' : '4px'};
     visibility: ${({ isVisible }) => (isVisible ? 'visible' : 'hidden')};
 
     /* hack to keep button in place to prevent vertical jumping (if used display: none) */
     width: ${({ isVisible }) => (isVisible ? 'auto' : '0')};
 `;
 
+// @TODO this shouldn't be Button
 const SuccessButton = styled(Button)`
     cursor: wait;
     margin-left: 12px;
     width: auto;
-    background-color: ${({ theme }) => theme.BG_LIGHT_GREEN};
-    color: ${({ theme }) => theme.BG_GREEN};
+    background-color: ${({ theme }) => theme.backgroundPrimarySubtleOnElevation0};
+    color: ${({ theme }) => theme.textPrimaryDefault};
 
     :hover {
-        color: ${({ theme }) => theme.BG_GREEN};
-        background-color: ${({ theme }) => theme.BG_LIGHT_GREEN};
+        color: ${({ theme }) => theme.textPrimaryDefault};
+        background-color: ${({ theme }) => theme.backgroundPrimarySubtleOnElevation0};
     }
 `;
 
@@ -103,69 +103,92 @@ const RelativeButton = styled(Button)`
     padding-top: 4px;
     position: relative;
     overflow: hidden;
+    text-align: left;
 `;
 
 const RelativeLabel = styled(Label)<{ isVisible?: boolean }>`
     position: relative;
+    text-align: left;
 `;
 
-const ButtonLikeLabel = (props: ExtendedProps) => {
+const Inline = styled.span`
+    display: inline-flex;
+`;
+
+const ButtonLikeLabel = ({
+    editActive,
+    payload,
+    defaultEditableValue,
+    defaultVisibleValue,
+    onSubmit,
+    onBlur,
+    'data-test': dataTest,
+}: ExtendedProps) => {
     const EditableButton = useMemo(() => withEditable(RelativeButton), []);
 
-    if (props.editActive) {
+    if (editActive) {
         return (
             <EditableButton
                 // @ts-expect-error todo: hm this needs some clever generic
                 variant="tertiary"
                 icon="TAG"
-                data-test={props['data-test']}
-                originalValue={props.payload.value}
-                onSubmit={props.onSubmit}
-                onBlur={props.onBlur}
-                defaultVisibleValue={props.defaultVisibleValue}
-                isButton
+                data-test={dataTest}
+                originalValue={payload.value ?? defaultEditableValue}
+                onSubmit={onSubmit}
+                onBlur={onBlur}
+                size="tiny"
             />
         );
     }
 
-    if (props.payload.value) {
+    if (payload.value) {
         return (
-            <LabelButton variant="tertiary" icon="TAG" data-test={props['data-test']}>
-                <LabelValue>{props.payload.value} </LabelValue>
-                {/* This is the defaultVisibleValue which shows up after you hover over the label name: */}
-                {props.defaultVisibleValue && (
-                    <LabelDefaultValue>{props.defaultVisibleValue}</LabelDefaultValue>
-                )}
+            <LabelButton variant="tertiary" icon="TAG" data-test={dataTest} size="tiny">
+                <Inline>
+                    <LabelValue>{payload.value} </LabelValue>
+                    {/* This is the defaultVisibleValue which shows up after you hover over the label name: */}
+                    {defaultVisibleValue && (
+                        <LabelDefaultValue>{defaultVisibleValue}</LabelDefaultValue>
+                    )}
+                </Inline>
             </LabelButton>
         );
     }
-    return <>{props.defaultVisibleValue}</>;
+
+    return <>{defaultVisibleValue}</>;
 };
 
-const TextLikeLabel = (props: ExtendedProps) => {
+const TextLikeLabel = ({
+    editActive,
+    defaultVisibleValue,
+    defaultEditableValue,
+    payload,
+    'data-test': dataTest,
+    onSubmit,
+    onBlur,
+}: ExtendedProps) => {
     const EditableLabel = useMemo(() => withEditable(RelativeLabel), []);
 
-    if (props.editActive) {
+    if (editActive) {
         return (
             <EditableLabel
-                data-test={props['data-test']}
-                originalValue={props.payload.value}
-                onSubmit={props.onSubmit}
-                onBlur={props.onBlur}
-                defaultVisibleValue={props.defaultVisibleValue}
+                data-test={dataTest}
+                originalValue={payload.value ?? defaultEditableValue}
+                onSubmit={onSubmit}
+                onBlur={onBlur}
             />
         );
     }
 
-    if (props.payload.value) {
+    if (payload.value) {
         return (
-            <Label data-test={props['data-test']}>
-                <LabelValue>{props.payload.value}</LabelValue>
+            <Label data-test={dataTest}>
+                <LabelValue>{payload.value}</LabelValue>
             </Label>
         );
     }
 
-    return <>{props.defaultVisibleValue}</>;
+    return <>{defaultVisibleValue}</>;
 };
 
 const getLocalizedActions = (type: MetadataAddPayload['type']) => {
@@ -214,36 +237,44 @@ const getLocalizedActions = (type: MetadataAddPayload['type']) => {
  * - This component shows defaultVisibleValue and "Add label" button if no metadata is present.
  * - Otherwise it shows metadata value and provides way to edit it.
  */
-export const MetadataLabeling = (props: Props) => {
+export const MetadataLabeling = ({
+    payload,
+    dropdownOptions,
+    defaultEditableValue,
+    defaultVisibleValue,
+    isDisabled,
+    onSubmit,
+    visible,
+}: Props) => {
     const metadata = useSelector(state => state.metadata);
     const dispatch = useDispatch();
     const { isDiscoveryRunning } = useDiscovery();
     const [showSuccess, setShowSuccess] = useState(false);
     const [pending, setPending] = useState(false);
-    const theme = useTheme();
 
-    const l10nLabelling = getLocalizedActions(props.payload.type);
-    const dataTestBase = `@metadata/${props.payload.type}/${props.payload.defaultValue}`;
+    const l10nLabelling = getLocalizedActions(payload.type);
+    const dataTestBase = `@metadata/${payload.type}/${payload.defaultValue}`;
     const actionButtonsDisabled = isDiscoveryRunning || pending;
-    const isSubscribedToSubmitResult = useRef(props.payload.defaultValue);
+    const isSubscribedToSubmitResult = useRef(payload.defaultValue);
     let timeout: Timeout | undefined;
     useEffect(() => {
         setPending(false);
         setShowSuccess(false);
+
         return () => {
             isSubscribedToSubmitResult.current = '';
             clearTimeout(timeout!);
         };
-    }, [props.payload.defaultValue, timeout]);
+    }, [payload.defaultValue, timeout]);
 
     const isLabelingInitPossible = useSelector(selectIsLabelingInitPossible);
-    const deviceState = props.payload.type === 'walletLabel' ? props.payload.entityKey : undefined;
+    const deviceState = payload.type === 'walletLabel' ? payload.entityKey : undefined;
     const isLabelingAvailable = useSelector(state =>
-        selectIsLabelingAvailableForEntity(state, props.payload.entityKey, deviceState),
+        selectIsLabelingAvailableForEntity(state, payload.entityKey, deviceState),
     );
 
     // is this concrete instance being edited?
-    const editActive = metadata.editing === props.payload.defaultValue;
+    const editActive = metadata.editing === payload.defaultValue;
 
     const activateEdit = () => {
         // when clicking on inline input edit, ensure that everything needed is already ready
@@ -262,20 +293,20 @@ export const MetadataLabeling = (props: Props) => {
                 ),
             );
         }
-        dispatch(setEditing(props.payload.defaultValue));
+        dispatch(setEditing(payload.defaultValue));
     };
 
-    let dropdownItems: DropdownMenuItem[] = [
+    let dropdownItems: DropdownMenuItemProps[] = [
         {
-            callback: () => activateEdit(),
+            onClick: () => activateEdit(),
             label: l10nLabelling.edit,
             'data-test': '@metadata/edit-button',
             key: 'edit-label',
         },
     ];
 
-    if (props.dropdownOptions) {
-        dropdownItems = [...dropdownItems, ...props.dropdownOptions];
+    if (dropdownOptions) {
+        dropdownItems = [...dropdownItems, ...dropdownOptions];
     }
 
     const handleBlur = () => {
@@ -284,18 +315,18 @@ export const MetadataLabeling = (props: Props) => {
         }
     };
 
-    const onSubmit = async (value: string | undefined) => {
-        isSubscribedToSubmitResult.current = props.payload.defaultValue;
+    const defaultOnSubmit = async (value: string | undefined) => {
+        isSubscribedToSubmitResult.current = payload.defaultValue;
         setPending(true);
         const result = await dispatch(
             addMetadata({
-                ...props.payload,
+                ...payload,
                 value: value || undefined,
             }),
         );
-        // props.payload.defaultValue might change during next render, this comparison
+        // payload.defaultValue might change during next render, this comparison
         // ensures that success state does not appear if it is no longer relevant
-        if (isSubscribedToSubmitResult.current === props.payload.defaultValue) {
+        if (isSubscribedToSubmitResult.current === payload.defaultValue) {
             setPending(false);
             if (result) {
                 setShowSuccess(true);
@@ -307,53 +338,56 @@ export const MetadataLabeling = (props: Props) => {
     };
 
     const ButtonLikeLabelWithDropdown = useMemo(() => {
-        if (props.payload.value) {
+        if (payload.value) {
             return withDropdown(ButtonLikeLabel);
         }
-        return ButtonLikeLabel;
-    }, [props.payload.value]);
 
-    const labelContainerDatatest = `${dataTestBase}/hover-container`;
+        return ButtonLikeLabel;
+    }, [payload.value]);
+
+    const labelContainerDataTest = `${dataTestBase}/hover-container`;
 
     // should "add label"/"edit label" button be visible
     const showActionButton =
-        !props.isDisabled &&
+        !isDisabled &&
         (isLabelingAvailable || isLabelingInitPossible) &&
         !showSuccess &&
         !editActive;
-    const isVisible = pending || props.visible;
+    const isVisible = pending || visible;
 
     // metadata is still initiating, on hover, show only disabled button with spinner
     if (metadata.initiating)
         return (
-            <LabelContainer data-test={labelContainerDatatest}>
-                {props.defaultVisibleValue}
-                <ActionButton variant="tertiary" isDisabled isLoading>
+            <LabelContainer data-test={labelContainerDataTest}>
+                {defaultVisibleValue}
+                <ActionButton variant="tertiary" isDisabled isLoading size="tiny">
                     <Translation id="TR_LOADING" />
                 </ActionButton>
             </LabelContainer>
         );
 
     // should "add label"/"edit label" button for output label be visible
-    // special case here. It should not be visible if metadata label already exists (props.payload.value) because
+    // special case here. It should not be visible if metadata label already exists (payload.value) because
     // this type of labels has dropdown menu instead of "add/edit label button".
     // but we still want to show pending and success status after editing the label.
     const showOutputLabelActionButton =
-        showActionButton && (!props.payload.value || (props.payload.value && pending));
+        showActionButton && (!payload.value || (payload.value && pending));
 
     return (
         <LabelContainer
-            data-test={labelContainerDatatest}
+            data-test={labelContainerDataTest}
             onClick={e => editActive && e.stopPropagation()}
         >
-            {props.payload.type === 'outputLabel' ? (
+            {payload.type === 'outputLabel' ? (
                 <>
                     <ButtonLikeLabelWithDropdown
                         editActive={editActive}
-                        onSubmit={props.onSubmit || onSubmit}
+                        onSubmit={onSubmit || defaultOnSubmit}
                         onBlur={handleBlur}
                         data-test={dataTestBase}
-                        {...props}
+                        payload={payload}
+                        defaultEditableValue={defaultEditableValue}
+                        defaultVisibleValue={defaultVisibleValue}
                         dropdownOptions={dropdownItems}
                     />
                     {showOutputLabelActionButton && (
@@ -364,7 +398,8 @@ export const MetadataLabeling = (props: Props) => {
                             isLoading={actionButtonsDisabled}
                             isDisabled={actionButtonsDisabled}
                             isVisible={isVisible}
-                            isValueVisible={!!props.payload.value}
+                            size="tiny"
+                            isValueVisible={!!payload.value}
                             onClick={e => {
                                 e.stopPropagation();
                                 // by clicking on add label button, metadata.editing field is set
@@ -381,15 +416,17 @@ export const MetadataLabeling = (props: Props) => {
                 <>
                     <TextLikeLabel
                         editActive={editActive}
-                        onSubmit={props.onSubmit || onSubmit}
+                        onSubmit={onSubmit || defaultOnSubmit}
                         onBlur={handleBlur}
                         data-test={dataTestBase}
-                        {...props}
+                        payload={payload}
+                        defaultEditableValue={defaultEditableValue}
+                        defaultVisibleValue={defaultVisibleValue}
                     />
                     {showActionButton && (
                         <ActionButton
                             data-test={
-                                props.payload.value
+                                payload.value
                                     ? `${dataTestBase}/edit-label-button`
                                     : `${dataTestBase}/add-label-button`
                             }
@@ -398,20 +435,26 @@ export const MetadataLabeling = (props: Props) => {
                             isLoading={actionButtonsDisabled}
                             isDisabled={actionButtonsDisabled}
                             isVisible={isVisible}
+                            size="tiny"
                             onClick={e => {
                                 e.stopPropagation();
                                 activateEdit();
                             }}
                         >
-                            {props.payload.value ? l10nLabelling.edit : l10nLabelling.add}
+                            {payload.value ? l10nLabelling.edit : l10nLabelling.add}
                         </ActionButton>
                     )}
                 </>
             )}
 
             {showSuccess && !editActive && (
-                <SuccessButton variant="tertiary" data-test={`${dataTestBase}/success`}>
-                    <Icon icon="CHECK" color={theme.TYPE_GREEN} size={12} /> {l10nLabelling.edited}
+                <SuccessButton
+                    variant="tertiary"
+                    data-test={`${dataTestBase}/success`}
+                    icon="CHECK"
+                    size="tiny"
+                >
+                    {l10nLabelling.edited}
                 </SuccessButton>
             )}
         </LabelContainer>

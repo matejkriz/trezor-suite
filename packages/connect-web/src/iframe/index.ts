@@ -1,24 +1,18 @@
 // origin: https://github.com/trezor/connect/blob/develop/src/js/iframe/builder.js
 
-import { createDeferred, Deferred } from '@trezor/utils/lib/createDeferred';
+import { createDeferred } from '@trezor/utils';
 import * as ERRORS from '@trezor/connect/lib/constants/errors';
-import { IFRAME, UI_EVENT } from '@trezor/connect/lib/events';
+import { IFRAME, CoreRequestMessage } from '@trezor/connect/lib/events';
 import type { ConnectSettings } from '@trezor/connect/lib/types';
 import { getOrigin } from '@trezor/connect/lib/utils/urlUtils';
 import { setLogWriter, LogMessage, LogWriter } from '@trezor/connect/lib/utils/debug';
 import css from './inlineStyles';
 
-/* eslint-disable import/no-mutable-exports */
 export let instance: HTMLIFrameElement | null;
 export let origin: string;
 export let initPromise = createDeferred();
 export let timeout = 0;
 export let error: ERRORS.TrezorError;
-/* eslint-enable import/no-mutable-exports */
-
-let _messageID = 0;
-// every postMessage to iframe has its own promise to resolve
-export const messagePromises: { [key: number]: Deferred<any> } = {};
 
 export const dispose = () => {
     if (instance && instance.parentNode) {
@@ -106,6 +100,7 @@ export const init = async (settings: ConnectSettings) => {
     const onLoad = () => {
         if (!instance) {
             initPromise.reject(ERRORS.TypedError('Init_IframeBlocked'));
+
             return;
         }
         try {
@@ -113,6 +108,7 @@ export const init = async (settings: ConnectSettings) => {
             const iframeOrigin = instance.contentWindow?.location.origin;
             if (!iframeOrigin || iframeOrigin === 'null') {
                 handleIframeBlocked();
+
                 return;
             }
         } catch (e) {
@@ -174,22 +170,11 @@ export const init = async (settings: ConnectSettings) => {
     }
 };
 
-// post messages to iframe
-export const postMessage = (message: any, usePromise = true) => {
+export const postMessage = (message: CoreRequestMessage) => {
     if (!instance) {
         throw ERRORS.TypedError('Init_IframeBlocked');
     }
-    if (usePromise) {
-        _messageID++;
-        message.id = _messageID;
-        messagePromises[_messageID] = createDeferred();
-        const { promise } = messagePromises[_messageID];
-        instance.contentWindow?.postMessage(message, origin);
-        return promise;
-    }
-
     instance.contentWindow?.postMessage(message, origin);
-    return null;
 };
 
 export const clearTimeout = () => {
@@ -200,7 +185,6 @@ export const initIframeLogger = () => {
     const logWriterFactory = (): LogWriter => ({
         add: (message: LogMessage) => {
             postMessage({
-                event: UI_EVENT,
                 type: IFRAME.LOG,
                 payload: message,
             });

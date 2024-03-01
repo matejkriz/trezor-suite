@@ -1,6 +1,6 @@
 import styled from 'styled-components';
 
-import { H2, P, variables } from '@trezor/components';
+import { H2, Paragraph, variables } from '@trezor/components';
 
 export const Row = styled.div`
     display: flex;
@@ -28,8 +28,6 @@ export const Divider = styled.div`
 `;
 
 export const ImageWrapper = styled.div`
-    margin-left: auto;
-    margin-right: auto;
     top: 50px;
     left: 0;
     right: 0;
@@ -46,7 +44,7 @@ export const Title = styled(H2)`
     padding-bottom: 12px;
 `;
 
-export const Description = styled(P)`
+export const Description = styled(Paragraph)`
     font-size: ${variables.FONT_SIZE.SMALL};
     color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
 `;

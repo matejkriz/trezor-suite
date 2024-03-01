@@ -1,14 +1,21 @@
 import { useWatch } from 'react-hook-form';
-import styled, { useTheme } from 'styled-components';
+import styled from 'styled-components';
 
 import { Checkbox, TooltipButton, Warning, variables } from '@trezor/components';
 import { useDevice } from 'src/hooks/suite';
 import { useSendFormContext } from 'src/hooks/wallet';
 import { isLowAnonymityWarning } from '@suite-common/wallet-utils';
 import { Translation } from 'src/components/suite/Translation';
+import { spacingsPx } from '@trezor/theme';
+
+const Container = styled.div`
+    display: flex;
+    flex-direction: column;
+    grid-column: 1 / 3;
+    gap: ${spacingsPx.md};
+`;
 
 const StyledWarning = styled(Warning)`
-    margin-top: 8px;
     justify-content: flex-start;
 `;
 
@@ -16,7 +23,6 @@ const ButtonReview = styled(TooltipButton)<{ isRed: boolean }>`
     background: ${({ isRed, theme }) => isRed && theme.BUTTON_RED};
     display: flex;
     flex-direction: column;
-    margin: 32px auto;
     min-width: 200px;
 
     :disabled {
@@ -77,8 +83,6 @@ export const ReviewButton = () => {
         control,
     });
 
-    const theme = useTheme();
-
     const values = getValues();
     const broadcastEnabled = options.includes('broadcast');
     const coinControlOpen = options.includes('utxoSelection');
@@ -108,6 +112,7 @@ export const ReviewButton = () => {
                 ? 'TR_SEND_NOT_ANONYMIZED_COINS'
                 : 'TR_SIGN_WITH_NOT_ANONYMIZED_COINS';
         }
+
         return broadcastEnabled ? 'REVIEW_AND_SEND_TRANSACTION' : 'SIGN_TRANSACTION';
     };
 
@@ -144,11 +149,11 @@ export const ReviewButton = () => {
         ) : null;
 
     return (
-        <>
+        <Container>
             {showCoinControlWarning && (
-                <StyledWarning variant="critical">
+                <StyledWarning variant="destructive">
                     <Checkbox
-                        color={theme.BG_RED}
+                        variant="destructive"
                         isChecked={anonymityWarningChecked}
                         onClick={toggleAnonymityWarning}
                     >
@@ -156,6 +161,7 @@ export const ReviewButton = () => {
                     </Checkbox>
                 </StyledWarning>
             )}
+
             <ButtonReview
                 interactiveTooltip={!coinControlOpen}
                 isRed={anonymityWarningChecked}
@@ -171,6 +177,6 @@ export const ReviewButton = () => {
                     </SecondLine>
                 )}
             </ButtonReview>
-        </>
+        </Container>
     );
 };

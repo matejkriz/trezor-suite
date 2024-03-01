@@ -17,6 +17,7 @@ import {
     getSuiteVersion,
     getWindowHeight,
     getWindowWidth,
+    isCodesignBuild,
 } from '@trezor/env-utils';
 import { LogEntry } from '@suite-common/logger';
 import { DEVICE } from '@trezor/connect';
@@ -33,7 +34,7 @@ import { getPhysicalDeviceUniqueIds } from '@suite-common/suite-utils';
 
 import { getIsTorEnabled } from 'src/utils/suite/tor';
 import { AppState, TrezorDevice } from 'src/types/suite';
-import { METADATA } from 'src/actions/suite/constants';
+import { METADATA_LABELING } from 'src/actions/suite/constants';
 import { Account } from 'src/types/wallet';
 import { selectLabelingDataForWallet } from 'src/reducers/suite/metadataReducer';
 
@@ -45,6 +46,7 @@ export const prettifyLog = (json: Record<any, any>) => JSON.stringify(json, null
 
 export const redactAccount = (account: DeepPartial<Account> | undefined) => {
     if (!account) return undefined;
+
     return {
         ...account,
         descriptor: REDACTED_REPLACEMENT,
@@ -89,6 +91,7 @@ export const redactDiscovery = (discovery: DeepPartial<Discovery> | undefined) =
 
 export const redactDevice = (device: DeepPartial<TrezorDevice> | undefined) => {
     if (!device) return undefined;
+
     return {
         ...device,
         id: REDACTED_REPLACEMENT,
@@ -179,7 +182,7 @@ export const getApplicationInfo = (state: AppState, hideSensitiveInfo: boolean) 
     suiteVersion: getSuiteVersion(),
     commitHash: getCommitHash(),
     startTime,
-    isDev: !process.env.CODESIGN_BUILD,
+    isDev: !isCodesignBuild(),
     debugMenu: state.suite.settings.debug.showDebugMenu,
     online: state.suite.online,
     browserName: getBrowserName(),
@@ -243,7 +246,7 @@ export const getApplicationInfo = (state: AppState, hideSensitiveInfo: boolean) 
         deviceLabel: hideSensitiveInfo ? REDACTED_REPLACEMENT : device.label,
         label:
             // eslint-disable-next-line no-nested-ternary
-            device.metadata[METADATA.ENCRYPTION_VERSION]
+            device.metadata[METADATA_LABELING.ENCRYPTION_VERSION]
                 ? hideSensitiveInfo
                     ? REDACTED_REPLACEMENT
                     : selectLabelingDataForWallet(state).walletLabel

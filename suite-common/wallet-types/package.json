@@ -7,7 +7,7 @@
     "main": "src/index",
     "scripts": {
         "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "type-check": "tsc --build"
+        "type-check": "yarn g:tsc --build"
     },
     "dependencies": {
         "@suite-common/intl-types": "workspace:*",
@@ -15,14 +15,11 @@
         "@suite-common/suite-config": "workspace:*",
         "@suite-common/wallet-config": "workspace:*",
         "@suite-common/wallet-constants": "workspace:*",
+        "@trezor/blockchain-link-types": "workspace:*",
         "@trezor/connect": "workspace:*",
         "@trezor/type-utils": "workspace:*",
         "@trezor/utils": "workspace:*",
         "react": "18.2.0",
-        "react-hook-form": "^7.48.2"
-    },
-    "devDependencies": {
-        "jest": "29.5.0",
-        "typescript": "5.3.2"
+        "react-hook-form": "^7.50.1"
     }
 }

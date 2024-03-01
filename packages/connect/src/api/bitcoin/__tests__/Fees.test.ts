@@ -5,38 +5,6 @@ import { parseCoinsJson, getBitcoinNetwork } from '../../../data/coinInfo';
 import { initBlockchain } from '../../../backend/BlockchainLink';
 import { FeeLevels } from '../Fees';
 
-// mock blockchain-link module to spy/mock `estimateFee` method
-jest.mock('@trezor/blockchain-link', () => ({
-    __esModule: true,
-    default: class BlockchainLink {
-        name = 'jest-mocked-module';
-        listeners: Record<string, () => void> = {};
-        constructor(args: any) {
-            this.name = args.name;
-        }
-        on(...args: any[]) {
-            const [type, fn] = args;
-            this.listeners[type] = fn;
-        }
-        connect() {
-            this.listeners.connected();
-        }
-        disconnect() {}
-        removeAllListeners() {}
-        dispose() {}
-        getInfo() {
-            return {
-                url: this,
-                name: this.name,
-                shortcut: this.name,
-            };
-        }
-        estimateFee(params: { blocks: number[] }) {
-            return params.blocks.map(() => ({ feePerUnit: '-1' }));
-        }
-    },
-}));
-
 describe('api/bitcoin/Fees', () => {
     // load coin definitions
     parseCoinsJson({ ...coinsJSON, eth: ethereumCoinsJSON });
@@ -52,8 +20,10 @@ describe('api/bitcoin/Fees', () => {
                 const response = params.blocks.map(block => {
                     const reduce = Math.floor(block / 10) * 379; // every 10th result is lower
                     const fee = 10000 - reduce;
+
                     return { feePerUnit: fee.toString() };
                 });
+
                 return Promise.resolve(response);
             });
 
@@ -84,8 +54,10 @@ describe('api/bitcoin/Fees', () => {
                     if (block < 20 && block % 3 === 0) return { feePerUnit: '-1' }; // each third requested block returns unknown value
                     const reduce = Math.floor(block / 2) * 379; // every second known result is lower
                     const fee = 10000 - reduce;
+
                     return { feePerUnit: fee.toString() };
                 });
+
                 return Promise.resolve(response);
             });
 
@@ -111,8 +83,10 @@ describe('api/bitcoin/Fees', () => {
                     if (block < 5) return { feePerUnit: '-1' }; // first 5 requested blocks are unknown
                     const reduce = Math.floor(block / 2) * 379; // every second known result is lower
                     const fee = 10000 - reduce;
+
                     return { feePerUnit: fee.toString() };
                 });
+
                 return Promise.resolve(response);
             });
 

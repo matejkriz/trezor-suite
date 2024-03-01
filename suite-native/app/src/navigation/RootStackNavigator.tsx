@@ -18,6 +18,7 @@ import { TransactionDetailScreen } from '@suite-native/transactions';
 import { OnboardingStackNavigator } from '@suite-native/module-onboarding';
 import { ReceiveModalScreen } from '@suite-native/receive';
 import { ConnectDeviceStackNavigator } from '@suite-native/module-connect-device';
+import { AddCoinAccountStackNavigator } from '@suite-native/module-add-accounts';
 import { DeviceInfoModalScreen, useHandleDeviceConnection } from '@suite-native/device';
 
 import { AppTabNavigator } from './AppTabNavigator';
@@ -33,6 +34,7 @@ export const RootStackNavigator = () => {
         if (isOnboardingFinished) {
             return RootStackRoutes.AppTabs;
         }
+
         return RootStackRoutes.Onboarding;
     };
 
@@ -73,6 +75,10 @@ export const RootStackNavigator = () => {
             <RootStack.Screen
                 name={RootStackRoutes.DevUtilsStack}
                 component={DevUtilsStackNavigator}
+            />
+            <RootStack.Screen
+                name={RootStackRoutes.AddCoinAccountStack}
+                component={AddCoinAccountStackNavigator}
             />
             <RootStack.Screen name={RootStackRoutes.ReceiveModal} component={ReceiveModalScreen} />
             <RootStack.Screen name={RootStackRoutes.DeviceInfo} component={DeviceInfoModalScreen} />

@@ -7,7 +7,7 @@
     "main": "src/index",
     "scripts": {
         "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "type-check": "tsc --build"
+        "type-check": "yarn g:tsc --build"
     },
     "dependencies": {
         "@mobily/ts-belt": "^3.13.1",
@@ -26,6 +26,7 @@
         "@suite-native/device-mutex": "workspace:*",
         "@trezor/connect": "workspace:*",
         "@trezor/device-utils": "workspace:*",
+        "proxy-memoize": "2.0.2",
         "react": "18.2.0",
         "react-redux": "8.0.7"
     }

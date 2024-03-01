@@ -1,4 +1,4 @@
-/* eslint-disable max-classes-per-file, no-console */
+/* eslint-disable no-console */
 
 import express, { Express } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -59,6 +59,7 @@ export class GoogleMock {
                 res.writeHeader(response.status, response.headers);
                 res.write(JSON.stringify(response!.body));
                 res.end();
+
                 return;
             }
             next();
@@ -68,8 +69,10 @@ export class GoogleMock {
             if (!this.user) {
                 res.status(401);
                 res.send();
+
                 return;
             }
+
             return next();
         });
 
@@ -167,6 +170,7 @@ export class GoogleMock {
     start() {
         if (this.running) {
             this.reset();
+
             return;
         }
 

@@ -1,9 +1,9 @@
 import { useRef, useCallback, useMemo, useState, MouseEvent, DragEvent, ChangeEvent } from 'react';
 import styled from 'styled-components';
-import { P, Icon } from '@trezor/components';
+import { Icon, IconType, Paragraph } from '@trezor/components';
 import { Translation } from 'src/components/suite';
 import type { ExtendedMessageDescriptor } from 'src/types/suite';
-import { IconType } from '@trezor/components/src/support/types';
+import { borders } from '@trezor/theme';
 
 interface DropZoneProps {
     // 'accept' attribute for underlying HTML file input
@@ -37,12 +37,14 @@ export const useDropZone = ({ accept, onSelect, className }: DropZoneProps) => {
             setFilename(file?.name);
             if (!file) {
                 setError({ id: 'TR_DROPZONE_ERROR_EMPTY' });
+
                 return;
             }
             if (allowedExtensions.length) {
                 const extRegex = new RegExp(`\\.(${allowedExtensions.join('|')})$`, 'i');
                 if (!extRegex.test(file.name)) {
                     setError({ id: 'TR_DROPZONE_ERROR_FILETYPE' });
+
                     return;
                 }
             }
@@ -145,7 +147,7 @@ const Wrapper = styled.div`
     justify-content: center;
     align-items: center;
     border: 2px dashed ${({ theme }) => theme.STROKE_GREY};
-    border-radius: 8px;
+    border-radius: ${borders.radii.xs};
     cursor: pointer;
     min-height: 250px;
     transition: background-color 0.3s;
@@ -184,9 +186,9 @@ export const DropZone = (props: DropZoneProps) => {
                 {filename || <Translation id="TR_DROPZONE" />}
             </Label>
             {error && (
-                <P>
+                <Paragraph>
                     <Translation {...error} />
-                </P>
+                </Paragraph>
             )}
         </Wrapper>
     );

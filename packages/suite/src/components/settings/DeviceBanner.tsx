@@ -1,10 +1,11 @@
 import { ReactNode } from 'react';
 import styled from 'styled-components';
-import { LottieAnimation, P, variables } from '@trezor/components';
+import { Card, LottieAnimation, Paragraph, variables } from '@trezor/components';
 
 import { useDevice, useSelector } from 'src/hooks/suite';
 import { isWebUsb } from 'src/utils/suite/transport';
 import { WebUsbButton } from 'src/components/suite/WebUsbButton';
+import { spacingsPx } from '@trezor/theme';
 
 const StyledLottieAnimation = styled(LottieAnimation)`
     margin: 8px 16px 8px 0;
@@ -12,17 +13,12 @@ const StyledLottieAnimation = styled(LottieAnimation)`
     background: ${({ theme }) => theme.BG_GREY};
 `;
 
-const Wrapper = styled.div`
-    display: flex;
-    align-items: center;
-    background-color: ${({ theme }) => theme.STROKE_GREY};
-    border-radius: 12px;
-    margin-bottom: 24px;
-    padding: 8px 16px;
-    width: 100%;
+const Wrapper = styled(Card)`
+    flex-direction: row;
+    margin-bottom: ${spacingsPx.lg};
 `;
 
-const Description = styled(P)`
+const Description = styled(Paragraph)`
     color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
 `;
 
@@ -33,7 +29,7 @@ const Column = styled.div`
     width: 100%;
 `;
 
-const Title = styled(P)`
+const Title = styled(Paragraph)`
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -69,7 +65,7 @@ export const DeviceBanner = ({ title, description }: DeviceBannerProps) => {
                 loop
             />
             <Column>
-                <Title weight="bold">
+                <Title type="highlight">
                     {title}{' '}
                     {!description && isWebUsbTransport && !device?.connected && <WebUsbButton />}
                 </Title>

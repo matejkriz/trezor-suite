@@ -1,76 +1,124 @@
-import { useState, useEffect, ReactNode, useCallback } from 'react';
+import { useState, useEffect, ReactNode, useCallback, KeyboardEvent } from 'react';
 import styled, { css } from 'styled-components';
-import { SCREEN_SIZE, FONT_SIZE, FONT_WEIGHT } from '../../../config/variables';
-import { INPUT_BORDER_RADIUS, Label, LabelLeft } from '../InputStyles';
+import { breakpointMediaQueries } from '@trezor/styles';
+import { borders, spacings, spacingsPx, typography } from '@trezor/theme';
+import { focusStyleTransition, getFocusShadowStyle } from '../../../utils/utils';
 
-const Wrapper = styled.div<{ isInLine: boolean }>`
+const Wrapper = styled.div<{ isFullWidth?: boolean }>`
     display: flex;
-    height: 40px;
+    align-items: center;
+    gap: ${spacingsPx.sm};
+    width: ${({ isFullWidth }) => (isFullWidth ? '100%' : 'auto')};
 
-    @media (max-width: ${SCREEN_SIZE.SM}) {
-        height: auto;
-        width: 100%;
-    }
-
-    ${({ isInLine }) =>
-        !isInLine &&
-        css`
-            width: 100%;
-            height: auto;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-start;
-        `};
-`;
-
-const Options = styled.div<{ isInLine: boolean }>`
-    display: flex;
-    flex: ${({ isInLine }) => isInLine && '1'};
-    padding: 0 4px;
-    border-radius: ${INPUT_BORDER_RADIUS}px;
-    background: ${({ theme }) => theme.BG_GREY};
-
-    @media (max-width: ${SCREEN_SIZE.SM}) {
+    ${breakpointMediaQueries.below_sm} {
         flex-direction: column;
+        align-items: flex-start;
         width: 100%;
-    }
-
-    @media (min-width: ${SCREEN_SIZE.SM}) {
-        height: ${({ isInLine }) => !isInLine && '48px'};
     }
 `;
 
-const Option = styled.div<{ isSelected: boolean }>`
+const Label = styled.span`
+    color: ${({ theme }) => theme.textSubdued};
+    text-transform: capitalize;
+`;
+
+const getTranslateValue = (index: number) => {
+    const value = index * 100;
+
+    if (!index) {
+        return;
+    }
+
+    return `calc(${value}% + ${index * spacings.xxs}px)`;
+};
+
+const getPuckWidth = (optionsCount: number) =>
+    `calc((100% - 8px - ${(optionsCount - 1) * spacings.xxs}px) / ${optionsCount})`;
+
+const Options = styled.div<{ optionsCount: number; isFullWidth?: boolean }>`
+    position: relative;
+    display: grid;
+    grid-auto-columns: ${({ optionsCount }) => `minmax(${getPuckWidth(optionsCount)}, 1fr)`};
+    grid-auto-flow: column;
+    gap: ${spacingsPx.xxs};
+    padding: ${spacingsPx.xxs};
+    background: ${({ theme }) => theme.backgroundSurfaceElevation0};
+    border-radius: ${borders.radii.full};
+    width: ${({ isFullWidth }) => (isFullWidth ? '100%' : 'auto')};
+
+    ${breakpointMediaQueries.below_sm} {
+        grid-auto-flow: row;
+        width: 100%;
+        border-radius: ${borders.radii.lg};
+    }
+`;
+
+const Puck = styled.div<{ optionsCount: number; selectedIndex: number }>`
+    position: absolute;
+    left: 4px;
+    top: 4px;
+    bottom: 4px;
+    width: ${({ optionsCount }) => getPuckWidth(optionsCount)};
+    padding: ${spacingsPx.xxs} ${spacingsPx.xl};
+    background: ${({ theme }) => theme.backgroundSurfaceElevation1};
+    border-radius: ${borders.radii.full};
+    box-shadow: ${({ theme }) => theme.boxShadowBase};
+    transform: ${({ selectedIndex }) => `translateX(${getTranslateValue(selectedIndex)})`};
+    transition:
+        transform 0.175s cubic-bezier(1, 0.02, 0.38, 0.74),
+        ${focusStyleTransition};
+
+    ${getFocusShadowStyle()}
+
+    ${breakpointMediaQueries.below_sm} {
+        left: 4px;
+        right: 4px;
+        top: 4px;
+        width: auto;
+        height: ${({ optionsCount }) => getPuckWidth(optionsCount)};
+        transform: ${({ selectedIndex }) => `translateY(${getTranslateValue(selectedIndex)})`};
+    }
+`;
+
+const WidthMock = styled.span`
+    height: 0;
+    visibility: hidden;
+    ${typography.highlight}
+`;
+
+const Option = styled.div<{ isSelected: boolean; isDisabled: boolean }>`
+    position: relative;
     display: flex;
-    flex: 1;
     justify-content: center;
     align-items: center;
-    margin: 4px 0;
-    padding: 0 14px;
-    padding-top: 1px;
-    border-radius: 8px;
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    font-size: ${FONT_SIZE.SMALL};
+    flex-direction: column;
+    height: 36px;
+    padding: ${spacingsPx.xxs} ${spacingsPx.xl};
+    color: ${({ theme }) => theme.textSubdued};
+    ${typography.body}
     text-transform: capitalize;
     white-space: nowrap;
-    font-weight: ${FONT_WEIGHT.DEMI_BOLD};
+    transition: color 0.175s;
     cursor: pointer;
+
+    :hover {
+        color: ${({ theme, isSelected, isDisabled }) =>
+            !isSelected && !isDisabled && theme.textDefault};
+    }
 
     ${({ isSelected }) =>
         isSelected &&
         css`
-            background: ${({ theme }) => theme.BG_WHITE};
-            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
-            color: ${({ theme }) => theme.TYPE_DARK_GREY};
-            font-weight: ${FONT_WEIGHT.DEMI_BOLD};
+            color: ${({ theme }) => theme.textPrimaryDefault};
+            ${typography.highlight}
         `}
 
-    @media (max-width: ${SCREEN_SIZE.SM}) {
-        flex: auto;
-        justify-content: center;
-        width: 100%;
-        height: 40px;
-    }
+    ${({ isDisabled }) =>
+        isDisabled &&
+        css`
+            color: ${({ theme }) => theme.textDisabled};
+            pointer-events: none;
+        `}
 `;
 
 type ValueTypes = number | string | boolean;
@@ -85,8 +133,8 @@ export interface SelectBarProps<V extends ValueTypes> {
     options: Option<V>[];
     selectedOption?: V;
     onChange?: (value: V) => void;
-    isInLine?: boolean;
     isDisabled?: boolean;
+    isFullWidth?: boolean;
     className?: string;
 }
 
@@ -96,8 +144,8 @@ export const SelectBar: <V extends ValueTypes>(props: SelectBarProps<V>) => JSX.
     options,
     selectedOption,
     onChange,
-    isInLine = true,
     isDisabled,
+    isFullWidth,
     className,
     ...rest
 }) => {
@@ -111,7 +159,7 @@ export const SelectBar: <V extends ValueTypes>(props: SelectBarProps<V>) => JSX.
 
     const handleOptionClick = useCallback(
         (option: Option<ValueTypes>) => () => {
-            if (isDisabled || option.value === selectedOptionIn) {
+            if (option.value === selectedOptionIn) {
                 return;
             }
 
@@ -119,22 +167,56 @@ export const SelectBar: <V extends ValueTypes>(props: SelectBarProps<V>) => JSX.
 
             onChange?.(option?.value as any);
         },
-        [isDisabled, selectedOptionIn, onChange],
+        [selectedOptionIn, onChange],
     );
 
-    return (
-        <Wrapper className={className} isInLine={isInLine} {...rest}>
-            {label && (
-                <Label>
-                    <LabelLeft>{label}</LabelLeft>
-                </Label>
-            )}
+    const handleKeyboardNav = (e: KeyboardEvent) => {
+        const selectedOptionIndex = options.findIndex(option => option.value === selectedOptionIn);
 
-            <Options isInLine={isInLine}>
+        let option;
+        if (e.key === 'ArrowLeft') {
+            const previousIndex = selectedOptionIndex - 1;
+
+            if (previousIndex >= 0) {
+                option = options[previousIndex];
+            } else {
+                option = options[options.length - 1];
+            }
+        } else if (e.key === 'ArrowRight') {
+            const previousIndex = selectedOptionIndex + 1;
+
+            if (previousIndex <= options.length - 1) {
+                option = options[previousIndex];
+            } else {
+                [option] = options;
+            }
+        }
+
+        if (option) {
+            setSelected(option.value);
+            handleOptionClick(option)();
+        }
+    };
+
+    const selectedIndex = options.findIndex(option => option.value === selectedOptionIn);
+
+    return (
+        <Wrapper className={className} isFullWidth={isFullWidth} {...rest}>
+            {label && <Label>{label}</Label>}
+
+            <Options optionsCount={options.length} isFullWidth={isFullWidth}>
+                <Puck
+                    optionsCount={options.length}
+                    selectedIndex={selectedIndex}
+                    tabIndex={0}
+                    onKeyDown={handleKeyboardNav}
+                />
+
                 {options.map(option => (
                     <Option
                         key={String(option.value)}
                         onClick={handleOptionClick(option)}
+                        isDisabled={!!isDisabled}
                         isSelected={
                             selectedOptionIn !== undefined
                                 ? selectedOptionIn === option.value
@@ -142,7 +224,8 @@ export const SelectBar: <V extends ValueTypes>(props: SelectBarProps<V>) => JSX.
                         }
                         data-test={`select-bar/${String(option.value)}`}
                     >
-                        {option.label}
+                        <span>{option.label}</span>
+                        <WidthMock>{option.label}</WidthMock>
                     </Option>
                 ))}
             </Options>

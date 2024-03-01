@@ -7,7 +7,6 @@ import { variables, Button } from '@trezor/components';
 import { calcTicks, calcTicksFromData } from '@suite-common/suite-utils';
 import { selectDevice } from '@suite-common/wallet-core';
 
-import { CARD_PADDING_SIZE } from 'src/constants/suite/layout';
 import GraphWorker from 'src/support/workers/graph';
 import { getGraphDataForInterval, updateGraphData } from 'src/actions/wallet/graphActions';
 import { useDispatch, useSelector } from 'src/hooks/suite';
@@ -15,6 +14,7 @@ import { Account } from 'src/types/wallet';
 import { TransactionsGraph, Translation, HiddenPlaceholder } from 'src/components/suite';
 import { AggregatedDashboardHistory } from 'src/types/wallet/graph';
 import { getMinMaxValueFromData } from 'src/utils/wallet/graph';
+import { selectLocalCurrency } from 'src/reducers/wallet/settingsReducer';
 
 const Wrapper = styled.div`
     display: flex;
@@ -25,7 +25,7 @@ const Wrapper = styled.div`
 const GraphWrapper = styled(HiddenPlaceholder)`
     display: flex;
     flex: 1 1 auto;
-    padding: ${CARD_PADDING_SIZE} 0;
+    padding: 16px 0;
     height: 320px;
 `;
 
@@ -49,7 +49,7 @@ interface DashboardGraphProps {
 export const DashboardGraph = memo(({ accounts }: DashboardGraphProps) => {
     const { error, isLoading, selectedRange } = useSelector(state => state.wallet.graph);
     const selectedDevice = useSelector(selectDevice);
-    const localCurrency = useSelector(state => state.wallet.settings.localCurrency);
+    const localCurrency = useSelector(selectLocalCurrency);
     const dispatch = useDispatch();
 
     const [data, setData] = useState<AggregatedDashboardHistory[]>([]);
@@ -116,6 +116,7 @@ export const DashboardGraph = memo(({ accounts }: DashboardGraphProps) => {
             };
 
             worker.addEventListener('message', handleMessage);
+
             return () => {
                 worker.removeEventListener('message', handleMessage);
                 worker.terminate();

@@ -13,7 +13,7 @@ export function getAmountLimits(
 ): AmountLimits | undefined {
     let minAmount: number | undefined;
     let maxAmount: number | undefined;
-    // eslint-disable-next-line no-restricted-syntax
+
     for (const quote of quotes) {
         // if at least one quote succeeded do not return any message
         if (!quote.error) {
@@ -61,6 +61,7 @@ export function processQuotes(allQuotes: SellFiatTrade[]): [SellFiatTrade[], Sel
     const alternativeQuotes = allQuotes.filter(
         q => q.tags && q.tags.includes('alternativeCurrency') && !q.error,
     );
+
     return [quotes, alternativeQuotes];
 }
 
@@ -96,6 +97,7 @@ export const createQuoteLink = async (
 
     if (isDesktop()) {
         const url = await desktopApi.getHttpReceiverAddress('/sell-redirect');
+
         return `${url}?p=${encodeURIComponent(`/coinmarket-redirect/${params}`)}`;
     }
 

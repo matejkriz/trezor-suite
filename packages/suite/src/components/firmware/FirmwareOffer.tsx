@@ -1,12 +1,16 @@
 import styled from 'styled-components';
 
-import { getFwUpdateVersion, parseFirmwareChangelog } from '@suite-common/suite-utils';
+import {
+    getChangelogUrl,
+    getFwUpdateVersion,
+    parseFirmwareChangelog,
+} from '@suite-common/suite-utils';
 import { Icon, Tooltip, variables } from '@trezor/components';
 import { getFirmwareVersion } from '@trezor/device-utils';
 import { AcquiredDevice } from '@suite-common/suite-types';
 import { FirmwareType } from '@trezor/connect';
 
-import { Translation } from 'src/components/suite';
+import { Translation, TrezorLink } from 'src/components/suite';
 import { FirmwareChangelog } from 'src/components/firmware';
 import { useFirmware, useTranslation, useSelector } from 'src/hooks/suite';
 import { getSuiteFirmwareTypeString } from 'src/utils/firmware';
@@ -30,7 +34,7 @@ const FwVersion = styled.div`
 `;
 
 const Version = styled.div<{ isNew?: boolean }>`
-    color: ${({ isNew, theme }) => (isNew ? theme.TYPE_GREEN : theme.TYPE_LIGHT_GREY)};
+    color: ${({ isNew, theme }) => (isNew ? theme.backgroundPrimaryDefault : theme.textSubdued)};
     font-size: ${variables.FONT_SIZE.SMALL};
     font-variant-numeric: tabular-nums;
     margin-top: 6px;
@@ -38,6 +42,15 @@ const Version = styled.div<{ isNew?: boolean }>`
 
 const Label = styled.div`
     font-size: ${variables.FONT_SIZE.TINY};
+`;
+
+const StyledLink = styled(TrezorLink)`
+    margin-left: auto;
+    text-decoration: underline;
+
+    path {
+        fill: ${({ theme }) => theme.iconSubdued};
+    }
 `;
 
 interface FirmwareOfferProps {
@@ -62,6 +75,7 @@ export const FirmwareOffer = ({
     const parsedChangelog = customFirmware
         ? null
         : parseFirmwareChangelog(device.firmwareRelease?.release);
+    const changelogUrl = getChangelogUrl(device);
 
     const currentFirmwareType = getSuiteFirmwareTypeString(device.firmwareType);
     const futureFirmwareType = getSuiteFirmwareTypeString(targetFirmwareType || targetType);
@@ -96,10 +110,26 @@ export const FirmwareOffer = ({
                 </Label>
                 {parsedChangelog ? (
                     <Tooltip
-                        rich
                         dashed
-                        content={<FirmwareChangelog device={device} {...parsedChangelog} />}
-                        placement="top"
+                        isLarge
+                        title={
+                            <>
+                                <Translation
+                                    id="TR_VERSION"
+                                    values={{ version: parsedChangelog.versionString }}
+                                />
+
+                                <StyledLink
+                                    type="hint"
+                                    variant="nostyle"
+                                    icon="EXTERNAL_LINK"
+                                    href={parsedChangelog.notes || changelogUrl}
+                                >
+                                    <Translation id="TR_VIEW_ALL" />
+                                </StyledLink>
+                            </>
+                        }
+                        content={<FirmwareChangelog changelog={parsedChangelog.changelog} />}
                     >
                         {nextVersionElement}
                     </Tooltip>

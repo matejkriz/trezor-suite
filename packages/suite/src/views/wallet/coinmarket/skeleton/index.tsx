@@ -1,9 +1,8 @@
 import styled from 'styled-components';
 
-import { variables } from '@trezor/components';
+import { SkeletonRectangle, SkeletonSpread, variables } from '@trezor/components';
 
 import { useLoadingSkeleton } from 'src/hooks/suite';
-import { SkeletonRectangle, SkeletonSpread } from 'src/components/suite';
 import {
     Wrapper,
     Left,
@@ -63,6 +62,7 @@ const StyledRight = styled(Right)`
 
 export const CoinmarketSkeleton = () => {
     const { shouldAnimate } = useLoadingSkeleton();
+
     return (
         <Wrapper responsiveSize="LG">
             <SkeletonWrapper>

@@ -1,6 +1,6 @@
 import { defineConfig } from 'cypress';
 
-import CDP from 'chrome-remote-interface';
+// import CDP from 'chrome-remote-interface';
 import fs from 'fs';
 import path from 'path';
 import { addMatchImageSnapshotPlugin } from 'cypress-image-snapshot/plugin';
@@ -23,21 +23,21 @@ const mocked = {
     google: new GoogleMock(),
 };
 
-const ensureRdpPort = (args: any[]) => {
-    const existing = args.find(arg => arg.slice(0, 23) === '--remote-debugging-port');
+// const ensureRdpPort = (args: any[]) => {
+//     const existing = args.find(arg => arg.slice(0, 23) === '--remote-debugging-port');
 
-    if (existing) {
-        return Number(existing.split('=')[1]);
-    }
+//     if (existing) {
+//         return Number(existing.split('=')[1]);
+//     }
 
-    const port = 40000 + Math.round(Math.random() * 25000);
+//     const port = 40000 + Math.round(Math.random() * 25000);
 
-    args.push(`--remote-debugging-port=${port}`);
+//     args.push(`--remote-debugging-port=${port}`);
 
-    return port;
-};
+//     return port;
+// };
 
-let port = 0;
+// let port = 0;
 let client: any = null;
 let blockbook: BackendWebsocketServerMock | undefined;
 
@@ -73,10 +73,11 @@ export default defineConfig({
         trashAssetsBeforeRuns: false,
         chromeWebSecurity: false,
         experimentalFetchPolyfill: true,
+        experimentalRunAllSpecs: true,
         setupNodeEvents(on, config) {
-            on('before:browser:launch', (_browser, launchOptions) => {
-                const args = Array.isArray(launchOptions) ? launchOptions : launchOptions.args;
-                port = ensureRdpPort(args);
+            on('before:browser:launch', _browser => {
+                // const args = Array.isArray(launchOptions) ? launchOptions : launchOptions.args;
+                // port = ensureRdpPort(args);
                 addMatchImageSnapshotPlugin(on, config);
             });
             on('task', {
@@ -91,6 +92,7 @@ export default defineConfig({
                         default:
                             throw new Error('not a valid case');
                     }
+
                     return null;
                 },
                 metadataStopProvider: provider => {
@@ -104,6 +106,7 @@ export default defineConfig({
                         default:
                             throw new Error('not a valid case');
                     }
+
                     return null;
                 },
                 metadataSetFileContent: async ({ provider, file, content, aesKey }) => {
@@ -118,6 +121,7 @@ export default defineConfig({
                         default:
                             throw new Error('not a valid case');
                     }
+
                     return null;
                 },
                 metadataSetNextResponse: ({ provider, status, body }) => {
@@ -131,6 +135,7 @@ export default defineConfig({
                         default:
                             throw new Error('not a valid case');
                     }
+
                     return null;
                 },
                 metadataGetRequests: ({ provider }) => {
@@ -145,10 +150,12 @@ export default defineConfig({
                 },
                 startMockedBridge: async har => {
                     await mocked.bridge.start(har);
+
                     return null;
                 },
                 stopMockedBridge: async () => {
                     await mocked.bridge.stop();
+
                     return null;
                 },
                 stealBridgeSession: async () => {
@@ -169,27 +176,6 @@ export default defineConfig({
 
                     return Promise.resolve(true);
                 },
-                activateHoverPseudo: async ({ selector }) => {
-                    client = client || (await CDP({ port }));
-                    await client.DOM.enable();
-                    await client.CSS.enable();
-                    // as the Window consists of two IFrames, we must retrieve the right one
-                    const allRootNodes = await client.DOM.getFlattenedDocument();
-                    const isIframe = (node: any) =>
-                        node.nodeName === 'IFRAME' && node.contentDocument;
-                    const filtered = allRootNodes.nodes.filter(isIframe);
-                    // The first IFrame is our App
-                    const root = filtered[0].contentDocument;
-                    const { nodeId } = await client.DOM.querySelector({
-                        nodeId: root.nodeId,
-                        selector,
-                    });
-
-                    return client.CSS.forcePseudoState({
-                        nodeId,
-                        forcedPseudoClasses: ['hover'],
-                    });
-                },
                 readDir: dir => fs.readdirSync(dir, { encoding: 'utf-8' }),
                 readFile: path => fs.readFileSync(path, { encoding: 'utf-8' }),
                 rmDir: (opts: {
@@ -207,6 +193,7 @@ export default defineConfig({
                     if (fs.existsSync(dir)) {
                         fs.rmdirSync(dir, { recursive });
                     }
+
                     return null;
                 },
                 csvToJson(data) {
@@ -222,6 +209,7 @@ export default defineConfig({
                         }
                         result.push(obj);
                     }
+
                     return result;
                 },
                 async startBlockbookMock({ endpointsFile }) {
@@ -229,22 +217,30 @@ export default defineConfig({
 
                     blockbook = await BackendWebsocketServerMock.create('blockbook');
                     blockbook.setFixtures(fixtures);
+
                     return blockbook.options.port;
                 },
                 stopBlockbookMock() {
                     if (blockbook) {
                         blockbook.stop();
                     }
+
                     return null;
                 },
                 set({ key, value }: { key: string; value: any }) {
                     store[key] = value;
+
                     return null;
                 },
                 get({ key }: { key: string }): any {
                     return store[key];
                 },
                 ...TrezorUserEnvLink.api,
+                async setupEmu(opts: Parameters<typeof TrezorUserEnvLink.api.setupEmu>[0]) {
+                    await TrezorUserEnvLink.api.setupEmu(opts);
+
+                    return TrezorUserEnvLink.api.startBridge();
+                },
             });
         },
     },

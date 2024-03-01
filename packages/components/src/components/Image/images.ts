@@ -9,6 +9,10 @@ export const SVG_IMAGES = {
     DEVICE_CONFIRM_TREZOR_T2T1: 'device-confirm-trezor-t2t1.svg',
     DEVICE_CONFIRM_TREZOR_T2B1: 'device-confirm-trezor-t2b1.svg',
     SPINNER: 'spinner.svg',
+    SPINNER_GREY: 'spinner-grey.svg',
+    SPINNER_LIGHT_GREY: 'spinner-light-grey.svg',
+    SPINNER_ORANGE: 'spinner-orange.svg',
+    SPINNER_PRIMARY_DEFAULT: 'spinner-primary-default.svg',
     DEVICE_ANOTHER_SESSION: 'device-another-session.svg',
     CONNECT_DEVICE: 'connect-device.svg',
     ERROR_404: 'error-404.svg',
@@ -26,11 +30,13 @@ export const SVG_IMAGES = {
     TREZOR_PATTERN: 'trezor-pattern.svg',
     HOLLOW_APP_LOGO: 'hollow-app-logo.svg',
     APP_STORE_BADGE: 'app-store-badge.svg',
-    PLAY_STORE_BADGE: 'play-store-badge.svg',
     APP_STORE_TITLE: 'app-store-title.svg',
+    PLAY_STORE_BADGE: 'play-store-badge.svg',
     PLAY_STORE_TITLE: 'play-store-title.svg',
     STROKE_BORDER: 'stroke-border.svg',
     TREZOR_SAFE_PROMO_UNDERLINE: 'trezor-safe-promo-underline.svg',
+    CONFIRM_EVM_EXPLANATION_ETH: 'confirm-evm-explanation-eth.svg',
+    CONFIRM_EVM_EXPLANATION_OTHER: 'confirm-evm-explanation-other.svg',
 } as const;
 
 export type PngImage = keyof typeof PNG_IMAGES;

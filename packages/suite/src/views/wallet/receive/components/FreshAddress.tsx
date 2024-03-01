@@ -6,27 +6,30 @@ import { AppState } from 'src/types/suite';
 import { showAddress } from 'src/actions/wallet/receiveActions';
 import { useDispatch, useSelector } from 'src/hooks/suite/';
 
-import { Button, Card, variables, H2, Tooltip } from '@trezor/components';
+import { Button, Card, variables, H2, Tooltip, GradientOverlay } from '@trezor/components';
 import { getFirstFreshAddress } from '@suite-common/wallet-utils';
 import { AccountsRootState, selectIsAccountUtxoBased } from '@suite-common/wallet-core';
+import { networks } from '@suite-common/wallet-config';
+import { EvmExplanationBox } from 'src/components/wallet/EvmExplanationBox';
+import { spacingsPx, typography } from '@trezor/theme';
 
 const StyledCard = styled(Card)`
     width: 100%;
     flex-flow: row wrap;
-    margin-bottom: 16px;
+    margin-bottom: ${spacingsPx.md};
     align-items: center;
     justify-content: space-between;
-    padding: 32px 42px;
+    padding: ${spacingsPx.xxl} ${spacingsPx.xxxl};
 
     @media (max-width: ${variables.SCREEN_SIZE.SM}) {
-        padding: 32px 20px;
+        padding: ${spacingsPx.xxl} ${spacingsPx.lg};
     }
 
     @media all and (max-width: ${variables.SCREEN_SIZE.LG}) {
         button {
             width: 100%;
             margin-left: auto;
-            margin-top: 12px;
+            margin-top: ${spacingsPx.sm};
         }
     }
 `;
@@ -37,37 +40,28 @@ const AddressContainer = styled.div`
 
 const StyledButton = styled(Button)`
     min-width: 220px;
-    margin-left: 20px;
+    margin-left: ${spacingsPx.lg};
 `;
 
 const FreshAddressWrapper = styled.div`
     display: flex;
     flex-direction: column;
     position: relative;
-    margin-top: 8px;
+    margin-top: ${spacingsPx.xs};
 `;
 
 const StyledFreshAddress = styled(H2)`
-    color: ${({ theme }) => theme.TYPE_DARK_GREY};
-    font-weight: ${variables.FONT_WEIGHT.REGULAR};
+    color: ${({ theme }) => theme.textDefault};
 `;
 const AddressLabel = styled.span`
-    font-weight: 600;
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    font-size: ${variables.FONT_SIZE.TINY};
-    letter-spacing: 0.2px;
+    color: ${({ theme }) => theme.textSubdued};
+    ${typography.label}
     text-transform: uppercase;
     font-variant-numeric: slashed-zero tabular-nums;
 `;
 
-const Overlay = styled.div`
-    inset: 0;
-    position: absolute;
-    background-image: linear-gradient(
-        to right,
-        rgb(0 0 0 / 0%) 0%,
-        ${({ theme }) => theme.BG_WHITE} 220px
-    );
+const StyledEvmExplanationBox = styled(EvmExplanationBox)`
+    margin-top: 26px;
 `;
 
 const TooltipLabel = ({
@@ -105,6 +99,7 @@ const TooltipLabel = ({
             />
         );
     }
+
     return addressLabel;
 };
 
@@ -157,6 +152,7 @@ export const FreshAddress = ({
         if (!firstFreshAddress) {
             return <Translation id="RECEIVE_ADDRESS_LIMIT_REACHED" />;
         }
+
         return null;
     };
 
@@ -169,7 +165,7 @@ export const FreshAddress = ({
                     accountType={account.accountType}
                 />
                 <FreshAddressWrapper>
-                    {addressValue && <Overlay />}
+                    {addressValue && <GradientOverlay hiddenFrom="220px" />}
                     <StyledFreshAddress>
                         {addressValue ?? <Translation id="RECEIVE_ADDRESS_UNAVAILABLE" />}
                     </StyledFreshAddress>
@@ -186,6 +182,28 @@ export const FreshAddress = ({
                     <Translation id="RECEIVE_ADDRESS_REVEAL" />
                 </StyledButton>
             </Tooltip>
+            {/* TODO: POLYGON DEBUG */}
+            {account.networkType === 'ethereum' && account.symbol === 'matic' && (
+                <StyledEvmExplanationBox
+                    caret
+                    symbol={account.symbol}
+                    title={
+                        <Translation
+                            id="TR_EVM_EXPLANATION_TITLE"
+                            values={{
+                                network: networks[account.symbol].name,
+                            }}
+                        />
+                    }
+                >
+                    <Translation
+                        id="TR_EVM_EXPLANATION_RECEIVE_DESCRIPTION"
+                        values={{
+                            network: networks[account.symbol].name,
+                        }}
+                    />
+                </StyledEvmExplanationBox>
+            )}
         </StyledCard>
     );
 };

@@ -1,10 +1,10 @@
-// @group:onboarding
+// @group:device-management
 // @retry=2
 
 describe('Onboarding - recover wallet T2T1', () => {
     beforeEach(() => {
         cy.task('startBridge');
-        cy.viewport(1080, 1440).resetDb();
+        cy.viewport(1440, 2560).resetDb();
         cy.prefixedVisit('/');
 
         cy.task('startEmu', { wipe: true, version: '2.5.3' });
@@ -33,12 +33,13 @@ describe('Onboarding - recover wallet T2T1', () => {
         }
 
         // pressing the final Continue button
-        cy.wait(1000);
+        cy.wait(1500);
         cy.task('pressYes');
 
         // pin is tested in create path, so here we test 'skipping' path instead
         cy.getTestElement('@onboarding/recovery/continue-button').click();
         cy.getTestElement('@onboarding/skip-button').click();
+        cy.getTestElement('@onboarding/skip-button-confirm').click();
     });
 });
 

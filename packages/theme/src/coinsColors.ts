@@ -2,7 +2,7 @@ import { CSSColor } from './types';
 
 export type CoinsColors = Record<string, CSSColor>;
 
-export const coinsColors = {
+export const coinsColors: CoinsColors = {
     vtc: '#1B9065',
     bch: '#0AC18E',
     etc: '#60C67E',

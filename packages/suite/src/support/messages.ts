@@ -126,6 +126,14 @@ export default defineMessages({
         defaultMessage: 'Add account',
         id: 'TR_ADD_ACCOUNT',
     },
+    TR_ADD_NETWORK_ACCOUNT: {
+        defaultMessage: 'Add {network} account',
+        id: 'TR_ADD_NETWORK_ACCOUNT',
+    },
+    TR_SELECT_TYPE: {
+        defaultMessage: 'Select type',
+        id: 'TR_SELECT_TYPE',
+    },
     TR_ADD_HIDDEN_WALLET: {
         defaultMessage: 'Add hidden wallet',
         id: 'TR_ADD_HIDDEN_WALLET',
@@ -601,7 +609,7 @@ export default defineMessages({
         id: 'TR_EXCHANGE_APPROVAL_TO_SWAP_BUTTON',
     },
     TR_EXCHANGE_SWAP_SEND_TO: {
-        defaultMessage: "{provider}'s contract",
+        defaultMessage: '{provider} contract address',
         id: 'TR_EXCHANGE_SWAP_SEND_TO',
     },
     TR_EXCHANGE_SWAP_DATA: {
@@ -2199,11 +2207,6 @@ export default defineMessages({
         description: 'Prompt to user to reconnect his device.',
         id: 'TR_RECONNECT_YOUR_DEVICE',
     },
-    TR_WARNING: {
-        defaultMessage: 'Warning',
-        description: 'Device status',
-        id: 'TR_WARNING',
-    },
     TR_CONNECTED: {
         defaultMessage: 'Connected',
         description: 'Device status',
@@ -2802,6 +2805,14 @@ export default defineMessages({
         defaultMessage: 'Community',
         id: 'TR_COMMUNITY_LANGUAGES',
     },
+    TR_TOKEN_UNRECOGNIZED_BY_TREZOR: {
+        defaultMessage: 'Unrecognized tokens',
+        id: 'TR_TOKEN_UNRECOGNIZED_BY_TREZOR',
+    },
+    TR_TOKEN_UNRECOGNIZED_BY_TREZOR_TOOLTIP: {
+        defaultMessage: 'Unrecognized tokens pose potential risks. Use caution.',
+        id: 'TR_TOKEN_UNRECOGNIZED_BY_TREZOR_TOOLTIP',
+    },
     TR_LEARN: {
         defaultMessage: 'Learn',
         description: 'Link to Suite Guide.',
@@ -2981,6 +2992,14 @@ export default defineMessages({
     TR_NETWORK_NEM: {
         defaultMessage: 'NEM',
         id: 'TR_NETWORK_NEM',
+    },
+    TR_NETWORK_POLYGON: {
+        defaultMessage: 'Polygon PoS',
+        id: 'TR_NETWORK_POLYGON',
+    },
+    TR_NETWORK_POLYGON_LABEL: {
+        defaultMessage: 'Incl. MRC20 tokens',
+        id: 'TR_NETWORK_POLYGON_LABEL',
     },
     TR_NETWORK_STELLAR: {
         defaultMessage: 'Stellar',
@@ -4349,13 +4368,13 @@ export default defineMessages({
         id: 'TR_ACCOUNT_TYPE',
         defaultMessage: 'Account type',
     },
-    TR_SELECT_COIN: {
-        id: 'TR_SELECT_COIN',
-        defaultMessage: 'Select coin',
+    TR_ACTIVATED_COINS: {
+        id: 'TR_ACTIVATED_COINS',
+        defaultMessage: 'Activated coins',
     },
-    TR_ACTIVATE_COINS: {
-        id: 'TR_ACTIVATE_COINS',
-        defaultMessage: 'Activate more coins',
+    TR_INACTIVE_COINS: {
+        id: 'TR_INACTIVE_COINS',
+        defaultMessage: 'Not activated yet',
     },
     TR_COIN_SETTINGS: {
         id: 'TR_COIN_SETTINGS',
@@ -4374,10 +4393,6 @@ export default defineMessages({
         id: 'FW_CAPABILITY_CONNECT_OUTDATED',
         defaultMessage: 'Application update required',
         description: 'Firmware is too NEW use this coin (trezor-connect is outdated)',
-    },
-    MODAL_ADD_ACCOUNT_TITLE: {
-        id: 'MODAL_ADD_ACCOUNT_TITLE',
-        defaultMessage: 'New account',
     },
     MODAL_ADD_ACCOUNT_NO_ACCOUNT: {
         id: 'MODAL_ADD_ACCOUNT_NO_ACCOUNT',
@@ -5384,10 +5399,6 @@ export default defineMessages({
         id: 'TR_NAV_SAVINGS',
         defaultMessage: 'Save {cryptoCurrencyName}',
     },
-    TR_NAV_SAVINGS_BADGE: {
-        id: 'TR_NAV_SAVINGS_BADGE',
-        defaultMessage: 'New',
-    },
     TR_NAV_INVITY: {
         id: 'TR_NAV_INVITY',
         defaultMessage: 'Invity',
@@ -5416,10 +5427,6 @@ export default defineMessages({
         id: 'TR_TOKENS',
         defaultMessage: 'Tokens',
     },
-    TR_TOKENS_COUNT: {
-        id: 'TR_TOKENS_COUNT',
-        defaultMessage: '{count} {count, plural, one {token} other {tokens}}',
-    },
     TR_TOKENS_ADD: {
         id: 'TR_TOKENS_ADD',
         defaultMessage: 'Add token',
@@ -5432,21 +5439,18 @@ export default defineMessages({
         id: 'TR_ADD_TOKEN_TITLE',
         defaultMessage: 'Add ERC20 token',
     },
+    TR_ADD_TOKEN_DESCRIPTION: {
+        id: 'TR_ADD_TOKEN_DESCRIPTION',
+        defaultMessage:
+            "Enter a contract address of a token you wish to add to your wallet. This is typically a 42-character alphanumeric string starting with '0x'.",
+    },
     TR_ADD_TOKEN_LABEL: {
         id: 'TR_ADD_TOKEN_LABEL',
-        defaultMessage: 'ERC20 token address',
+        defaultMessage: 'Token address',
     },
     TR_ADD_TOKEN_SUBMIT: {
         id: 'TR_ADD_TOKEN_SUBMIT',
         defaultMessage: 'Add token',
-    },
-    TR_ADD_TOKEN_PLACEHOLDER: {
-        id: 'TR_ADD_TOKEN_PLACEHOLDER',
-        defaultMessage: 'Paste token address',
-    },
-    TR_ADD_TOKEN_TOOLTIP: {
-        id: 'TR_ADD_TOKEN_TOOLTIP',
-        defaultMessage: 'Enter an ERC20 token contract address',
     },
     TR_ADD_TOKEN_ADDRESS_NOT_VALID: {
         id: 'TR_ADD_TOKEN_ADDRESS_NOT_VALID',
@@ -5617,10 +5621,6 @@ export default defineMessages({
         id: 'LOCKTIME_IS_NOT_SET',
         defaultMessage: 'Locktime not set',
     },
-    LOCKTIME_IS_NOT_NUMBER: {
-        id: 'LOCKTIME_IS_NOT_NUMBER',
-        defaultMessage: 'Locktime is not a number',
-    },
     LOCKTIME_IS_NOT_INTEGER: {
         id: 'LOCKTIME_IS_NOT_INTEGER',
         defaultMessage: 'Locktime is not an integer',
@@ -5652,11 +5652,6 @@ export default defineMessages({
         defaultMessage:
             'Destination tag is a unique code to identify the receiver of a transaction.',
     },
-    DESTINATION_TAG_EXPLAINED: {
-        defaultMessage:
-            'Destination tag is an arbitrary number which serves as a unique identifier of your transaction. Some services may require this to process your transaction.',
-        id: 'DESTINATION_TAG_EXPLAINED',
-    },
     DESTINATION_TAG_NOT_SET: {
         defaultMessage: 'Destination tag is not set',
         id: 'DESTINATION_TAG_NOT_SET',
@@ -5672,10 +5667,6 @@ export default defineMessages({
     DATA_ETH: {
         id: 'DATA_ETH',
         defaultMessage: 'Data',
-    },
-    DATA_ETH_TOOLTIP: {
-        id: 'DATA_ETH_TOOLTIP',
-        defaultMessage: 'Data is usually used when you send transactions to contracts.',
     },
     DATA_ETH_ADD: {
         id: 'DATA_ETH_ADD',
@@ -5727,11 +5718,6 @@ export default defineMessages({
         id: 'SEND_RAW',
         description: 'item in dropdown menu',
         defaultMessage: 'Send raw',
-    },
-    SEND_RAW_TRANSACTION: {
-        id: 'SEND_RAW_TRANSACTION',
-        description: 'Send raw form header',
-        defaultMessage: 'Send raw transaction',
     },
     RAW_TRANSACTION: {
         id: 'RAW_TRANSACTION',
@@ -5793,7 +5779,7 @@ export default defineMessages({
     },
     CUSTOM_FEE_IS_NOT_SET: {
         defaultMessage:
-            'How much do you want to spend on fees to make this transaction go through.',
+            'Enter the fee rate you want to spend in order to complete this transaction.',
         id: 'CUSTOM_FEE_IS_NOT_SET',
     },
     CUSTOM_FEE_IS_NOT_INTEGER: {
@@ -5930,25 +5916,25 @@ export default defineMessages({
         id: 'TR_CONNECTED_TO_PROVIDER',
     },
     TR_CONNECTED_TO_PROVIDER_LOCALLY: {
-        defaultMessage: 'Saving labels locally',
+        defaultMessage: 'Labels saved locally',
         id: 'TR_CONNECTED_TO_PROVIDER_LOCALLY',
     },
     TR_YOUR_LABELING_IS_SYNCED: {
         defaultMessage:
-            'Your labeling is synced with a cloud storage provider. Your data is safe, as only your Trezor can decrypt it.',
+            'Your labels are synced with a cloud storage provider. Your data is safe, as only your Trezor can decrypt it.',
         id: 'TR_YOUR_LABELING_IS_SYNCED',
     },
     TR_YOUR_LABELING_IS_SYNCED_LOCALLY: {
-        defaultMessage: 'Labels are saved locally on your machine.',
+        defaultMessage: 'Your labels are saved locally on your machine.',
         id: 'TR_YOUR_LABELING_IS_SYNCED_LOCALLY',
     },
     TR_LABELING_NOT_SYNCED: {
-        defaultMessage: 'Labeling not synced.',
+        defaultMessage: 'Labels not synced',
         id: 'TR_LABELING_NOT_SYNCED',
     },
     TR_TO_MAKE_YOUR_LABELS_PERSISTENT: {
         defaultMessage:
-            'To make your labels persistent and available on different devices connect to a cloud storage provider.',
+            'To make your labels consistent and available on different devices, connect to a cloud storage provider.',
         id: 'TR_TO_MAKE_YOUR_LABELS_PERSISTENT',
     },
     TR_DROPBOX: {
@@ -5963,13 +5949,17 @@ export default defineMessages({
         description:
             'Name of cloud provider. Intended to be translated only in languages that do not use latin script',
     },
+    TR_LOCAL_FILE_SYSTEM: {
+        defaultMessage: 'Local file system',
+        id: 'TR_LOCAL_FILE_SYSTEM',
+    },
     METADATA_MODAL_HEADING: {
         defaultMessage: 'Save labels',
         id: 'METADATA_MODAL_HEADING',
     },
     METADATA_MODAL_DESCRIPTION: {
         defaultMessage:
-            'Please select a cloud provider for saving your labels. Your data is encrypted by Trezor.',
+            'Select a cloud storage provider to sync your labels or save them locally. Your data is encrypted by Trezor.',
         id: 'METADATA_MODAL_DESCRIPTION',
     },
     TR_DISABLED_SWITCH_TOOLTIP: {
@@ -6156,7 +6146,7 @@ export default defineMessages({
     TR_GRAPH_MISSING_DATA: {
         id: 'TR_GRAPH_MISSING_DATA',
         defaultMessage:
-            'XRP, SOL and any token transactions are included in the balance, but not currently supported in the graph view.',
+            "XRP, SOL, and other token transactions are included in portfolio balance, but aren't currently supported in graph view.",
     },
     METADATA_PROVIDER_NOT_FOUND_ERROR: {
         id: 'METADATA_PROVIDER_NOT_FOUND_ERROR',
@@ -6165,12 +6155,12 @@ export default defineMessages({
     METADATA_PROVIDER_AUTH_ERROR: {
         id: 'METADATA_PROVIDER_AUTH_ERROR',
         defaultMessage:
-            'Failed to sync labeling data with cloud provider {provider}. User was logged out.',
+            'Failed to sync labels with cloud storage provider {provider}. User was logged out.',
     },
     METADATA_PROVIDER_UNEXPECTED_ERROR: {
         id: 'METADATA_PROVIDER_UNEXPECTED_ERROR',
         defaultMessage:
-            'Failed to sync labeling data with cloud provider {provider}. User was logged out.',
+            'Failed to sync labels with cloud storage provider {provider}. User was logged out.',
     },
     TR_REVEAL_ADDRESS: {
         id: 'TR_REVEAL_ADDRESS',
@@ -6449,6 +6439,10 @@ export default defineMessages({
         id: 'TR_ACCOUNT_SEARCH_NO_RESULTS',
         defaultMessage: 'No results',
     },
+    TR_ACCOUNT_NO_ACCOUNTS: {
+        id: 'TR_ACCOUNT_NO_ACCOUNTS',
+        defaultMessage: 'No accounts',
+    },
     TR_COLOR_SCHEME: {
         id: 'TR_COLOR_SCHEME',
         defaultMessage: 'Color scheme',
@@ -6559,7 +6553,7 @@ export default defineMessages({
     TR_TRANSACTIONS_SEARCH_TIP_2: {
         id: 'TR_TRANSACTIONS_SEARCH_TIP_2',
         defaultMessage:
-            'Tip: You can use the greater than (>) and less than (<) symbols on amount searches. For example <strong>> 1</strong> will show all transactions that have an amount of 1 or higher.',
+            'Tip: Use the greater than (>) and less than (<) symbols for amount searches. For example <strong>> 1</strong> will show all transactions that have an amount of 1 and higher.',
     },
     TR_TRANSACTIONS_SEARCH_TIP_3: {
         id: 'TR_TRANSACTIONS_SEARCH_TIP_3',
@@ -6574,32 +6568,32 @@ export default defineMessages({
     TR_TRANSACTIONS_SEARCH_TIP_5: {
         id: 'TR_TRANSACTIONS_SEARCH_TIP_5',
         defaultMessage:
-            'Tip: Dates can be searched using the <strong>YYYY-MM-DD</strong> format. For example <strong>2020-12-14</strong> will show all transactions on December 14th, 2020.',
+            'Tip: Dates can be searched using the <strong>YYYY-MM-DD</strong> format. For example <strong>{lastYear}-12-14</strong> will show all transactions on December 14th, {lastYear}.',
     },
     TR_TRANSACTIONS_SEARCH_TIP_6: {
         id: 'TR_TRANSACTIONS_SEARCH_TIP_6',
         defaultMessage:
-            'Tip: You can use greater than (>) and lesser than (<) symbols on date searches. For example <strong>> 2020-12-01<strong> will show all transactions on and after December 1st, 2020.',
+            'Tip: Use greater than (>) and lesser than (<) symbols on date searches. For example <strong>> {lastYear}-12-01</strong> will show all transactions on and after December 1st, {lastYear}.',
     },
     TR_TRANSACTIONS_SEARCH_TIP_7: {
         id: 'TR_TRANSACTIONS_SEARCH_TIP_7',
         defaultMessage:
-            'Tip: You can exclude a date by using the exlamation mark and equal symbols together (!=). For example <strong>!= 2020-12-14</strong> will show all transactions except the ones on December 14th, 2020.',
+            'Tip: You can exclude a date by using the exclamation mark and equal symbols together (!=). For example <strong>!= {lastYear}-12-14</strong> will show all transactions except the ones on December 14th, {lastYear}.',
     },
     TR_TRANSACTIONS_SEARCH_TIP_8: {
         id: 'TR_TRANSACTIONS_SEARCH_TIP_8',
         defaultMessage:
-            'Tip: You can display results matching at least one of multiple searches by grouping them with the OR operator (|). For example <strong>2022-12-31 | 2023-01-01</strong> will show all transactions that have happened on the 31st of December 2022 or the 1st of January 2023.',
+            'Tip: You can display results matching at least one of multiple searches by grouping them with the OR operator (|). For example <strong>{lastYear}-11-30 | {lastYear}-12-01</strong> will show all transactions that have happened on the 30th of November or the 1st of December {lastYear}.',
     },
     TR_TRANSACTIONS_SEARCH_TIP_9: {
         id: 'TR_TRANSACTIONS_SEARCH_TIP_9',
         defaultMessage:
-            'Tip: You can display results matching multiple searches by grouping them with the AND operator (&). For example <strong>> 2020-12-01 & < 2020-12-31 & > 0</strong> will show all incoming (amount higher than 0) transactions in December 2020.',
+            'Tip: Display results matching multiple searches by grouping them with the AND operator (&). For example <strong>> {lastYear}-12-01 & < {lastYear}-12-31 & > 0</strong> will show all incoming (amount higher than 0) transactions in December {lastYear}.',
     },
     TR_TRANSACTIONS_SEARCH_TIP_10: {
         id: 'TR_TRANSACTIONS_SEARCH_TIP_10',
         defaultMessage:
-            'Tip: You can combine AND (&) and OR (|) operators for more complex searches. For example <strong>> 2022-01-01 & < 2022-01-31 | > 2022-12-01 & < 2022-12-31</strong> will show all transactions in January 2022 or December 2022.',
+            'Tip: Combine AND (&) and OR (|) operators for more complex searches. For example <strong>> {lastYear}-01-01 & < {lastYear}-01-31 | > {lastYear}-12-01 & < {lastYear}-12-31</strong> will show all transactions in January or December {lastYear}.',
     },
     TR_INTERNAL_TRANSACTIONS: {
         id: 'TR_INTERNAL_TRANSACTIONS',
@@ -6771,10 +6765,6 @@ export default defineMessages({
     TR_GUIDE_SUPPORT_AND_FEEDBACK: {
         id: 'TR_GUIDE_SUPPORT_AND_FEEDBACK',
         defaultMessage: 'Support & Feedback',
-    },
-    TR_GUIDE_CATEGORIES: {
-        id: 'TR_GUIDE_CATEGORIES',
-        defaultMessage: 'Categories',
     },
     TR_GUIDE_ARTICLES: {
         id: 'TR_GUIDE_ARTICLES',
@@ -7473,10 +7463,6 @@ export default defineMessages({
         id: 'TR_EXCEEDS_MAX',
         defaultMessage: 'Exceeds max length',
     },
-    TR_ADDRESS_FORMAT: {
-        id: 'TR_ADDRESS_FORMAT',
-        defaultMessage: 'Correct address format',
-    },
     TR_ABORT: {
         id: 'TR_ABORT',
         defaultMessage: 'Abort',
@@ -7938,6 +7924,14 @@ export default defineMessages({
         id: 'TR_LOADING_FUNDS',
         defaultMessage: 'Loading Funds...',
     },
+    TR_LOADING_ACCOUNTS: {
+        id: 'TR_LOADING_ACCOUNTS',
+        defaultMessage: 'Loading accounts...',
+    },
+    TR_LOADING_ACCOUNTS_DESCRIPTION: {
+        id: 'TR_LOADING_ACCOUNTS_DESCRIPTION',
+        defaultMessage: 'You can change these settings after accounts have loaded.',
+    },
     TR_LOADING_FACT_TITLE: {
         id: 'TR_LOADING_FACT_TITLE',
         defaultMessage: 'Did you know?',
@@ -8130,47 +8124,38 @@ export default defineMessages({
     TR_SESSION_PHASE_ROUND_SEARCH: {
         id: 'TR_SESSION_PHASE_ROUND_SEARCH',
         defaultMessage: 'Looking for a round',
-        description: '29 symbols max',
     },
     TR_SESSION_PHASE_COIN_SELECTION: {
         id: 'TR_SESSION_PHASE_COIN_SELECTION',
         defaultMessage: 'Choosing coins',
-        description: '29 symbols max',
     },
     TR_SESSION_PHASE_ROUND_PAIRING: {
         id: 'TR_SESSION_PHASE_ROUND_PAIRING',
         defaultMessage: 'Selecting coins for the next round',
-        description: '29 symbols max',
     },
     TR_SESSION_PHASE_COIN_REGISTRATION: {
         id: 'TR_SESSION_PHASE_COIN_REGISTRATION',
         defaultMessage: 'Registering coins',
-        description: '29 symbols max',
     },
     TR_SESSION_ERROR_PHASE_MISSING_UTXOS: {
         id: 'TR_SESSION_ERROR_PHASE_MISSING_UTXOS',
         defaultMessage: 'Looking for available coins',
-        description: '29 symbols max',
     },
     TR_SESSION_ERROR_PHASE_SKIPPING_ROUND: {
         id: 'TR_SESSION_ERROR_PHASE_SKIPPING_ROUND',
         defaultMessage: 'Skipping round',
-        description: '29 symbols max',
     },
     TR_SESSION_ERROR_PHASE_RETRYING_PAIRING: {
         id: 'TR_SESSION_ERROR_PHASE_RETRYING_PAIRING',
         defaultMessage: 'Retrying pairing',
-        description: '29 symbols max',
     },
     TR_SESSION_ERROR_PHASE_AFFILIATE_SERVERS_OFFLINE: {
         id: 'TR_SESSION_ERROR_PHASE_AFFILIATE_SERVERS_OFFLINE',
         defaultMessage: 'The coinjoin service is temporarily unavailable',
-        description: '29 symbols max',
     },
     TR_SESSION_ERROR_PHASE_CRITICAL_ERROR: {
         id: 'TR_SESSION_ERROR_PHASE_CRITICAL_ERROR',
         defaultMessage: 'Critical error, stopping coinjoin.',
-        description: '29 symbols max',
     },
     TR_SESSION_ERROR_PHASE_BLOCKED_UTXOS: {
         id: 'TR_SESSION_ERROR_PHASE_BLOCKED_UTXOS',
@@ -8402,5 +8387,395 @@ export default defineMessages({
     TR_RESTART_TREZOR_DEVICE_TUTORIAL: {
         id: 'TR_RESTART_TREZOR_DEVICE_TUTORIAL',
         defaultMessage: 'Restart tutorial',
+    },
+    TR_HIDE_BALANCES: {
+        id: 'TR_HIDE_BALANCES',
+        defaultMessage: 'Hide balances',
+    },
+    TR_SHOW_BALANCES: {
+        id: 'TR_SHOW_BALANCES',
+        defaultMessage: 'Show balances',
+    },
+    TR_SEND_ADDRESS_SECTION: {
+        id: 'TR_SEND_ADDRESS_SECTION',
+        defaultMessage: 'To',
+    },
+    TR_SEND_RECIPIENT_ADDRESS: {
+        id: 'TR_SEND_RECIPIENT_ADDRESS',
+        defaultMessage:
+            '{index, selectordinal, one {#st} two {#nd} few {#rd} other {#th} } Recipient',
+    },
+    TR_DISCOVERY_NEW_COINS: {
+        id: 'TR_DISCOVERY_NEW_COINS',
+        defaultMessage: 'Activate coins',
+    },
+    TR_DISCOVERY_NEW_COINS_TEXT: {
+        id: 'TR_DISCOVERY_NEW_COINS_TEXT',
+        defaultMessage: "Don't see an account after activating a coin?",
+    },
+    TR_SIDEBAR_ADD_COIN: {
+        id: 'TR_SIDEBAR_ADD_COIN',
+        defaultMessage: 'Add a coin',
+    },
+    TR_EVM_EXPLANATION_TITLE: {
+        id: 'TR_EVM_EXPLANATION_TITLE',
+        defaultMessage: '{network} is its own network',
+    },
+    TR_EVM_EXPLANATION_DESCRIPTION: {
+        id: 'TR_EVM_EXPLANATION_DESCRIPTION',
+        defaultMessage:
+            "It shares the same address style as Ethereum but has its own unique coins and tokens that can't be used on other networks.",
+    },
+    TR_CONFIRM_EVM_EXPLANATION_RECEIVE_TITLE: {
+        id: 'TR_CONFIRM_EVM_EXPLANATION_RECEIVE_TITLE',
+        defaultMessage: 'Receive through the {network} network',
+    },
+    TR_CONFIRM_EVM_EXPLANATION_RECEIVE_DESCRIPTION_ETH: {
+        id: 'TR_CONFIRM_EVM_EXPLANATION_RECEIVE_DESCRIPTION_ETH',
+        defaultMessage:
+            'Make sure you receive your crypto only through the Ethereum network. If coins or tokens are sent outside the Ethereum network (e.g., Polygon or Avalanche), you may not be able to access them.',
+    },
+    TR_CONFIRM_EVM_EXPLANATION_RECEIVE_DESCRIPTION_OTHER: {
+        id: 'TR_CONFIRM_EVM_EXPLANATION_RECEIVE_DESCRIPTION_OTHER',
+        defaultMessage:
+            'Make sure you receive your crypto only through the {network} network. If coins or tokens are sent outside the {network} network, you may not be able to access them.',
+    },
+    TR_CONFIRM_EVM_EXPLANATION_SEND_TITLE: {
+        id: 'TR_CONFIRM_EVM_EXPLANATION_SEND_TITLE',
+        defaultMessage: 'Send through the {network} network',
+    },
+    TR_CONFIRM_EVM_EXPLANATION_SEND_DESCRIPTION: {
+        id: 'TR_CONFIRM_EVM_EXPLANATION_SEND_DESCRIPTION',
+        defaultMessage:
+            'Make sure you send your crypto only through the {network} network. If coins or tokens are sent outside the {network} network, the receiver may not be able to access them.',
+    },
+    TR_EVM_EXPLANATION_RECEIVE_DESCRIPTION: {
+        id: 'TR_EVM_EXPLANATION_RECEIVE_DESCRIPTION',
+        defaultMessage:
+            'This receive address is only for {network} coins and tokens. If someone sends you crypto from outside the {network} network, you may not receive them.',
+    },
+    TR_EVM_EXPLANATION_SEND_TITLE: {
+        id: 'TR_EVM_EXPLANATION_SEND_TITLE',
+        defaultMessage: 'Send through the {network} network',
+    },
+    TR_EVM_EXPLANATION_SEND_DESCRIPTION: {
+        id: 'TR_EVM_EXPLANATION_SEND_DESCRIPTION',
+        defaultMessage:
+            'Send only through the {network} network. The address must be on the {network} network for the crypto to be received.',
+    },
+    TR_EVM_EXPLANATION_EXCHANGE_TITLE: {
+        id: 'TR_EVM_EXPLANATION_EXCHANGE_TITLE',
+        defaultMessage: 'Did you choose the correct network?',
+    },
+    TR_EVM_EXPLANATION_EXCHANGE_DESCRIPTION: {
+        id: 'TR_EVM_EXPLANATION_EXCHANGE_DESCRIPTION',
+        defaultMessage:
+            "You selected {coin} on the {network} network, but it seems you don't have any {networkSymbol} coins. Did you mean to choose {coin} on another network?",
+    },
+    TR_EVM_EXPLANATION_SEND_MODAL_DESCRIPTION: {
+        id: 'TR_EVM_EXPLANATION_SEND_MODAL_DESCRIPTION',
+        defaultMessage:
+            'You can only send {network} tokens to a <b>receive address on the {network} network</b>, otherwise your tokens <b>may be lost</b>.',
+    },
+    TR_FROM: {
+        id: 'TR_FROM',
+        defaultMessage: 'From',
+    },
+    TR_TO: {
+        id: 'TR_TO',
+        defaultMessage: 'To',
+    },
+    TR_STAKE_ETH: {
+        id: 'TR_STAKE_ETH',
+        defaultMessage: 'Stake Ethereum',
+    },
+    TR_STAKE_ETH_BADGE: {
+        id: 'TR_STAKE_ETH_BADGE',
+        defaultMessage: 'New',
+    },
+    TR_STAKE_ETH_CARD_TITLE: {
+        id: 'TR_STAKE_ETH_CARD_TITLE',
+        defaultMessage: 'The easiest way to earn ETH.',
+    },
+    TR_STAKE_ETH_EARN_REPEAT: {
+        id: 'TR_STAKE_ETH_EARN_REPEAT',
+        defaultMessage: 'Stake. Earn rewards. Repeat.',
+    },
+    TR_STAKE_ETH_SEE_MONEY_DANCE: {
+        id: 'TR_STAKE_ETH_SEE_MONEY_DANCE',
+        defaultMessage: 'See your money dance',
+    },
+    TR_STAKE_ETH_SEE_MONEY_DANCE_DESC: {
+        id: 'TR_STAKE_ETH_SEE_MONEY_DANCE_DESC',
+        defaultMessage: 'Earn {apyPercent}% APY* by staking your Ethereum with Trezor.',
+    },
+    TR_STAKE_APY_DESC: {
+        id: 'TR_STAKE_APY_DESC',
+        defaultMessage: '*Annual Percentage Yield',
+    },
+    TR_STAKE_ETH_LOCK_FUNDS: {
+        id: 'TR_STAKE_ETH_LOCK_FUNDS',
+        defaultMessage: 'Lock in funds with flexibility',
+    },
+    TR_STAKE_ETH_LOCK_FUNDS_DESC: {
+        id: 'TR_STAKE_ETH_LOCK_FUNDS_DESC',
+        defaultMessage: 'Staking locks in your funds, but you can unstake them anytime.',
+    },
+    TR_STAKE_ETH_MAXIMIZE_REWARDS: {
+        id: 'TR_STAKE_ETH_MAXIMIZE_REWARDS',
+        defaultMessage: 'Maximize your rewards',
+    },
+    TR_STAKE_ETH_MAXIMIZE_REWARDS_DESC: {
+        id: 'TR_STAKE_ETH_MAXIMIZE_REWARDS_DESC',
+        defaultMessage: 'Soar high! Earn rewards on your rewards. Staking has never felt so good.',
+    },
+    TR_AVAILABLE_NOW_FOR: {
+        id: 'TR_AVAILABLE_NOW_FOR',
+        defaultMessage: 'Available now for',
+    },
+    TR_STAKE_START_STAKING: {
+        id: 'TR_STAKE_START_STAKING',
+        defaultMessage: 'Start staking',
+    },
+    TR_MAYBE_LATER: {
+        id: 'TR_MAYBE_LATER',
+        defaultMessage: 'Maybe later',
+    },
+    TR_STAKE_WHAT_IS_STAKING: {
+        id: 'TR_STAKE_WHAT_IS_STAKING',
+        defaultMessage: 'What is staking?',
+    },
+    TR_STAKE_STAKING_IS: {
+        id: 'TR_STAKE_STAKING_IS',
+        defaultMessage:
+            "Staking is like a friendly gesture where you temporarily lock your Ethereum assets to support the blockchain's operation. As a sweet reward, you'll actually earn more ETH in return!",
+    },
+    TR_STAKE_ANY_AMOUNT_ETH: {
+        id: 'TR_STAKE_ANY_AMOUNT_ETH',
+        defaultMessage:
+            'Stake any amount and watch that sweet ETH roll in. With our current APY rate of {apyPercent}%, your rewards earn too!',
+    },
+    TR_STAKE_LEARN_MORE: {
+        id: 'TR_STAKE_LEARN_MORE',
+        defaultMessage: 'Learn more',
+    },
+    TR_STAKE_STAKING_IN_A_NUTSHELL: {
+        id: 'TR_STAKE_STAKING_IN_A_NUTSHELL',
+        defaultMessage: 'Staking in a nutshell',
+    },
+    TR_STAKE_STAKED_ETH_AMOUNT_LOCKED: {
+        id: 'TR_STAKE_STAKED_ETH_AMOUNT_LOCKED',
+        defaultMessage: 'The staked amount of ETH is locked and can’t be traded or sent.',
+    },
+    TR_STAKE_UNSTAKING_TAKES: {
+        id: 'TR_STAKE_UNSTAKING_TAKES',
+        defaultMessage:
+            'Unstaking usually takes about 3 days. Once completed, you can trade or send it.',
+    },
+    TR_STAKE_ETH_REWARDS_EARN: {
+        id: 'TR_STAKE_ETH_REWARDS_EARN',
+        defaultMessage: 'Your rewards also earn. Keep them staked and watch your ETH rewards soar.',
+    },
+    TR_STAKE_AVAILABLE: {
+        id: 'TR_STAKE_AVAILABLE',
+        defaultMessage: 'Available',
+    },
+    TR_STAKE_MAX_FEE_DESC: {
+        id: 'TR_STAKE_MAX_FEE_DESC',
+        defaultMessage:
+            'Maximum fee is the network transaction fee that you’re willing to pay on the network to ensure your transaction gets processed.',
+    },
+    TR_STAKE_MAX: {
+        id: 'TR_STAKE_MAX',
+        defaultMessage: 'Max',
+    },
+    TR_STAKE_LEFT_AMOUNT_FOR_WITHDRAWAL: {
+        id: 'TR_STAKE_LEFT_AMOUNT_FOR_WITHDRAWAL',
+        defaultMessage:
+            'We’ve left {amount} ETH out so you will be able to pay for withdrawal fees',
+    },
+    TR_STAKE_RECOMMENDED_AMOUNT_FOR_WITHDRAWALS: {
+        id: 'TR_STAKE_RECOMMENDED_AMOUNT_FOR_WITHDRAWALS',
+        defaultMessage:
+            'We recommend you to leave {amount} ETH so you will be able to pay for withdrawal fees',
+    },
+    TR_STAKE_CONFIRM_ENTRY_PERIOD: {
+        id: 'TR_STAKE_CONFIRM_ENTRY_PERIOD',
+        defaultMessage: 'Confirm entry period',
+    },
+    TR_STAKE_CONFIRM_AND_STAKE: {
+        id: 'TR_STAKE_CONFIRM_AND_STAKE',
+        defaultMessage: 'Confirm & stake',
+    },
+    TR_STAKE_ENTERING_POOL_MAY_TAKE: {
+        id: 'TR_STAKE_ENTERING_POOL_MAY_TAKE',
+        defaultMessage: 'Entering the staking pool may take up to {days} days',
+    },
+    TR_STAKE_ETH_WILL_BE_BLOCKED: {
+        id: 'TR_STAKE_ETH_WILL_BE_BLOCKED',
+        defaultMessage:
+            'Your ETH will be blocked during this period, and you can’t cancel this. <a>Learn more</a>',
+    },
+    TR_STAKE_ACKNOWLEDGE_ENTRY_PERIOD: {
+        id: 'TR_STAKE_ACKNOWLEDGE_ENTRY_PERIOD',
+        defaultMessage: 'I acknowledge the above entry period',
+    },
+    TR_STAKE_STAKE: {
+        id: 'TR_STAKE_STAKE',
+        defaultMessage: 'Stake',
+    },
+    TR_STAKE_UNSTAKE: {
+        id: 'TR_STAKE_UNSTAKE',
+        defaultMessage: 'Unstake',
+    },
+    TR_STAKE_CLAIM: {
+        id: 'TR_STAKE_CLAIM',
+        defaultMessage: 'Claim',
+    },
+    TR_STAKE_STAKED_AMOUNT: {
+        id: 'TR_STAKE_STAKED_AMOUNT',
+        defaultMessage: 'Staked amount',
+    },
+    TR_STAKE_APY: {
+        id: 'TR_STAKE_APY',
+        defaultMessage: 'Annual Percentage Yield',
+    },
+    TR_STAKE_DAYS: {
+        id: 'TR_STAKE_DAYS',
+        defaultMessage: '{days} days',
+    },
+    TR_STAKE_NEXT_PAYOUT: {
+        id: 'TR_STAKE_NEXT_PAYOUT',
+        defaultMessage: 'Next reward payout',
+    },
+    TR_STAKE_STAKE_MORE: {
+        id: 'TR_STAKE_STAKE_MORE',
+        defaultMessage: 'Stake more',
+    },
+    TR_STAKE_UNSTAKE_TO_CLAIM: {
+        id: 'TR_STAKE_UNSTAKE_TO_CLAIM',
+        defaultMessage: 'Unstake to claim',
+    },
+    TR_STAKE_ETH_REWARDS_EARN_APY: {
+        id: 'TR_STAKE_ETH_REWARDS_EARN_APY',
+        defaultMessage:
+            'Your {symbol} rewards also earn the APY rate. Keep your funds staked or add more to increase your rewards.',
+    },
+    TR_STAKE_REWARDS: {
+        id: 'TR_STAKE_REWARDS',
+        defaultMessage: 'Rewards',
+    },
+    TR_STAKE_WAITING_TO_BE_ADDED: {
+        id: 'TR_STAKE_WAITING_TO_BE_ADDED',
+        defaultMessage: 'Your {symbol} is waiting to be added {br} to the staking pool.',
+    },
+    TR_TX_CONFIRMED: {
+        id: 'TR_TX_CONFIRMED',
+        defaultMessage: 'Transaction confirmed',
+    },
+    TR_STAKE_ADDING_TO_POOL: {
+        id: 'TR_STAKE_ADDING_TO_POOL',
+        defaultMessage: 'Adding to staking pool',
+    },
+    TR_STAKE_STAKED_AND_EARNING: {
+        id: 'TR_STAKE_STAKED_AND_EARNING',
+        defaultMessage: 'Staked & earning rewards',
+    },
+    TR_STAKE_CLAIM_AFTER_UNSTAKING: {
+        id: 'TR_STAKE_CLAIM_AFTER_UNSTAKING',
+        defaultMessage: 'You can claim once the unstaking period is complete.',
+    },
+    TR_STAKE_UNSTAKING_PERIOD: {
+        id: 'TR_STAKE_UNSTAKING_PERIOD',
+        defaultMessage: 'Unstaking period',
+    },
+    TR_UP_TO_DAYS: {
+        id: 'TR_UP_TO_DAYS',
+        defaultMessage: 'up to {days} days',
+    },
+    TR_STAKE_PAID_FROM_BALANCE: {
+        id: 'TR_STAKE_PAID_FROM_BALANCE',
+        defaultMessage: 'Paid from your balance',
+    },
+    TR_STAKE_OTHER_AMOUNT: {
+        id: 'TR_STAKE_OTHER_AMOUNT',
+        defaultMessage: 'Other amount',
+    },
+    TR_UP_TO: {
+        id: 'TR_UP_TO',
+        defaultMessage: 'up to',
+    },
+    TR_STAKE_ONLY_REWARDS: {
+        id: 'TR_STAKE_ONLY_REWARDS',
+        defaultMessage: 'Only rewards',
+    },
+    TR_STAKE_UNSTAKED_AND_READY_TO_CLAIM: {
+        id: 'TR_STAKE_UNSTAKED_AND_READY_TO_CLAIM',
+        defaultMessage: 'Unstaked and ready to claim',
+    },
+    TR_STAKE_TIME_TO_CLAIM: {
+        id: 'TR_STAKE_TIME_TO_CLAIM',
+        defaultMessage: 'Time to claim',
+    },
+    TR_STAKE_INSTANT: {
+        id: 'TR_STAKE_INSTANT',
+        defaultMessage: 'Instant',
+    },
+    TR_STAKE_CLAIM_PENDING: {
+        id: 'TR_STAKE_CLAIM_PENDING',
+        defaultMessage: 'Claim pending',
+    },
+    TR_STAKE_CLAIMED_AMOUNT_TRANSFERRED: {
+        id: 'TR_STAKE_CLAIMED_AMOUNT_TRANSFERRED',
+        defaultMessage: 'The claimed amount is transferred to your {symbol} account.',
+    },
+    TR_STAKE_CLAIMING_PERIOD: {
+        id: 'TR_STAKE_CLAIMING_PERIOD',
+        defaultMessage: 'Claiming period',
+    },
+    TR_NOT_ENOUGH_FUNDS_FOR_TX: {
+        id: 'TR_NOT_ENOUGH_FUNDS_FOR_TX',
+        defaultMessage: 'Not enough funds to execute the transaction',
+    },
+    TR_STAKE_MIN_AMOUNT_TOOLTIP: {
+        id: 'TR_STAKE_MIN_AMOUNT_TOOLTIP',
+        defaultMessage: 'Minimum amount to stake is {amount} {symbol}',
+    },
+    TOAST_TX_STAKED: {
+        id: 'TOAST_TX_STAKED',
+        defaultMessage: '{amount} staked from {account}',
+    },
+    TOAST_TX_UNSTAKED: {
+        id: 'TOAST_TX_UNSTAKED',
+        defaultMessage: '{amount} unstaked',
+    },
+    TOAST_TX_CLAIMED: {
+        id: 'TOAST_TX_CLAIMED',
+        defaultMessage: '{amount} claimed',
+    },
+    TOAST_SUCCESSFUL_CLAIM: {
+        id: 'TOAST_SUCCESSFUL_CLAIM',
+        defaultMessage: '{symbol} claimed successfully',
+    },
+    TR_STAKE_TOTAL_PENDING: {
+        id: 'TR_STAKE_TOTAL_PENDING',
+        defaultMessage: 'Total stake pending:',
+    },
+    TR_STAKE_LAST_STAKE_REQUEST_STATE: {
+        id: 'TR_STAKE_LAST_STAKE_REQUEST_STATE',
+        defaultMessage: 'Last stake request',
+    },
+    TR_STAKE_UNSTAKING: {
+        id: 'TR_STAKE_UNSTAKING',
+        defaultMessage: 'Unstaking',
+    },
+    TR_STAKE_CAN_CLAIM_WARNING: {
+        id: 'TR_STAKE_CAN_CLAIM_WARNING',
+        defaultMessage:
+            'You can already claim {amount} {symbol}. {br}Please claim or wait until new unstake is processed',
+    },
+    TR_STAKE_CLAIM_IN_NEXT_BLOCK: {
+        id: 'TR_STAKE_CLAIM_IN_NEXT_BLOCK',
+        defaultMessage: 'in the next block',
     },
 });

@@ -12,6 +12,7 @@ import { setFlag } from 'src/actions/suite/suiteActions';
 import { applySettings, changePin } from 'src/actions/settings/deviceSettingsActions';
 import { goto } from 'src/actions/suite/routerActions';
 import { SettingsAnchor } from 'src/constants/suite/anchors';
+import { selectIsDiscreteModeActive } from 'src/reducers/wallet/settingsReducer';
 
 import { SecurityCard, SecurityCardProps } from '../SecurityCard';
 
@@ -30,7 +31,7 @@ const Content = styled.div`
 `;
 
 const SecurityFeatures = () => {
-    const discreetMode = useSelector(state => state.wallet.settings.discreetMode);
+    const discreetMode = useSelector(selectIsDiscreteModeActive);
     const device = useSelector(selectDevice);
     const flags = useSelector(state => state.suite.flags);
     const dispatch = useDispatch();
@@ -69,7 +70,7 @@ const SecurityFeatures = () => {
               heading: <Translation id="TR_BACKUP_YOUR_DEVICE" />,
               description: <Translation id="TR_RECOVERY_SEED_IS_OFFLINE" />,
               cta: {
-                  label: <Translation id="TR_BACKUP_NOW" />,
+                  label: <Translation id="TR_BACKUP_NOW" isNested />,
                   dataTest: 'backup',
                   action: () => dispatch(goto('backup-index')),
                   isDisabled: !!backupFailed,
@@ -80,7 +81,7 @@ const SecurityFeatures = () => {
               icon: 'BACKUP',
               heading: <Translation id="TR_BACKUP_SEED_CREATED_SUCCESSFULLY" />,
               cta: {
-                  label: <Translation id="TR_CHECK_SEED_IN_SETTINGS" />,
+                  label: <Translation id="TR_CHECK_SEED_IN_SETTINGS" isNested />,
                   dataTest: 'seed-link',
                   action: () =>
                       dispatch(
@@ -187,6 +188,7 @@ const SecurityFeatures = () => {
                     variant="tertiary"
                     icon={securityStepsHidden ? 'ARROW_DOWN' : 'ARROW_UP'}
                     onClick={() => dispatch(setFlag('securityStepsHidden', !securityStepsHidden))}
+                    size="small"
                 >
                     {securityStepsHidden ? (
                         <Translation id="TR_SHOW_BUTTON" />
@@ -206,7 +208,6 @@ const SecurityFeatures = () => {
 
                         return (
                             <SecurityCard
-                                // eslint-disable-next-line react/no-array-index-key
                                 key={`${i}`}
                                 variant={card.variant}
                                 icon={card.icon}

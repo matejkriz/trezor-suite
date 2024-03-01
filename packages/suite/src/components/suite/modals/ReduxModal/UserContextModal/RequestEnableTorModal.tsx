@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 
 import styled from 'styled-components';
 
-import { Button, P } from '@trezor/components';
+import { Button, Paragraph } from '@trezor/components';
 import { UserContextPayload } from '@suite-common/suite-types';
 import { isDevEnv } from '@suite-common/suite-utils';
 import { RequestEnableTorResponse } from '@suite-common/suite-config';
@@ -15,7 +15,7 @@ const SmallModal = styled(Modal)`
     width: 560px;
 `;
 
-const Description = styled(P)`
+const Description = styled(Paragraph)`
     text-align: left;
     margin-bottom: 16px;
 `;
@@ -64,18 +64,18 @@ export const RequestEnableTorModal = ({ onCancel, decision }: RequestEnableTorMo
             onBackClick={onBackClick}
             isHeadingCentered
             heading={<Translation id="TR_TOR_ENABLE" />}
-            bottomBar={
+            bottomBarComponents={
                 <>
                     {(isDevEnv || coinjoinAllowNoTor) && (
                         <Button
-                            variant="secondary"
+                            variant="tertiary"
                             onClick={onSkip}
                             data-test="@request-enable-tor-modal/skip-button"
                         >
                             <Translation id="TR_TOR_SKIP" />
                         </Button>
                     )}
-                    <Button variant="secondary" onClick={onCancel}>
+                    <Button variant="tertiary" onClick={onCancel}>
                         <Translation id="TR_TOR_REQUEST_ENABLE_FOR_COIN_JOIN_LEAVE" />
                     </Button>
 

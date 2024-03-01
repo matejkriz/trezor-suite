@@ -1,6 +1,6 @@
 {
     "name": "@trezor/protobuf",
-    "version": "1.0.6",
+    "version": "1.0.9",
     "license": "See LICENSE.md in repo root",
     "repository": {
         "type": "git",
@@ -10,7 +10,10 @@
         "url": "https://github.com/trezor/trezor-suite/issues"
     },
     "sideEffects": false,
-    "main": "lib/index",
+    "main": "src/index.ts",
+    "publishConfig": {
+        "main": "lib/index.js"
+    },
     "npmPublishAccess": "public",
     "files": [
         "lib/",
@@ -22,25 +25,22 @@
     ],
     "scripts": {
         "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "test:unit": "jest -c ../../jest.config.base.js --passWithNoTests",
-        "type-check": "tsc --build",
-        "build:lib": "rimraf ./lib && yarn tsc --build tsconfig.lib.json",
-        "update:schema": "yarn workspace @trezor/schema-utils codegen $(pwd)/src/messages.ts > src/messages-schema.ts && npx prettier --write src/messages-schema.ts && eslint --fix src/messages-schema.ts",
-        "update:protobuf": "./scripts/protobuf-build.sh && npx prettier --write \"{messages.json,src/messages.ts}\"",
+        "test:unit": "yarn g:jest -c ../../jest.config.base.js",
+        "type-check": "yarn g:tsc --build",
+        "build:lib": "yarn g:rimraf ./lib && yarn g:tsc --build tsconfig.lib.json",
+        "update:schema": "yarn workspace @trezor/schema-utils codegen $(pwd)/src/messages.ts > src/messages-schema.ts && yarn g:prettier --write src/messages-schema.ts && yarn g:eslint --fix src/messages-schema.ts",
+        "update:protobuf": "./scripts/protobuf-build.sh && yarn g:prettier --write \"{messages.json,src/messages.ts}\" && yarn g:eslint --fix src/messages.ts",
         "prepublishOnly": "yarn tsx ../../scripts/prepublishNPM.js",
         "prepublish": "yarn tsx ../../scripts/prepublish.js"
     },
     "dependencies": {
         "@trezor/schema-utils": "workspace:*",
         "long": "^4.0.0",
-        "protobufjs": "7.2.5"
+        "protobufjs": "7.2.6"
     },
     "devDependencies": {
-        "jest": "29.5.0",
         "protobufjs-cli": "^1.1.2",
-        "rimraf": "^5.0.5",
-        "tsx": "^4.6.2",
-        "typescript": "5.3.2"
+        "tsx": "^4.7.0"
     },
     "peerDependencies": {
         "tslib": "^2.6.2"

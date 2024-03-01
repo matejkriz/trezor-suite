@@ -11,20 +11,22 @@ import styled from 'styled-components';
 import { Input, InputProps, variables } from '@trezor/components';
 
 const LevelContainer = styled.div`
-    width: 68px;
+    width: 64px;
 `;
 
 const Level = styled(Input)`
-    background: none;
-    height: 42px;
-    padding: ${({ innerAddon }) => !innerAddon && '1px 12px 0 12px'};
-    border: 1.5px solid ${({ theme }) => theme.STROKE_GREY};
-    color: ${({ theme }) => theme.TYPE_GREEN};
-    font-size: ${variables.FONT_SIZE.H3};
-    text-align: center;
+    input {
+        background: none;
+        height: 42px;
+        padding: ${({ innerAddon }) => !innerAddon && '1px 12px 0 12px'};
+        border: 1.5px solid ${({ theme }) => theme.STROKE_GREY};
+        color: ${({ theme }) => theme.TYPE_GREEN};
+        font-size: ${variables.FONT_SIZE.H3};
+        text-align: center;
 
-    :disabled {
-        color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
+        :disabled {
+            color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
+        }
     }
 `;
 
@@ -36,7 +38,7 @@ const InnerAddon = styled.div`
 
 const MAX_ALLOWED_INTEGER = 1000000;
 
-export interface SliderInputProps extends Pick<InputProps, 'isDisabled' | 'addonAlign'> {
+export interface SliderInputProps extends Pick<InputProps, 'isDisabled' | 'innerAddonAlign'> {
     value: number | '';
     onChange: (number: number) => void;
     min: number;
@@ -120,8 +122,6 @@ export const SliderInput = forwardRef<
     return (
         <LevelContainer className={className}>
             <Level
-                noError
-                noTopLabel
                 value={String(inputValue)}
                 onChange={handleChange}
                 onFocus={handleFocus}

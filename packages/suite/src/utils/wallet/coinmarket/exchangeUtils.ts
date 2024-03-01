@@ -7,7 +7,7 @@ export const getAmountLimits = (quotes: ExchangeTrade[]): CryptoAmountLimits | u
     let min: number | undefined;
     let max: number | undefined;
     let currency = '';
-    // eslint-disable-next-line no-restricted-syntax
+
     for (const quote of quotes) {
         let noError = true;
         const amount = Number(quote.sendStringAmount);
@@ -48,6 +48,7 @@ export const isQuoteError = (quote: ExchangeTrade): boolean => {
     if (quote.max && quote.max !== 'NONE' && Number(quote.sendStringAmount) > quote.max) {
         return true;
     }
+
     return false;
 };
 
@@ -83,18 +84,19 @@ export const splitToQuoteCategories = (
         fixedOK.length > 0
             ? fixedOK.concat(fixedMinMax)
             : okLength > 0
-            ? []
-            : fixedMinMax.concat(fixedError);
+              ? []
+              : fixedMinMax.concat(fixedError);
     const floatQuotes =
         // eslint-disable-next-line no-nested-ternary
         floatOK.length > 0
             ? floatOK.concat(floatMinMax)
             : okLength > 0
-            ? []
-            : floatMinMax.concat(floatError);
+              ? []
+              : floatMinMax.concat(floatError);
     const dexQuotes =
         // eslint-disable-next-line no-nested-ternary
         dexOK.length > 0 ? dexOK.concat(dexMinMax) : okLength > 0 ? [] : dexMinMax.concat(dexError);
+
     return [fixedQuotes, floatQuotes, dexQuotes];
 };
 

@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import styled from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
-import { P, Icon, variables, motionAnimation } from '@trezor/components';
+import { Paragraph, Icon, motionAnimation } from '@trezor/components';
 import { Translation } from 'src/components/suite';
 import { useSelector, useTranslation } from 'src/hooks/suite';
 import { selectIsLabelingAvailable } from 'src/reducers/suite/metadataReducer';
+import { borders, spacingsPx, typography } from '@trezor/theme';
 
 const Wrapper = styled.div`
     display: flex;
@@ -16,7 +17,7 @@ const Wrapper = styled.div`
 const ExpandWrapper = styled(motion.div)`
     width: 100%;
     background: ${({ theme }) => theme.BG_GREY};
-    border-radius: 8px;
+    border-radius: ${borders.radii.xs};
     overflow: hidden;
     margin-top: 8px;
     padding: 12px;
@@ -26,11 +27,12 @@ const ExpandWrapper = styled(motion.div)`
 
 const ExpandButton = styled.div`
     display: flex;
-    cursor: pointer;
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    font-size: ${variables.FONT_SIZE.SMALL};
-    font-weight: 500;
+    align-items: center;
     justify-content: space-between;
+    gap: ${spacingsPx.xxs};
+    color: ${({ theme }) => theme.textSubdued};
+    ${typography.label}
+    cursor: pointer;
 `;
 
 export const ExampleCSV = () => {
@@ -64,6 +66,7 @@ export const ExampleCSV = () => {
                             : 'TR_IMPORT_CSV_MODAL_SHOW_EXAMPLE'
                     }
                 />
+
                 <Icon size={16} icon={!isExpanded ? 'ARROW_DOWN' : 'ARROW_UP'} />
             </ExpandButton>
 
@@ -71,17 +74,19 @@ export const ExampleCSV = () => {
                 {isExpanded && (
                     <ExpandWrapper {...motionAnimation.expand}>
                         {/* CSV keys shouldn't be translated */}
-                        <P size="small">address,amount,currency{isLabelingAvailable && ',label'}</P>
-                        <P size="small">
+                        <Paragraph type="hint">
+                            address,amount,currency{isLabelingAvailable && ',label'}
+                        </Paragraph>
+                        <Paragraph type="hint">
                             {addresses[0]},0.31337,{account.symbol.toUpperCase()}
                             {isLabelingAvailable &&
                                 `,${translationString('TR_SENDFORM_LABELING_EXAMPLE_1')}`}
-                        </P>
-                        <P size="small">
+                        </Paragraph>
+                        <Paragraph type="hint">
                             {addresses[1]},0.1,USD
                             {isLabelingAvailable &&
                                 `,${translationString('TR_SENDFORM_LABELING_EXAMPLE_2')}`}
-                        </P>
+                        </Paragraph>
                     </ExpandWrapper>
                 )}
             </AnimatePresence>

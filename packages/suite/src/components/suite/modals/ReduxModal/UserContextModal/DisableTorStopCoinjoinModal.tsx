@@ -1,6 +1,6 @@
 import styled from 'styled-components';
 
-import { Button, P } from '@trezor/components';
+import { Button, Paragraph } from '@trezor/components';
 import { UserContextPayload } from '@suite-common/suite-types';
 
 import { Modal, Translation } from 'src/components/suite';
@@ -9,7 +9,7 @@ const SmallModal = styled(Modal)`
     width: 560px;
 `;
 
-const Description = styled(P)`
+const Description = styled(Paragraph)`
     text-align: left;
     margin-bottom: 16px;
 `;
@@ -44,9 +44,9 @@ export const DisableTorStopCoinjoinModal = ({
                 onCancel={onKeepRunningTor}
                 isHeadingCentered
                 heading={<Translation id="TR_TOR_DISABLE" />}
-                bottomBar={
+                bottomBarComponents={
                     <>
-                        <Button variant="secondary" onClick={onStopRunningTor}>
+                        <Button variant="tertiary" onClick={onStopRunningTor}>
                             <Translation id="TR_TOR_STOP" />
                         </Button>
                         <Button variant="primary" onClick={onKeepRunningTor}>

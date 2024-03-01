@@ -9,6 +9,7 @@ import {
     BLOCKCHAIN as TREZOR_CONNECT_BLOCKCHAIN_ACTIONS,
     BlockchainBlock,
     BlockchainError,
+    BlockchainReconnecting,
     BlockchainInfo,
 } from '@trezor/connect';
 
@@ -49,6 +50,7 @@ export const blockchainInitialState: BlockchainNetworks = networksCompatibility.
                       }
                     : {},
         };
+
         return state;
     },
     initialStatePredefined as BlockchainState,
@@ -115,21 +117,22 @@ const update = (draft: BlockchainState, block: BlockchainBlock) => {
     };
 };
 
+const reconnecting = (draft: BlockchainState, payload: BlockchainReconnecting) => {
+    const network = getNetwork(payload.coin.shortcut.toLowerCase());
+    if (!network) return;
+
+    draft[network.symbol] = {
+        ...draft[network.symbol],
+        reconnection: {
+            time: payload.time,
+        },
+    };
+};
+
 export const prepareBlockchainReducer = createReducerWithExtraDeps(
     blockchainInitialState,
     (builder, extra) => {
         builder
-
-            .addCase(blockchainActions.reconnectTimeoutStart, (state, action) => {
-                state[action.payload.symbol] = {
-                    ...state[action.payload.symbol],
-                    reconnection: {
-                        id: action.payload.id,
-                        time: action.payload.time,
-                        count: action.payload.count,
-                    },
-                };
-            })
             .addCase(blockchainActions.synced, (state, action) => {
                 state[action.payload.symbol].syncTimeout = action.payload.timeout;
             })
@@ -162,6 +165,12 @@ export const prepareBlockchainReducer = createReducerWithExtraDeps(
                 },
             )
             .addMatcher(
+                action => action.type === TREZOR_CONNECT_BLOCKCHAIN_ACTIONS.RECONNECTING,
+                (state, { payload }: PayloadAction<BlockchainReconnecting>) => {
+                    reconnecting(state, payload);
+                },
+            )
+            .addMatcher(
                 action => action.type === TREZOR_CONNECT_BLOCKCHAIN_ACTIONS.BLOCK,
                 (state, { payload }: PayloadAction<BlockchainBlock>) => {
                     update(state, payload);
@@ -178,6 +187,7 @@ export const selectNetworkBlockchainInfo =
 export const selectBlockchainHeightBySymbol = memoizeWithArgs(
     (state: BlockchainRootState, symbol: NetworkSymbol) => {
         const blockchain = selectNetworkBlockchainInfo(symbol)(state);
+
         return blockchain.blockHeight;
     },
 );
@@ -186,6 +196,7 @@ export const selectBlockchainExplorerBySymbol = memoizeWithArgs(
     (state: BlockchainRootState, symbol?: NetworkSymbol) => {
         if (!symbol) return null;
         const blockchain = selectNetworkBlockchainInfo(symbol)(state);
+
         return blockchain.explorer;
     },
     { size: 100 },
@@ -194,6 +205,7 @@ export const selectBlockchainExplorerBySymbol = memoizeWithArgs(
 export const selectBlockchainBlockInfoBySymbol = memoizeWithArgs(
     (state: BlockchainRootState, symbol: NetworkSymbol) => {
         const blockchain = selectNetworkBlockchainInfo(symbol)(state);
+
         return {
             blockhash: blockchain.blockHash,
             blockHeight: blockchain.blockHeight,

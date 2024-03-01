@@ -14,15 +14,18 @@ import {
     Network,
     NetworkFeature,
     NetworkSymbol,
+    NetworkType,
 } from '@suite-common/wallet-config';
 import {
     Account,
-    CoinFiatRates,
     Discovery,
     PrecomposedTransactionFinal,
     ReceiveInfo,
+    TokenAddress,
     TxFinalCardano,
+    FiatRates,
 } from '@suite-common/wallet-types';
+import { FiatCurrencyCode } from '@suite-common/suite-config';
 import { TrezorDevice } from '@suite-common/suite-types';
 import { ACCOUNT_TYPE } from '@suite-common/wallet-constants';
 import {
@@ -32,6 +35,7 @@ import {
 } from '@trezor/urls';
 
 import { toFiatCurrency } from './fiatConverterUtils';
+import { getFiatRateKey } from './fiatRatesUtils';
 
 export const isEthereumAccountSymbol = (symbol: NetworkSymbol) => symbol === 'eth';
 
@@ -63,6 +67,7 @@ export const getFirstFreshAddress = (
     // const addressLabel = utxoBasedAccount ? 'RECEIVE_ADDRESS_FRESH' : 'RECEIVE_ADDRESS';
     // NOTE: unrevealed[0] can be undefined (limit exceeded)
     const firstFreshAddress = utxoBasedAccount ? unrevealed[0] : unused[0];
+
     return firstFreshAddress;
 };
 
@@ -73,8 +78,10 @@ export const sortByBIP44AddressIndex = <T extends { path: string }>(
 ) => {
     const lookup = addresses.reduce<{ [path: string]: number }>((prev, _, i) => {
         prev[`${pathBase}/${i}`] = i;
+
         return prev;
     }, {});
+
     return addresses.slice().sort((a, b) => lookup[a.path] - lookup[b.path]);
 };
 
@@ -168,6 +175,8 @@ export const getTitleForNetwork = (symbol: NetworkSymbol) => {
             return 'TR_NETWORK_SOLANA_MAINNET';
         case 'dsol':
             return 'TR_NETWORK_SOLANA_DEVNET';
+        case 'matic':
+            return 'TR_NETWORK_POLYGON';
         default:
             return 'TR_NETWORK_UNKNOWN';
     }
@@ -216,6 +225,7 @@ export const getAccountTypeName = (path: string) => {
     if (bip43 === 'bip49') return 'TR_ACCOUNT_TYPE_BIP49_NAME';
     if (bip43 === 'shelley') return 'TR_ACCOUNT_TYPE_SHELLEY';
     if (bip43 === 'slip25') return 'TR_ACCOUNT_TYPE_SLIP25_NAME';
+
     return 'TR_ACCOUNT_TYPE_BIP44_NAME';
 };
 
@@ -228,6 +238,7 @@ export const getAccountTypeTech = (path: string) => {
     if (bip43 === 'bip49') return 'TR_ACCOUNT_TYPE_BIP49_TECH';
     if (bip43 === 'shelley') return 'TR_ACCOUNT_TYPE_SHELLEY';
     if (bip43 === 'slip25') return 'TR_ACCOUNT_TYPE_SLIP25_TECH';
+
     return 'TR_ACCOUNT_TYPE_BIP44_TECH';
 };
 
@@ -240,6 +251,7 @@ export const getAccountTypeDesc = (path: string) => {
     if (bip43 === 'bip49') return 'TR_ACCOUNT_TYPE_BIP49_DESC';
     if (bip43 === 'shelley') return 'TR_ACCOUNT_TYPE_SHELLEY_DESC';
     if (bip43 === 'slip25') return 'TR_ACCOUNT_TYPE_SLIP25_DESC';
+
     return 'TR_ACCOUNT_TYPE_BIP44_DESC';
 };
 
@@ -272,6 +284,7 @@ export const formatAmount = (amount: BigNumber.Value, decimals: number) => {
         if (bAmount.isNaN()) {
             throw new Error('Amount is not a number');
         }
+
         return bAmount.div(10 ** decimals).toString(10);
     } catch (error) {
         return '-1';
@@ -284,6 +297,7 @@ export const amountToSatoshi = (amount: BigNumber.Value, decimals: number) => {
         if (bAmount.isNaN()) {
             throw new Error('Amount is not a number');
         }
+
         return bAmount.times(10 ** decimals).toString(10);
     } catch (error) {
         // TODO: return null, so we can decide how to handle missing value in caller component
@@ -297,6 +311,7 @@ export const satoshiAmountToBtc = (amount: BigNumber.Value) => {
         if (satsAmount.isNaN()) {
             throw new Error('Amount is not a number');
         }
+
         return satsAmount.times(10 ** -8).toString(10);
     } catch (error) {
         // TODO: return null, so we can decide how to handle missing value in caller component
@@ -344,13 +359,16 @@ export const sortByCoin = (accounts: Account[]) =>
     accounts.sort((a, b) => {
         const aIndex = NETWORKS.findIndex(n => {
             const accountType = n.accountType || ACCOUNT_TYPE.NORMAL;
+
             return accountType === a.accountType && n.symbol === a.symbol;
         });
         const bIndex = NETWORKS.findIndex(n => {
             const accountType = n.accountType || ACCOUNT_TYPE.NORMAL;
+
             return accountType === b.accountType && n.symbol === b.symbol;
         });
         if (aIndex === bIndex) return a.index - b.index;
+
         return aIndex - bIndex;
     });
 
@@ -370,6 +388,7 @@ export const findAccountsByAddress = (address: string, accounts: Account[]) =>
                 a.descriptor === address
             );
         }
+
         return a.descriptor === address;
     });
 
@@ -378,6 +397,7 @@ export const findAccountDevice = (account: Account, devices: TrezorDevice[]) =>
 
 export const getAllAccounts = (deviceState: string | typeof undefined, accounts: Account[]) => {
     if (!deviceState) return [];
+
     return accounts.filter(a => a.deviceState === deviceState && a.visible);
 };
 
@@ -404,6 +424,7 @@ export const getAccountKey = (descriptor: string, symbol: string, deviceState: s
 export const countUniqueCoins = (accounts: Account[]) => {
     const coins = new Set();
     accounts.forEach(acc => coins.add(acc.symbol));
+
     return coins.size;
 };
 
@@ -415,10 +436,12 @@ export const countUniqueCoins = (accounts: Account[]) => {
  */
 export const enhanceTokens = (tokens: Account['tokens']) => {
     if (!tokens) return [];
+
     return tokens
-        .filter(t => t.symbol && t.balance && t.name)
+        .filter(t => t.symbol && t.balance)
         .map(t => ({
             ...t,
+            name: t.name || t.symbol,
             symbol: t.symbol!.toLowerCase(),
             balance: formatAmount(t.balance!, t.decimals),
         }));
@@ -529,31 +552,31 @@ export const enhanceHistory = ({
 export const getAccountFiatBalance = (
     account: Account,
     localCurrency: string,
-    fiat: CoinFiatRates[],
+    rates: FiatRates | undefined,
 ) => {
-    const coinFiatRates = fiat.find(f => f.symbol === account.symbol);
-    if (!coinFiatRates) return null;
+    const coinFiatRateKey = getFiatRateKey(
+        account.symbol as NetworkSymbol,
+        localCurrency as FiatCurrencyCode,
+    );
+    const coinFiatRate = rates?.[coinFiatRateKey];
+    if (!coinFiatRate?.rate) return null;
 
     let totalBalance = new BigNumber(0);
 
     // account fiat balance
-    const balance = toFiatCurrency(
-        account.formattedBalance,
-        localCurrency,
-        coinFiatRates.current?.rates,
-    );
+    const balance = toFiatCurrency(account.formattedBalance, localCurrency, coinFiatRate, 2, false);
 
     // sum fiat value of all tokens
     account.tokens?.forEach(t => {
-        const tokenRates = fiat.find(
-            f => f.mainNetworkSymbol === account.symbol && f.tokenAddress === t.contract,
+        const tokenFiatRateKey = getFiatRateKey(
+            account.symbol as NetworkSymbol,
+            localCurrency as FiatCurrencyCode,
+            t.contract as TokenAddress,
         );
-        if (tokenRates && t.balance) {
-            const tokenBalance = toFiatCurrency(
-                t.balance,
-                localCurrency,
-                tokenRates.current?.rates,
-            );
+
+        const tokenFiatRate = rates?.[tokenFiatRateKey];
+        if (tokenFiatRate?.rate && t.balance) {
+            const tokenBalance = toFiatCurrency(t.balance, localCurrency, tokenFiatRate, 2, false);
             if (tokenBalance) {
                 totalBalance = totalBalance.plus(tokenBalance);
             }
@@ -561,24 +584,27 @@ export const getAccountFiatBalance = (
     });
 
     totalBalance = totalBalance.plus(balance ?? 0);
+
     return totalBalance.toFixed();
 };
 
 export const getTotalFiatBalance = (
     deviceAccounts: Account[],
     localCurrency: string,
-    fiat: CoinFiatRates[],
+    rates: FiatRates | undefined,
 ) => {
     let instanceBalance = new BigNumber(0);
     deviceAccounts.forEach(a => {
-        const accountFiatBalance = getAccountFiatBalance(a, localCurrency, fiat) ?? '0';
+        const accountFiatBalance = getAccountFiatBalance(a, localCurrency, rates) ?? '0';
         instanceBalance = instanceBalance.plus(accountFiatBalance);
     });
+
     return instanceBalance;
 };
 
 export const isTestnet = (symbol: NetworkSymbol) => {
     const net = NETWORKS.find(n => n.symbol === symbol);
+
     return net?.testnet ?? false;
 };
 
@@ -608,7 +634,8 @@ export const isAccountOutdated = (account: Account, freshInfo: AccountInfo) => {
         case 'ethereum':
             return (
                 freshInfo.misc!.nonce !== account.misc.nonce ||
-                freshInfo.balance !== account.balance // balance can change because of beacon chain txs (staking)
+                freshInfo.balance !== account.balance || // balance can change because of beacon chain txs (staking) |
+                JSON.stringify(freshInfo?.stakingPools) !== JSON.stringify(account?.stakingPools)
             );
         case 'cardano':
             return (
@@ -650,6 +677,7 @@ export const getAccountSpecific = (
             },
             marker: undefined,
             page: accountInfo.page,
+            stakingPools: accountInfo?.stakingPools,
         };
     }
 
@@ -690,6 +718,7 @@ export const getAccountSpecific = (
 export const getFailedAccounts = (discovery: Discovery): Account[] =>
     discovery.failed.map(f => {
         const descriptor = `failed:${f.index}:${f.symbol}:${f.accountType}`;
+
         return {
             failed: true,
             deviceState: discovery.deviceState,
@@ -949,6 +978,7 @@ export const getUtxoOutpoint = (utxo: { txid: string; vout: number }) => {
     const buffer = Buffer.allocUnsafe(36);
     hash.copy(buffer);
     buffer.writeUInt32LE(utxo.vout, hash.length);
+
     return buffer.toString('hex');
 };
 
@@ -957,8 +987,25 @@ export const readUtxoOutpoint = (outpoint: string) => {
     const buffer = Buffer.from(outpoint, 'hex');
     const txid = bufferUtils.reverseBuffer(buffer.subarray(0, 32));
     const vout = buffer.readUInt32LE(txid.length);
+
     return { txid: txid.toString('hex'), vout };
 };
 
 export const isSameUtxo = (a: AccountUtxo, b: AccountUtxo) =>
     a.txid === b.txid && a.vout === b.vout;
+
+/**
+ * Returns true if network uses receive address instead of XPUB.
+ */
+export const isAddressBasedNetwork = (networkType: NetworkType) => {
+    if (networkType === 'bitcoin') return false;
+    if (networkType === 'cardano') return false;
+    if (networkType === 'ethereum') return true;
+    if (networkType === 'ripple') return true;
+    if (networkType === 'solana') return true;
+
+    // Checks that all networkType options were handled.
+    const exhaustiveCheck: never = networkType;
+
+    return !!exhaustiveCheck;
+};

@@ -1,5 +1,5 @@
 import styled from 'styled-components';
-import { Button, P } from '@trezor/components';
+import { Button, Paragraph } from '@trezor/components';
 import { Modal, Translation } from 'src/components/suite';
 import { isDesktop } from '@trezor/env-utils';
 import { useSelector } from 'src/hooks/suite/useSelector';
@@ -9,7 +9,7 @@ const StyledModal = styled(Modal)`
     width: 550px;
 `;
 
-const Content = styled(P)`
+const Content = styled(Paragraph)`
     margin: 16px 0;
 `;
 
@@ -25,9 +25,9 @@ export const TorModal = ({ onResult }: TorModalProps) => {
     return (
         <StyledModal
             heading={<Translation id="TR_TOR_ENABLE" />}
-            bottomBar={
+            bottomBarComponents={
                 <>
-                    <Button variant="secondary" onClick={() => onResult('use-defaults')}>
+                    <Button variant="tertiary" onClick={() => onResult('use-defaults')}>
                         <Translation id="TR_USE_DEFAULT_BACKENDS" />
                     </Button>
 

@@ -31,6 +31,7 @@ export const sortByBlockHeight = (a: { blockHeight?: number }, b: { blockHeight?
     // tx with no blockHeight comes first
     if (!blockA) return -1;
     if (!blockB) return 1;
+
     return blockB - blockA;
 };
 
@@ -59,6 +60,7 @@ const generateTransactionDateKey = (d: Date) =>
 /** Parse Date object from a string in YYYY-MM-DD format */
 export const parseTransactionDateKey = (key: string) => {
     const [year, month, day] = key.split('-');
+
     return new Date(Number(year), Number(month) - 1, Number(day));
 };
 
@@ -83,6 +85,7 @@ export const groupTransactionsByDate = (
     // Built-in sort doesn't include undefined elements but ts-belt does so there will be some refactoring involved.
     const keyFormatter =
         groupBy === 'day' ? generateTransactionDateKey : generateTransactionMonthKey;
+
     return (
         [...transactions]
             // There could be some undefined/null in array, not sure how it happens. Maybe related to pagination?
@@ -95,6 +98,7 @@ export const groupTransactionsByDate = (
                         ? keyFormatter(new Date(item.blockTime * 1000))
                         : 'pending';
                 const prev = r[key] ?? [];
+
                 return {
                     ...r,
                     [key]: [...prev, item],
@@ -108,6 +112,7 @@ export const groupJointTransactions = (transactions: WalletAccountTransaction[])
         .reduce<WalletAccountTransaction[][]>((prev, tx) => {
             const last = prev.pop();
             if (!last) return [[tx]];
+
             return tx.type === 'joint' && last[0].type === 'joint'
                 ? [...prev, [...last, tx]]
                 : [...prev, last, [tx]];
@@ -179,6 +184,7 @@ export const sumTransactions = (transactions: WalletAccountTransaction[]) => {
             }
         });
     });
+
     return totalAmount;
 };
 
@@ -235,6 +241,7 @@ export const sumTransactionsFiat = (
             }
         });
     });
+
     return totalAmount;
 };
 
@@ -248,6 +255,7 @@ export const findTransactions = (
     Object.keys(transactions).flatMap(key => {
         const tx = findTransaction(txid, transactions[key]);
         if (!tx) return [];
+
         return [{ key, tx }];
     });
 
@@ -272,11 +280,13 @@ export const findChainedTransactions = (
                     result.others = result.others.filter(t => t.txid !== tx.txid);
                 }
                 result.own.push(tx);
+
                 return true;
             }
 
             if (!ownTxs.includes(tx.txid) && !othersTxs.includes(tx.txid)) {
                 result.others.push(tx);
+
                 return true;
             }
 
@@ -422,6 +432,7 @@ export const getTxOperation = (
     if (type === 'recv') {
         return 'positive';
     }
+
     return null;
 };
 
@@ -480,6 +491,14 @@ export const getTargetAmount = (
         return txAmount;
     }
 
+    // The amount used for Ethereum transactions (e.g. unstake) when there wasn't any account balance change
+    // except fees. In this case, there's no other amount available in other fields, but we still should show
+    // a user the amount info
+    const ethParsedAmount = transaction.ethereumSpecific?.parsedData?.params?.[0].values?.[0];
+    if (ethParsedAmount) {
+        return formatNetworkAmount(ethParsedAmount, transaction.symbol);
+    }
+
     // "sent to self" target while other non-self targets are also present
     return null;
 };
@@ -494,6 +513,7 @@ export const replaceEthereumSpecific = (
     precomposedTx: PrecomposedTransactionFinal,
 ) => {
     if (!tx.ethereumSpecific) return;
+
     return {
         ...tx.ethereumSpecific,
         gasLimit: Number(precomposedTx.feeLimit),
@@ -540,7 +560,7 @@ const getEthereumRbfParams = (
         ],
         ethereumNonce: tx.ethereumSpecific.nonce,
         ethereumData,
-        feeRate: fromWei(tx.ethereumSpecific.gasPrice, 'gwei'),
+        feeRate: fromWei(tx.ethereumSpecific?.gasPrice ?? '0', 'gwei'),
         baseFee: 0, // irrelevant
     };
 };
@@ -561,6 +581,7 @@ const getBitcoinRbfParams = (
         // find input AccountAddress
         const addr = allAddresses.find(a => input.addresses?.includes(a.address));
         if (!addr) return []; // skip utxo, TODO: set some error? is it even possible?
+
         // re-create utxo from the input
         return {
             amount: input.value!,
@@ -813,6 +834,7 @@ export const simpleSearchTransactions = (
         // Is number?
         if (!Number.isNaN(search)) {
             const amount = new BigNumber(search);
+
             return transactions.filter(t => numberSearchFilter(t, amount, searchOperator));
         }
 
@@ -909,6 +931,7 @@ export const advancedSearchTransactions = (
             );
 
             const transactionCount: { [txid: string]: number } = {};
+
             return andTxs.filter(txid => {
                 if (!transactionCount[txid]) {
                     transactionCount[txid] = 0;

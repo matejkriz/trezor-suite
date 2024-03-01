@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState, ChangeEvent } from 'react';
-import styled from 'styled-components';
 import TrezorConnect, { TokenInfo } from '@trezor/connect';
 import { analytics, EventType } from '@trezor/suite-analytics';
 
-import { Input, Button, Tooltip } from '@trezor/components';
+import { Input, Button, Paragraph } from '@trezor/components';
 import { addToken } from 'src/actions/wallet/tokenActions';
 import { Modal } from 'src/components/suite';
 import { Translation } from 'src/components/suite/Translation';
@@ -11,11 +10,14 @@ import { useDispatch, useSelector, useTranslation } from 'src/hooks/suite';
 import { isAddressValid } from '@suite-common/wallet-utils';
 import { Account } from 'src/types/wallet';
 import { selectSelectedAccount } from 'src/reducers/wallet/selectedAccountReducer';
+import { selectLocalCurrency } from 'src/reducers/wallet/settingsReducer';
+import styled from 'styled-components';
+import { spacingsPx } from '@trezor/theme';
 
-const Wrapper = styled.div`
-    display: flex;
-    justify-content: center;
-    margin: 24px 0;
+const StyledP = styled(Paragraph)`
+    color: ${({ theme }) => theme.textSubdued};
+    text-align: left;
+    margin-bottom: ${spacingsPx.lg};
 `;
 
 interface AddTokenModalProps {
@@ -28,6 +30,7 @@ export const AddTokenModal = ({ onCancel }: AddTokenModalProps) => {
     const [isFetching, setIsFetching] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const account = useSelector(selectSelectedAccount);
+    const localCurrency = useSelector(selectLocalCurrency);
     const dispatch = useDispatch();
     const { translationString } = useTranslation();
 
@@ -96,12 +99,13 @@ export const AddTokenModal = ({ onCancel }: AddTokenModalProps) => {
     };
     const getInputState = () => {
         if (error) return 'error';
-        if (contractAddress && !isFetching) return 'success';
+
         return undefined;
     };
+
     const handleAddTokenButtonClick = () => {
         if (tokenInfo) {
-            dispatch(addToken(account, tokenInfo));
+            dispatch(addToken(account, tokenInfo, localCurrency));
             onCancel();
 
             analytics.report({
@@ -120,7 +124,7 @@ export const AddTokenModal = ({ onCancel }: AddTokenModalProps) => {
             isCancelable
             onCancel={onCancel}
             heading={<Translation id="TR_ADD_TOKEN_TITLE" />}
-            bottomBar={
+            bottomBarComponents={
                 <Button
                     onClick={handleAddTokenButtonClick}
                     isDisabled={!tokenInfo || !!error}
@@ -130,20 +134,17 @@ export const AddTokenModal = ({ onCancel }: AddTokenModalProps) => {
                 </Button>
             }
         >
-            <Wrapper>
-                <Input
-                    label={
-                        <Tooltip content={<Translation id="TR_ADD_TOKEN_TOOLTIP" />} dashed>
-                            <Translation id="TR_ADD_TOKEN_LABEL" />
-                        </Tooltip>
-                    }
-                    placeholder={translationString('TR_ADD_TOKEN_PLACEHOLDER')}
-                    value={contractAddress}
-                    bottomText={error}
-                    inputState={getInputState()}
-                    onChange={onChange}
-                />
-            </Wrapper>
+            <StyledP type="hint">
+                <Translation id="TR_ADD_TOKEN_DESCRIPTION" />
+            </StyledP>
+            <Input
+                label={<Translation id="TR_ADD_TOKEN_LABEL" />}
+                value={contractAddress}
+                bottomText={error || null}
+                inputState={getInputState()}
+                onChange={onChange}
+                hasBottomPadding={false}
+            />
         </Modal>
     );
 };

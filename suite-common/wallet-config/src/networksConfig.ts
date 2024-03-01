@@ -72,7 +72,7 @@ export const networks = {
             address: 'https://eth1.trezor.io/address/',
             queryString: '',
         },
-        features: ['rbf', 'sign-verify', 'tokens'],
+        features: ['rbf', 'sign-verify', 'tokens', 'token-definitions', 'staking'],
         label: 'TR_NETWORK_ETHEREUM_LABEL',
         tooltip: 'TR_NETWORK_ETHEREUM_TOOLTIP',
         customBackends: ['blockbook'],
@@ -322,6 +322,7 @@ export const networks = {
                 bip43Path: "m/44'/1'/i'",
             },
         },
+        isDebugOnly: true,
     },
     tsep: {
         name: 'Ethereum Sepolia',
@@ -338,7 +339,7 @@ export const networks = {
             address: 'https://sepolia1.trezor.io/address/',
             queryString: '',
         },
-        features: ['rbf', 'sign-verify', 'tokens'],
+        features: ['rbf', 'sign-verify', 'tokens', 'token-definitions'],
         customBackends: ['blockbook'],
         accountTypes: {},
     },
@@ -357,7 +358,7 @@ export const networks = {
             address: 'https://goerli1.trezor.io/address/',
             queryString: '',
         },
-        features: ['rbf', 'sign-verify', 'tokens'],
+        features: ['rbf', 'sign-verify', 'tokens', 'token-definitions', 'staking'],
         customBackends: ['blockbook'],
         accountTypes: {},
     },
@@ -376,7 +377,7 @@ export const networks = {
             address: 'https://holesky1.trezor.io/address/',
             queryString: '',
         },
-        features: ['rbf', 'sign-verify', 'tokens'],
+        features: ['rbf', 'sign-verify', 'tokens', 'token-definitions', 'staking'],
         customBackends: ['blockbook'],
         accountTypes: {},
     },
@@ -499,6 +500,26 @@ export const networks = {
         customBackends: ['solana'],
         accountTypes: {},
     },
+    matic: {
+        name: 'Polygon PoS',
+        networkType: 'ethereum',
+        chainId: 137,
+        bip43Path: "m/44'/60'/0'/0/i",
+        decimals: 18,
+        testnet: false,
+        label: 'TR_NETWORK_POLYGON_LABEL',
+        explorer: {
+            tx: 'https://matic2.trezor.io/tx/',
+            account: 'https://matic2.trezor.io/address/',
+            nft: 'https://matic2.trezor.io/nft/',
+            address: 'https://matic2.trezor.io/address/',
+            queryString: '',
+        },
+        features: ['rbf', 'sign-verify', 'tokens', 'token-definitions'],
+        customBackends: ['blockbook'],
+        accountTypes: {},
+        isDebugOnly: true, // TODO: POLYGON DEBUG
+    },
 } as const;
 
 export const TREZOR_CONNECT_BACKENDS = [
@@ -519,7 +540,13 @@ export type NetworkSymbol = keyof Networks;
 export type NetworkType = Network['networkType'];
 type NetworkValue = Networks[NetworkSymbol];
 export type AccountType = Keys<NetworkValue['accountTypes']> | 'imported' | 'taproot' | 'normal';
-export type NetworkFeature = 'rbf' | 'sign-verify' | 'amount-unit' | 'tokens' | 'staking';
+export type NetworkFeature =
+    | 'rbf'
+    | 'sign-verify'
+    | 'amount-unit'
+    | 'tokens'
+    | 'staking'
+    | 'token-definitions';
 export type Network = Without<NetworkValue, 'accountTypes'> & {
     symbol: NetworkSymbol;
     accountType?: AccountType;
@@ -533,6 +560,7 @@ export type Network = Without<NetworkValue, 'accountTypes'> & {
     support?: {
         [key in DeviceModelInternal]: string;
     };
+    isDebugOnly?: boolean;
 };
 
 // Transforms the network object into the previously used format so we don't have to change
@@ -550,11 +578,12 @@ export const networksCompatibility: Network[] = Object.entries(networks).flatMap
     ],
 );
 
-export const getMainnets = () => networksCompatibility.filter(n => !n.accountType && !n.testnet);
+export const getMainnets = (debug = false) =>
+    networksCompatibility.filter(n => !n.accountType && !n.testnet && (!n.isDebugOnly || debug));
 
 export const getTestnets = (debug = false) =>
     networksCompatibility.filter(
-        n => !n.accountType && n.testnet === true && (n.symbol !== 'regtest' || debug),
+        n => !n.accountType && n.testnet === true && (!n.isDebugOnly || debug),
     );
 
 export const getEthereumTypeNetworkSymbols = () =>
@@ -563,3 +592,7 @@ export const getEthereumTypeNetworkSymbols = () =>
 export const getTestnetSymbols = () => getTestnets().map(n => n.symbol);
 
 export const getNetworkType = (symbol: NetworkSymbol) => networks[symbol]?.networkType;
+
+// takes into account just network features, not features for specific accountTypes
+export const getNetworkFeatures = (symbol: NetworkSymbol) =>
+    networks[symbol]?.features as unknown as NetworkFeature;

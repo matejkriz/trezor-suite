@@ -16,9 +16,9 @@ import { goto } from 'src/actions/suite/routerActions';
 import { fillSendForm } from 'src/actions/suite/protocolActions';
 import { AppState } from 'src/types/suite';
 import {
-    CoinFiatRates,
     FormState,
     SendContextValues,
+    TokenAddress,
     UseSendFormState,
 } from '@suite-common/wallet-types';
 import {
@@ -26,6 +26,7 @@ import {
     getDefaultValues,
     amountToSatoshi,
     formatAmount,
+    getFiatRateKey,
 } from '@suite-common/wallet-utils';
 import { useSendFormOutputs } from './useSendFormOutputs';
 import { useSendFormFields } from './useSendFormFields';
@@ -36,6 +37,8 @@ import { PROTOCOL_TO_NETWORK } from 'src/constants/suite/protocol';
 import { useBitcoinAmountUnit } from './useBitcoinAmountUnit';
 import { useUtxoSelection } from './form/useUtxoSelection';
 import { useExcludedUtxos } from './form/useExcludedUtxos';
+import { selectFiatRatesByFiatRateKey } from '@suite-common/wallet-core';
+import { FiatCurrencyCode } from '@suite-common/suite-config';
 
 export const SendContext = createContext<SendContextValues | null>(null);
 SendContext.displayName = 'SendContext';
@@ -46,7 +49,6 @@ export interface SendFormProps {
     localCurrency: AppState['wallet']['settings']['localCurrency'];
     fees: AppState['wallet']['fees'];
     online: boolean;
-    coins: CoinFiatRates[];
     sendRaw?: boolean;
     metadataEnabled: boolean;
     targetAnonymity?: number;
@@ -88,9 +90,6 @@ const getStateFromProps = (props: UseSendFormProps) => {
 export const useSendForm = (props: UseSendFormProps): SendContextValues => {
     // public variables, exported to SendFormContext
     const [isLoading, setLoading] = useState(false);
-    const fiatRates = props.coins.find(
-        item => item.symbol === props.selectedAccount.account.symbol,
-    );
 
     const [state, setState] = useState<UseSendFormState>(getStateFromProps(props));
     // private variables, used inside sendForm hook
@@ -106,6 +105,16 @@ export const useSendForm = (props: UseSendFormProps): SendContextValues => {
     });
 
     const { control, reset, register, getValues, formState, setValue, trigger } = useFormMethods;
+
+    const values = getValues();
+    const token = values?.outputs?.[0]?.token;
+
+    const fiatRateKey = getFiatRateKey(
+        props.selectedAccount.account.symbol,
+        localCurrencyOption.value as FiatCurrencyCode,
+        token as TokenAddress,
+    );
+    const fiatRate = useSelector(state => selectFiatRatesByFiatRateKey(state, fiatRateKey));
 
     // register array fields (outputs array in react-hook-form)
     const outputsFieldArray = useFieldArray({
@@ -128,6 +137,7 @@ export const useSendForm = (props: UseSendFormProps): SendContextValues => {
                     }
                 }
             }
+
             return {
                 ...getDefaultValues(localCurrencyOption, state.network),
                 ...loadedState,
@@ -157,7 +167,7 @@ export const useSendForm = (props: UseSendFormProps): SendContextValues => {
     // declare sendFormUtils, sub-hook of useSendForm
     const sendFormUtils = useSendFormFields({
         ...useFormMethods,
-        fiatRates,
+        fiatRate,
         network: state.network,
     });
 
@@ -222,7 +232,7 @@ export const useSendForm = (props: UseSendFormProps): SendContextValues => {
     const { importTransaction, validateImportedTransaction } = useSendFormImport({
         network: state.network,
         tokens: state.account.tokens,
-        fiatRates,
+        fiatRate,
         localCurrencyOption,
     });
 
@@ -362,8 +372,8 @@ export const useSendForm = (props: UseSendFormProps): SendContextValues => {
         ...state,
         ...useFormMethods,
         isLoading,
+        fiatRate,
         register,
-        fiatRates,
         outputs: outputsFieldArray.fields,
         composedLevels,
         updateContext,
@@ -384,5 +394,6 @@ export const useSendForm = (props: UseSendFormProps): SendContextValues => {
 export const useSendFormContext = () => {
     const ctx = useContext(SendContext);
     if (ctx === null) throw Error('useSendFormContext used without Context');
+
     return ctx;
 };

@@ -1,15 +1,8 @@
 import { useEffect, ReactNode } from 'react';
-import styled from 'styled-components';
+import styled, { useTheme } from 'styled-components';
 
 import { notificationsActions } from '@suite-common/toast-notifications';
-import {
-    Button,
-    ConfirmOnDevice,
-    ModalProps,
-    Tooltip,
-    useTheme,
-    variables,
-} from '@trezor/components';
+import { Button, ConfirmOnDevice, ModalProps, Tooltip, variables } from '@trezor/components';
 import { copyToClipboard } from '@trezor/dom-utils';
 import { selectDevice } from '@suite-common/wallet-core';
 import { selectIsActionAbortable } from 'src/reducers/suite/suiteReducer';
@@ -22,6 +15,7 @@ import { DeviceDisconnected } from './DeviceDisconnected';
 import { TransactionReviewStepIndicator } from '../TransactionReviewModal/TransactionReviewOutputList/TransactionReviewStepIndicator';
 import { TransactionReviewOutputElement } from '../TransactionReviewModal/TransactionReviewOutputList/TransactionReviewOutputElement';
 import { Account } from '@suite-common/wallet-types';
+import { borders } from '@trezor/theme';
 
 const Wrapper = styled.div`
     display: flex;
@@ -51,7 +45,7 @@ const Right = styled.div`
 `;
 
 const StyledQrCode = styled(QrCode)`
-    border-radius: 12px;
+    border-radius: ${borders.radii.sm};
     background: ${({ theme }) => theme.BG_GREY};
     padding: 32px;
     max-height: 100%;
@@ -128,6 +122,7 @@ export const ConfirmValueModal = ({
         if (!addressConfirmed) {
             return <Translation id="TR_CONFIRM_BEFORE_COPY" />;
         }
+
         return null;
     };
 
@@ -160,7 +155,7 @@ export const ConfirmValueModal = ({
                     <StyledQrCode
                         value={value}
                         bgColor="transparent"
-                        fgColor={addressConfirmed ? theme.TYPE_DARK_GREY : theme.TYPE_LIGHT_GREY}
+                        fgColor={addressConfirmed ? theme.iconDefault : theme.iconSubdued}
                         showMessage={!addressConfirmed}
                     />
                     <Right>

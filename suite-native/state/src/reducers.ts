@@ -5,6 +5,7 @@ import {
     prepareBlockchainReducer,
     prepareDeviceReducer,
     prepareDiscoveryReducer,
+    prepareTokenDefinitionsReducer,
     prepareTransactionsReducer,
 } from '@suite-common/wallet-core';
 import { prepareFiatRatesReducer } from '@suite-native/fiat-rates';
@@ -16,7 +17,10 @@ import {
     preparePersistReducer,
 } from '@suite-native/storage';
 import { prepareAnalyticsReducer } from '@suite-common/analytics';
-import { prepareMessageSystemReducer } from '@suite-common/message-system';
+import {
+    messageSystemPersistedWhitelist,
+    prepareMessageSystemReducer,
+} from '@suite-common/message-system';
 import { notificationsReducer } from '@suite-common/toast-notifications';
 import { graphReducer, graphPersistWhitelist } from '@suite-native/graph';
 import { discoveryConfigPersistWhitelist, discoveryConfigReducer } from '@suite-native/discovery';
@@ -30,9 +34,10 @@ const accountsReducer = prepareAccountsReducer(extraDependencies);
 const fiatRatesReducer = prepareFiatRatesReducer(extraDependencies);
 const blockchainReducer = prepareBlockchainReducer(extraDependencies);
 const analyticsReducer = prepareAnalyticsReducer(extraDependencies);
-const messageSystem = prepareMessageSystemReducer(extraDependencies);
+const messageSystemReducer = prepareMessageSystemReducer(extraDependencies);
 const deviceReducer = prepareDeviceReducer(extraDependencies);
 const discoveryReducer = prepareDiscoveryReducer(extraDependencies);
+const tokenDefinitionsReducer = prepareTokenDefinitionsReducer(extraDependencies);
 
 export const prepareRootReducers = async () => {
     const appSettingsPersistedReducer = await preparePersistReducer({
@@ -48,6 +53,7 @@ export const prepareRootReducers = async () => {
         fiat: fiatRatesReducer,
         transactions: transactionsReducer,
         discovery: discoveryReducer,
+        tokenDefinitions: tokenDefinitionsReducer,
     });
 
     const walletPersistedReducer = await preparePersistReducer({
@@ -60,6 +66,7 @@ export const prepareRootReducers = async () => {
                 const oldAccountsState: { accounts: any } = { accounts: oldState.accounts };
                 const migratedAccounts = migrateAccountLabel(oldAccountsState.accounts);
                 const migratedState = { ...oldState, accounts: migratedAccounts };
+
                 return migratedState;
             },
             3: oldState => {
@@ -68,6 +75,7 @@ export const prepareRootReducers = async () => {
                     oldAccountsState.accounts,
                 );
                 const migratedState = { ...oldState, accounts: migratedAccounts };
+
                 return migratedState;
             },
         },
@@ -101,6 +109,13 @@ export const prepareRootReducers = async () => {
         version: 1,
     });
 
+    const messageSystemPersistedReducer = await preparePersistReducer({
+        reducer: messageSystemReducer,
+        persistedKeys: messageSystemPersistedWhitelist,
+        key: 'messageSystem',
+        version: 1,
+    });
+
     return combineReducers({
         app: appReducer,
         analytics: analyticsPersistedReducer,
@@ -112,6 +127,6 @@ export const prepareRootReducers = async () => {
         logs: logsSlice.reducer,
         notifications: notificationsReducer,
         discoveryConfig: discoveryConfigPersistedReducer,
-        messageSystem,
+        messageSystem: messageSystemPersistedReducer,
     });
 };

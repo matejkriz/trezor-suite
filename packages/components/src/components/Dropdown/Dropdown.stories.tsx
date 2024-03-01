@@ -1,125 +1,140 @@
-import { Dropdown } from './Dropdown';
-import { storiesOf } from '@storybook/react';
-import { select, number, boolean } from '@storybook/addon-knobs';
+import React from 'react';
+import styled from 'styled-components';
+import { Meta, StoryObj } from '@storybook/react';
+import { Dropdown as DropdownComponent, DropdownProps } from './Dropdown';
 
-storiesOf('Misc/Dropdown', module).add('Dropdown', () => {
-    const alignMenu: any = select(
-        'alignMenu',
-        {
-            default: null,
-            left: 'left',
-            right: 'right',
+const Center = styled.div`
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 100%;
+    padding: 100px 0;
+    gap: 20px;
+`;
+
+const ClickableAreaTestWrapper = styled.div`
+    background: ${({ theme }) => theme.backgroundAlertRedSubtleOnElevation1};
+    width: fit-content;
+    display: flex;
+`;
+
+const ColoredBox = styled.div`
+    background-color: ${({ theme }) => theme.backgroundAlertBlueSubtleOnElevation1};
+`;
+
+// This will cause inner content to be "cut" by the container
+// This is the way how it may be used, if you want to swap custom component into dropdown.
+const StyledDropdown = styled(DropdownComponent)`
+    overflow: hidden;
+`;
+
+export default {
+    title: 'Misc/Dropdown',
+    component: DropdownComponent,
+} as Meta;
+
+export const Dropdown: StoryObj<DropdownProps> = {
+    render: args => (
+        <Center>
+            <h3>Default dots as content</h3>
+            <ClickableAreaTestWrapper>
+                <DropdownComponent {...args} />
+            </ClickableAreaTestWrapper>
+            <hr />
+            <h3>Custom children with overflow: hidden; on the Dropdown itself</h3>
+            <ClickableAreaTestWrapper>
+                <StyledDropdown {...args}>
+                    <ColoredBox>
+                        Everything the State says is a lie, and everything it has it has stolen.
+                    </ColoredBox>
+                </StyledDropdown>
+            </ClickableAreaTestWrapper>
+        </Center>
+    ),
+    args: {
+        addon: {
+            onClick: () => {
+                console.log('navigate somewhere');
+            },
+            label: 'some link',
+            icon: 'ARROW_RIGHT_LONG',
         },
-        null,
-    );
-    const isDisabled = boolean('isDisabled', false);
-    const offset = number('offset', 10);
-    const horizontalPadding = number('Horizontal padding', 8);
-    const topPadding = number('Top padding', 8);
-    const bottomPadding = number('Bottom padding', 8);
-    const minWidth = number('Minimum width', 350);
-
-    return (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <Dropdown
-                {...(alignMenu ? { alignMenu } : {})}
-                {...(offset ? { offset } : {})}
-                {...(isDisabled ? { isDisabled } : {})}
-                horizontalPadding={horizontalPadding}
-                topPadding={topPadding}
-                bottomPadding={bottomPadding}
-                minWidth={minWidth}
-                masterLink={{
-                    callback: () => {
-                        console.log('navigate somewhere');
-                    },
-                    label: 'some link',
-                    icon: 'ARROW_RIGHT_LONG',
-                }}
-                items={[
-                    // {
-                    //     options: [
-                    //         {
-                    //             label: 'item without a group',
-                    //             callback: () => {
-                    //                 console.log('item 1 clicked');
-                    //             },
-                    //         },
-                    //     ],
-                    // },
+        alignMenu: 'right-top',
+        items: [
+            {
+                key: '1',
+                label: 'Group 1',
+                options: [
                     {
                         key: '1',
-                        label: 'Group 1',
-                        options: [
-                            {
-                                key: '1',
-                                label: 'item 1',
-                                callback: () => {
-                                    console.log('item 1 clicked');
-                                },
-                            },
-                            {
-                                key: '2',
-                                label: 'item 2',
-                                callback: () => {
-                                    console.log('item 2 clicked');
-                                },
-                            },
-                        ],
+                        label: 'item 1',
+                        onClick: () => {
+                            console.log('item 1 clicked');
+                        },
                     },
                     {
                         key: '2',
-                        label: 'Group 2 - with rounded items',
-                        options: [
-                            {
-                                key: '1',
-                                label: 'item 3 with very long name',
-                                callback: () => {
-                                    console.log('item 1 clicked');
-                                },
-                                isRounded: true,
-                            },
-                            {
-                                key: '2',
-                                label: 'disabled item with icon',
-                                callback: () => {
-                                    console.log('item 2 clicked - disabled');
-                                },
-                                icon: 'LIGHTBULB',
-                                isRounded: true,
-                                isDisabled: true,
-                            },
-                            {
-                                key: '3',
-                                label: 'disabled item with iconRight',
-                                callback: () => {
-                                    console.log('item 3 clicked - disabled');
-                                },
-                                iconRight: 'ARROW_RIGHT',
-                                isRounded: true,
-                                isDisabled: true,
-                            },
-                            {
-                                key: '4',
-                                label: 'basic item',
-                                callback: () => {
-                                    console.log('item 4 clicked');
-                                },
-                                isRounded: true,
-                            },
-                            {
-                                key: '5',
-                                label: 'item with iconRight and separator',
-                                callback: () => {
-                                    console.log('item 5 clicked');
-                                },
-                                iconRight: 'ARROW_RIGHT',
-                                separatorBefore: true,
-                            },
-                        ],
+                        label: 'item 2',
+                        onClick: () => {
+                            console.log('item 2 clicked');
+                        },
                     },
-                ]}
-            />
-        </div>
-    );
-});
+                ],
+            },
+            {
+                key: '2',
+                label: 'Group 2 - with rounded items',
+                options: [
+                    {
+                        key: '1',
+                        label: 'item 3 with very long name',
+                        onClick: () => {
+                            console.log('item 1 clicked');
+                        },
+                    },
+                    {
+                        key: '2',
+                        label: 'disabled item with icon',
+                        onClick: () => {
+                            console.log('item 2 clicked - disabled');
+                        },
+                        icon: 'LIGHTBULB',
+                        isDisabled: true,
+                    },
+                    {
+                        key: '3',
+                        label: 'disabled item with iconRight',
+                        onClick: () => {
+                            console.log('item 3 clicked - disabled');
+                        },
+                        iconRight: 'ARROW_RIGHT',
+                        isDisabled: true,
+                    },
+                    {
+                        key: '4',
+                        label: 'basic item',
+                        onClick: () => {
+                            console.log('item 4 clicked');
+                        },
+                    },
+                    {
+                        key: '5',
+                        label: 'item with iconRight and separator',
+                        onClick: () => {
+                            console.log('item 5 clicked');
+                        },
+                        iconRight: 'ARROW_RIGHT',
+                        separatorBefore: true,
+                    },
+                ],
+            },
+        ],
+    },
+    argTypes: {
+        addon: { control: { disable: true } },
+        items: { control: { disable: true } },
+        content: { control: { disable: true } },
+        className: { control: { disable: true } },
+        coords: { control: { disable: true } },
+    },
+};

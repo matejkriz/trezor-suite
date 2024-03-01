@@ -16,10 +16,19 @@ const SettingsContent = styled.section`
     flex-direction: column;
 `;
 
+const ConfirmationMessage = styled.div`
+    margin-top: 20px;
+    color: green;
+    font-weight: bold;
+`;
+
 export const Settings = () => {
     const connectOptions = useSelector(state => ({
-        trustedHost: state.connect?.options?.trustedHost || false,
+        trustedHost: state.connect?.options?.trustedHost,
+        connectSrc: state.connect?.options?.connectSrc,
     }));
+
+    const isHandshakeConfirmed = useSelector(state => state.connect?.isHandshakeConfirmed || false);
     const actions = useActions({
         onSubmitInit: trezorConnectActions.onSubmitInit,
         onFieldChange: trezorConnectActions.onConnectOptionChange,
@@ -33,6 +42,12 @@ export const Settings = () => {
             key: 'trustedHost',
             value: connectOptions?.trustedHost || false,
         },
+        {
+            name: 'connectSrc',
+            type: 'input',
+            key: 'connectSrc',
+            value: connectOptions?.connectSrc || '',
+        },
     ];
 
     return (
@@ -43,6 +58,11 @@ export const Settings = () => {
                     {submitButton}
                 </Button>
             </Row>
+            {isHandshakeConfirmed && (
+                <ConfirmationMessage data-test="@settings/handshake-confirmed">
+                    Handshake confirmed!
+                </ConfirmationMessage>
+            )}
         </SettingsContent>
     );
 };

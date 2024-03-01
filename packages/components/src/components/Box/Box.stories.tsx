@@ -1,4 +1,5 @@
 import styled from 'styled-components';
+import { Meta, StoryObj } from '@storybook/react';
 import { Box as BoxComponent } from './Box';
 import { FONT_WEIGHT } from '../../config/variables';
 
@@ -10,32 +11,32 @@ const Wrapper = styled.div`
     display: flex;
     flex: 1;
     flex-direction: column;
-`;
-
-const StyledRow = styled(BoxComponent)`
-    margin: 10px 0;
+    gap: 20px;
 `;
 
 export default {
     title: 'Misc/Box',
-};
+} as Meta;
 
-export const Box = {
+export const Box: StoryObj = {
     render: () => (
         <>
             <Wrapper>
-                <StyledRow>
+                <BoxComponent>
                     <Text>No state</Text>
-                </StyledRow>
-                <StyledRow state="success">
+                </BoxComponent>
+                <BoxComponent variant="primary">
                     <Text>Success</Text>
-                </StyledRow>
-                <StyledRow state="error">
+                </BoxComponent>
+                <BoxComponent variant="destructive">
                     <Text>Error</Text>
-                </StyledRow>
-                <StyledRow state="warning">
+                </BoxComponent>
+                <BoxComponent variant="warning">
                     <Text>Warning</Text>
-                </StyledRow>
+                </BoxComponent>
+                <BoxComponent variant="info">
+                    <Text>Info</Text>
+                </BoxComponent>
             </Wrapper>
         </>
     ),

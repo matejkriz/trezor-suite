@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
-import styled from 'styled-components';
+import styled, { useTheme } from 'styled-components';
 
 import { selectHasAccountTransactions } from '@suite-common/wallet-core';
-import { Card, useTheme } from '@trezor/components';
+import { Card } from '@trezor/components';
 import { useSelector } from 'src/hooks/suite';
 import { selectHasAnonymitySetError } from 'src/reducers/wallet/coinjoinReducer';
 import { BalancePrivacyBreakdown } from './BalancePrivacyBreakdown/BalancePrivacyBreakdown';
@@ -14,7 +14,7 @@ export const Container = styled.div`
     justify-content: space-between;
     gap: 8px;
     width: 100%;
-    height: 150px;
+    height: 160px;
     align-items: center;
 `;
 

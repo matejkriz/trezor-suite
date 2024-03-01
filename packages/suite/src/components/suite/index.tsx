@@ -2,8 +2,7 @@ import { AccountLabel } from './AccountLabel';
 import { DeviceConfirmImage } from './DeviceConfirmImage';
 import { CheckItem } from './CheckItem';
 import { PrerequisitesGuide } from './PrerequisitesGuide/PrerequisitesGuide';
-import { WelcomeLayout } from './WelcomeLayout';
-import { CardWithHeader } from './CardWithHeader';
+import { WelcomeLayout } from './layouts/WelcomeLayout/WelcomeLayout';
 import { NotificationCard } from './NotificationCard';
 import { WordInput } from './WordInput';
 import { WordInputAdvanced } from './WordInputAdvanced';
@@ -14,11 +13,17 @@ import { WebUsbButton } from './WebUsbButton';
 import { HiddenPlaceholder } from './HiddenPlaceholder';
 import { QuestionTooltip } from './QuestionTooltip';
 import { DeviceInvalidModeLayout } from './DeviceInvalidModeLayout';
-import { AppNavigationPanel } from './AppNavigationPanel';
-import { AppNavigation } from './AppNavigation/AppNavigation';
 import { Ticker } from './Ticker/Ticker';
+import { TrendTicker } from './Ticker/TrendTicker';
+import { PriceTicker } from './Ticker/PriceTicker';
 import { Translation } from './Translation';
-import { AccountLabeling, AddressLabeling, WalletLabeling, MetadataLabeling } from './labeling';
+import {
+    AccountLabeling,
+    AddressLabeling,
+    WalletLabeling,
+    MetadataLabeling,
+    useGetWalletLabel,
+} from './labeling';
 import { FormattedCryptoAmount } from './FormattedCryptoAmount';
 import { FormattedNftAmount } from './FormattedNftAmount';
 import { Sign } from './Sign';
@@ -30,7 +35,6 @@ import { FormattedDateWithBullet } from './FormattedDateWithBullet';
 import { Metadata } from './Metadata';
 import { HomescreenGallery } from './HomescreenGallery';
 import { DeviceMatrixExplanation } from './DeviceMatrixExplanation';
-import { AccountFormCloseButton } from './AccountFormCloseButton';
 import { TroubleshootingTips } from './troubleshooting/TroubleshootingTips';
 import { ConnectDevicePrompt } from './ConnectDevicePrompt';
 import { CoinGroup } from './CoinGroup/CoinGroup';
@@ -49,6 +53,8 @@ import { HoverAnimation } from './HoverAnimation';
 import { Preloader } from './Preloader/Preloader';
 import { PinMatrix } from './PinMatrix/PinMatrix';
 import { UdevDownload } from './UdevDownload';
+import { StakingFeature } from './StakingFeature';
+import { StakeAmountWrapper } from './StakeAmountWrapper';
 
 export {
     AccountLabel,
@@ -57,7 +63,6 @@ export {
     DeviceInvalidModeLayout,
     PrerequisitesGuide,
     WelcomeLayout,
-    CardWithHeader as Card,
     NotificationCard,
     FiatValue,
     Translation,
@@ -70,13 +75,14 @@ export {
     AccountLabeling,
     AddressLabeling,
     WalletLabeling,
+    useGetWalletLabel,
     MetadataLabeling,
     QuestionTooltip,
-    AppNavigationPanel,
-    AppNavigation,
     FormattedCryptoAmount,
     FormattedNftAmount,
     Ticker,
+    TrendTicker,
+    PriceTicker,
     Sign,
     ReadMoreLink,
     TrezorLink,
@@ -86,7 +92,6 @@ export {
     Metadata,
     HomescreenGallery,
     DeviceMatrixExplanation,
-    AccountFormCloseButton,
     TroubleshootingTips,
     ConnectDevicePrompt,
     CoinGroup,
@@ -105,9 +110,11 @@ export {
     Preloader,
     PinMatrix,
     UdevDownload,
+    StakingFeature,
+    StakeAmountWrapper,
 };
 export * from './graph';
 export * from './notifications';
 export * from './section';
-export * from './skeletons';
+export * from './styled';
 export type { ModalProps, NumberInputProps };

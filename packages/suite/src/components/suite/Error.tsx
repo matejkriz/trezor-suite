@@ -1,5 +1,5 @@
 import styled from 'styled-components';
-import { H1, P, Button, variables } from '@trezor/components';
+import { H2, Paragraph, Button, variables } from '@trezor/components';
 import { db } from 'src/storage';
 import { reloadApp } from 'src/utils/suite/reload';
 
@@ -41,8 +41,9 @@ const StyledButton = styled(Button)`
     margin: 6px 12px;
 `;
 
-const GenericMessage = styled(P)`
+const GenericMessage = styled(Paragraph)`
     margin-bottom: 10px;
+    text-align: center;
 `;
 
 const ErrorMessage = styled.span`
@@ -59,8 +60,8 @@ type ErrorProps = {
 
 export const Error = ({ error }: ErrorProps) => (
     <Wrapper>
-        <H1>Error occurred</H1>
-        <GenericMessage textAlign="center">It appears something is broken.</GenericMessage>
+        <H2>Error occurred</H2>
+        <GenericMessage>It appears something is broken.</GenericMessage>
         <ErrorMessage>{error}</ErrorMessage>
         <Separator />
         <Buttons>

@@ -1,6 +1,7 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import styled, { css } from 'styled-components';
 import { useSelector } from 'src/hooks/suite';
+import { selectIsDiscreteModeActive } from 'src/reducers/wallet/settingsReducer';
 
 interface WrapperProps {
     intensity: number;
@@ -8,6 +9,8 @@ interface WrapperProps {
 }
 
 const Wrapper = styled.span<WrapperProps>`
+    font-variant-numeric: tabular-nums;
+
     ${(props: WrapperProps) =>
         props.discreetMode &&
         css`
@@ -21,7 +24,7 @@ const Wrapper = styled.span<WrapperProps>`
 `;
 
 interface HiddenPlaceholderProps {
-    intensity?: number;
+    enforceIntensity?: number;
     children: ReactNode;
     className?: string;
     ['data-test']?: string;
@@ -29,16 +32,34 @@ interface HiddenPlaceholderProps {
 
 export const HiddenPlaceholder = ({
     children,
-    intensity = 5,
+    enforceIntensity,
     className,
     ...rest
 }: HiddenPlaceholderProps) => {
-    const discreetMode = useSelector(state => state.wallet.settings.discreetMode);
+    const ref = useRef<HTMLSpanElement>(null);
+    const [automaticIntensity, setAutomaticIntensity] = useState(10);
+    const discreetMode = useSelector(selectIsDiscreteModeActive);
+
+    useEffect(() => {
+        if (ref.current === null) {
+            return;
+        }
+
+        const fontSize = Number(
+            window
+                .getComputedStyle(ref.current, null)
+                .getPropertyValue('font-size')
+                .replace('px', ''),
+        );
+        setAutomaticIntensity(fontSize / 5);
+    }, []);
+
     return (
         <Wrapper
             discreetMode={discreetMode}
-            intensity={intensity}
+            intensity={enforceIntensity !== undefined ? enforceIntensity : automaticIntensity}
             className={className}
+            ref={ref}
             data-test={rest['data-test']}
         >
             {children}

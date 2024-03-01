@@ -1,4 +1,4 @@
-/* eslint-disable no-console, no-await-in-loop */
+/* eslint-disable no-console */
 
 // TODO: future coinjoin-backend-link package? similar to trezor-user-env-link
 
@@ -17,7 +17,6 @@ export const generateBlock = () =>
     });
 
 export const waitForCoinjoinBackend = () =>
-    // eslint-disable-next-line no-async-promise-executor
     new Promise<void>(async (resolve, reject) => {
         const limit = 60;
         const error = '';
@@ -35,6 +34,7 @@ export const waitForCoinjoinBackend = () =>
                 const res = await fetch('http://localhost:19121/');
                 if (res.status === 200) {
                     console.log('coinjoin backend is online');
+
                     return resolve();
                 }
             } catch (err) {

@@ -86,16 +86,16 @@ const attemptLoop = async <T>(
         const onClear = () => aborter.abort();
         clear.addEventListener('abort', onClear);
         try {
-            // eslint-disable-next-line no-await-in-loop
             return await attempt(a, aborter.signal);
         } catch {
             onClear();
-            // eslint-disable-next-line no-await-in-loop
+
             await failure(a);
         } finally {
             clear.removeEventListener('abort', onClear);
         }
     }
+
     return clear.aborted ? Promise.reject() : attempt(attempts - 1, clear);
 };
 

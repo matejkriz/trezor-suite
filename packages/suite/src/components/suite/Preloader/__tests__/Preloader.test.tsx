@@ -93,6 +93,7 @@ const mockStore = configureStore<State, any>();
 
 const initStore = (state: State) => {
     const store = mockStore(state);
+
     return store;
 };
 
@@ -179,7 +180,7 @@ describe('Preloader component', () => {
         const { unmount } = renderWithProviders(store, <Index app={store.getState().router.app} />);
 
         expect(findByTestId('@connect-device-prompt')).not.toBeNull();
-        expect(findByTestId('TR_CHECK_FOR_DEVICES')).not.toBeNull();
+        expect(findByTestId('web-usb-button')).not.toBeNull();
 
         unmount();
     });

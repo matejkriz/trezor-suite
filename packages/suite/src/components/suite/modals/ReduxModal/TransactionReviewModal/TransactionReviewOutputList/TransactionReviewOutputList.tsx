@@ -5,6 +5,7 @@ import { analytics, EventType } from '@trezor/suite-analytics';
 import { Button, variables } from '@trezor/components';
 import { Translation } from 'src/components/suite';
 import { notificationsActions } from '@suite-common/toast-notifications';
+import { TranslationKey } from '@suite-common/intl-types';
 import { copyToClipboard, download } from '@trezor/dom-utils';
 import { useDispatch } from 'src/hooks/suite';
 import { TransactionReviewDetails } from './TransactionReviewDetails';
@@ -18,11 +19,17 @@ import type {
 import { getOutputState } from 'src/utils/wallet/reviewTransactionUtils';
 import { TransactionReviewTotalOutput } from './TransactionReviewTotalOutput';
 import { ReviewOutput } from 'src/types/wallet/transaction';
+import { spacingsPx } from '@trezor/theme';
+import { StakeFormState } from '@suite-common/wallet-types';
 
 const Content = styled.div`
     display: flex;
     padding: 0;
     flex: 1;
+`;
+const Flex = styled.div`
+    display: flex;
+    gap: ${spacingsPx.xxs};
 `;
 
 const Right = styled.div`
@@ -73,7 +80,7 @@ const StyledButton = styled(Button)`
 
 export interface TransactionReviewOutputListProps {
     account: Account;
-    precomposedForm: FormState;
+    precomposedForm: FormState | StakeFormState;
     precomposedTx: PrecomposedTransactionFinal | TxFinalCardano;
     signedTx?: { tx: string }; // send reducer
     decision?: { resolve: (success: boolean) => void }; // dfd
@@ -81,6 +88,7 @@ export interface TransactionReviewOutputListProps {
     outputs: ReviewOutput[];
     buttonRequestsCount: number;
     isRbfAction: boolean;
+    actionText: TranslationKey;
 }
 
 export const TransactionReviewOutputList = ({
@@ -93,13 +101,21 @@ export const TransactionReviewOutputList = ({
     outputs,
     buttonRequestsCount,
     isRbfAction,
+    actionText,
 }: TransactionReviewOutputListProps) => {
     const dispatch = useDispatch();
     const { networkType } = account;
 
     const { symbol } = account;
-    const { options, selectedFee, isCoinControlEnabled, hasCoinControlBeenOpened } =
-        precomposedForm;
+    const { options, selectedFee } = precomposedForm;
+    let isCoinControlEnabled = false;
+    let hasCoinControlBeenOpened = false;
+    if ('isCoinControlEnabled' in precomposedForm) {
+        ({ isCoinControlEnabled } = precomposedForm);
+    }
+    if ('hasCoinControlBeenOpened' in precomposedForm) {
+        ({ hasCoinControlBeenOpened } = precomposedForm);
+    }
     const broadcastEnabled = options.includes('broadcast');
 
     const reportTransactionCreatedEvent = (action: 'sent' | 'copied' | 'downloaded' | 'replaced') =>
@@ -183,7 +199,7 @@ export const TransactionReviewOutputList = ({
                             return (
                                 <TransactionReviewOutput
                                     // it's safe to use array index since outputs do not change
-                                    // eslint-disable-next-line react/no-array-index-key
+
                                     key={index}
                                     ref={el => (outputRefs.current[index] = el)}
                                     {...output}
@@ -214,10 +230,10 @@ export const TransactionReviewOutputList = ({
                             isDisabled={!signedTx}
                             onClick={handleSend}
                         >
-                            <Translation id={isRbfAction ? 'TR_REPLACE_TX' : 'SEND_TRANSACTION'} />
+                            <Translation id={actionText} />
                         </StyledButton>
                     ) : (
-                        <>
+                        <Flex>
                             <StyledButton
                                 isDisabled={!signedTx}
                                 onClick={handleCopy}
@@ -226,13 +242,13 @@ export const TransactionReviewOutputList = ({
                                 <Translation id="COPY_TRANSACTION_TO_CLIPBOARD" />
                             </StyledButton>
                             <StyledButton
-                                variant="secondary"
+                                variant="tertiary"
                                 isDisabled={!signedTx}
                                 onClick={handleDownload}
                             >
                                 <Translation id="DOWNLOAD_TRANSACTION" />
                             </StyledButton>
-                        </>
+                        </Flex>
                     )}
                 </RightBottom>
             </Right>

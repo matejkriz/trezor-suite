@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import styled from 'styled-components';
+import styled, { useTheme } from 'styled-components';
 import { QuestionTooltip, Translation } from 'src/components/suite';
-import { variables, Button, Select, Icon, useTheme } from '@trezor/components';
+import { variables, Button, Select, Icon } from '@trezor/components';
 import { useCoinmarketSellOffersContext } from 'src/hooks/wallet/useCoinmarketSellOffers';
 import { BankAccount } from 'invity-api';
 import { formatIban } from 'src/utils/wallet/coinmarket/sellUtils';
@@ -149,7 +149,7 @@ export const SelectBankAccount = () => {
                         value={bankAccount}
                         isClearable={false}
                         options={bankAccounts}
-                        minWidth="70px"
+                        minValueWidth="70px"
                         formatOptionLabel={(option: BankAccount) => (
                             <Option>
                                 <AccountInfo>

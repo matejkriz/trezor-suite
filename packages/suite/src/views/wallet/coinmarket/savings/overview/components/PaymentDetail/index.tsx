@@ -7,6 +7,7 @@ import { Translation } from 'src/components/suite';
 import type { SavingsTradePlannedPayment } from 'invity-api';
 import type { ExtendedMessageDescriptor } from 'src/types/suite';
 import { useCoinmarketSavingsPaymentInfoCopy } from 'src/hooks/wallet/useCoinmarketSavingsPaymentInfoCopy';
+import { borders } from '@trezor/theme';
 
 const Wrapper = styled.div`
     margin-top: 18px;
@@ -29,18 +30,24 @@ const IconWrapper = styled.div`
 
 const PaymentItem = styled.div`
     border: 1px solid ${({ theme }) => theme.STROKE_GREY};
-    border-radius: 8px;
+    border-radius: ${borders.radii.xs};
     display: flex;
     flex-flow: column nowrap;
     align-items: stretch;
     place-content: stretch space-between;
 `;
 
-const PaymentItemDate = styled.div`
+const PaymentItemDateWrapper = styled.div`
+    display: flex;
     margin: 4px 0;
     padding: 9px 38px;
     border-right: 1px solid ${({ theme }) => theme.STROKE_GREY};
     width: 25%;
+    align-items: center;
+`;
+
+const PaymentItemDate = styled.div`
+    width: 100%;
 `;
 
 const PaymentItemStatus = styled.div<{ isNextUp: boolean; isPaymentInfoAvailable: boolean }>`
@@ -52,16 +59,14 @@ const PaymentItemStatus = styled.div<{ isNextUp: boolean; isPaymentInfoAvailable
 `;
 
 const PaymentItemButton = styled(Button)`
-    height: 24px;
     margin: 12px 17px;
-    font-size: 12px;
-    line-height: 16px;
-    width: 25%;
 `;
+
 const PaymentItemStatusIcon = styled.div`
     margin-right: 3px;
     display: flex;
 `;
+
 const PaymentItemStatusIconReactSVG = styled(Image)<{ isNextUp: boolean }>`
     & div {
         display: flex;
@@ -122,6 +127,7 @@ export const PaymentDetail = ({
     const { copyPaymentInfo } = useCoinmarketSavingsPaymentInfoCopy(
         savingsTradePayment.paymentInfo,
     );
+
     return (
         <Wrapper>
             <Label>
@@ -134,9 +140,11 @@ export const PaymentDetail = ({
             </Label>
             <PaymentItem>
                 <Row>
-                    <PaymentItemDate>
-                        {format(parseISO(savingsTradePayment.plannedPaymentAt), 'dd MMM yyyy')}
-                    </PaymentItemDate>
+                    <PaymentItemDateWrapper>
+                        <PaymentItemDate>
+                            {format(parseISO(savingsTradePayment.plannedPaymentAt), 'dd MMM yyyy')}
+                        </PaymentItemDate>
+                    </PaymentItemDateWrapper>
                     <PaymentItemStatus
                         isNextUp={isNextUp}
                         isPaymentInfoAvailable={!!savingsTradePayment.paymentInfo}
@@ -164,7 +172,11 @@ export const PaymentDetail = ({
                         )}
                     </PaymentItemStatus>
                     {savingsTradePayment.paymentInfo && (
-                        <PaymentItemButton type="button" onClick={() => setShowDetail(!showDetail)}>
+                        <PaymentItemButton
+                            type="button"
+                            onClick={() => setShowDetail(!showDetail)}
+                            size="small"
+                        >
                             <Translation
                                 id={
                                     showDetail

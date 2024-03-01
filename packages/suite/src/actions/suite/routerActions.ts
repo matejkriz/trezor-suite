@@ -1,5 +1,5 @@
 /**
- * Use override for react-native (@trezor/suite-native/src/actions)
+ * Use override for react-native (@suite-native/app/src/actions)
  */
 import { Route } from '@suite-common/suite-types';
 
@@ -43,6 +43,7 @@ export const onBeforePopState = () => (_dispatch: Dispatch, getState: GetState) 
     const { locks } = getState().suite;
     const isLocked = locks.includes(SUITE.LOCK_TYPE.ROUTER) || locks.includes(SUITE.LOCK_TYPE.UI);
     const hasActionModal = getState().modal.context !== '@modal/context-none';
+
     return !isLocked && !hasActionModal;
 };
 
@@ -123,15 +124,17 @@ export const goto =
                 // postpone propagation to allow clearing anchor in redux state by click listener
                 setTimeout(() => dispatch(onAnchorChange(anchor)), 0);
             }
+
             return;
         }
-
         const newUrl = `${urlBase}${preserveParams ? history.location.hash : ''}`;
         dispatch(onLocationChange(newUrl, anchor));
 
         const route = findRouteByName(routeName);
+
         if (route?.isForegroundApp) {
             dispatch(suiteActions.lockRouter(true));
+
             return;
         }
 

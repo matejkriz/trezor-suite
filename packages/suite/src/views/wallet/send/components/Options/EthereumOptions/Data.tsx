@@ -1,11 +1,12 @@
 import { useEffect } from 'react';
 import styled from 'styled-components';
 import { Textarea, Icon } from '@trezor/components';
-import { QuestionTooltip } from 'src/components/suite';
+import { Translation } from 'src/components/suite';
 import { useSendFormContext } from 'src/hooks/wallet';
 import { getInputState, isHexValid } from '@suite-common/wallet-utils';
 import { formInputsMaxLength } from '@suite-common/validators';
 import { useTranslation } from 'src/hooks/suite';
+import { spacingsPx } from '@trezor/theme';
 
 const inputAsciiName = 'ethereumDataAscii';
 const inputHexName = 'ethereumDataHex';
@@ -16,11 +17,14 @@ const Wrapper = styled.div`
     width: 100%;
     justify-content: space-between;
     align-items: center;
+    align-items: flex-end;
 `;
 
 const Space = styled.div`
     display: flex;
     justify-content: center;
+    align-self: center;
+    padding-top: ${spacingsPx.lg};
     min-width: 65px;
 `;
 
@@ -98,24 +102,22 @@ export const Data = ({ close }: DataProps) => {
     return (
         <Wrapper>
             <Textarea
-                inputState={getInputState(asciiError, asciiValue)}
-                isMonospace
+                inputState={getInputState(asciiError)}
                 data-test={inputAsciiName}
                 defaultValue={asciiValue}
                 maxLength={formInputsMaxLength.ethData}
-                bottomText={asciiError?.message}
-                label={<QuestionTooltip label="DATA_ETH" tooltip="DATA_ETH_TOOLTIP" />}
+                bottomText={asciiError?.message || null}
+                label={<Translation id="DATA_ETH" />}
                 innerRef={asciiRef}
                 {...asciiField}
             />
             <Space> = </Space>
             <Textarea
-                inputState={getInputState(hexError, hexValue)}
-                isMonospace
+                inputState={getInputState(hexError)}
                 data-test={inputHexName}
                 defaultValue={hexValue}
                 maxLength={formInputsMaxLength.ethData}
-                bottomText={hexError?.message}
+                bottomText={hexError?.message || null}
                 labelRight={
                     <Icon
                         size={20}

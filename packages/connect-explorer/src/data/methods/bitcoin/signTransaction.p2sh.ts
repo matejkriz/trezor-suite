@@ -1,4 +1,3 @@
-/* eslint-disable no-bitwise */
 import { select } from './common';
 
 const name = 'signTransaction';
@@ -59,6 +58,7 @@ export default [
                     .filter(c => c.affectedValue.indexOf('m/49') >= 0)
                     .map(v => {
                         const example = examples[v.value];
+
                         return {
                             ...v,
                             affectedValue: example ? [example.inputs, example.outputs] : undefined,

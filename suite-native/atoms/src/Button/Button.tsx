@@ -13,8 +13,6 @@ import { useButtonPressAnimatedStyle } from './useButtonPressAnimatedStyle';
 import { TestProps } from '../types';
 import { HStack } from '../Stack';
 
-export type ButtonBackgroundElevation = '0' | '1';
-
 export type ButtonSize = 'small' | 'medium' | 'large';
 export type ButtonColorScheme =
     | 'primary'
@@ -127,6 +125,7 @@ const buttonToIconSizeMap = {
 export const buttonStyle = prepareNativeStyle<ButtonStyleProps>(
     (utils, { size, backgroundColor, isDisabled }) => {
         const sizeDimensions = sizeToDimensionsMap[size];
+
         return {
             flexDirection: 'row',
             justifyContent: 'center',

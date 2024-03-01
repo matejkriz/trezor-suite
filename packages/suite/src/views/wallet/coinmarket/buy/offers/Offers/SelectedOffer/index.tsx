@@ -3,10 +3,11 @@ import { Card, variables } from '@trezor/components';
 import VerifyAddress from './components/VerifyAddress';
 import { useCoinmarketBuyOffersContext } from 'src/hooks/wallet/useCoinmarketBuyOffers';
 import { CoinmarketBuyOfferInfo } from '../../../components/CoinmarketBuyOfferInfo';
+import { spacingsPx } from '@trezor/theme';
 
 const Wrapper = styled.div`
     display: flex;
-    margin-top: 20px;
+    margin: ${spacingsPx.lg} 0;
 
     @media screen and (max-width: ${variables.SCREEN_SIZE.LG}) {
         flex-direction: column;

@@ -1,11 +1,12 @@
-import { variables, H1, Card } from '@trezor/components';
+import { variables, H2, Card } from '@trezor/components';
+import { borders } from '@trezor/theme';
 import styled from 'styled-components';
 
 export const Heading = styled.div`
     padding-left: 5px;
 `;
 
-export const StyledH1 = styled(H1)`
+export const StyledH2 = styled(H2)`
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -66,7 +67,7 @@ export const Value = styled.div`
     width: fit-content;
     background: ${({ theme }) => theme.BG_LIGHT_GREY};
     border: 1px solid ${({ theme }) => theme.STROKE_GREY};
-    border-radius: 8px;
+    border-radius: ${borders.radii.xs};
     word-break: break-all;
     padding: 10px;
 `;

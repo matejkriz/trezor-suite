@@ -1,41 +1,70 @@
 import styled from 'styled-components';
-import { Tooltip } from '../../index';
-import { storiesOf } from '@storybook/react';
-import { select, number, text, boolean } from '@storybook/addon-knobs';
+import { Tooltip as TooltipComponent, TooltipProps } from '../../index';
+import { Meta, StoryObj } from '@storybook/react';
 
 const Center = styled.div`
     display: flex;
     justify-content: center;
     width: 100%;
-    padding: 100px 0px;
+    padding: 100px 0;
 `;
 
-Center.displayName = 'CenterWrapper';
+const Addon = styled.span`
+    background: blue;
+    padding: 4px 8px;
+    border-radius: 4px;
+    color: white;
+`;
 
-storiesOf('Misc/Tooltip', module).add('Tooltip', () => {
-    const placement: any = select(
-        'Placement',
-        {
-            Top: 'top',
-            Bottom: 'bottom',
-            Left: 'left',
-            Right: 'right',
-        },
-        'bottom',
-    );
+export default {
+    title: 'Misc/Tooltip',
+    component: TooltipComponent,
+} as Meta;
 
-    return (
+export const Tooltip: StoryObj<TooltipProps> = {
+    render: args => (
         <Center>
-            <Tooltip
-                maxWidth={number('Max width', 280)}
-                offset={number('Offset (distance)', 10)}
-                placement={placement}
-                dashed={boolean('Dashed', false)}
-                cursor={select('Cursor', ['help', 'inherit', 'default'], 'help')}
-                content={text('Content', 'Passphrase is an optional feature.')}
-            >
+            <TooltipComponent {...args}>
                 <span>Text with tooltip</span>
-            </Tooltip>
+            </TooltipComponent>
         </Center>
-    );
-});
+    ),
+    args: {
+        content: 'Passphrase is an optional feature',
+        offset: 10,
+    },
+    argTypes: {
+        maxWidth: {
+            type: 'number',
+        },
+        title: {
+            options: ['null', 'title'],
+            mapping: { null: null, title: <span>Title</span> },
+            control: {
+                type: 'select',
+                labels: {
+                    null: 'Null',
+                    title: 'Title',
+                },
+            },
+        },
+        placement: {
+            control: 'radio',
+            options: ['top', 'bottom', 'left', 'right'],
+        },
+        cursor: {
+            options: ['pointer', 'help', 'not-allowed', 'default'],
+        },
+        addon: {
+            options: ['null', 'addon'],
+            mapping: { null: null, addon: <Addon>Addon</Addon> },
+            control: {
+                type: 'select',
+                labels: {
+                    null: 'Null',
+                    addon: 'Addon',
+                },
+            },
+        },
+    },
+};

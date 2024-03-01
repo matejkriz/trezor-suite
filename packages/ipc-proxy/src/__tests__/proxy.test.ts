@@ -35,11 +35,13 @@ describe('proxy', () => {
         createIpcProxyHandler<TestApi>(ipcMain, 'TestApi', {
             onCreateInstance: () => {
                 const api = new TestApi();
+
                 return {
                     onRequest: (method, params) => {
                         if (method === 'oneArgMethod') {
                             return api[method](...params);
                         }
+
                         // unfortunately still needs type-casting
                         // return api[method](...params);
                         return (api[method] as any)(...params);
@@ -71,28 +73,28 @@ describe('proxy', () => {
         proxy.on('test-api-event', spy1);
         // NOTE: emit fn is async in proxy
         await proxy.emit('test-api-event', 'ActualResponse-arg-1', 'ActualResponse-arg-2');
-        expect(spy1).toBeCalledWith('ActualResponse-arg-1', 'ActualResponse-arg-2');
+        expect(spy1).toHaveBeenCalledWith('ActualResponse-arg-1', 'ActualResponse-arg-2');
 
         const spy2 = jest.fn();
         proxy.on('test-api-event', spy2);
 
         await proxy.emit('test-api-event');
-        expect(spy1).toBeCalledTimes(2);
-        expect(spy2).toBeCalledTimes(1);
+        expect(spy1).toHaveBeenCalledTimes(2);
+        expect(spy2).toHaveBeenCalledTimes(1);
 
         proxy.off('test-api-event', spy1);
         await proxy.emit('test-api-event');
-        expect(spy1).toBeCalledTimes(2); // listener was removed, number of calls is still the same
-        expect(spy2).toBeCalledTimes(2);
+        expect(spy1).toHaveBeenCalledTimes(2); // listener was removed, number of calls is still the same
+        expect(spy2).toHaveBeenCalledTimes(2);
 
         const spy3 = jest.fn();
         proxy.on('test-api-event', spy3);
         proxy.removeAllListeners('test-api-event');
         await proxy.emit('test-api-event');
         // all listener removed, number of calls is still the same
-        expect(spy1).toBeCalledTimes(2);
-        expect(spy2).toBeCalledTimes(2);
-        expect(spy3).toBeCalledTimes(0);
+        expect(spy1).toHaveBeenCalledTimes(2);
+        expect(spy2).toHaveBeenCalledTimes(2);
+        expect(spy3).toHaveBeenCalledTimes(0);
     });
 
     it('proper proxy event removing', async () => {
@@ -107,23 +109,23 @@ describe('proxy', () => {
 
         proxy.on('test-api-event', spyFoo);
         await proxy.emit('test-api-event');
-        expect(spyFoo).toBeCalledTimes(1);
-        expect(spyBar).toBeCalledTimes(0);
+        expect(spyFoo).toHaveBeenCalledTimes(1);
+        expect(spyBar).toHaveBeenCalledTimes(0);
 
         proxy.on('test-api-event', spyBar);
         await proxy.emit('test-api-event');
-        expect(spyFoo).toBeCalledTimes(2);
-        expect(spyBar).toBeCalledTimes(1);
+        expect(spyFoo).toHaveBeenCalledTimes(2);
+        expect(spyBar).toHaveBeenCalledTimes(1);
 
         proxy.off('test-api-event', spyBar);
         await proxy.emit('test-api-event');
-        expect(spyFoo).toBeCalledTimes(3);
-        expect(spyBar).toBeCalledTimes(1);
+        expect(spyFoo).toHaveBeenCalledTimes(3);
+        expect(spyBar).toHaveBeenCalledTimes(1);
 
         proxy.off('test-api-event', spyFoo);
         await proxy.emit('test-api-event');
-        expect(spyFoo).toBeCalledTimes(3);
-        expect(spyBar).toBeCalledTimes(1);
+        expect(spyFoo).toHaveBeenCalledTimes(3);
+        expect(spyBar).toHaveBeenCalledTimes(1);
     });
 
     it('multiple proxy instances', async () => {
@@ -137,13 +139,13 @@ describe('proxy', () => {
         proxy2.on('foo', spy2);
 
         await proxy1.emit('foo');
-        expect(spy1).toBeCalledTimes(1);
-        expect(spy2).toBeCalledTimes(0);
+        expect(spy1).toHaveBeenCalledTimes(1);
+        expect(spy2).toHaveBeenCalledTimes(0);
 
         await proxy2.emit('foo');
         await proxy2.emit('foo');
-        expect(spy1).toBeCalledTimes(1);
-        expect(spy2).toBeCalledTimes(2);
+        expect(spy1).toHaveBeenCalledTimes(1);
+        expect(spy2).toHaveBeenCalledTimes(2);
     });
 
     it('invalid channel', async () => {

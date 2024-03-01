@@ -34,6 +34,7 @@ import type { WalletAction } from 'src/types/wallet';
 const storageMiddleware = (api: MiddlewareAPI<Dispatch, AppState>) => {
     db.onBlocking = () => api.dispatch({ type: STORAGE.ERROR, payload: 'blocking' });
     db.onBlocked = () => api.dispatch({ type: STORAGE.ERROR, payload: 'blocked' });
+
     return (next: Dispatch) =>
         (action: SuiteAction | WalletAction): SuiteAction | WalletAction => {
             // pass action
@@ -170,6 +171,7 @@ const storageMiddleware = (api: MiddlewareAPI<Dispatch, AppState>) => {
                 case SUITE.SET_ADDRESS_DISPLAY_TYPE:
                 case SUITE.SET_AUTODETECT:
                 case SUITE.DEVICE_AUTHENTICITY_OPT_OUT:
+                case SUITE.EVM_CONFIRM_EXPLANATION_MODAL:
                     api.dispatch(storageActions.saveSuiteSettings());
                     break;
                 case SUITE.COINJOIN_RECEIVE_WARNING: {
@@ -284,6 +286,7 @@ const storageMiddleware = (api: MiddlewareAPI<Dispatch, AppState>) => {
                 default:
                     break;
             }
+
             return action;
         };
 };

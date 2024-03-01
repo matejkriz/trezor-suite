@@ -7,8 +7,7 @@
     "main": "src/index",
     "scripts": {
         "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "test:unit": "jest -c ../../jest.config.base.js --passWithNoTests",
-        "type-check": "tsc --build"
+        "type-check": "yarn g:tsc --build"
     },
     "dependencies": {
         "@suite-common/validators": "workspace:*",
@@ -19,6 +18,6 @@
         "@trezor/styles": "workspace:*",
         "jotai": "1.9.1",
         "react": "18.2.0",
-        "react-native": "0.71.8"
+        "react-native": "0.73.2"
     }
 }

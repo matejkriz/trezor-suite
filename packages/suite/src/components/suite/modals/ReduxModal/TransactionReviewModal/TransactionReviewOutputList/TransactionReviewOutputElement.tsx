@@ -6,8 +6,9 @@ import { FiatValue, FormattedCryptoAmount, Translation } from 'src/components/su
 import { Network, Account, NetworkSymbol } from 'src/types/wallet';
 import { TokenInfo } from '@trezor/connect';
 import { amountToSatoshi } from '@suite-common/wallet-utils';
-import { DeviceDisplay } from 'src/components/suite/DeviceDisplay';
 import { TransactionReviewStepIndicatorProps } from './TransactionReviewStepIndicator';
+import { zIndices } from '@trezor/theme';
+import { DeviceDisplay } from '../../../../DeviceDisplay/DeviceDisplay';
 
 const OutputWrapper = styled.div`
     display: flex;
@@ -39,6 +40,7 @@ const OutputLeft = styled.div<{ isCentered: boolean }>`
     display: flex;
     width: 30px;
     justify-content: ${({ isCentered }) => (isCentered ? 'center' : 'flex-start')};
+    padding-top: ${({ isCentered }) => (isCentered ? undefined : '5px')};
     flex-direction: column;
 `;
 
@@ -48,9 +50,9 @@ const MultiIndicatorWrapper = styled.div<{ linesCount: number }>`
     height: ${({ linesCount }) => linesCount * 80}px;
     align-items: center;
     position: relative;
-    z-index: ${variables.Z_INDEX.BASE};
+    z-index: ${zIndices.base};
 
-    &::after {
+    ::after {
         z-index: -2;
         width: 10px;
         left: 10px;
@@ -63,7 +65,7 @@ const MultiIndicatorWrapper = styled.div<{ linesCount: number }>`
         display: block;
     }
 
-    &::before {
+    ::before {
         z-index: -1;
         width: 20px;
         background: ${({ theme }) => theme.BG_WHITE};

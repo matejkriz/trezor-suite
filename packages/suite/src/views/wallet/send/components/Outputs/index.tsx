@@ -1,108 +1,122 @@
-import { useRef, useEffect, useState } from 'react';
-import styled, { css } from 'styled-components';
-import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import styled from 'styled-components';
+import { motion } from 'framer-motion';
+import { spacingsPx } from '@trezor/theme';
+import { Card, motionEasing } from '@trezor/components';
 import { useSendFormContext } from 'src/hooks/wallet';
-import { variables, motionAnimation } from '@trezor/components';
 import { Address } from './components/Address';
 import { Amount } from './components/Amount';
-import OpReturn from './components/OpReturn';
+import { OpReturn } from './components/OpReturn';
+import { motionEasingStrings } from '@trezor/components/src/config/motion';
+import { useLayoutSize } from '../../../../../hooks/suite';
+import { EvmExplanationBox } from 'src/components/wallet/EvmExplanationBox';
+import { Translation } from 'src/components/suite';
+import { networks } from '@suite-common/wallet-config';
 
-const Wrapper = styled.div``;
+const Container = styled.div<{ $height: number }>`
+    height: ${({ $height }) => ($height ? `${$height}px` : 'auto')};
+    transition: height 0.2s ${motionEasingStrings.transition};
 
-const OutputWrapper = styled.div<{ index: number }>`
-    display: flex;
-    flex-direction: column;
-    margin: 32px 42px;
-    margin-bottom: 20px;
-
-    &:last-child {
-        margin-bottom: 0;
+    > div {
+        display: flex;
+        flex-direction: column;
+        gap: ${spacingsPx.md};
     }
-
-    @media (max-width: ${variables.SCREEN_SIZE.SM}) {
-        margin: 32px 20px;
-    }
-
-    ${props =>
-        props.index > 0 &&
-        css`
-            margin: 0 42px;
-            padding-top: 32px;
-            border-top: 1px solid ${({ theme }) => theme.STROKE_GREY};
-        `}
 `;
 
-const Row = styled.div`
-    padding: 0 0 10px;
+const StyledCard = styled(Card)`
+    gap: ${spacingsPx.xs};
+`;
 
-    &:last-child {
-        padding: 0;
-    }
+const StyledEvmExplanationBox = styled(EvmExplanationBox)`
+    margin-bottom: ${spacingsPx.md};
 `;
 
 interface OutputsProps {
     disableAnim?: boolean; // used in tests, with animations enabled react-testing-library can't find output fields
 }
 
-const Outputs = ({ disableAnim }: OutputsProps) => {
-    const { outputs } = useSendFormContext();
-    const [renderedOutputs, setRenderedOutputs] = useState(1);
-    const lastOutputRef = useRef<HTMLDivElement | null>(null);
+export const Outputs = ({ disableAnim }: OutputsProps) => {
+    const [height, setHeight] = useState(0);
+    const [hasRenderedOutputs, setHasRenderedOutputs] = useState(false);
+    const size = useLayoutSize();
 
-    const onAddAnimationComplete = () => {
-        // scrolls only on adding outputs, doesn't scroll on removing them
-        if (outputs.length > 1 && outputs.length > renderedOutputs) {
-            lastOutputRef?.current?.scrollIntoView({ behavior: 'smooth' });
-        }
+    const {
+        outputs,
+        formState: { errors },
+        account,
+    } = useSendFormContext();
+    const ref = useRef<HTMLDivElement>(null);
 
-        setRenderedOutputs(outputs.length);
-    };
+    useLayoutEffect(() => {
+        setHeight(ref.current?.offsetHeight || 0);
+    }, [outputs, errors.outputs, size]);
 
+    // needed to have no entrance animation on the first render
+    // for some reason the first render does not have all the outputs
     useEffect(() => {
-        if (outputs.length < renderedOutputs) {
-            // updates rendered outputs count when removing an output
-            // this is necessary because onAddAnimationComplete is not fired when removing 2nd output
-            setRenderedOutputs(outputs.length);
+        if (outputs.length) {
+            setHasRenderedOutputs(true);
         }
-    }, [outputs.length, renderedOutputs, setRenderedOutputs]);
-
-    const animation = outputs.length > 1 && !disableAnim ? motionAnimation.expand : {}; // do not animate if there is only 1 output, prevents animation on clear
+    }, [outputs]);
 
     return (
-        <AnimatePresence initial={false}>
-            <Wrapper>
+        <Container $height={height || 0}>
+            <div ref={ref}>
                 {outputs.map((output, index) => (
                     <motion.div
+                        layout
                         key={output.id}
-                        {...animation}
-                        onAnimationComplete={onAddAnimationComplete}
+                        initial={
+                            index === 0 || !hasRenderedOutputs || disableAnim
+                                ? undefined
+                                : { scale: 0.8, opacity: 0 }
+                        }
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{
+                            duration: 0.2,
+                            ease: motionEasing.transition,
+                        }}
                     >
-                        <OutputWrapper
-                            ref={index === outputs.length - 1 ? lastOutputRef : undefined} // set ref to last output
-                            index={index}
-                        >
+                        <StyledCard>
                             {output.type === 'opreturn' ? (
                                 <OpReturn outputId={index} />
                             ) : (
                                 <>
-                                    <Row>
-                                        <Address
-                                            output={outputs[index]}
-                                            outputId={index}
-                                            outputsCount={outputs.length}
-                                        />
-                                    </Row>
-                                    <Row>
-                                        <Amount output={outputs[index]} outputId={index} />
-                                    </Row>
+                                    {account.networkType === 'ethereum' &&
+                                        account.symbol === 'matic' && ( // TODO: POLYGON DEBUG
+                                            <StyledEvmExplanationBox
+                                                symbol={account.symbol}
+                                                title={
+                                                    <Translation
+                                                        id="TR_EVM_EXPLANATION_SEND_TITLE"
+                                                        values={{
+                                                            network: networks[account.symbol].name,
+                                                        }}
+                                                    />
+                                                }
+                                            >
+                                                <Translation
+                                                    id="TR_EVM_EXPLANATION_SEND_DESCRIPTION"
+                                                    values={{
+                                                        network: networks[account.symbol].name,
+                                                    }}
+                                                />
+                                            </StyledEvmExplanationBox>
+                                        )}
+                                    <Address
+                                        output={outputs[index]}
+                                        outputId={index}
+                                        outputsCount={outputs.length}
+                                    />
+
+                                    <Amount output={outputs[index]} outputId={index} />
                                 </>
                             )}
-                        </OutputWrapper>
+                        </StyledCard>
                     </motion.div>
                 ))}
-            </Wrapper>
-        </AnimatePresence>
+            </div>
+        </Container>
     );
 };
-
-export default Outputs;

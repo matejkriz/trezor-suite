@@ -7,7 +7,7 @@ import {
     TransactionBuilder,
     Keypair,
     StrKey,
-} from 'stellar-base';
+} from '@stellar/stellar-sdk';
 
 const nativeAsset = Asset.native();
 const credit4Asset = new Asset('USD', 'GCNY5OXYSY4FKHOPT2SPOQZAOEIGXB5LBYW3HVU3OWSTQITS65M5RCNY');
@@ -30,7 +30,6 @@ const DEFAULT_TIMEBOUNDS = {
 };
 const DEFAULT_MEMO = Memo.text('trezor stellar');
 
-// eslint-disable-next-line camelcase
 function build_tx(
     source: any,
     sequence: any,
@@ -50,6 +49,7 @@ function build_tx(
     ops.forEach(op => {
         tx.addOperation(op);
     });
+
     return tx.build();
 }
 
@@ -148,6 +148,7 @@ export const transformTransactionInputs = [
                 destAmount: '200',
                 path: [nativeAsset, credit4Asset, credit12Asset],
             });
+
             return build_tx(
                 DEFAULT_SOURCE,
                 DEFAULT_SEQUENCE,
@@ -208,6 +209,7 @@ export const transformTransactionInputs = [
                 destAsset: credit4Asset,
                 destAmount: '200',
             });
+
             return build_tx(
                 DEFAULT_SOURCE,
                 DEFAULT_SEQUENCE,
@@ -257,6 +259,7 @@ export const transformTransactionInputs = [
                 destMin: '200',
                 path: [nativeAsset, credit4Asset, credit12Asset],
             });
+
             return build_tx(
                 DEFAULT_SOURCE,
                 DEFAULT_SEQUENCE,
@@ -317,6 +320,7 @@ export const transformTransactionInputs = [
                 destAsset: credit4Asset,
                 destMin: '200',
             });
+
             return build_tx(
                 DEFAULT_SOURCE,
                 DEFAULT_SEQUENCE,
@@ -804,6 +808,7 @@ export const transformTransactionInputs = [
                 assetCode: 'USDC',
                 authorize: true,
             });
+
             return build_tx(
                 DEFAULT_SOURCE,
                 DEFAULT_SEQUENCE,
@@ -844,6 +849,7 @@ export const transformTransactionInputs = [
                 assetCode: 'USDC',
                 authorize: false,
             });
+
             return build_tx(
                 DEFAULT_SOURCE,
                 DEFAULT_SEQUENCE,
@@ -1007,6 +1013,44 @@ export const transformTransactionInputs = [
         },
     },
     {
+        description: 'claim claimable balance operation',
+        path: "m/44'/148'/0'",
+        tx: (() => {
+            const op = Operation.claimClaimableBalance({
+                balanceId:
+                    '00000000178826fbfe339e1f5c53417c6fedfe2c05e8bec14303143ec46b38981b09c3f9',
+            });
+
+            return build_tx(
+                DEFAULT_SOURCE,
+                DEFAULT_SEQUENCE,
+                DEFAULT_FEE,
+                DEFAULT_NETWORK,
+                DEFAULT_TIMEBOUNDS,
+                DEFAULT_MEMO,
+                op,
+            );
+        })(),
+        result: {
+            networkPassphrase: 'Public Global Stellar Network ; September 2015',
+            path: "m/44'/148'/0'",
+            transaction: {
+                fee: 100,
+                memo: { text: 'trezor stellar', type: 1 },
+                operations: [
+                    {
+                        type: 'claimClaimableBalance',
+                        balanceId:
+                            '00000000178826fbfe339e1f5c53417c6fedfe2c05e8bec14303143ec46b38981b09c3f9',
+                    },
+                ],
+                sequence: '103420918407103889',
+                source: 'GBRF6PKZYP4J4WI2A3NF4CGF23SL34GRKA5LTQZCQFEUT2YJDZO2COXH',
+                timebounds: { maxTime: 1700000000, minTime: 1600000000 },
+            },
+        },
+    },
+    {
         description: 'none memo',
         path: "m/44'/148'/0'",
         tx: (() => {
@@ -1014,6 +1058,7 @@ export const transformTransactionInputs = [
                 bumpTo: '200000000000000000',
             });
             const memo = Memo.none();
+
             return build_tx(
                 DEFAULT_SOURCE,
                 DEFAULT_SEQUENCE,
@@ -1045,6 +1090,7 @@ export const transformTransactionInputs = [
                 bumpTo: '200000000000000000',
             });
             const memo = Memo.text('Hello, Stellar!');
+
             return build_tx(
                 DEFAULT_SOURCE,
                 DEFAULT_SEQUENCE,
@@ -1076,6 +1122,7 @@ export const transformTransactionInputs = [
                 bumpTo: '200000000000000000',
             });
             const memo = Memo.id('1234567890');
+
             return build_tx(
                 DEFAULT_SOURCE,
                 DEFAULT_SEQUENCE,
@@ -1109,6 +1156,7 @@ export const transformTransactionInputs = [
             const memo = Memo.hash(
                 '3389e9f0f1a65f19736cacf544c2e825313e8447f569233bb8db39aa607c8889',
             );
+
             return build_tx(
                 DEFAULT_SOURCE,
                 DEFAULT_SEQUENCE,
@@ -1145,6 +1193,7 @@ export const transformTransactionInputs = [
             const memo = Memo.return(
                 '3389e9f0f1a65f19736cacf544c2e825313e8447f569233bb8db39aa607c8889',
             );
+
             return build_tx(
                 DEFAULT_SOURCE,
                 DEFAULT_SEQUENCE,
@@ -1282,6 +1331,7 @@ export const transformTransactionInputs = [
                 asset: credit12Asset,
                 amount: '5000000',
             });
+
             return build_tx(
                 DEFAULT_SOURCE,
                 DEFAULT_SEQUENCE,

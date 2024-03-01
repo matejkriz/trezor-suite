@@ -16,12 +16,13 @@ describe('Sign and verify', () => {
         cy.task('setupEmu', { mnemonic: SEED });
         cy.task('startBridge');
 
-        cy.viewport(1080, 1440).resetDb();
+        cy.viewport(1440, 2560).resetDb();
         cy.prefixedVisit('/');
         cy.passThroughInitialRun();
 
-        cy.getTestElement('@suite/menu/wallet-index').click();
         cy.discoveryShouldFinish();
+        cy.getTestElement('@account-menu/btc/normal/0').click();
+
         cy.getTestElement('@wallet/menu/extra-dropdown').click();
         cy.getTestElement('@wallet/menu/wallet-sign-verify').click();
     });

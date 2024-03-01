@@ -1,11 +1,8 @@
-/* eslint-disable no-await-in-loop */
-
 import path from 'path';
 import { BrowserContext, chromium, Page } from '@playwright/test';
 
 // Waits and clicks for an array on buttons in serial order.
 export const waitAndClick = async (page: Page, buttons: string[]) => {
-    // eslint-disable-next-line no-restricted-syntax
     for (const button of buttons) {
         await page.waitForSelector(`[data-test='${button}']`, { state: 'visible' });
         await page.click(`[data-test='${button}']`);
@@ -15,6 +12,7 @@ export const waitAndClick = async (page: Page, buttons: string[]) => {
 // Helper to use data-test attributes to find elements.
 export const findElementByDataTest = async (page: Page, dataTest: string, timeout?: number) => {
     await page.waitForSelector(`[data-test='${dataTest}']`, { state: 'visible', timeout });
+
     return page.$(`[data-test='${dataTest}']`);
 };
 
@@ -28,8 +26,8 @@ const getExtensionPage = async () => {
         '..',
         '..',
         '..',
-        'connect-explorer-webextension',
-        'build',
+        'connect-explorer',
+        'build-webextension',
     );
 
     const initialBrowserContext = await chromium.launchPersistentContext(
@@ -86,7 +84,7 @@ export const getContexts = async (
 ) => {
     if (!isWebExtension) {
         return {
-            exploreUrl: originalUrl,
+            explorerUrl: originalUrl,
             explorerPage: originalPage,
         };
     }
@@ -94,7 +92,7 @@ export const getContexts = async (
 
     return {
         explorerPage: page,
-        exploreUrl: url,
+        explorerUrl: url,
         browserContext,
     };
 };
@@ -121,6 +119,7 @@ export const checkHasLogs = async (logPage: Page) => {
     if (await locator.isVisible()) {
         return true;
     }
+
     return false;
 };
 
@@ -131,12 +130,29 @@ export const downloadLogs = async (logPage: Page, downloadLogPath: string) => {
     ]);
 
     await download.saveAs(downloadLogPath);
+
     return download;
 };
 
-export const setTrustedHost = async (explorerPage: Page, explorerUrl: string) => {
+export const setConnectSettings = async (
+    explorerPage: Page,
+    explorerUrl: string,
+    { trustedHost = false, connectSrc }: { trustedHost?: boolean; connectSrc?: string },
+    isWebExtension?: boolean,
+) => {
     await explorerPage.goto(`${explorerUrl}#/settings`);
-    await waitAndClick(explorerPage, ['@checkbox/trustedHost']);
+    if (isWebExtension) {
+        // When webextension and using service-worker we need to wait for handshake is confirmed with proxy.
+        await explorerPage.waitForSelector("div[data-test='@settings/handshake-confirmed']");
+    }
+    if (trustedHost) {
+        await waitAndClick(explorerPage, ['@checkbox/trustedHost']);
+    }
+    if (connectSrc) {
+        (await explorerPage.waitForSelector("input[data-test='@input/connectSrc']")).fill(
+            connectSrc,
+        );
+    }
     await waitAndClick(explorerPage, ['@submit-button']);
 };
 

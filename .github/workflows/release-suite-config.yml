@@ -21,7 +21,7 @@ jobs:
       AWS_CLOUDFRONT_ID: E1ERY5K2OTKKI1
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           lfs: true
       - name: Configure aws credentials
@@ -36,7 +36,7 @@ jobs:
           yarn install
           yarn message-system-sign-config
 
-      - name: Build and sign ${{ github.event.inputs.environment }} messag-system config file
+      - name: Build and sign ${{ github.event.inputs.environment }} message-system config file
         if: ${{ github.event.inputs.environment == 'production' && github.ref == 'refs/heads/develop' }}
         env:
           IS_CODESIGN_BUILD: "true"
@@ -45,7 +45,7 @@ jobs:
           yarn install
           yarn message-system-sign-config
 
-      - name: Upload ${{ github.event.inputs.environment }} messag-system config file
+      - name: Upload ${{ github.event.inputs.environment }} message-system config file
         if: ${{ github.ref == 'refs/heads/develop' }}
         run: |
           if [ '${{ github.event.inputs.environment }}' == 'production' ]

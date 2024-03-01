@@ -4,6 +4,9 @@ import { Message, Category } from '@suite-common/suite-types';
 
 import { ContextDomain, FeatureDomain, MessageSystemRootState } from './messageSystemTypes';
 
+export const selectMessageSystemConfig = (state: MessageSystemRootState) =>
+    state.messageSystem.config;
+
 export const selectMessageSystemTimestamp = (state: MessageSystemRootState) =>
     state.messageSystem.timestamp;
 
@@ -35,17 +38,20 @@ export const selectActiveFeatureMessages = makeSelectActiveMessagesByCategory('f
 
 export const selectIsAnyBannerMessageActive = (state: MessageSystemRootState) => {
     const activeBannerMessages = selectActiveBannerMessages(state);
+
     return activeBannerMessages.length > 0;
 };
 
 export const selectBannerMessage = memoize((state: MessageSystemRootState) => {
     const activeBannerMessages = selectActiveBannerMessages(state);
+
     return activeBannerMessages[0];
 });
 
 export const selectContextMessage = memoizeWithArgs(
     (state: MessageSystemRootState, domain: ContextDomain) => {
         const activeContextMessages = selectActiveContextMessages(state);
+
         return activeContextMessages.find(message => message.context?.domain === domain);
     },
 );
@@ -57,6 +63,7 @@ export const selectContextMessageContent = memoizeWithArgs(
             activeContextMessage => activeContextMessage.context?.domain === domain,
         );
         if (!message) return;
+
         return {
             ...message,
             content: message?.content[language] ?? message?.content.en,
@@ -73,8 +80,9 @@ export const selectContextMessageContent = memoizeWithArgs(
 export const selectFeatureMessage = memoizeWithArgs(
     (state: MessageSystemRootState, domain: FeatureDomain) => {
         const activeFeatureMessages = selectActiveFeatureMessages(state);
-        return activeFeatureMessages.find(
-            message => message.feature?.some(feature => feature.domain === domain),
+
+        return activeFeatureMessages.find(message =>
+            message.feature?.some(feature => feature.domain === domain),
         );
     },
 );
@@ -82,6 +90,7 @@ export const selectFeatureMessage = memoizeWithArgs(
 export const selectFeatureMessageContent = memoizeWithArgs(
     (state: MessageSystemRootState, domain: FeatureDomain, language: string) => {
         const featureMessages = selectFeatureMessage(state, domain);
+
         return featureMessages?.content[language] ?? featureMessages?.content.en;
     },
 );
@@ -89,6 +98,7 @@ export const selectFeatureMessageContent = memoizeWithArgs(
 export const selectFeatureConfig = memoizeWithArgs(
     (state: MessageSystemRootState, domain: FeatureDomain) => {
         const featureMessages = selectFeatureMessage(state, domain);
+
         return featureMessages?.feature?.find(feature => feature.domain === domain);
     },
 );
@@ -99,6 +109,7 @@ export const selectIsFeatureEnabled = (
     defaultValue?: boolean,
 ) => {
     const featureFlag = selectFeatureConfig(state, domain)?.flag;
+
     return featureFlag ?? defaultValue ?? true;
 };
 
@@ -108,5 +119,6 @@ export const selectIsFeatureDisabled = (
     defaultValue?: boolean,
 ) => {
     const featureFlag = selectFeatureConfig(state, domain)?.flag;
+
     return typeof featureFlag === 'boolean' ? !featureFlag : defaultValue ?? false;
 };

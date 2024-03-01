@@ -1,6 +1,8 @@
 {
-    "extends": "../../tsconfig.json",
+    "extends": "../../tsconfig.base.json",
     "compilerOptions": {
+        "module": "commonjs",
+        "moduleResolution": "node",
         "outDir": "libDev",
         "types": [
             "chrome",
@@ -20,6 +22,7 @@
     ],
     "references": [
         { "path": "../connect" },
+        { "path": "../connect-common" },
         { "path": "../utils" }
     ]
 }

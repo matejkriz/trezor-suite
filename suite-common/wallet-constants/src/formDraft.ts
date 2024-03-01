@@ -4,4 +4,6 @@ export const FormDraftPrefixKeyValues = [
     'coinmarket-exchange',
     'coinmarket-p2p',
     'coinmarket-savings-setup-request',
+    'stake-eth',
+    'unstake-eth',
 ] as const;

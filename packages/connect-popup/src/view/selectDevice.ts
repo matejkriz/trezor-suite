@@ -33,7 +33,13 @@ const initWebUsbButton = (showLoader: boolean) => {
                     throw ERRORS.TypedError('Popup_ConnectionMissing');
                 }
                 window.postMessage(
-                    { type: POPUP.EXTENSION_USB_PERMISSIONS },
+                    {
+                        type: POPUP.EXTENSION_USB_PERMISSIONS,
+                        channel: {
+                            here: '@trezor/connect-popup',
+                            peer: '@trezor/connect-web',
+                        },
+                    },
                     window.location.origin,
                 );
 
@@ -41,12 +47,10 @@ const initWebUsbButton = (showLoader: boolean) => {
                 const channel = new BroadcastChannel(WEBEXTENSION.USB_PERMISSIONS_BROADCAST);
                 channel.onmessage = event => {
                     if (event.data.type === WEBEXTENSION.USB_PERMISSIONS_FINISHED) {
-                        postMessage({
-                            event: UI_EVENT,
-                            type: TRANSPORT.REQUEST_DEVICE,
-                        });
+                        postMessage({ type: TRANSPORT.REQUEST_DEVICE });
                     }
                 };
+
                 return;
             }
             await window.navigator.usb.requestDevice({
@@ -70,6 +74,9 @@ const initWebUsbButton = (showLoader: boolean) => {
             }
         } catch (error) {
             console.error(error);
+            if (error instanceof DOMException && error.name === 'NotFoundError') {
+                return;
+            }
             reactEventBus.dispatch({
                 type: 'error',
                 detail: 'iframe-failure',
@@ -88,6 +95,7 @@ export const selectDevice = (payload: UiRequestSelectDevice['payload']) => {
         if (payload.webusb) {
             initWebUsbButton(true);
         }
+
         return;
     }
 
@@ -118,6 +126,7 @@ export const selectDevice = (payload: UiRequestSelectDevice['payload']) => {
         if (d1.type !== 'unreadable' && d2.type === 'unreadable') {
             return -1;
         }
+
         return 0;
     });
 

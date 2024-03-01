@@ -1,6 +1,3 @@
-/* eslint-disable no-continue */
-/* eslint-disable camelcase */
-
 /*
     Heavily inspired by Mattermost,
     https://github.com/mattermost/mattermost-webapp/blob/master/e2e/run_tests.js good job guys.
@@ -104,6 +101,7 @@ const runTests = async () => {
 
     if (!finalTestFiles.length) {
         console.log('[run_tests.js] nothing to test!');
+
         return;
     }
 
@@ -185,7 +183,6 @@ const runTests = async () => {
             console.log(`[run_tests.js] config.e2e.baseUrl: ${config.e2e.baseUrl}`);
 
             try {
-                // eslint-disable-next-line no-await-in-loop
                 const runResult = await cypress.run({
                     browser: BROWSER,
                     // headless,

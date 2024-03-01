@@ -1,5 +1,5 @@
-import styled from 'styled-components';
-import { variables, H2, Button, Card, Icon, useTheme } from '@trezor/components';
+import styled, { useTheme } from 'styled-components';
+import { variables, H2, Button, Card, Icon } from '@trezor/components';
 import { Translation } from 'src/components/suite';
 
 const StyledCard = styled(Card)`
@@ -54,6 +54,7 @@ interface TaprootBannerProps {
 
 export const TaprootBanner = ({ onClose }: TaprootBannerProps) => {
     const theme = useTheme();
+
     return (
         <StyledCard data-test="@accounts/empty-account/taproot-account">
             <Heading>

@@ -9,11 +9,8 @@
         "@mobily/ts-belt": "^3.13.1"
     },
     "scripts": {
-        "type-check": "tsc --build",
+        "type-check": "yarn g:tsc --build",
         "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "test:unit": "jest -c ../../jest.config.base.js --passWithNoTests"
-    },
-    "devDependencies": {
-        "jest": "29.5.0"
+        "test:unit": "yarn g:jest -c ../../jest.config.base.js"
     }
 }

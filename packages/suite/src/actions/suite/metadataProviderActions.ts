@@ -2,7 +2,7 @@ import { analytics, EventType } from '@trezor/suite-analytics';
 import { createDeferred } from '@trezor/utils';
 import { notificationsActions } from '@suite-common/toast-notifications';
 
-import { METADATA } from 'src/actions/suite/constants';
+import { METADATA, METADATA_PROVIDER } from 'src/actions/suite/constants';
 import { Dispatch, GetState } from 'src/types/suite';
 import {
     MetadataProviderType,
@@ -49,12 +49,11 @@ const createProviderInstance = (
     environment: OAuthServerEnvironment = 'production',
     clientId?: string,
 ) => {
-    // eslint-disable-next-line default-case
     switch (type) {
         case 'dropbox':
             return new DropboxProvider({
                 token: tokens?.refreshToken,
-                clientId: clientId || METADATA.DROPBOX_CLIENT_ID,
+                clientId: clientId || METADATA_PROVIDER.DROPBOX_CLIENT_ID,
             });
         case 'google':
             return new GoogleProvider(tokens, environment);
@@ -207,6 +206,7 @@ export const handleProviderError =
 export const initProvider = () => (dispatch: Dispatch) => {
     const decision = createDeferred<boolean>();
     dispatch(modalActions.openModal({ type: 'metadata-provider', decision }));
+
     return decision.promise;
 };
 
@@ -257,6 +257,7 @@ export const connectProvider =
                     clientId: providerInstance.clientId,
                 }),
             );
+
             return;
         }
 

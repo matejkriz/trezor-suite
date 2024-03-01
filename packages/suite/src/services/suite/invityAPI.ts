@@ -6,7 +6,6 @@ import {
     ConfirmExchangeTradeRequest,
     ExchangeTrade,
     WatchExchangeTradeResponse,
-    ExchangeCoinInfo,
     BuyListResponse,
     BuyTradeQuoteRequest,
     BuyTradeQuoteResponse,
@@ -40,6 +39,7 @@ import {
     SavingsTradeKYCStatusResponse,
     WatchSavingTradeItemResponse,
     FormResponse,
+    CryptoSymbolsResponse,
 } from 'invity-api';
 import { isDesktop } from '@trezor/env-utils';
 import type { InvityServerEnvironment, InvityServers } from '@suite-common/invity';
@@ -74,30 +74,30 @@ class InvityAPI {
     // info service
     private DETECT_COUNTRY_INFO = '/api/info/country';
     private GET_COUNTRY_INFO = '/api/info/country/{{country}}';
+    private SYMBOLS_INFO = '/api/info/symbols';
 
     // exchange service
-    private EXCHANGE_LIST = '/api/exchange/list';
-    private EXCHANGE_COINS = '/api/exchange/coins';
-    private EXCHANGE_QUOTES = '/api/exchange/quotes';
-    private EXCHANGE_DO_TRADE = '/api/exchange/trade';
-    private EXCHANGE_WATCH_TRADE = '/api/exchange/watch/{{counter}}';
+    private EXCHANGE_LIST = '/api/v2/exchange/list';
+    private EXCHANGE_QUOTES = '/api/v2/exchange/quotes';
+    private EXCHANGE_DO_TRADE = '/api/v2/exchange/trade';
+    private EXCHANGE_WATCH_TRADE = '/api/v2/exchange/watch/{{counter}}';
 
     // buy service
-    private BUY_LIST = '/api/buy/list';
-    private BUY_QUOTES = '/api/buy/quotes';
-    private BUY_DO_TRADE = '/api/buy/trade';
-    private BUY_GET_TRADE_FORM = '/api/buy/tradeform';
-    private BUY_WATCH_TRADE = '/api/buy/watch/{{counter}}';
+    private BUY_LIST = '/api/v2/buy/list';
+    private BUY_QUOTES = '/api/v2/buy/quotes';
+    private BUY_DO_TRADE = '/api/v2/buy/trade';
+    private BUY_GET_TRADE_FORM = '/api/v2/buy/tradeform';
+    private BUY_WATCH_TRADE = '/api/v2/buy/watch/{{counter}}';
 
     // sell service
-    private SELL_LIST = '/api/sell/list';
-    private VOUCHER_QUOTES = '/api/sell/voucher/quotes';
-    private VOUCHER_REQUEST_TRADE = '/api/sell/voucher/trade';
-    private VOUCHER_CONFIRM_TRADE = '/api/sell/voucher/confirm';
-    private SELL_FIAT_QUOTES = '/api/sell/fiat/quotes';
-    private SELL_FIAT_DO_TRADE = '/api/sell/fiat/trade';
-    private SELL_FIAT_CONFIRM = '/api/sell/fiat/confirm';
-    private SELL_FIAT_WATCH_TRADE = '/api/sell/fiat/watch/{{counter}}';
+    private SELL_LIST = '/api/v2/sell/list';
+    private VOUCHER_QUOTES = '/api/v2/sell/voucher/quotes';
+    private VOUCHER_REQUEST_TRADE = '/api/v2/sell/voucher/trade';
+    private VOUCHER_CONFIRM_TRADE = '/api/v2/sell/voucher/confirm';
+    private SELL_FIAT_QUOTES = '/api/v2/sell/fiat/quotes';
+    private SELL_FIAT_DO_TRADE = '/api/v2/sell/fiat/trade';
+    private SELL_FIAT_CONFIRM = '/api/v2/sell/fiat/confirm';
+    private SELL_FIAT_WATCH_TRADE = '/api/v2/sell/fiat/watch/{{counter}}';
 
     private P2P_LIST = '/api/p2p/list';
     private P2P_QUOTES = '/api/p2p/quotes';
@@ -161,6 +161,7 @@ class InvityAPI {
                 body: JSON.stringify(body),
             };
         }
+
         return {
             method,
             mode: 'cors',
@@ -178,10 +179,12 @@ class InvityAPI {
     ): Promise<any> {
         const finalUrl = `${this.getApiServerUrl()}${url}`;
         const opts = this.options(body, method, apiHeaderValue);
+
         return fetch(finalUrl, opts).then(response => {
             if (response.ok) {
                 return response.json();
             }
+
             return response.json().then(output => {
                 if (output.error) {
                     return output;
@@ -198,11 +201,28 @@ class InvityAPI {
                     ? this.GET_COUNTRY_INFO.replace('{{country}}', country)
                     : this.DETECT_COUNTRY_INFO;
             const response: CountryInfo = await this.request(url, {}, 'GET');
+
             return response;
         } catch (error) {
             console.log('[fetchCountryInfo]', error);
         }
+
         return { country: this.unknownCountry };
+    };
+
+    getSymbolsInfo = async (): Promise<CryptoSymbolsResponse> => {
+        try {
+            const response = await this.request(this.SYMBOLS_INFO, {}, 'GET');
+            if (!response || response.length === 0) {
+                return [];
+            }
+
+            return response;
+        } catch (error) {
+            console.log('[getSymbolsInfo]', error);
+        }
+
+        return [];
     };
 
     getExchangeList = async (): Promise<ExchangeListResponse | []> => {
@@ -211,23 +231,12 @@ class InvityAPI {
             if (!response || response.length === 0) {
                 return [];
             }
+
             return response;
         } catch (error) {
             console.log('[getExchangeList]', error);
         }
-        return [];
-    };
 
-    getExchangeCoins = async (): Promise<ExchangeCoinInfo[]> => {
-        try {
-            const response = await this.request(this.EXCHANGE_COINS, {}, 'GET');
-            if (!response || response.length === 0) {
-                return [];
-            }
-            return response;
-        } catch (error) {
-            console.log('[getExchangeCoins]', error);
-        }
         return [];
     };
 
@@ -240,6 +249,7 @@ class InvityAPI {
                 params,
                 'POST',
             );
+
             return response;
         } catch (error) {
             console.log('[getExchangeQuotes]', error);
@@ -253,9 +263,11 @@ class InvityAPI {
                 tradeRequest,
                 'POST',
             );
+
             return response;
         } catch (error) {
             console.log('[doExchangeTrade]', error);
+
             return { error: error.toString(), exchange: tradeRequest.trade.exchange };
         }
     };
@@ -270,9 +282,11 @@ class InvityAPI {
                 trade,
                 'POST',
             );
+
             return response;
         } catch (error) {
             console.log('[watchExchangeTrade]', error);
+
             return { error: error.toString() };
         }
     };
@@ -280,6 +294,7 @@ class InvityAPI {
     getBuyList = async (): Promise<BuyListResponse | undefined> => {
         try {
             const response = await this.request(this.BUY_LIST, {}, 'GET');
+
             return response;
         } catch (error) {
             console.log('[getBuyList]', error);
@@ -293,6 +308,7 @@ class InvityAPI {
                 params,
                 'POST',
             );
+
             return response;
         } catch (error) {
             console.log('[getBuyQuotes]', error);
@@ -306,9 +322,11 @@ class InvityAPI {
                 tradeRequest,
                 'POST',
             );
+
             return response;
         } catch (error) {
             console.log('[doBuyTrade]', error);
+
             return { trade: { error: error.toString(), exchange: tradeRequest.trade.exchange } };
         }
     };
@@ -320,9 +338,11 @@ class InvityAPI {
                 tradeRequest,
                 'POST',
             );
+
             return response;
         } catch (error) {
             console.log('[getBuyTradeForm]', error);
+
             return { error: error.toString() };
         }
     };
@@ -334,9 +354,11 @@ class InvityAPI {
                 trade,
                 'POST',
             );
+
             return response;
         } catch (error) {
             console.log('[watchBuyTrade]', error);
+
             return { error: error.toString() };
         }
     };
@@ -344,6 +366,7 @@ class InvityAPI {
     getSellList = async (): Promise<SellListResponse | undefined> => {
         try {
             const response = await this.request(this.SELL_LIST, {}, 'GET');
+
             return response;
         } catch (error) {
             console.log('[getSellList]', error);
@@ -359,6 +382,7 @@ class InvityAPI {
                 params,
                 'POST',
             );
+
             return response;
         } catch (error) {
             console.log('[getVoucherQuotes]', error);
@@ -374,9 +398,11 @@ class InvityAPI {
                 tradeRequest,
                 'POST',
             );
+
             return response;
         } catch (error) {
             console.log('[doVoucherTrade]', error);
+
             return { error: error.toString(), exchange: tradeRequest.exchange };
         }
     };
@@ -388,9 +414,11 @@ class InvityAPI {
                 trade,
                 'POST',
             );
+
             return response;
         } catch (error) {
             console.log('[confirmVoucherTrade]', error);
+
             return { error: error.toString(), exchange: trade.exchange };
         }
     };
@@ -404,6 +432,7 @@ class InvityAPI {
                 params,
                 'POST',
             );
+
             return response;
         } catch (error) {
             console.log('[getSellQuotes]', error);
@@ -417,9 +446,11 @@ class InvityAPI {
                 tradeRequest,
                 'POST',
             );
+
             return response;
         } catch (error) {
             console.log('[doSellTrade]', error);
+
             return { trade: { error: error.toString(), exchange: tradeRequest.trade.exchange } };
         }
     };
@@ -431,9 +462,11 @@ class InvityAPI {
                 trade,
                 'POST',
             );
+
             return response;
         } catch (error) {
             console.log('[doSellConfirm]', error);
+
             return { error: error.toString(), exchange: trade.exchange };
         }
     };
@@ -448,9 +481,11 @@ class InvityAPI {
                 trade,
                 'POST',
             );
+
             return response;
         } catch (error) {
             console.log('[watchSellFiatTrade]', error);
+
             return { error: error.toString() };
         }
     };
@@ -489,9 +524,11 @@ class InvityAPI {
                 {},
                 'GET',
             );
+
             return response;
         } catch (error) {
             console.log('[watchSavingsTrade]', error);
+
             return { code: error.toString() };
         }
     };
@@ -499,6 +536,7 @@ class InvityAPI {
     getSavingsList = async (): Promise<SavingsListResponse | undefined> => {
         try {
             const response: SavingsListResponse = await this.request(this.SAVINGS_LIST, {}, 'GET');
+
             return response;
         } catch (error) {
             console.log('[getSavingsList]', error);
@@ -514,6 +552,7 @@ class InvityAPI {
                 savingsParameters,
                 'POST',
             );
+
             return response;
         } catch (error) {
             console.log('[initSavingsTrade]', error);
@@ -527,6 +566,7 @@ class InvityAPI {
                 {},
                 'GET',
             );
+
             return response;
         } catch (error) {
             console.log('[getSavingsTrade]', error);
@@ -542,6 +582,7 @@ class InvityAPI {
                 requestBody,
                 'POST',
             );
+
             return response;
         } catch (error) {
             console.log('[doSavingsTrade]', error);
@@ -557,6 +598,10 @@ class InvityAPI {
             console.log('[watchKYCStatus]', error);
         }
     };
+
+    getCoinLogoUrl(coin: string): string {
+        return `${this.getApiServerUrl()}/images/coins/suite/${coin}.svg`;
+    }
 }
 
 const invityAPI = new InvityAPI();

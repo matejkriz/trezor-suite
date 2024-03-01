@@ -8,16 +8,15 @@
     "main": "src/index",
     "scripts": {
         "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "type-check": "tsc --build",
-        "generate-videos": "yarn tsx ./scripts/generateVideos.ts"
+        "type-check": "yarn g:tsc --build",
+        "generate-videos": "yarn g:tsx ./scripts/generateVideos.ts"
     },
     "dependencies": {
         "@suite-native/atoms": "workspace:*",
         "@trezor/styles": "workspace:*",
-        "expo-av": "13.2.1",
-        "prettier": "3.0.3",
+        "expo-av": "13.10.5",
+        "prettier": "3.2.5",
         "react": "18.2.0",
-        "react-native": "0.71.8",
-        "tsx": "^4.6.2"
+        "react-native": "0.73.2"
     }
 }

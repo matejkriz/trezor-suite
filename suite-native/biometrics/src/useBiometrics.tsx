@@ -8,6 +8,7 @@ import {
     useIsBiometricsEnabled,
     useIsBiometricsOverlayVisible,
     useIsUserAuthenticated,
+    useIsBiometricsAuthenticationCanceled,
 } from './biometricsAtoms';
 
 /**
@@ -20,6 +21,7 @@ export const authenticate = async () => {
 
     if (isBiometricsAvailable) {
         const result = await LocalAuthentication.authenticateAsync();
+
         return result;
     }
 };
@@ -28,6 +30,8 @@ export const useBiometrics = () => {
     const { isBiometricsOptionEnabled } = useIsBiometricsEnabled();
     const { isUserAuthenticated, setIsUserAuthenticated } = useIsUserAuthenticated();
     const { setIsBiometricsOverlayVisible } = useIsBiometricsOverlayVisible();
+    const { isBiometricsAuthenticationCanceled, setIsBiometricsAuthenticationCanceled } =
+        useIsBiometricsAuthenticationCanceled();
     const appState = useRef(AppState.currentState);
     const [appStateVisible, setAppStateVisible] = useState(AppState.currentState);
     const goneToBackgroundAtTimestamp = useRef<null | number>(null);
@@ -36,15 +40,26 @@ export const useBiometrics = () => {
         // Stop the authentication flow if the user leaves the app.
         if (appState.current !== 'active' && Platform.OS === 'android') {
             LocalAuthentication.cancelAuthenticate();
+
             return;
         }
 
-        if (isBiometricsOptionEnabled && !isUserAuthenticated) {
+        if (
+            isBiometricsOptionEnabled &&
+            !isUserAuthenticated &&
+            !isBiometricsAuthenticationCanceled
+        ) {
             const result = await authenticate();
 
             if (result && result?.success) {
                 setIsUserAuthenticated(true);
                 setIsBiometricsOverlayVisible(false);
+
+                // If the user cancels the authentication by button, we need to ask him again later.
+                // Otherwise a lot of tries would render this feauture unusable blocking user from the app.
+                // see https://github.com/trezor/trezor-suite/issues/10647
+            } else if (result?.error === 'user_cancel') {
+                setIsBiometricsAuthenticationCanceled(true);
             } else {
                 handleAuthentication();
             }
@@ -52,9 +67,19 @@ export const useBiometrics = () => {
     }, [
         isBiometricsOptionEnabled,
         isUserAuthenticated,
+        isBiometricsAuthenticationCanceled,
         setIsUserAuthenticated,
         setIsBiometricsOverlayVisible,
+        setIsBiometricsAuthenticationCanceled,
     ]);
+
+    // This is to relaunch authentication if the user canceled it previously by a button
+    // and now wanted to reenable it.
+    useEffect(() => {
+        if (!isBiometricsAuthenticationCanceled) {
+            handleAuthentication();
+        }
+    }, [handleAuthentication, isBiometricsAuthenticationCanceled]);
 
     // Monitors AppState and adjust the authentication state accordingly.
     useEffect(() => {

@@ -10,8 +10,10 @@ import { useTranslation } from 'src/hooks/suite';
 import { validateDecimals, validateMin } from 'src/utils/suite/validation';
 
 const StyledInput = styled(NumberInput)`
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
+    input {
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
+    }
 ` as typeof NumberInput; // Styled wrapper doesn't preserve type argument, see https://github.com/styled-components/styled-components/issues/1803#issuecomment-857092410
 
 const FiatInput = () => {
@@ -22,16 +24,12 @@ const FiatInput = () => {
         formState: { errors },
         updateSendCryptoValue,
         setValue,
-        getValues,
     } = useCoinmarketExchangeFormContext();
 
     const { translationString } = useTranslation();
 
     const amountError = errors.outputs?.[0]?.amount;
     const fiatError = errors.outputs?.[0]?.fiat;
-
-    const { outputs } = getValues();
-    const fiat = outputs?.[0]?.fiat;
 
     const fiatInputRules = {
         validate: {
@@ -52,12 +50,11 @@ const FiatInput = () => {
                     clearErrors(FIAT_INPUT);
                 }
             }}
-            inputState={getInputState(fiatError || amountError, fiat)}
+            inputState={getInputState(fiatError || amountError)}
             name={FIAT_INPUT}
-            noTopLabel
             maxLength={formInputsMaxLength.amount}
             rules={fiatInputRules}
-            bottomText={fiatError?.message}
+            bottomText={fiatError?.message || null}
             innerAddon={<FiatSelect />}
             data-test="@coinmarket/exchange/fiat-input"
         />

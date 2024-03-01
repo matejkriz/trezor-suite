@@ -1,7 +1,8 @@
 import { NavigatorScreenParams } from '@react-navigation/native';
+import { RequireAllOrNone } from 'type-fest';
 
 import { AccountKey, TokenAddress, XpubAddress } from '@suite-common/wallet-types';
-import { NetworkSymbol } from '@suite-common/wallet-config';
+import { AccountType, Network, NetworkSymbol } from '@suite-common/wallet-config';
 import { AccountInfo, TokenTransfer } from '@trezor/connect';
 
 import {
@@ -15,12 +16,18 @@ import {
     DevUtilsStackRoutes,
     OnboardingStackRoutes,
     ConnectDeviceStackRoutes,
+    AddCoinAccountStackRoutes,
 } from './routes';
+
+type AddCoinFlowParams = RequireAllOrNone<
+    { networkSymbol: NetworkSymbol; accountType: AccountType; accountIndex: number },
+    'networkSymbol' | 'accountType' | 'accountIndex'
+>;
 
 type ReceiveAccountsParams = {
     accountKey?: AccountKey;
     tokenContract?: TokenAddress;
-};
+} & AddCoinFlowParams;
 
 export type AccountsStackParamList = {
     [AccountsStackRoutes.Accounts]: undefined;
@@ -82,6 +89,19 @@ export type AccountsImportStackParamList = {
     };
 };
 
+export type AddCoinFlowType = 'receive' | 'accounts';
+
+export type AddCoinAccountStackParamList = {
+    [AddCoinAccountStackRoutes.AddCoinAccount]: {
+        flowType: AddCoinFlowType;
+    };
+    [AddCoinAccountStackRoutes.SelectAccountType]: {
+        accountType: AccountType;
+        network: Network;
+        flowType: AddCoinFlowType;
+    };
+};
+
 export type ConnectDeviceStackParamList = {
     [ConnectDeviceStackRoutes.ConnectAndUnlockDevice]: undefined;
     [ConnectDeviceStackRoutes.PinMatrix]: undefined;
@@ -102,8 +122,9 @@ export type RootStackParamList = {
     };
     [RootStackRoutes.DevUtilsStack]: undefined;
     [RootStackRoutes.AccountDetail]: {
-        accountKey: AccountKey;
+        accountKey?: AccountKey;
         tokenContract?: TokenAddress;
-    };
+    } & AddCoinFlowParams;
     [RootStackRoutes.DeviceInfo]: undefined;
+    [RootStackRoutes.AddCoinAccountStack]: NavigatorScreenParams<AddCoinAccountStackParamList>;
 };

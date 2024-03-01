@@ -35,9 +35,11 @@ export const useDocs = (url: string) => {
                         if (link.startsWith('./')) {
                             return `${baseUrl}/${link}`.replace('./', '');
                         }
+
                         return `${baseUrl}/${link}`;
                     },
                 });
+                // @ts-expect-error
                 markdown.use(MarkdownReplaceLink);
                 markdown.use(MarkdownReplaceLinkAttrs, {
                     attrs: {

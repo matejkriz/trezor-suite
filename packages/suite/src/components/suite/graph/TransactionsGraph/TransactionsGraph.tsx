@@ -1,8 +1,10 @@
 import { memo, useState } from 'react';
-import styled from 'styled-components';
+
+import styled, { useTheme } from 'styled-components';
 import { ComposedChart, Tooltip, Bar, YAxis, XAxis, Line, CartesianGrid, Cell } from 'recharts';
 
-import { variables, Icon, useTheme } from '@trezor/components';
+import { variables, Icon } from '@trezor/components';
+import { zIndices } from '@trezor/theme';
 
 import { useGraph } from 'src/hooks/suite';
 import { Account } from 'src/types/wallet';
@@ -118,7 +120,7 @@ export const TransactionsGraph = memo((props: TransactionsGraphProps) => {
         <Wrapper>
             {!props.hideToolbar && (
                 <Toolbar>
-                    <GraphRangeSelector align="right" />
+                    <GraphRangeSelector align="bottom-right" />
                     {props.onRefresh && <Icon size={14} icon="REFRESH" onClick={props.onRefresh} />}
                 </Toolbar>
             )}
@@ -179,7 +181,7 @@ export const TransactionsGraph = memo((props: TransactionsGraphProps) => {
                             />
                             <Tooltip
                                 position={{ y: 0, x: 0 }}
-                                wrapperStyle={{ zIndex: variables.Z_INDEX.TOOLTIP }}
+                                wrapperStyle={{ zIndex: zIndices.tooltip }}
                                 cursor={{ stroke: theme.BG_TOOLTIP, strokeWidth: 1 }}
                                 content={
                                     props.variant === 'one-asset' ? (

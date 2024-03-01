@@ -109,7 +109,7 @@ export const AddressOptions = <TFieldValues extends AddressOptionsFormState>({
                     isClearable={false}
                     value={value}
                     options={buildOptions(addresses)}
-                    minWidth="70px"
+                    minValueWidth="70px"
                     menuPlacement={menuPlacement}
                     formatOptionLabel={(accountAddress: AccountAddress) => {
                         if (!accountAddress) return null;
@@ -117,6 +117,7 @@ export const AddressOptions = <TFieldValues extends AddressOptionsFormState>({
                             accountAddress.balance || '0',
                             receiveSymbol as Account['symbol'],
                         );
+
                         return (
                             <Option>
                                 <AddressWrapper>

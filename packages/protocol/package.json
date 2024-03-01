@@ -1,6 +1,6 @@
 {
     "name": "@trezor/protocol",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "license": "See LICENSE.md in repo root",
     "repository": {
         "type": "git",
@@ -10,7 +10,10 @@
         "url": "https://github.com/trezor/trezor-suite/issues"
     },
     "sideEffects": false,
-    "main": "lib/index",
+    "main": "src/index.ts",
+    "publishConfig": {
+        "main": "lib/index.js"
+    },
     "npmPublishAccess": "public",
     "files": [
         "lib/",
@@ -18,19 +21,16 @@
     ],
     "scripts": {
         "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "test:unit": "jest -c ../../jest.config.base.js",
-        "type-check": "tsc --build",
-        "build:lib": "rimraf ./lib && yarn tsc --build tsconfig.lib.json",
+        "test:unit": "yarn g:jest -c ../../jest.config.base.js",
+        "type-check": "yarn g:tsc --build",
+        "build:lib": "yarn g:rimraf ./lib && yarn g:tsc --build tsconfig.lib.json",
         "prepublishOnly": "yarn tsx ../../scripts/prepublishNPM.js",
         "prepublish": "yarn tsx ../../scripts/prepublish.js"
     },
-    "devDependencies": {
-        "jest": "29.5.0",
-        "rimraf": "^5.0.5",
-        "tsx": "^4.6.2",
-        "typescript": "5.3.2"
-    },
     "peerDependencies": {
         "tslib": "^2.6.2"
+    },
+    "devDependencies": {
+        "tsx": "^4.7.0"
     }
 }

@@ -1,9 +1,16 @@
 // origin: https://github.com/trezor/connect/blob/develop/src/js/popup/view/common.js
 
-import { POPUP, ERRORS, PopupInit, CoreMessage, createUiResponse } from '@trezor/connect';
+import {
+    POPUP,
+    ERRORS,
+    PopupInit,
+    createUiResponse,
+    CoreRequestMessage,
+    CoreEventMessage,
+} from '@trezor/connect';
 import { createRoot } from 'react-dom/client';
 
-import { ConnectUI, State } from '@trezor/connect-ui';
+import { ConnectUI, State, getDefaultState } from '@trezor/connect-ui';
 import { StyleSheetWrapper } from './react/StylesSheetWrapper';
 import { reactEventBus } from '@trezor/connect-ui/src/utils/eventBus';
 
@@ -11,7 +18,7 @@ export const header: HTMLElement = document.getElementsByTagName('header')[0];
 export const container: HTMLElement = document.getElementById('container')!;
 export const views: HTMLElement = document.getElementById('views')!;
 
-let state: State = {};
+let state: State = getDefaultState();
 
 export const setState = (newState: Partial<State>) => (state = { ...state, ...newState });
 export const getState = () => state;
@@ -49,11 +56,13 @@ const renderLegacyView = (className: string) => {
             container.innerHTML = unknownItem.outerHTML;
         }
     }
+
     return container;
 };
 
 export const showView = (component: string) => {
     reactEventBus.dispatch();
+
     return renderLegacyView(component);
 };
 
@@ -73,6 +82,7 @@ export const getIframeElement = () => {
             // do nothing, try next entry
         }
     }
+
     return iframe;
 };
 
@@ -129,6 +139,7 @@ export const initMessageChannelWithIframe = async (
             // POPUP.HANDSHAKE successfully received back from the iframe
             if (await broadcastHandshake) {
                 setState({ broadcast, systemInfo, iframe });
+
                 return;
             }
 
@@ -159,6 +170,7 @@ export const initMessageChannelWithIframe = async (
     // POPUP.HANDSHAKE successfully received back from the iframe
     if (await iframeHandshake) {
         setState({ iframe, systemInfo });
+
         return;
     }
 
@@ -166,24 +178,31 @@ export const initMessageChannelWithIframe = async (
 };
 
 // this method can be used from anywhere
-export const postMessage = (message: CoreMessage) => {
+export const postMessage = (message: CoreRequestMessage) => {
     const { broadcast, iframe, core } = getState();
     if (core) {
         core.handleMessage(message);
+
         return;
     }
     if (broadcast) {
         broadcast.postMessage(message);
+
         return;
     }
     if (iframe) {
         iframe.postMessage(message, window.location.origin);
+
         return;
     }
     throw ERRORS.TypedError('Popup_ConnectionMissing');
 };
 
-export const postMessageToParent = (message: CoreMessage) => {
+export const postMessageToParent = (message: CoreEventMessage) => {
+    message.channel = {
+        here: '@trezor/connect-popup',
+        peer: '@trezor/connect-web',
+    };
     if (window.opener) {
         // post message to parent and wait for POPUP.INIT message
         window.opener.postMessage(message, '*');

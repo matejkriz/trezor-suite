@@ -11,7 +11,7 @@ describe('Send form for bitcoin', () => {
             mnemonic: 'all all all all all all all all all all all all',
         });
         cy.task('startBridge');
-        cy.viewport(1080, 1440).resetDb();
+        cy.viewport(1440, 2560).resetDb();
         cy.prefixedVisit('/');
         cy.passThroughInitialRun();
         cy.discoveryShouldFinish();
@@ -23,8 +23,8 @@ describe('Send form for bitcoin', () => {
                 },
             ],
         });
+        cy.getTestElement('@suite/menu/suite-index').click();
         // navigate to the send form
-        cy.getTestElement('@suite/menu/wallet-index').click();
         cy.getTestElement('@account-menu/regtest/normal/0/label').click();
         cy.getTestElement('@wallet/menu/wallet-send').click();
     });

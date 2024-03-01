@@ -8,7 +8,7 @@ describe('Recovery - dry run', () => {
             mnemonic: 'all all all all all all all all all all all all',
         });
         cy.task('startBridge');
-        cy.viewport(1080, 1440).resetDb();
+        cy.viewport(1440, 2560).resetDb();
     });
 
     // Test case skipped because it was unstable
@@ -44,7 +44,7 @@ describe('Recovery - dry run', () => {
             'On app reload, recovery process should auto start if app detects initialized device in recovery mode',
         );
 
-        cy.reload().task('stopBridge').task('startBridge');
+        cy.safeReload().task('stopBridge').task('startBridge');
         cy.wait(2000);
 
         cy.getTestElement('@suite/modal/confirm-action-on-device');

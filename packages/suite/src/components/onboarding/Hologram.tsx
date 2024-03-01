@@ -8,18 +8,7 @@ import { TREZOR_RESELLERS_URL, TREZOR_SUPPORT_URL } from '@trezor/urls';
 import { Translation, TrezorLink } from 'src/components/suite';
 import { useRef } from 'react';
 import { useSelector } from 'src/hooks/suite';
-
-const Wrapper = styled.div`
-    display: flex;
-    flex-direction: column;
-    width: 300px;
-`;
-
-const HologramHeading = styled.span`
-    font-size: ${variables.FONT_SIZE.NORMAL};
-    font-weight: ${variables.FONT_WEIGHT.DEMI_BOLD};
-    margin-bottom: 16px;
-`;
+import { typography } from '@trezor/theme';
 
 const HologramSubHeading = styled.span`
     font-size: ${variables.FONT_SIZE.SMALL};
@@ -34,7 +23,11 @@ const AnimationWrapper = styled.div`
 const StyledWarning = styled(Warning)`
     width: calc(100% + 16px);
     margin: 0 -8px;
-    font-size: ${variables.FONT_SIZE.TINY};
+    ${typography.label}
+
+    a {
+        color: ${({ theme }) => theme.backgroundAlertYellowBold};
+    }
 `;
 
 export const Hologram = () => {
@@ -44,11 +37,7 @@ export const Hologram = () => {
     const hologramRef = useRef<HTMLVideoElement>(null);
 
     return (
-        <Wrapper>
-            <HologramHeading>
-                <Translation id="TR_HOLOGRAM_STEP_HEADING" />
-            </HologramHeading>
-
+        <>
             <HologramSubHeading>
                 <Translation id="TR_HOLOGRAM_STEP_SUBHEADING" />
             </HologramSubHeading>
@@ -58,6 +47,7 @@ export const Hologram = () => {
                     type="HOLOGRAM"
                     shape="ROUNDED-SMALL"
                     loop
+                    width="100%"
                     deviceModelInternal={device?.features?.internal_model}
                     onVideoMouseOver={() => {
                         // If the video is placed in tooltip it stops playing after tooltip minimizes and won't start again
@@ -90,6 +80,6 @@ export const Hologram = () => {
                     }}
                 />
             </StyledWarning>
-        </Wrapper>
+        </>
     );
 };

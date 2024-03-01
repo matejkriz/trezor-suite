@@ -1,81 +1,106 @@
 import { ReactNode } from 'react';
-import styled from 'styled-components';
-import { transparentize } from 'polished';
+import styled, { DefaultTheme, useTheme } from 'styled-components';
 
-import { Icon } from '../assets/Icon/Icon';
-import { useTheme } from '../../utils';
+import { Icon, IconType } from '../assets/Icon/Icon';
 import { variables } from '../../config';
+import { CSSColor, Color, borders, spacingsPx, typography } from '@trezor/theme';
+import { UIVariant } from '../../config/types';
 
-type Variant = 'learn' | 'info' | 'warning' | 'critical';
+export type WarningVariant = Extract<UIVariant, 'primary' | 'info' | 'warning' | 'destructive'>;
 
-const getColor = (variant: Variant, colors: Record<Variant, string>) => colors[variant];
-const getIcon = (variant: Variant) => {
-    switch (variant) {
-        case 'learn':
-            return 'LIGHTBULB';
-        case 'info':
-            return 'INFO';
-        default:
-            return 'WARNING';
-    }
+export interface WarningProps {
+    children: ReactNode;
+    className?: string;
+    variant?: WarningVariant;
+    withIcon?: boolean;
+    icon?: IconType;
+}
+
+type MapArgs = {
+    variant: WarningVariant;
+    theme: DefaultTheme;
 };
 
-const Wrapper = styled.div<{ variant: Variant; withIcon?: boolean }>`
+const mapVariantToBackgroundColor = ({ variant, theme }: MapArgs): CSSColor => {
+    const colorMap: Record<WarningVariant, Color> = {
+        primary: 'backgroundPrimarySubtleOnElevation0',
+        info: 'backgroundAlertBlueSubtleOnElevation0',
+        warning: 'backgroundAlertYellowSubtleOnElevation0',
+        destructive: 'backgroundAlertRedSubtleOnElevation0',
+    };
+
+    return theme[colorMap[variant]];
+};
+
+const mapVariantToTextColor = ({ variant, theme }: MapArgs): CSSColor => {
+    const colorMap: Record<WarningVariant, Color> = {
+        primary: 'textPrimaryDefault',
+        info: 'textAlertBlue',
+        warning: 'textAlertYellow',
+        destructive: 'textAlertRed',
+    };
+
+    return theme[colorMap[variant]];
+};
+const mapVariantToIconColor = ({ variant, theme }: MapArgs): CSSColor => {
+    const colorMap: Record<WarningVariant, Color> = {
+        primary: 'iconPrimaryDefault',
+        info: 'iconAlertBlue',
+        warning: 'iconAlertYellow',
+        destructive: 'iconAlertRed',
+    };
+
+    return theme[colorMap[variant]];
+};
+
+const mapVariantToIcon = ({ variant }: Pick<MapArgs, 'variant'>): IconType => {
+    const iconMap: Record<WarningVariant, IconType> = {
+        primary: 'LIGHTBULB',
+        info: 'INFO',
+        warning: 'WARNING',
+        destructive: 'WARNING',
+    };
+
+    return iconMap[variant];
+};
+
+const Wrapper = styled.div<{ variant: WarningVariant; withIcon?: boolean }>`
     align-items: center;
-    background: ${({ variant, theme }) =>
-        transparentize(
-            0.9,
-            getColor(variant, {
-                learn: theme.BG_GREEN,
-                info: theme.TYPE_BLUE,
-                warning: theme.TYPE_DARK_ORANGE,
-                critical: theme.BG_RED,
-            }),
-        )};
-    border-radius: 8px;
-    color: ${({ variant, theme }) =>
-        getColor(variant, {
-            learn: theme.TYPE_DARK_GREY,
-            info: theme.TYPE_BLUE,
-            warning: theme.TYPE_DARK_ORANGE,
-            critical: theme.TYPE_DARK_GREY,
-        })};
+    background: ${mapVariantToBackgroundColor};
+    border-radius: ${borders.radii.xs};
+    color: ${mapVariantToTextColor};
     display: flex;
-    font-size: ${variables.FONT_SIZE.SMALL};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-    gap: 14px;
+    ${typography.hint}
+    gap: ${spacingsPx.sm};
     justify-content: ${({ withIcon }) => !withIcon && 'center'};
-    padding: 14px 20px;
+    padding: ${spacingsPx.sm} ${spacingsPx.lg};
     width: 100%;
 
     ${variables.SCREEN_QUERY.MOBILE} {
         align-items: stretch;
         flex-direction: column;
-        gap: 8px;
+        gap: ${spacingsPx.xs};
     }
 `;
 
-export interface WarningProps {
-    children: ReactNode;
-    className?: string;
-    variant?: Variant;
-    withIcon?: boolean;
-}
-
-export const Warning = ({ children, className, variant = 'warning', withIcon }: WarningProps) => {
+export const Warning = ({
+    children,
+    className,
+    variant = 'warning',
+    withIcon,
+    icon,
+}: WarningProps) => {
     const theme = useTheme();
-
-    const iconColor = getColor(variant, {
-        learn: theme.TYPE_GREEN,
-        info: theme.TYPE_BLUE,
-        warning: theme.TYPE_ORANGE,
-        critical: theme.TYPE_RED,
-    });
-    const icon = getIcon(variant);
 
     return (
         <Wrapper variant={variant} withIcon={withIcon} className={className}>
-            {withIcon && <Icon size={20} icon={icon} color={iconColor} />}
+            {withIcon && (
+                <Icon
+                    size={20}
+                    icon={icon === undefined ? mapVariantToIcon({ variant }) : icon}
+                    color={mapVariantToIconColor({ variant, theme })}
+                />
+            )}
             {children}
         </Wrapper>
     );

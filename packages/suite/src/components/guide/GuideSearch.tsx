@@ -7,9 +7,10 @@ import { GuideNode } from 'src/components/guide';
 import { useGuideSearch } from 'src/hooks/guide';
 
 import type { GuideCategory } from '@suite-common/suite-types';
+import { spacingsPx } from '@trezor/theme';
 
 const Wrapper = styled.div`
-    margin-bottom: 40px;
+    margin-bottom: ${spacingsPx.xs};
 `;
 
 const PageFoundList = styled.div`
@@ -36,20 +37,6 @@ const PreviewContent = styled.div`
     & > em {
         font-style: inherit;
         color: ${({ theme }) => theme.TYPE_DARK_GREY};
-    }
-`;
-
-const StyledInput = styled(Input)`
-    && {
-        background-color: ${({ theme }) => theme.BG_GREY_ALT};
-        border-radius: 8px;
-        height: 40px;
-        border-color: ${({ theme }) => theme.BG_GREY_ALT};
-        transition: border-color 0.2s;
-
-        :focus {
-            border-color: ${({ theme }) => theme.STROKE_GREY_ALT};
-        }
     }
 `;
 
@@ -86,16 +73,14 @@ export const GuideSearch = ({ pageRoot, setSearchActive }: GuideSearchProps) => 
 
     return (
         <Wrapper>
-            <StyledInput
-                noTopLabel
+            <Input
                 placeholder={translationString('TR_SEARCH')}
-                noError
                 value={query}
                 onChange={e => setQuery(e.currentTarget.value)}
-                addonAlign="left"
-                clearButton="always"
+                innerAddonAlign="left"
+                showClearButton="always"
                 onClear={() => setQuery('')}
-                innerAddon={loading ? <Spinner size={16} /> : <Icon icon="SEARCH" size={16} />}
+                innerAddon={loading ? <Spinner size={24} /> : <Icon icon="SEARCH" size={24} />}
                 data-test="@guide/search"
             />
 

@@ -1,15 +1,14 @@
 import { useState, ChangeEvent, MouseEventHandler } from 'react';
-import styled from 'styled-components';
+import styled, { useTheme } from 'styled-components';
 import { Translation, AccountLabeling, FormattedCryptoAmount } from 'src/components/suite';
 import {
     Button,
     Icon,
     Input,
-    P,
+    Paragraph,
     SelectBar,
     Tooltip,
     Truncate,
-    useTheme,
     variables,
 } from '@trezor/components';
 import { useCoinmarketExchangeOffersContext } from 'src/hooks/wallet/useCoinmarketExchangeOffers';
@@ -105,9 +104,11 @@ const SlippageSettingsButton = styled.button`
 `;
 
 const StyledInput = styled(Input)`
-    display: flex;
-    flex: 1;
-    max-width: 70px;
+    input {
+        display: flex;
+        flex: 1;
+        max-width: 70px;
+    }
 `;
 
 const slippageOptions = [
@@ -148,6 +149,7 @@ export function formatCryptoAmountAsAmount(
     if (baseAmount < 0.01) {
         digits = decimals;
     }
+
     return amount.toFixed(digits);
 }
 
@@ -215,6 +217,7 @@ const SendSwapTransactionComponent = () => {
                 type: 'error',
                 message: 'TR_EXCHANGE_SWAP_SLIPPAGE_NOT_SET',
             });
+
             return;
         }
         const slippage = new BigNumber(value);
@@ -291,15 +294,13 @@ const SendSwapTransactionComponent = () => {
                         {slippage === 'CUSTOM' && (
                             <RightColumn>
                                 <StyledInput
-                                    isMonospace
-                                    noTopLabel
                                     value={customSlippage}
-                                    variant="small"
-                                    inputState={customSlippageError ? 'error' : 'success'}
+                                    size="small"
+                                    inputState={customSlippageError && 'error'}
                                     name="CustomSlippage"
                                     data-test="CustomSlippage"
                                     onChange={changeCustomSlippage}
-                                    bottomText={customSlippageError?.message}
+                                    bottomText={customSlippageError?.message || null}
                                 />
                             </RightColumn>
                         )}
@@ -353,9 +354,9 @@ const SendSwapTransactionComponent = () => {
                     <Translation id="TR_EXCHANGE_SWAP_DATA" />
                 </LabelText>
                 <BreakableValue>
-                    <P size="small">
+                    <Paragraph type="hint">
                         <Truncate>{dexTx.data}</Truncate>
-                    </P>
+                    </Paragraph>
                 </BreakableValue>
             </Row>
             <ButtonWrapper>

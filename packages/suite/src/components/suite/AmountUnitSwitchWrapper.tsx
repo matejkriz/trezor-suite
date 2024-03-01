@@ -1,9 +1,10 @@
-import { ReactNode } from 'react';
+import { MouseEvent, ReactNode } from 'react';
 import styled from 'styled-components';
-import { Tooltip, variables } from '@trezor/components';
+import { TOOLTIP_DELAY_NONE, TOOLTIP_DELAY_NORMAL, Tooltip } from '@trezor/components';
 import { useBitcoinAmountUnit } from 'src/hooks/wallet/useBitcoinAmountUnit';
 import { NetworkSymbol } from 'src/types/wallet';
 import { Translation } from './Translation';
+import { mediaQueries } from '@trezor/styles';
 
 const Container = styled.div`
     position: relative;
@@ -15,12 +16,16 @@ const Container = styled.div`
     border-radius: 6px;
     transition: background 0.1s ease-in;
     cursor: pointer;
-
-    ${variables.MEDIA_QUERY.HOVER} {
+    ${mediaQueries.hover} {
         :hover {
             background: ${({ theme }) => theme.BG_GREY};
         }
     }
+`;
+
+const Flex = styled.div`
+    display: flex;
+    align-items: center;
 `;
 
 interface AmountUnitSwitchWrapperProps {
@@ -33,21 +38,27 @@ export const AmountUnitSwitchWrapper = ({ symbol, children }: AmountUnitSwitchWr
         useBitcoinAmountUnit(symbol);
 
     if (!areUnitsSupportedByNetwork) {
-        return <>{children}</>;
+        return <Flex>{children}</Flex>;
     }
+
+    const handleToggleBitcoinAmountUnits = (e: MouseEvent) => {
+        toggleBitcoinAmountUnits();
+        e.stopPropagation();
+    };
 
     return (
         <Tooltip
             cursor="default"
             maxWidth={200}
-            delay={[600, 0]}
+            delayShow={TOOLTIP_DELAY_NORMAL}
+            delayHide={TOOLTIP_DELAY_NONE}
             placement="bottom"
             interactive={false}
             hideOnClick={false}
             content={<Translation id={areSatsDisplayed ? 'TR_TO_BTC' : 'TR_TO_SATOSHIS'} />}
         >
             <Container
-                onClick={toggleBitcoinAmountUnits}
+                onClick={handleToggleBitcoinAmountUnits}
                 data-test={`amount-unit-switch/${symbol}`}
             >
                 {children}

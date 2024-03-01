@@ -2,22 +2,23 @@
     "name": "@trezor/scripts",
     "version": "1.0.0",
     "private": true,
-    "type": "module",
     "scripts": {
-        "type-check": "tsc --build"
+        "type-check": "yarn g:tsc --build",
+        "run:analytics": "tsx githubAnalytics.ts"
     },
     "dependencies": {
         "@mobily/ts-belt": "^3.13.1",
         "chalk": "^4.1.2",
-        "fs-extra": "^11.1.1",
-        "prettier": "3.0.3",
+        "dotenv": "^16.4.1",
+        "fs-extra": "^11.2.0",
+        "minimatch": "^9.0.3",
+        "octokit": "3.1.2",
+        "prettier": "3.2.5",
         "sort-package-json": "^1.57.0",
         "yargs": "17.7.2"
     },
     "devDependencies": {
-        "@types/fs-extra": "^11.0.3",
-        "@types/prettier": "^3.0.0",
-        "jest": "29.5.0",
-        "typescript": "5.3.2"
+        "@types/fs-extra": "^11.0.4",
+        "@types/prettier": "^3.0.0"
     }
 }

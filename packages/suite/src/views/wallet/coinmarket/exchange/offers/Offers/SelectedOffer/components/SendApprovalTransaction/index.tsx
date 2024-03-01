@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { Translation, AccountLabeling } from 'src/components/suite';
-import { Button, Spinner, P, RadioButton, Truncate, variables } from '@trezor/components';
+import { Button, Spinner, Radio, Truncate, variables, Paragraph } from '@trezor/components';
 import { useCoinmarketExchangeOffersContext } from 'src/hooks/wallet/useCoinmarketExchangeOffers';
 import { useCoinmarketNavigation } from 'src/hooks/wallet/useCoinmarketNavigation';
 import { DexApprovalType, ExchangeTrade } from 'invity-api';
@@ -47,7 +47,7 @@ const Row = styled.div`
     margin: 10px 24px;
 `;
 
-const RadioButtonInner = styled.div`
+const RadioInner = styled.div`
     display: flex;
     flex-direction: column;
     align-items: flex-center;
@@ -211,18 +211,18 @@ const SendApprovalTransactionComponent = () => {
                     {selectedQuote.status === 'APPROVAL_REQ' && (
                         <>
                             <Value>
-                                <RadioButton
+                                <Radio
                                     isChecked={approvalType === 'MINIMAL'}
                                     onClick={() => selectApprovalValue('MINIMAL')}
                                 >
-                                    <RadioButtonInner>
+                                    <RadioInner>
                                         <>
-                                            <P>
+                                            <Paragraph>
                                                 <Translation
                                                     id="TR_EXCHANGE_APPROVAL_VALUE_MINIMAL"
                                                     values={translationValues}
                                                 />
-                                            </P>
+                                            </Paragraph>
                                             <LabelText>
                                                 <Translation
                                                     id="TR_EXCHANGE_APPROVAL_VALUE_MINIMAL_INFO"
@@ -230,40 +230,40 @@ const SendApprovalTransactionComponent = () => {
                                                 />
                                             </LabelText>
                                         </>
-                                    </RadioButtonInner>
-                                </RadioButton>
+                                    </RadioInner>
+                                </Radio>
                             </Value>
                             <Value>
-                                <RadioButton
+                                <Radio
                                     isChecked={approvalType === 'INFINITE'}
                                     onClick={() => selectApprovalValue('INFINITE')}
                                 >
-                                    <RadioButtonInner>
-                                        <P>
+                                    <RadioInner>
+                                        <Paragraph>
                                             <Translation
                                                 id="TR_EXCHANGE_APPROVAL_VALUE_INFINITE"
                                                 values={translationValues}
                                             />
-                                        </P>
+                                        </Paragraph>
                                         <LabelText>
                                             <Translation
                                                 id="TR_EXCHANGE_APPROVAL_VALUE_INFINITE_INFO"
                                                 values={translationValues}
                                             />
                                         </LabelText>
-                                    </RadioButtonInner>
-                                </RadioButton>
+                                    </RadioInner>
+                                </Radio>
                             </Value>
                         </>
                     )}
                     {selectedQuote.status !== 'APPROVAL_REQ' && (
                         <Value>
-                            <RadioButton
+                            <Radio
                                 isChecked={approvalType === 'APPROVED'}
                                 onClick={() => selectApprovalValue('APPROVED')}
                             >
-                                <RadioButtonInner>
-                                    <P>
+                                <RadioInner>
+                                    <Paragraph>
                                         {!isToken && (
                                             <Translation
                                                 id="TR_EXCHANGE_APPROVAL_NOT_REQUIRED"
@@ -276,35 +276,35 @@ const SendApprovalTransactionComponent = () => {
                                         {isToken && !selectedQuote.approvalSendTxHash && (
                                             <Translation id="TR_EXCHANGE_APPROVAL_PREAPPROVED" />
                                         )}
-                                    </P>
+                                    </Paragraph>
                                     <LabelText>
                                         <Translation id="TR_EXCHANGE_APPROVAL_PROCEED" />
                                     </LabelText>
-                                </RadioButtonInner>
-                            </RadioButton>
+                                </RadioInner>
+                            </Radio>
                         </Value>
                     )}
                     {isToken && !isFullApproval && (
                         <Value>
-                            <RadioButton
+                            <Radio
                                 isChecked={approvalType === 'ZERO'}
                                 onClick={() => selectApprovalValue('ZERO')}
                             >
-                                <RadioButtonInner>
-                                    <P>
+                                <RadioInner>
+                                    <Paragraph>
                                         <Translation
                                             id="TR_EXCHANGE_APPROVAL_VALUE_ZERO"
                                             values={translationValues}
                                         />
-                                    </P>
+                                    </Paragraph>
                                     <LabelText>
                                         <Translation
                                             id="TR_EXCHANGE_APPROVAL_VALUE_ZERO_INFO"
                                             values={translationValues}
                                         />
                                     </LabelText>
-                                </RadioButtonInner>
-                            </RadioButton>
+                                </RadioInner>
+                            </Radio>
                         </Value>
                     )}
                 </Row>
@@ -316,9 +316,9 @@ const SendApprovalTransactionComponent = () => {
                         <Translation id="TR_EXCHANGE_APPROVAL_DATA" />
                     </LabelText>
                     <BreakableValue>
-                        <P size="small">
+                        <Paragraph type="hint">
                             <Truncate>{dexTx.data}</Truncate>
-                        </P>
+                        </Paragraph>
                     </BreakableValue>
                 </Row>
             )}

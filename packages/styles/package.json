@@ -6,9 +6,9 @@
     "main": "src/index",
     "sideEffects": false,
     "scripts": {
-        "type-check": "tsc --build",
+        "type-check": "yarn g:tsc --build",
         "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "test:unit": "jest -c ../../jest.config.base.js"
+        "test:unit": "yarn g:jest -c ../../jest.config.base.js"
     },
     "dependencies": {
         "@mobily/ts-belt": "^3.13.1",
@@ -25,13 +25,9 @@
         "fela-plugin-unit": "^12.2.1",
         "fela-sort-media-query-mobile-first": "^12.2.1",
         "fela-utils": "^12.2.1",
-        "polished": "^4.2.2",
+        "polished": "^4.3.1",
         "react": "18.2.0",
         "react-fela": "^12.2.1",
-        "react-native": "0.71.8"
-    },
-    "devDependencies": {
-        "jest": "29.5.0",
-        "typescript": "5.3.2"
+        "react-native": "0.73.2"
     }
 }

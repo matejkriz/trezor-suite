@@ -36,6 +36,7 @@ export abstract class AbstractApiTransport extends AbstractTransport {
     public init() {
         return this.scheduleAction(async () => {
             const handshakeRes = await this.sessionsClient.handshake();
+
             return handshakeRes.success
                 ? this.success(undefined)
                 : this.unknownError('handshake error', []);
@@ -119,6 +120,7 @@ export abstract class AbstractApiTransport extends AbstractTransport {
                     if (this.listenPromise) {
                         this.listenPromise[path].resolve(openDeviceResult);
                     }
+
                     return openDeviceResult;
                 }
 
@@ -184,6 +186,7 @@ export abstract class AbstractApiTransport extends AbstractTransport {
                     if (getPathBySessionResponse.error === 'session not found') {
                         return this.error({ error: ERRORS.DEVICE_DISCONNECTED_DURING_ACTION });
                     }
+
                     return this.error({ error: ERRORS.UNEXPECTED_ERROR });
                 }
                 const { path } = getPathBySessionResponse.payload;
@@ -193,7 +196,7 @@ export abstract class AbstractApiTransport extends AbstractTransport {
                     const buffers = buildBuffers(this.messages, name, data, encode);
                     for (let i = 0; i < buffers.length; i++) {
                         const chunk = buffers[i];
-                        // eslint-disable-next-line no-await-in-loop
+
                         await this.api.write(path, chunk).then(result => {
                             if (!result.success) {
                                 throw new Error(result.error);
@@ -247,13 +250,14 @@ export abstract class AbstractApiTransport extends AbstractTransport {
                 const buffers = buildBuffers(this.messages, name, data, encode);
                 for (let i = 0; i < buffers.length; i++) {
                     const chunk = buffers[i];
-                    // eslint-disable-next-line no-await-in-loop
+
                     await this.api.write(path, chunk).then(result => {
                         if (!result.success) {
                             throw new Error(result.error);
                         }
                     });
                 }
+
                 return this.success(undefined);
             } catch (err) {
                 if (err.message === ERRORS.DEVICE_DISCONNECTED_DURING_ACTION) {
@@ -284,6 +288,7 @@ export abstract class AbstractApiTransport extends AbstractTransport {
                             if (!result.success) {
                                 throw new Error(result.error);
                             }
+
                             return result.payload;
                         }),
                     decode,

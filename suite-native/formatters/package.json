@@ -7,8 +7,8 @@
     "main": "src/index",
     "scripts": {
         "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "test:unit": "jest -c ../../jest.config.base.js --passWithNoTests",
-        "type-check": "tsc --build"
+        "test:unit": "yarn g:jest -c ../../jest.config.base.js",
+        "type-check": "yarn g:tsc --build"
     },
     "dependencies": {
         "@mobily/ts-belt": "^3.13.1",
@@ -24,13 +24,10 @@
         "@suite-native/module-settings": "workspace:*",
         "@trezor/blockchain-link": "workspace:*",
         "@trezor/styles": "workspace:*",
-        "bignumber.js": "^9.1.1",
+        "bignumber.js": "^9.1.2",
         "react": "18.2.0",
-        "react-native": "0.71.8",
+        "react-native": "0.73.2",
         "react-redux": "8.0.7",
         "web3-utils": "^1.10.0"
-    },
-    "devDependencies": {
-        "jest": "29.5.0"
     }
 }

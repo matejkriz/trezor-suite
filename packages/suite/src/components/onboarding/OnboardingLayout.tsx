@@ -6,19 +6,20 @@ import { TREZOR_SUPPORT_URL } from '@trezor/urls';
 import { TrezorLink, Translation } from 'src/components/suite';
 import { OnboardingProgressBar } from 'src/components/onboarding';
 import { useSelector, useOnboarding } from 'src/hooks/suite';
-import { MAX_WIDTH } from 'src/constants/suite/layout';
+import { MAX_ONBOARDING_WIDTH } from 'src/constants/suite/layout';
 import steps from 'src/config/onboarding/steps';
-import { GuideButton, GuidePanel } from 'src/components/guide';
+import { GuideButton, GuideRouter } from 'src/components/guide';
 import { selectBannerMessage } from '@suite-common/message-system';
 import { MessageSystemBanner } from 'src/components/suite/banners';
 import { ModalContextProvider } from 'src/support/suite/ModalContext';
+import { spacingsPx, zIndices } from '@trezor/theme';
 
 const Wrapper = styled.div`
     display: flex;
     width: 100%;
     height: 100%;
     flex-direction: column;
-    background: ${({ theme }) => theme.BG_LIGHT_GREY};
+    background: ${({ theme }) => theme.backgroundSurfaceElevation2};
 `;
 
 const Body = styled.div`
@@ -38,7 +39,6 @@ const ContentWrapper = styled.div`
     display: flex;
     flex-direction: column;
     flex: 1;
-    padding: 20px;
     align-items: center;
     overflow: auto;
 `;
@@ -48,29 +48,30 @@ const Header = styled.div`
     top: 0;
     display: flex;
     width: 100%;
-    padding: 10px;
+    padding: ${spacingsPx.sm};
     justify-content: space-between;
     align-items: center;
     flex-direction: column;
-    max-width: ${MAX_WIDTH};
-    background: ${({ theme }) => theme.BG_LIGHT_GREY};
-    box-shadow: 0 14px 10px 4px ${({ theme }) => theme.BG_LIGHT_GREY};
-    margin-bottom: 14px;
-    z-index: ${variables.Z_INDEX.BASE};
+    max-width: ${MAX_ONBOARDING_WIDTH}px;
+    background: ${({ theme }) => theme.backgroundSurfaceElevation2};
+    box-shadow: 0 ${spacingsPx.md} ${spacingsPx.sm} ${spacingsPx.xxs}
+        ${({ theme }) => theme.backgroundSurfaceElevation2};
+    margin-bottom: ${spacingsPx.md};
+    z-index: ${zIndices.base};
 
     ${variables.SCREEN_QUERY.BELOW_LAPTOP} {
-        padding: 0 20px;
+        padding: 0 ${spacingsPx.lg};
     }
 
     ${variables.SCREEN_QUERY.MOBILE} {
         /* low width screen (mobile) */
-        margin-bottom: 26px;
+        margin-bottom: ${spacingsPx.xl};
     }
 
     @media all and (max-height: ${variables.SCREEN_SIZE.SM}) {
         /* low height screen */
-        padding: 0 20px;
-        margin-bottom: 26px;
+        padding: 0 ${spacingsPx.lg};
+        margin-bottom: ${spacingsPx.xl};
     }
 `;
 
@@ -78,7 +79,8 @@ const LogoHeaderRow = styled.div`
     display: flex;
     width: 100%;
     justify-content: space-between;
-    margin-bottom: 30px;
+    margin-top: ${spacingsPx.lg};
+    margin-bottom: ${spacingsPx.xxl};
 
     ${variables.SCREEN_QUERY.MOBILE} {
         display: none;
@@ -87,7 +89,7 @@ const LogoHeaderRow = styled.div`
 
 const ProgressBarRow = styled.div`
     width: 100%;
-    margin-bottom: 20px;
+    margin-bottom: ${spacingsPx.lg};
 
     ${variables.SCREEN_QUERY.MOBILE} {
         margin-bottom: 0;
@@ -97,12 +99,12 @@ const ProgressBarRow = styled.div`
 const Content = styled.div`
     display: flex;
     flex-direction: column;
-    color: ${({ theme }) => theme.TYPE_DARK_GREY};
+    color: ${({ theme }) => theme.textSubdued};
     justify-content: center;
     align-items: center;
-    max-width: ${MAX_WIDTH};
+    max-width: ${MAX_ONBOARDING_WIDTH}px;
     width: 100%;
-    padding-bottom: 48px;
+    padding: 0 ${spacingsPx.lg} ${spacingsPx.xxxxl} ${spacingsPx.lg};
 `;
 
 const progressBarSteps = [
@@ -150,14 +152,15 @@ export const OnboardingLayout = ({ children }: OnboardingLayoutProps) => {
                                     <TrezorLogo type="suite" width="128px" />
 
                                     <TrezorLink
-                                        size="small"
+                                        type="hint"
                                         variant="nostyle"
                                         href={TREZOR_SUPPORT_URL}
                                     >
                                         <Button
                                             variant="tertiary"
                                             icon="EXTERNAL_LINK"
-                                            alignIcon="right"
+                                            iconAlignment="right"
+                                            size="small"
                                         >
                                             <Translation id="TR_HELP" />
                                         </Button>
@@ -178,7 +181,7 @@ export const OnboardingLayout = ({ children }: OnboardingLayoutProps) => {
                 </ScrollingWrapper>
 
                 <GuideButton />
-                <GuidePanel />
+                <GuideRouter />
             </Body>
         </Wrapper>
     );

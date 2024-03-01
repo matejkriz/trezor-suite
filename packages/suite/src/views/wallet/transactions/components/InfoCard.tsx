@@ -1,18 +1,12 @@
 import { ReactNode } from 'react';
 import styled from 'styled-components';
-import { variables, Card } from '@trezor/components';
-import {
-    HiddenPlaceholder,
-    FormattedCryptoAmount,
-    Sign,
-    SkeletonRectangle,
-} from 'src/components/suite';
+import { variables, Card, SkeletonRectangle } from '@trezor/components';
+import { HiddenPlaceholder, FormattedCryptoAmount, Sign } from 'src/components/suite';
 import { Account } from 'src/types/wallet';
 import BigNumber from 'bignumber.js';
 
 const Wrapper = styled(Card)`
     display: flex;
-    padding: 14px 16px;
     flex: 1;
     min-height: 100px;
 `;

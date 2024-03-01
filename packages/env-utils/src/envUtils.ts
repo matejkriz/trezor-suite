@@ -10,6 +10,7 @@ export const isNative = () => false;
 
 export const getEnvironment = (): Environment => {
     if (isWeb()) return 'web';
+
     return 'desktop';
 };
 
@@ -23,6 +24,7 @@ const getUserAgentParser = () => {
         const ua = getUserAgent();
         userAgentParser = new UAParser(ua);
     }
+
     return userAgentParser;
 };
 
@@ -41,6 +43,7 @@ const getSuiteVersion = () => process.env.VERSION || '';
 
 const getBrowserName = () => {
     const browserName = getUserAgentParser().getBrowser().name;
+
     return browserName?.toLowerCase() || '';
 };
 
@@ -91,7 +94,7 @@ const isLinux = () => {
     return getPlatform().startsWith('Linux');
 };
 
-const isCodesignBuild = () => !!process.env.CODESIGN_BUILD;
+const isCodesignBuild = () => process.env.IS_CODESIGN_BUILD === 'true';
 
 const getOsName = () => {
     if (isWindows()) return 'windows';
@@ -115,6 +118,7 @@ const getOsFamily = () => {
     if (osName === 'Mac OS') {
         return 'MacOS';
     }
+
     return 'Linux';
 };
 

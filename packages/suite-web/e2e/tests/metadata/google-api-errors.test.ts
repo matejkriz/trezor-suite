@@ -7,7 +7,7 @@ const provider = 'google';
 
 describe('Google api errors', () => {
     beforeEach(() => {
-        cy.viewport(1080, 1440).resetDb();
+        cy.viewport(1440, 2560).resetDb();
         cy.task('startEmu', { wipe: true });
         cy.task('setupEmu', {
             mnemonic: 'all all all all all all all all all all all all',
@@ -22,7 +22,7 @@ describe('Google api errors', () => {
         });
         cy.passThroughInitialRun();
         cy.discoveryShouldFinish();
-        cy.getTestElement('@suite/menu/wallet-index').click();
+        cy.getTestElement('@account-menu/btc/normal/0').click();
     });
 
     it('Malformed token', () => {

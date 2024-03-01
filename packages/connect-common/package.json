@@ -1,6 +1,6 @@
 {
     "name": "@trezor/connect-common",
-    "version": "0.0.26",
+    "version": "0.0.29",
     "author": "Trezor <info@trezor.io>",
     "homepage": "https://github.com/trezor/trezor-suite/tree/develop/packages/connect-common",
     "keywords": [
@@ -17,7 +17,7 @@
     "npmPublishAccess": "public",
     "license": "SEE LICENSE IN LICENSE.md",
     "description": "Collection of assets and utils used by trezor-connect library.",
-    "main": "./lib/index.js",
+    "main": "./src/index.ts",
     "files": [
         "lib/",
         "files/**/*.json",
@@ -25,13 +25,16 @@
         "CHANGELOG.md",
         "!**/*.map"
     ],
-    "types": "lib/index.d.ts",
-    "typings": "lib/index.d.ts",
+    "publishConfig": {
+        "main": "lib/index.js",
+        "types": "lib/index.d.ts",
+        "typings": "lib/index.d.ts"
+    },
     "scripts": {
         "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "test:unit": "jest",
-        "build:lib": "rimraf lib && yarn tsc --build ./tsconfig.lib.json",
-        "type-check": "tsc --build tsconfig.json",
+        "test:unit": "yarn g:jest",
+        "build:lib": "yarn g:rimraf lib && yarn g:tsc --build ./tsconfig.lib.json",
+        "type-check": "yarn g:tsc --build tsconfig.json",
         "prepublishOnly": "yarn tsx ../../scripts/prepublishNPM.js",
         "prepublish": "yarn tsx ../../scripts/prepublish.js"
     },
@@ -39,13 +42,10 @@
         "@trezor/env-utils": "workspace:*",
         "@trezor/utils": "workspace:*"
     },
-    "devDependencies": {
-        "jest": "29.5.0",
-        "rimraf": "^5.0.5",
-        "tsx": "^4.6.2",
-        "typescript": "5.3.2"
-    },
     "peerDependencies": {
         "tslib": "^2.6.2"
+    },
+    "devDependencies": {
+        "tsx": "^4.7.0"
     }
 }

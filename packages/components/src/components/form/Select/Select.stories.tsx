@@ -1,6 +1,7 @@
 import { useArgs } from '@storybook/client-api';
+import { Meta, StoryObj } from '@storybook/react';
 
-import { Select as SelectComponent } from './Select';
+import { Select as SelectComponent, SelectProps } from './Select';
 
 const values: any = {
     'None (default)': null,
@@ -16,48 +17,45 @@ const options = Object.keys(values)
 
 export default {
     title: 'Form/Select',
-    argTypes: {
-        option: {
-            control: {
-                disable: true,
-            },
-        },
-        variant: {
-            control: {
-                options: { 'Large (default)': null, Small: 'small' },
-                type: 'radio',
-            },
-        },
-    },
-    args: {
-        option: 'low',
-        variant: null,
-        isSearchable: false,
-        isClearable: false,
-        isClean: false,
-        isDisabled: false,
-        withDropdownIndicator: true,
-    },
-};
+    component: SelectComponent,
+} as Meta;
 
-export const Select = {
+export const Select: StoryObj<SelectProps> = {
     render: ({ ...args }) => {
         // eslint-disable-next-line
         const [{ option }, updateArgs] = useArgs();
         const setOption = (option: { label: string; value: 'string' }) => updateArgs({ option });
 
-        return (
-            <SelectComponent
-                isSearchable={args.isSearchable}
-                isClearable={args.isClearable}
-                isClean={args.isClean}
-                isDisabled={args.isDisabled}
-                withDropdownIndicator={args.withDropdownIndicator}
-                variant={args.variant}
-                value={option}
-                onChange={setOption}
-                options={options}
-            />
-        );
+        return <SelectComponent {...args} value={option} onChange={setOption} options={options} />;
+    },
+    argTypes: {
+        isSearchable: {
+            control: {
+                type: 'boolean',
+            },
+        },
+        isDisabled: {
+            control: {
+                type: 'boolean',
+            },
+        },
+        bottomText: {
+            control: { type: 'text' },
+        },
+        size: {
+            control: {
+                options: { 'Large (default)': null, Small: 'small' },
+                type: 'radio',
+            },
+        },
+        label: {
+            control: { type: 'text' },
+        },
+        placeholder: {
+            control: { type: 'text' },
+        },
+    },
+    args: {
+        label: 'Label',
     },
 };

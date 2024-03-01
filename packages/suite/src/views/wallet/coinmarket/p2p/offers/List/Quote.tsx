@@ -1,20 +1,21 @@
 import { FormattedNumber } from 'react-intl';
-import styled from 'styled-components';
+import styled, { useTheme } from 'styled-components';
 import BigNumber from 'bignumber.js';
 
 import { useFormatters } from '@suite-common/formatters';
 import { Translation } from 'src/components/suite';
-import { Button, H3, Icon, Tooltip, useTheme, variables } from '@trezor/components';
+import { Button, H3, Icon, Tooltip, variables } from '@trezor/components';
 import regional from 'src/constants/wallet/coinmarket/regional';
 import { useCoinmarketP2pOffersContext } from 'src/hooks/wallet/useCoinmarketP2pOffers';
 import { CoinmarketFiatAmount, CoinmarketProviderInfo } from 'src/views/wallet/coinmarket/common';
 import { P2pQuote, P2pQuotesRequest } from 'invity-api';
 import { Avatar } from '../Avatar';
+import { borders } from '@trezor/theme';
 
 const Wrapper = styled.div`
     display: flex;
     flex-direction: column;
-    border-radius: 8px;
+    border-radius: ${borders.radii.xs};
     flex: 1;
     width: 100%;
     min-height: 150px;
@@ -66,7 +67,7 @@ const MainHeading = styled.div`
     color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
     font-size: ${variables.FONT_SIZE.TINY};
     font-weight: ${variables.FONT_WEIGHT.DEMI_BOLD};
-    text-transform: uppercase;
+    text-transform: capitalize;
 `;
 
 const MainValue = styled(H3)`
@@ -113,7 +114,7 @@ const DetailColumn = styled.div`
 
 const DetailHeading = styled.div`
     display: flex;
-    text-transform: uppercase;
+    text-transform: capitalize;
     color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
     font-weight: ${variables.FONT_WEIGHT.DEMI_BOLD};
     padding-bottom: 9px;

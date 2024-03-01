@@ -72,8 +72,9 @@ export const FirmwareTypeChange = ({ isDeviceLocked }: FirmwareTypeProps) => {
                                         <TrezorLink href={HELP_FIRMWARE_TYPE} variant="nostyle">
                                             <Button
                                                 variant="tertiary"
+                                                size="tiny"
                                                 icon="EXTERNAL_LINK"
-                                                alignIcon="right"
+                                                iconAlignment="right"
                                             >
                                                 <Translation id={currentFwType} />
                                             </Button>

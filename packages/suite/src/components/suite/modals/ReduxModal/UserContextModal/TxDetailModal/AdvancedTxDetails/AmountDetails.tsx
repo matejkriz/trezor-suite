@@ -27,7 +27,7 @@ const AmountWrapper = styled.div`
     /* columns: 1. title, 2. crypto amount, 3. fiat amount old, 4. fiat amount now */
     grid-template-columns: 140px minmax(110px, auto) minmax(100px, auto) minmax(100px, auto);
 
-    font-size: ${variables.NEUE_FONT_SIZE.SMALL};
+    font-size: ${variables.FONT_SIZE.SMALL};
     font-weight: ${variables.FONT_WEIGHT.MEDIUM};
     align-items: center;
     overflow: visible;
@@ -157,7 +157,6 @@ export const AmountDetails = ({ tx, isTestnet }: AmountDetailsProps) => {
                 )}
                 {tx.internalTransfers.map((transfer, i) => (
                     <AmountRow
-                        // eslint-disable-next-line react/no-array-index-key
                         key={i}
                         firstColumn={
                             !tx.targets.length && i === 0 ? <Translation id="AMOUNT" /> : undefined
@@ -187,7 +186,6 @@ export const AmountDetails = ({ tx, isTestnet }: AmountDetailsProps) => {
                 ))}
                 {tx.tokens.map((transfer, i) => (
                     <AmountRow
-                        // eslint-disable-next-line react/no-array-index-key
                         key={i}
                         firstColumn={
                             !tx.targets.length && !tx.internalTransfers.length && i === 0 ? (

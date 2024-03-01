@@ -10,7 +10,7 @@ describe('LTC send form with mocked blockbook', () => {
         });
         cy.task('startBridge');
 
-        cy.viewport(1080, 1440).resetDb();
+        cy.viewport(1440, 2560).resetDb();
         cy.prefixedVisit('/settings/coins');
         cy.passThroughInitialRun();
     });
@@ -44,6 +44,7 @@ describe('LTC send form with mocked blockbook', () => {
                 cy.getTestElement('@settings/advance/url').type(customBlockbook);
                 cy.getTestElement('@settings/advance/button/save').click();
 
+                cy.wait(1000);
                 cy.prefixedVisit('/accounts/send#/ltc/0');
                 cy.discoveryShouldFinish();
 

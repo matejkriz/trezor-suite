@@ -1,8 +1,7 @@
 import { useState, useMemo } from 'react';
 import styled from 'styled-components';
-import { variables, Button } from '@trezor/components';
+import { Button } from '@trezor/components';
 import { HELP_CENTER_ZERO_VALUE_ATTACKS } from '@trezor/urls';
-import { getIsZeroValuePhishing } from '@suite-common/suite-utils';
 import {
     isPending,
     findChainedTransactions,
@@ -14,12 +13,14 @@ import {
     selectAccountByKey,
     selectTransactionConfirmations,
     selectAllPendingTransactions,
+    selectIsPhishingTransaction,
 } from '@suite-common/wallet-core';
 import { Translation, Modal, TrezorLink } from 'src/components/suite';
 import { WalletAccountTransaction } from 'src/types/wallet';
 import { BasicTxDetails } from './BasicTxDetails';
 import { AdvancedTxDetails, TabID } from './AdvancedTxDetails/AdvancedTxDetails';
 import { ChangeFee } from './ChangeFee/ChangeFee';
+import { borders, spacingsPx, typography } from '@trezor/theme';
 
 const StyledModal = styled(Modal)`
     width: 755px;
@@ -30,17 +31,17 @@ const StyledModal = styled(Modal)`
 `;
 
 const PhishingBanner = styled.div`
-    margin-bottom: 6px;
-    padding: 6px 0;
-    border-radius: 8px;
-    background: ${({ theme }) => theme.BG_RED};
-    color: ${({ theme }) => theme.TYPE_WHITE};
-    font-size: ${variables.FONT_SIZE.SMALL};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
+    margin-bottom: ${spacingsPx.xs};
+    padding: ${spacingsPx.xs} ${spacingsPx.sm};
+    border-radius: ${borders.radii.xs};
+    background: ${({ theme }) => theme.backgroundAlertRedBold};
+    color: ${({ theme }) => theme.textDefault};
+    ${typography.hint};
 `;
 
 const HelpLink = styled(TrezorLink)`
-    color: ${({ theme }) => theme.TYPE_WHITE};
+    color: ${({ theme }) => theme.textDefault};
+    ${typography.hint}
 `;
 
 const SectionActions = styled.div`
@@ -51,9 +52,8 @@ const SectionActions = styled.div`
 `;
 
 const SectionTitle = styled.div`
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    font-size: ${variables.NEUE_FONT_SIZE.NORMAL};
-    font-weight: ${variables.FONT_WEIGHT.DEMI_BOLD};
+    color: ${({ theme }) => theme.textSubdued};
+    ${typography.highlight}
 `;
 
 const Col = styled.div`
@@ -69,7 +69,7 @@ const Right = styled(Col)`
     justify-content: flex-end;
 
     > * + * {
-        margin-left: 12px;
+        margin-left: ${spacingsPx.sm};
     }
 `;
 
@@ -94,6 +94,7 @@ export const TxDetailModal = ({ tx, rbfForm, onCancel }: TxDetailModalProps) => 
     // https://github.com/trezor/blockbook/issues/555
     const chainedTxs = useMemo(() => {
         if (!isPending(tx)) return;
+
         return findChainedTransactions(tx.descriptor, tx.txid, transactions);
     }, [tx, transactions]);
     const accountKey = getAccountKey(tx.descriptor, tx.symbol, tx.deviceState);
@@ -102,7 +103,9 @@ export const TxDetailModal = ({ tx, rbfForm, onCancel }: TxDetailModalProps) => 
     );
     const account = useSelector(state => selectAccountByKey(state, accountKey));
     const network = account && getAccountNetwork(account);
-    const isZeroValuePhishing = getIsZeroValuePhishing(tx);
+    const isPhishingTransaction = useSelector(state =>
+        selectIsPhishingTransaction(state, tx.txid, accountKey),
+    );
 
     return (
         <StyledModal
@@ -110,13 +113,17 @@ export const TxDetailModal = ({ tx, rbfForm, onCancel }: TxDetailModalProps) => 
             onCancel={onCancel}
             heading={<Translation id="TR_TRANSACTION_DETAILS" />}
         >
-            {isZeroValuePhishing && (
+            {isPhishingTransaction && (
                 <PhishingBanner>
                     <Translation
                         id="TR_ZERO_PHISHING_BANNER"
                         values={{
                             a: chunks => (
-                                <HelpLink href={HELP_CENTER_ZERO_VALUE_ATTACKS} variant="underline">
+                                <HelpLink
+                                    type="hint"
+                                    href={HELP_CENTER_ZERO_VALUE_ATTACKS}
+                                    variant="underline"
+                                >
                                     {chunks}
                                 </HelpLink>
                             ),
@@ -133,8 +140,8 @@ export const TxDetailModal = ({ tx, rbfForm, onCancel }: TxDetailModalProps) => 
                 confirmations={confirmations}
             />
 
-            <SectionActions>
-                {network?.features?.includes('rbf') && tx.rbfParams && !tx.deadline && (
+            {network?.features?.includes('rbf') && tx.rbfParams && !tx.deadline && (
+                <SectionActions>
                     <>
                         {section === 'CHANGE_FEE' && (
                             // Show back button and section title when bumping fee/finalizing txs
@@ -194,8 +201,8 @@ export const TxDetailModal = ({ tx, rbfForm, onCancel }: TxDetailModalProps) => 
                             )}
                         </Right>
                     </>
-                )}
-            </SectionActions>
+                </SectionActions>
+            )}
 
             {section === 'CHANGE_FEE' ? (
                 <ChangeFee
@@ -214,6 +221,7 @@ export const TxDetailModal = ({ tx, rbfForm, onCancel }: TxDetailModalProps) => 
                     network={network!}
                     tx={tx}
                     chainedTxs={chainedTxs}
+                    isPhishingTransaction={isPhishingTransaction}
                 />
             )}
         </StyledModal>

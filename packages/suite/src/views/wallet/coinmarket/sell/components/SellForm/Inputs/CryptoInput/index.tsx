@@ -18,7 +18,7 @@ import {
     invityApiSymbolToSymbol,
 } from 'src/utils/wallet/coinmarket/coinmarketUtils';
 import { useBitcoinAmountUnit } from 'src/hooks/wallet/useBitcoinAmountUnit';
-import { useTranslation } from 'src/hooks/suite';
+import { useSelector, useTranslation } from 'src/hooks/suite';
 import { useFormatters } from '@suite-common/formatters';
 import {
     validateDecimals,
@@ -26,6 +26,9 @@ import {
     validateLimits,
     validateMin,
 } from 'src/utils/suite/validation';
+import { networkToCryptoSymbol } from 'src/utils/wallet/coinmarket/cryptoSymbolUtils';
+import { selectTokenDefinitions } from '@suite-common/wallet-core';
+import { hasNetworkTypeTradableTokens } from 'src/utils/wallet/coinmarket/commonUtils';
 
 const Option = styled.div`
     display: flex;
@@ -50,27 +53,26 @@ const CryptoInput = () => {
         control,
         amountLimits,
         onCryptoAmountChange,
-        getValues,
         sellInfo,
         setValue,
         setAmountLimits,
         composeRequest,
-        tokensFiatValue,
     } = useCoinmarketSellFormContext();
     const { shouldSendInSats } = useBitcoinAmountUnit(account.symbol);
+    const tokenDefinitions = useSelector(state => selectTokenDefinitions(state, account.symbol));
 
     const { CryptoAmountFormatter } = useFormatters();
 
     const { translationString } = useTranslation();
 
-    const uppercaseSymbol = account.symbol.toUpperCase();
+    const cryptoSymbol = networkToCryptoSymbol(account.symbol)!;
     const cryptoOption = {
-        value: uppercaseSymbol,
-        label: uppercaseSymbol,
+        value: cryptoSymbol,
+        label: cryptoSymbol,
+        cryptoSymbol,
     };
 
     const { tokens } = account;
-    const cryptoInputValue = getValues(CRYPTO_INPUT);
 
     const cryptoInputRules = {
         validate: {
@@ -92,12 +94,11 @@ const CryptoInput = () => {
             control={control}
             onChange={onCryptoAmountChange}
             defaultValue=""
-            inputState={getInputState(errors.cryptoInput, cryptoInputValue)}
+            inputState={getInputState(errors.cryptoInput)}
             name={CRYPTO_INPUT}
-            noTopLabel
             maxLength={formInputsMaxLength.amount}
             rules={cryptoInputRules}
-            bottomText={errors[CRYPTO_INPUT]?.message}
+            bottomText={errors[CRYPTO_INPUT]?.message || null}
             innerAddon={
                 <Controller
                     control={control}
@@ -135,22 +136,19 @@ const CryptoInput = () => {
                             options={getSendCryptoOptions(
                                 account,
                                 sellInfo?.supportedCryptoCurrencies || new Set(),
-                                tokensFiatValue,
+                                tokenDefinitions,
                             )}
                             isClean
-                            hideTextCursor
-                            isDisabled={account.networkType !== 'ethereum'}
-                            minWidth="100px"
-                            formatOptionLabel={(option: any) => (
+                            isDisabled={!hasNetworkTypeTradableTokens(account.networkType)}
+                            minValueWidth="100px"
+                            formatOptionLabel={(
+                                option: ReturnType<typeof getSendCryptoOptions>[number],
+                            ) => (
                                 <Option>
                                     {account.symbol === option.value.toLowerCase() ? (
                                         <CoinLogo size={18} symbol={account.symbol} />
                                     ) : (
-                                        <TokenLogo
-                                            src={`${invityAPI.getApiServerUrl()}/images/coins/suite/${
-                                                option.value
-                                            }.svg`}
-                                        />
+                                        <TokenLogo src={invityAPI.getCoinLogoUrl(option.value)} />
                                     )}
                                     <Label>{shouldSendInSats ? 'sat' : option.label}</Label>
                                 </Option>

@@ -1,16 +1,20 @@
 import TrezorConnect from '@trezor/connect';
-import { Button, ButtonProps } from '@trezor/components';
-import { Translation } from 'src/components/suite';
+import { ButtonProps, Button } from '@trezor/components';
+import { Translation } from './Translation';
 
-export const WebUsbButton = (props: ButtonProps) => (
-    <Button
-        {...props}
-        icon="SEARCH"
-        onClick={e => {
-            e.stopPropagation();
-            TrezorConnect.requestWebUSBDevice();
-        }}
-    >
-        <Translation id="TR_CHECK_FOR_DEVICES" />
-    </Button>
+export const WebUsbButton = (props: Omit<ButtonProps, 'children'>) => (
+    <div data-test="web-usb-button">
+        <Button
+            {...props}
+            icon="SEARCH"
+            variant="primary"
+            onClick={e => {
+                e.stopPropagation();
+                TrezorConnect.requestWebUSBDevice();
+            }}
+            size="small"
+        >
+            <Translation id="TR_CHECK_FOR_DEVICES" />
+        </Button>
+    </div>
 );

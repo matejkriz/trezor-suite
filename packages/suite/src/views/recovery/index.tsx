@@ -3,12 +3,12 @@ import { useIntl } from 'react-intl';
 import styled from 'styled-components';
 
 import { getCheckBackupUrl } from '@suite-common/suite-utils';
-import { Button, H2, P, Image, variables } from '@trezor/components';
+import { Button, H2, Paragraph, Image } from '@trezor/components';
 import { pickByDeviceModel } from '@trezor/device-utils';
 import TrezorConnect, { DeviceModelInternal } from '@trezor/connect';
 
 import { SelectWordCount, SelectRecoveryType } from 'src/components/recovery';
-import { Loading, Translation, CheckItem, TrezorLink, Modal } from 'src/components/suite';
+import { Loading, Translation, CheckItem, Modal } from 'src/components/suite';
 import { ReduxModal } from 'src/components/suite/modals/ReduxModal/ReduxModal';
 import {
     checkSeed,
@@ -21,6 +21,7 @@ import type { ForegroundAppProps } from 'src/types/suite';
 import type { WordCount } from 'src/types/recovery';
 import { InstructionStep } from 'src/components/suite/InstructionStep';
 import messages from 'src/support/messages';
+import { LearnMoreButton } from 'src/components/suite/LearnMoreButton';
 
 const StyledModal = styled(Modal)`
     min-height: 450px;
@@ -38,8 +39,7 @@ const StepsContainer = styled.div`
     margin: 40px 0;
 `;
 
-const StyledP = styled(P)`
-    font-size: ${variables.FONT_SIZE.SMALL};
+const StyledP = styled(Paragraph)`
     color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
 `;
 
@@ -113,7 +113,7 @@ export const Recovery = ({ onCancel }: ForegroundAppProps) => {
 
     const actionButtons = (
         <>
-            {recovery.status === 'initial' && (
+            {recovery.status === 'initial' ? (
                 <StyledButton
                     onClick={() =>
                         deviceModelInternal === DeviceModelInternal.T1B1
@@ -124,6 +124,10 @@ export const Recovery = ({ onCancel }: ForegroundAppProps) => {
                     data-test="@recovery/start-button"
                 >
                     <Translation id="TR_START" />
+                </StyledButton>
+            ) : (
+                <StyledButton onClick={() => onCancel()}>
+                    <Translation id="TR_CLOSE" />
                 </StyledButton>
             )}
         </>
@@ -142,7 +146,7 @@ export const Recovery = ({ onCancel }: ForegroundAppProps) => {
             case 'initial':
                 return (
                     <>
-                        <LeftAlignedP>
+                        <LeftAlignedP type="hint">
                             <Translation id={seedBackupLengthMessage} />
                         </LeftAlignedP>
 
@@ -185,11 +189,7 @@ export const Recovery = ({ onCancel }: ForegroundAppProps) => {
                             title={<Translation id="TR_DRY_RUN_CHECK_ITEM_TITLE" />}
                             description={<Translation id="TR_DRY_RUN_CHECK_ITEM_DESCRIPTION" />}
                             isChecked={understood}
-                            link={
-                                <TrezorLink icon="EXTERNAL_LINK" size="tiny" href={learnMoreUrl}>
-                                    <Translation id="TR_LEARN_MORE" />
-                                </TrezorLink>
-                            }
+                            link={<LearnMoreButton url={learnMoreUrl} />}
                             onClick={() => setUnderstood(!understood)}
                         />
                     </>
@@ -217,7 +217,7 @@ export const Recovery = ({ onCancel }: ForegroundAppProps) => {
                 return modal.context !== '@modal/context-none' ? (
                     <>
                         {device.features.capabilities.includes('Capability_PassphraseEntry') && (
-                            <LeftAlignedP>
+                            <LeftAlignedP type="hint">
                                 <Translation id="TR_ENTER_SEED_WORDS_ON_DEVICE" />
                             </LeftAlignedP>
                         )}
@@ -233,7 +233,7 @@ export const Recovery = ({ onCancel }: ForegroundAppProps) => {
                         <H2 data-test="@recovery/success-title">
                             <Translation id="TR_SEED_CHECK_SUCCESS_TITLE" />
                         </H2>
-                        <StyledP>
+                        <StyledP type="hint">
                             <Translation id="TR_SEED_CHECK_SUCCESS_DESC" />
                         </StyledP>
                     </VerticalCenter>
@@ -243,7 +243,7 @@ export const Recovery = ({ onCancel }: ForegroundAppProps) => {
                         <H2>
                             <Translation id="TR_SEED_CHECK_FAIL_TITLE" />
                         </H2>
-                        <StyledP>
+                        <StyledP type="hint">
                             <Translation
                                 id="TR_RECOVERY_ERROR"
                                 values={{ error: recovery.error }}
@@ -260,7 +260,7 @@ export const Recovery = ({ onCancel }: ForegroundAppProps) => {
             heading={<Translation id="TR_CHECK_RECOVERY_SEED" />}
             totalProgressBarSteps={statesInProgressBar.length}
             currentProgressBarStep={statesInProgressBar.findIndex(s => s === recovery.status) + 1}
-            bottomBar={actionButtons}
+            bottomBarComponents={actionButtons}
             isCancelable
             onCancel={() => {
                 if (['in-progress', 'waiting-for-confirmation'].includes(recovery.status)) {

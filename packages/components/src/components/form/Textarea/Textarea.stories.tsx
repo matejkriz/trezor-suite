@@ -1,11 +1,12 @@
 import { useArgs } from '@storybook/client-api';
+import { Meta, StoryObj } from '@storybook/react';
 import { ChangeEventHandler } from 'react';
-import { Textarea as TextareaComponent } from './Textarea';
+import { Textarea as TextareaComponent, TextareaProps } from './Textarea';
 
 export default {
     title: 'Form/Textarea',
     component: TextareaComponent,
-};
+} as Meta;
 
 const Component = ({ ...args }) => {
     const [{ value }, updateArgs] = useArgs();
@@ -16,16 +17,21 @@ const Component = ({ ...args }) => {
     return <TextareaComponent value={value} onChange={handleChange} {...args} />;
 };
 
-export const Textarea = {
+export const Textarea: StoryObj<TextareaProps> = {
     render: Component,
     args: {
-        defaultValue: 'Textarea',
         label: 'Label',
         rows: 5,
         maxLength: 500,
         characterCount: true,
     },
     argTypes: {
+        label: {
+            control: 'text',
+        },
+        placeholder: {
+            control: 'text',
+        },
         rows: {
             control: {
                 min: 1,
@@ -34,20 +40,17 @@ export const Textarea = {
                 type: 'range',
             },
         },
-        labelAddon: {
-            control: false,
+        labelHoverAddon: {
+            control: 'text',
         },
         labelRight: {
-            control: false,
-        },
-        innerRef: {
-            control: false,
-        },
-        wrapperProps: {
-            control: false,
+            control: 'text',
         },
         bottomText: {
             control: 'text',
+        },
+        innerRef: {
+            control: false,
         },
         value: {
             control: false,

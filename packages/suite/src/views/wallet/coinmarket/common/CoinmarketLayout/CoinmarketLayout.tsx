@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import styled from 'styled-components';
 
-import { WalletLayout, WalletLayoutHeader } from 'src/components/wallet';
+import { WalletLayout, WalletSubpageHeading } from 'src/components/wallet';
 import { Card, Button, variables } from '@trezor/components';
 import { CoinmarketLayoutNavigation } from './CoinmarketLayoutNavigation';
 import { CoinmarketAccountTransactions } from './CoinmarketAccountTransactions/CoinmarketAccountTransactions';
@@ -17,10 +17,25 @@ const Content = styled.div`
     }
 `;
 
+const StyledCard = styled(Card)`
+    flex: 1;
+    align-self: flex-start;
+`;
+
 const BottomContent = styled.div`
     flex: 1;
     display: flex;
     flex-direction: column;
+`;
+
+const Layout = styled.div`
+    display: flex;
+    flex-direction: row;
+    gap: 60px;
+
+    ${variables.SCREEN_QUERY.BELOW_LAPTOP} {
+        flex-direction: column;
+    }
 `;
 
 interface CoinmarketLayoutProps {
@@ -34,19 +49,27 @@ export const CoinmarketLayout = ({
     selectedAccount,
     onClearFormButtonClick,
 }: CoinmarketLayoutProps) => (
-    <WalletLayout title="TR_NAV_TRADE" account={selectedAccount}>
-        <WalletLayoutHeader title="TR_NAV_TRADE">
+    <WalletLayout title="TR_NAV_TRADE" isSubpage account={selectedAccount}>
+        <WalletSubpageHeading title="TR_NAV_TRADE">
             {onClearFormButtonClick && (
-                <Button type="button" variant="tertiary" onClick={onClearFormButtonClick}>
+                <Button
+                    size="small"
+                    type="button"
+                    variant="tertiary"
+                    onClick={onClearFormButtonClick}
+                >
                     <Translation id="TR_CLEAR_ALL" />
                 </Button>
             )}
-        </WalletLayoutHeader>
+        </WalletSubpageHeading>
 
-        <Card noPadding>
+        <Layout>
             <CoinmarketLayoutNavigation />
-            <Content>{children}</Content>
-        </Card>
+
+            <StyledCard paddingType="none">
+                <Content>{children}</Content>
+            </StyledCard>
+        </Layout>
 
         <BottomContent>
             <CoinmarketAccountTransactions />

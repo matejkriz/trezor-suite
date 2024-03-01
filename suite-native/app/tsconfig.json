@@ -1,6 +1,6 @@
 {
-    "extends": "../../tsconfig.json",
-    "compilerOptions": { "outDir": "libDev" },
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": { "outDir": "./libDev" },
     "references": [
         {
             "path": "../../suite-common/analytics"
@@ -39,6 +39,7 @@
         {
             "path": "../module-accounts-management"
         },
+        { "path": "../module-add-accounts" },
         { "path": "../module-connect-device" },
         { "path": "../module-dev-utils" },
         { "path": "../module-home" },

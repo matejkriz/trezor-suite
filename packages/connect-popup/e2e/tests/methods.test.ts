@@ -1,15 +1,13 @@
-/* eslint-disable no-await-in-loop */
-/* eslint-disable no-restricted-syntax */
-
-import { test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { TrezorUserEnvLink } from '@trezor/trezor-user-env-link';
 import { fixtures } from './__fixtures__/methods';
 import { buildOverview } from '../support/buildOverview';
 import { ensureDirectoryExists } from '@trezor/node-utils';
-import { getContexts, log, openPopup } from '../support/helpers';
+import { getContexts, log, openPopup, setConnectSettings } from '../support/helpers';
 
 const url = process.env.URL || 'http://localhost:8088/';
+const connectSrc = process.env.TREZOR_CONNECT_SRC;
 
 const emuScreenshots: Record<string, string> = {};
 
@@ -27,6 +25,9 @@ const screenshotEmu = async (path: string) => {
 
 test.beforeAll(async () => {
     await TrezorUserEnvLink.connect();
+    log(`isWebExtension: ${isWebExtension}`);
+    log(`connectSrc: ${connectSrc}`);
+    log(`url: ${url}`);
 });
 
 test.afterEach(async () => {
@@ -48,6 +49,7 @@ const filteredFixtures = fixtures.filter(f => {
     if (isWebExtension && methodsUrlToSkipInWebExtension.includes(f.url)) {
         return false;
     }
+
     return true;
 });
 filteredFixtures.forEach(f => {
@@ -79,14 +81,21 @@ filteredFixtures.forEach(f => {
 
         const screenshotsPath = await ensureDirectoryExists(`./e2e/screenshots/${f.url}`);
 
-        const { explorerPage, exploreUrl, browserContext } = await getContexts(
+        const { explorerPage, explorerUrl, browserContext } = await getContexts(
             page,
             url,
             isWebExtension,
         );
         context = browserContext;
 
-        await explorerPage.goto(`${exploreUrl}#/method/${f.url}`);
+        if (connectSrc) {
+            await setConnectSettings(explorerPage, explorerUrl, {
+                trustedHost: false,
+                connectSrc,
+            });
+        }
+
+        await explorerPage.goto(`${explorerUrl}#/method/${f.url}`);
 
         // screenshot request
         log(f.url, 'screenshot @trezor/connect call params');
@@ -118,12 +127,22 @@ filteredFixtures.forEach(f => {
         });
         await popup.click('button.confirm');
 
+        log(f.url, 'checking method name set');
+        // In React shadow DOM, so we use evaluate to get the method name
+        const methodName = await popup.evaluate(() => {
+            return (document as Document)
+                ?.querySelector('#react')
+                ?.shadowRoot?.querySelector("aside[data-test='@info-panel'] h2")?.textContent;
+        });
+        expect(methodName).not.toBe(undefined);
+        expect(methodName).not.toBe('');
+
         let screenshotCount = 1;
         for (const v of f.views) {
             log(f.url, v.selector, 'expecting view');
 
             if (v.action === 'close') {
-                popup.close();
+                popup.close({ runBeforeUnload: true });
             }
 
             if (v.selector) {

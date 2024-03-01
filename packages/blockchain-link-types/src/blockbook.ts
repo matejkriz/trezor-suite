@@ -8,7 +8,7 @@ import type {
     EstimateFeeParams,
     AccountInfoParams,
 } from './params';
-import type { AccountBalanceHistory, FiatRates, TokenStandard } from './common';
+import type { AccountBalanceHistory, FiatRatesLegacy, TokenStandard, StakingPool } from './common';
 import type {
     Tx as BlockbookTx,
     Vin,
@@ -103,6 +103,7 @@ export interface AccountInfo {
     nonce?: string;
     tokens?: (XPUBAddress | ERC20 | ERC721 | ERC1155)[];
     erc20Contract?: ERC20;
+    stakingPools?: StakingPool[];
 }
 
 export interface AccountUtxoParams {
@@ -151,12 +152,12 @@ export interface AddressNotification {
 }
 
 export interface FiatRatesNotification {
-    rates: FiatRates;
+    rates: FiatRatesLegacy;
 }
 
 export interface TimestampedFiatRates {
     ts: number;
-    rates: FiatRates;
+    rates: FiatRatesLegacy;
 }
 
 export interface FiatRatesForTimestamp {

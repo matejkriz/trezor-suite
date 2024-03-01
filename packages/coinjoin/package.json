@@ -16,12 +16,12 @@
     "sideEffects": false,
     "main": "src/index.ts",
     "scripts": {
-        "lint": "eslint '**/*.{ts,js}'",
-        "test:unit": "jest --version && jest",
-        "test:discovery": "tsx ./tests/tools/discovery-test.ts",
-        "test:anonymity": "tsx ./tests/tools/anonymity-test.ts",
-        "test:benchmark": "tsx ./tests/tools/benchmark-test.ts",
-        "type-check": "tsc --build"
+        "lint:js": "eslint '**/*.{ts,js}'",
+        "test:unit": "yarn g:jest",
+        "test:discovery": "yarn g:tsx ./tests/tools/discovery-test.ts",
+        "test:anonymity": "yarn g:tsx ./tests/tools/anonymity-test.ts",
+        "test:benchmark": "yarn g:tsx ./tests/tools/benchmark-test.ts",
+        "type-check": "yarn g:tsc --build"
     },
     "dependencies": {
         "@trezor/blockchain-link": "workspace:*",
@@ -29,15 +29,10 @@
         "@trezor/blockchain-link-utils": "workspace:*",
         "@trezor/utils": "workspace:*",
         "@trezor/utxo-lib": "workspace:*",
-        "bignumber.js": "^9.1.1",
+        "bignumber.js": "^9.1.2",
         "cross-fetch": "^4.0.0",
         "events": "^3.3.0",
         "golomb": "1.2.0",
         "n64": "^0.2.10"
-    },
-    "devDependencies": {
-        "jest": "29.5.0",
-        "rimraf": "^5.0.5",
-        "typescript": "5.3.2"
     }
 }

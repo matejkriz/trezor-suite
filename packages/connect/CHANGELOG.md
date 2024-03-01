@@ -1,3 +1,104 @@
+# 9.2.0
+
+## @trezor/connect-web npm package
+
+Single unified popup manager that for both connect-web and connect-webextension package.
+
+-   chore(connect-web): add channel descriptors to poup, iframe (d6a054e)
+-   chore(connect-web): refactor popupmanager (af1723e)
+-   other: 0059145, 5da505b, ee98bb5
+-   fix(connect-web): race condition POPUP.HANDSHAKE before IFRAME.CALL (a433f85)
+
+## @trezor/connect-webextension npm package
+
+This package is now out of beta.
+
+-   fix(connect-webextension): equalSettings in init, don't focus extension on error (64eb6ec)
+-   feat(connect): add CHANNEL_HANDSHAKE_CONFIRM to webextension events (1527034)
+-   feat(connect-webextension): emit events for WEBEXTENSION.CHANNEL_HANDSHAKE_CONFIRM (4ab8a8c)
+-   test(connect-popup): integrate testing for connect-webextension (06b91ec)
+
+## @trezor/connect
+
+-   feat(connect): device.availableTranslations field (5ac97e7)
+-   feat(connect): rebootToBootloader, add params (boot_command, firmware_header, language_data_length) (b0f7487)
+-   fix(connect): set min version for rebootToBootloader to correct value (74ad010)
+-   chore(connect): improve types of fetch assets util (9d60004)
+-   fix(connect): toMessageObject undefined (df55715)
+-   feat(connect): add reconnect functionality to BackendManager (9783a9e, 3390bfb, af0599f)
+
+## @trezor/connect-explorer and @trezor/connect-popup
+
+-   feat(connect-explorer): add changeLanguage method (7339a2d)
+-   chore(connect-explorer): upgrade markdown-it (087ca01)
+-   chore(connect-explorer): update markdown-it-replace-link (0a83011)
+-   chore(connect-explorer): remove unused AsyncSelect (94eb3f7)
+-   fix(connect): display loading before device acquired (815c69d)
+-   fix(connect): display device selection if device unacquired (231410e)
+
+## Stellar
+
+-   feat(connect): add support for StellarClaimClaimableBalanceOp. (51a3e29)
+-   chore(connect-plugin-stellar): update stellar libraries (2130437, 714bbbd)
+
+## General refactoring
+
+-   chore: dependencies and monorepo changes (fecd89f, c21d81f, 84bc9b8, 5a6759e, 01e33b7, 00fe229, a7e6879, 004938e, fac6d99, d3f8043, ed1fd3e, 3861846, 9fdccc9, 44fa12a)
+-   chore(repo): remove build from protobuf (chore(repo): remove build from protobuf #11288) (11ffd94)
+-   chore(repo): remove build:lib for some simple packages (chore(repo): remove build:lib for some simple packages #11276) (7febd10)
+-   chore(utils): remove build step requirement from @trezor/utils (chore(utils): remove build step requirement from @trezor/utils #11176) (6cd3d3c)
+-   chore(connect-explorer-webextension): delete package - now in connect-explorer/src-webextension (494afc7)
+
+## Dependencies update
+
+-   npm-release: @trezor/blockchain-link 2.1.26
+-   npm-release: @trezor/blockchain-link-utils 1.0.15
+-   npm-release: @trezor/blockchain-link-types 1.0.14
+-   npm-release: @trezor/type-utils 1.0.5
+-   npm-release: @trezor/connect-analytics 1.0.13
+-   npm-release: @trezor/analytics 1.0.15
+-   npm-release: @trezor/connect-common 0.0.29
+-   npm-release: @trezor/env-utils 1.0.14
+-   npm-release: @trezor/transport 1.1.25
+-   npm-release: @trezor/protobuf 1.0.9
+-   npm-release: @trezor/schema-utils 1.0.2
+-   npm-release: @trezor/protocol 1.0.6
+-   npm-release: @trezor/utxo-lib 2.0.7
+-   npm-release: @trezor/utils 9.0.22
+-   npm-release: @trezor/connect 9.2.0
+
+# 9.1.12
+
+-   chore(connect): add new CA pubkeys and update timestamp (a4ca9b1)
+-   chore(connect): improve types, replace any with PassphrasePromptResponse (9a95962)
+-   feat: add Polygon (8c569ca)
+-   fix(connect-popup): display errors with no code (8b7cbfa)
+-   fix(connect-popup): don't show error when no device selected (f246369)
+-   fix(connect-ui): tipcontainer bottom margin (bb0379d)
+-   refactor(connect): unify message promises (b0d4b11)
+-   refactor(connect): remove initAsyncPromise (da48a71)
+-   refactor(connect): unify initCore and initTransport (00deffa, 027be4f)
+-   refactor(connect): CoreRequestMessage/CoreEventMessage separation (ea3afa2)
+-   chore(connect-ui): mirror store to local react state (b587a65)
+-   feat(connect): deal with disconnected && preferredDevice (40e9db8, 6e4ddb4)
+-   chore(connect): use preferred device from store (d1899e8)
+-   chore(connect-common): remove es5 target (fails with TypedEmitter) (0a19580)
+-   feat(connect-common): store is event emitter, saves permissions and preferred device (db0e963)
+-   feat(connect-common): message channel to allow lazy handshake (79be923)
+-   chore(connect-ui): ui changes (dcb8e02, 03c6cc6, 936f6b5, 6b7ed69, 8f9f3e2, 4cc0cd6)
+-   fix(libs): changes in libs that should allow compiling connect with typescript option skipLibCheck: false
+-   chore(connect): split dev and prod builds. (535dd48)
+-   dependencies update: @trezor/blockchain-link, @trezor/blockchain-link-types, @trezor/type-utils, @trezor/analytics, @trezor/connect-common, @trezor/env-utils, @trezor/transport, @trezor/protobuf, @trezor/utxo-lib, @trezor/utils
+
+# 9.1.11
+
+-   fix(connect): use weak assert in altcoin signTransaction (86b3703279)
+-   fix(connect): rebootToBootloader misbehaviour (662543c429)
+-   feat(connect-explorer): add connectSrc to settings (053e9f0908)
+-   fix(connect): nem and eth signTx validation issues (a53937c2ea)
+-   fix(connect): allow empty signature in multisig in getAddress (3b356b5952)
+-   fix(connect-examples): webextensions example update usb permissions url (cfbdfc2469)
+
 # 9.1.10
 
 -   chore(connect): bump ADA support version, min required version is now 2.4.3 (7937fea3ec)

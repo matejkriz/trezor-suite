@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { Timestamp } from '@suite-common/wallet-types';
+import { Timestamp, TokenAddress } from '@suite-common/wallet-types';
 import BigNumber from 'bignumber.js';
 import styled from 'styled-components';
 import { Controller } from 'react-hook-form';
@@ -42,7 +42,7 @@ export const Fiat = ({ output, outputId }: FiatProps) => {
     const {
         account,
         network,
-        fiatRates,
+        fiatRate,
         formState: { errors },
         clearErrors,
         getDefaultValue,
@@ -101,7 +101,7 @@ export const Fiat = ({ output, outputId }: FiatProps) => {
     const errorToDisplay = !error && fiatValue && amountError ? amountError : error;
 
     const isLowAnonymity = isLowAnonymityWarning(outputError);
-    const inputState = isLowAnonymity ? 'warning' : getInputState(errorToDisplay, fiatValue);
+    const inputState = isLowAnonymity ? 'warning' : getInputState(errorToDisplay);
     const bottomText = isLowAnonymity ? null : errorToDisplay?.message;
 
     const handleChange = useCallback(
@@ -128,10 +128,9 @@ export const Fiat = ({ output, outputId }: FiatProps) => {
 
             const decimals = token ? token.decimals : network.decimals;
 
-            const amount =
-                fiatRates && fiatRates.current && fiatCurrency
-                    ? fromFiatCurrency(value, fiatCurrency, fiatRates.current.rates, decimals)
-                    : null;
+            const amount = fiatRate?.rate
+                ? fromFiatCurrency(value, fiatCurrency, fiatRate, decimals, false)
+                : null;
 
             const formattedAmount = shouldSendInSats
                 ? amountToSatoshi(amount || '0', decimals)
@@ -152,7 +151,7 @@ export const Fiat = ({ output, outputId }: FiatProps) => {
             currencyValue.value,
             token,
             network.decimals,
-            fiatRates,
+            fiatRate,
             shouldSendInSats,
             composeTransaction,
             amountInputName,
@@ -182,8 +181,7 @@ export const Fiat = ({ output, outputId }: FiatProps) => {
             value={value}
             isClearable={false}
             isSearchable
-            hideTextCursor
-            minWidth="58px"
+            minValueWidth="58px"
             isClean
             data-test={currencyInputName}
             onChange={async (selected: CurrencyOption) => {
@@ -193,7 +191,10 @@ export const Fiat = ({ output, outputId }: FiatProps) => {
                 // Get (fresh) fiat rates for newly selected currency
                 const updateFiatRatesResult = await dispatch(
                     updateFiatRatesThunk({
-                        ticker: { symbol: account.symbol as NetworkSymbol },
+                        ticker: {
+                            symbol: account.symbol as NetworkSymbol,
+                            tokenAddress: token?.contract as TokenAddress,
+                        },
                         localCurrency: selected.value as FiatCurrencyCode,
                         rateType: 'current',
                         lastSuccessfulFetchTimestamp: Date.now() as Timestamp,
@@ -214,14 +215,13 @@ export const Fiat = ({ output, outputId }: FiatProps) => {
             <NumberInput
                 control={control}
                 inputState={inputState}
-                isMonospace
                 onChange={handleChange}
                 name={fiatInputName}
                 data-test={fiatInputName}
                 defaultValue={fiatValue}
                 maxLength={formInputsMaxLength.fiat}
                 rules={rules}
-                bottomText={bottomText}
+                bottomText={bottomText || null}
                 innerAddon={
                     <Controller
                         control={control}

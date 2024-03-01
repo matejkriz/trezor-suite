@@ -1,17 +1,14 @@
 import styled from 'styled-components';
 
-import {
-    CoinmarketFooter,
-    CoinmarketSellTopPanel,
-    NoOffers,
-} from 'src/views/wallet/coinmarket/common';
+import { CoinmarketFooter, NoOffers } from 'src/views/wallet/coinmarket/common';
 import { variables } from '@trezor/components';
 import { Translation } from 'src/components/suite';
 import { useLayout } from 'src/hooks/suite/useLayout';
 import { useCoinmarketSellOffersContext } from 'src/hooks/wallet/useCoinmarketSellOffers';
+import { PageHeader } from 'src/components/suite/layouts/SuiteLayout';
 import { useCoinmarketNavigation } from 'src/hooks/wallet/useCoinmarketNavigation';
-import List from './List';
 import { SelectedOffer } from './SelectedOffer';
+import { SellQuoteList } from './List/SellQuoteList';
 
 const Wrapper = styled.div`
     padding: 16px 32px 32px;
@@ -44,7 +41,7 @@ const DividerRight = styled(DividerLine)``;
 
 const Currency = styled.div`
     color: ${({ theme }) => theme.TYPE_DARK_GREY};
-    text-transform: uppercase;
+    text-transform: capitalize;
     padding-left: 3px;
 `;
 
@@ -66,10 +63,11 @@ const Offers = () => {
         useCoinmarketSellOffersContext();
     const { navigateToSellForm } = useCoinmarketNavigation(account);
 
-    useLayout('Trezor Suite | Trade', CoinmarketSellTopPanel);
+    useLayout('Trezor Suite | Trade', () => <PageHeader backRoute="wallet-coinmarket-sell" />);
 
     const hasLoadingFailed = !(quotes && alternativeQuotes);
     const noOffers = hasLoadingFailed || (quotes.length === 0 && alternativeQuotes.length === 0);
+
     return (
         <Wrapper>
             {!selectedQuote && (
@@ -84,7 +82,7 @@ const Offers = () => {
                         />
                     ) : (
                         <>
-                            <List quotes={quotes} />
+                            {quotes.length > 0 && <SellQuoteList quotes={quotes} />}
                             {alternativeQuotes.length > 0 && (
                                 <>
                                     <Divider>
@@ -95,7 +93,7 @@ const Offers = () => {
                                         </DividerMiddle>
                                         <DividerRight />
                                     </Divider>
-                                    <List isAlternative quotes={alternativeQuotes} />
+                                    <SellQuoteList isAlternative quotes={alternativeQuotes} />
                                 </>
                             )}
                         </>

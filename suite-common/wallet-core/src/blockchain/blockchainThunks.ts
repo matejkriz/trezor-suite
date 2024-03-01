@@ -169,6 +169,7 @@ export const setCustomBackendThunk = createThunk(
     (coin: NetworkSymbol, { getState }) => {
         const blockchain = selectBlockchainState(getState());
         const backends = [getBackendFromSettings(coin, blockchain[coin].backends)];
+
         return setBackendsToConnect(backends);
     },
 );
@@ -215,6 +216,7 @@ export const subscribeBlockchainThunk = createThunk(
             selectAccounts(getState()),
         ).filter(a => isTrezorConnectBackendType(a.backendType)); // do not subscribe accounts with unsupported backend type
         if (!accountsToSubscribe.length) return;
+
         return TrezorConnect.blockchainSubscribe({
             accounts: accountsToSubscribe,
             coin: symbol,
@@ -241,6 +243,7 @@ export const unsubscribeBlockchainThunk = createThunk(
                     coin: symbol,
                 });
             }
+
             // there are no accounts left for this coin, disconnect backend
             return TrezorConnect.blockchainDisconnect({ coin: symbol });
         });
@@ -281,12 +284,9 @@ export const syncAccountsWithBlockchainThunk = createThunk(
 
 export const onBlockchainConnectThunk = createThunk(
     `${blockchainActionsPrefix}/onBlockchainConnectThunk`,
-    async (symbol: string, { dispatch, getState }) => {
+    async (symbol: string, { dispatch }) => {
         const network = getNetwork(symbol.toLowerCase());
         if (!network) return;
-        const blockchainInfo = selectNetworkBlockchainInfo(network.symbol)(getState());
-        // reset previous timeout
-        tryClearTimeout(blockchainInfo.reconnection?.id);
         await dispatch(subscribeBlockchainThunk({ symbol: network.symbol, fiatRates: true }));
         await dispatch(updateFeeInfoThunk(network.symbol));
         // update accounts for connected network
@@ -301,12 +301,19 @@ export const onBlockMinedThunk = createThunk(
         const symbol = block.coin.shortcut.toLowerCase();
         const network = getNetwork(symbol);
 
-        // Don't sync Solana because we emit a new block for Solana every 10 seconds.
-        // Solana accounts are updated via account subscription or also by the timer
-        // in syncAccountsWithBlockchainThunk.
-        if (isNetworkSymbol(symbol) && network?.networkType !== 'solana') {
-            return dispatch(syncAccountsWithBlockchainThunk(symbol));
+        if (!isNetworkSymbol(symbol)) {
+            return;
         }
+
+        // Don't sync fast networks because a new block is emitted every few seconds.
+        // Accounts are updated via account subscription or also by the timer in syncAccountsWithBlockchainThunk.
+        // Solana - new block every 10 seconds
+        // Polygon (matic) - new block every 2 seconds
+        if (network?.networkType === 'solana' || symbol === 'matic') {
+            return;
+        }
+
+        return dispatch(syncAccountsWithBlockchainThunk(symbol));
     },
 );
 
@@ -368,34 +375,13 @@ export const onBlockchainNotificationThunk = createThunk(
 
 export const onBlockchainDisconnectThunk = createThunk(
     `${blockchainActionsPrefix}/onBlockchainDisconnectThunk`,
-    (error: BlockchainError, { dispatch, getState }) => {
+    (error: BlockchainError, { getState }) => {
         const network = getNetwork(error.coin.shortcut.toLowerCase());
         if (!network) return;
 
         const blockchain = selectBlockchainState(getState());
-        const accounts = selectAccounts(getState());
-        const { reconnection, syncTimeout } = blockchain[network.symbol];
+        const { syncTimeout } = blockchain[network.symbol];
         // reset previous timeout
-        tryClearTimeout(reconnection?.id);
         tryClearTimeout(syncTimeout);
-
-        // there is no need to reconnect since there are no accounts for this network
-        const a = findAccountsByNetwork(network.symbol, accounts);
-        if (!a.length) return;
-
-        const count = reconnection ? reconnection.count : 0;
-        const timeout = Math.min(2500 * count, 20000);
-        const time = new Date().getTime() + timeout;
-
-        const id = setTimeout(() => dispatch(reconnectBlockchainThunk(network.symbol)), timeout);
-
-        dispatch(
-            blockchainActions.reconnectTimeoutStart({
-                symbol: network.symbol,
-                id,
-                time,
-                count: count + 1,
-            }),
-        );
     },
 );

@@ -1,14 +1,15 @@
 import styled from 'styled-components';
 
-import { P, Image, variables } from '@trezor/components';
+import { Paragraph, Image, variables } from '@trezor/components';
 import { Translation } from 'src/components/suite';
+import { borders } from '@trezor/theme';
 
 const Wrapper = styled.div`
     display: flex;
     text-align: left;
     background: ${({ theme }) => theme.BG_GREY};
     align-items: center;
-    border-radius: 8px;
+    border-radius: ${borders.radii.xs};
     width: 100%;
     justify-content: space-between;
 `;
@@ -39,15 +40,15 @@ interface DeviceDisconnectedProps {
 export const DeviceDisconnected = ({ label, ...rest }: DeviceDisconnectedProps) => (
     <Wrapper {...rest}>
         <ContentCol>
-            <P size="small">
+            <Paragraph type="hint">
                 <Translation
                     id="TR_DEVICE_LABEL_IS_NOT_CONNECTED"
                     values={{ deviceLabel: label }}
                 />
-            </P>
-            <P size="tiny">
+            </Paragraph>
+            <Paragraph type="label">
                 <Translation id="TR_PLEASE_CONNECT_YOUR_DEVICE" />
-            </P>
+            </Paragraph>
         </ContentCol>
         <ImageCol>
             <Image image="UNI_ERROR" />

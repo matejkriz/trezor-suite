@@ -1,44 +1,13 @@
-import styled, { keyframes, css } from 'styled-components';
+import styled, { css, useTheme } from 'styled-components';
 
 import { Ref, forwardRef, SVGAttributes } from 'react';
 import { ReactSVG } from 'react-svg';
-import { IconType } from '../../../support/types';
-import { useTheme } from '../../../utils';
 import { ICONS } from './icons';
 
-// TODO: make animation of icons better
-const rotate180up = keyframes`
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(180deg);
-    }
-`;
-
-const rotate180down = keyframes`
-    from {
-        transform: rotate(180deg);
-    }
-    to {
-        transform: rotate(0deg);
-    }
-`;
-
-const chooseIconAnimationType = (canAnimate?: boolean, isActive?: boolean) => {
-    if (canAnimate) {
-        if (isActive) {
-            return rotate180up;
-        }
-        return rotate180down;
-    }
-    return null;
-};
+export type IconType = keyof typeof ICONS;
 
 const SvgWrapper = styled.div<{
-    $canAnimate: WrapperProps['canAnimate'];
     $color: WrapperProps['color'];
-    $isActive: WrapperProps['isActive'];
     $hoverColor: WrapperProps['hoverColor'];
     $size: WrapperProps['size'];
     $useCursorPointer: WrapperProps['useCursorPointer'];
@@ -48,8 +17,6 @@ const SvgWrapper = styled.div<{
     justify-content: center;
     height: ${({ $size }) => $size}px;
     width: ${({ $size }) => $size}px;
-    animation: ${({ $canAnimate, $isActive }) => chooseIconAnimationType($canAnimate, $isActive)}
-        0.2s linear 1 forwards;
 
     div {
         display: flex;
@@ -89,8 +56,6 @@ export interface IconProps extends SVGAttributes<HTMLDivElement> {
     icon: IconType;
     size?: number;
     color?: string;
-    isActive?: boolean;
-    canAnimate?: boolean;
     hoverColor?: string;
     useCursorPointer?: boolean;
     'data-test'?: string;
@@ -102,31 +67,26 @@ export const Icon = forwardRef(
             icon,
             size = 24,
             color,
-            isActive,
-            canAnimate,
             hoverColor,
             useCursorPointer,
             className,
             onClick,
             onMouseEnter,
             onMouseLeave,
-            onFocus,
             'data-test': dataTest,
         }: IconProps,
         ref?: Ref<HTMLDivElement>,
     ) => {
         const theme = useTheme();
         const defaultColor = color ?? theme.TYPE_LIGHT_GREY;
+
         return (
             <SvgWrapper
                 className={className}
-                $canAnimate={canAnimate}
                 $hoverColor={hoverColor}
                 onClick={onClick}
                 onMouseEnter={onMouseEnter}
                 onMouseLeave={onMouseLeave}
-                onFocus={onFocus}
-                $isActive={isActive}
                 $size={size}
                 ref={ref}
                 $useCursorPointer={onClick !== undefined || useCursorPointer}

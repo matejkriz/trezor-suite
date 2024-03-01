@@ -1,5 +1,5 @@
-import styled from 'styled-components';
-import { Icon, useTheme, variables } from '@trezor/components';
+import styled, { useTheme } from 'styled-components';
+import { Icon, variables } from '@trezor/components';
 import { WalletAccountTransaction } from '@suite-common/wallet-types';
 import { FormattedDate } from 'src/components/suite';
 import { useLayoutSize } from 'src/hooks/suite/useLayoutSize';
@@ -53,6 +53,7 @@ export const AffectedTransactionItem = ({
     const { isMobileLayout } = useLayoutSize();
     const shownTxidChars = isMobileLayout ? 4 : 8;
     const iconType = tx.type === 'recv' ? 'RECEIVE' : 'SEND';
+
     return (
         <TxRow className={className}>
             {!isMobileLayout && (

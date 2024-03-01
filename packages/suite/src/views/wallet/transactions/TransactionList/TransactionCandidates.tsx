@@ -1,18 +1,18 @@
 import styled from 'styled-components';
 import { resolveStaticPath } from '@suite-common/suite-utils';
 import { Card, SVG_IMAGES, variables } from '@trezor/components';
+import { zIndices } from '@trezor/theme';
 import { useSelector } from 'src/hooks/suite';
 import { selectCoinjoinAccountByKey } from 'src/reducers/wallet/coinjoinReducer';
-import { SECONDARY_PANEL_HEIGHT } from 'src/components/suite/AppNavigation/AppNavigation';
 import { TransactionTypeIcon } from 'src/components/wallet/TransactionItem/TransactionTypeIcon';
 import { TxTypeIconWrapper } from 'src/components/wallet/TransactionItem/CommonComponents';
 import { Translation } from 'src/components/suite/Translation';
 import TooltipSymbol from 'src/components/suite/TooltipSymbol';
+import { SUBPAGE_NAV_HEIGHT } from 'src/constants/suite/layout';
 
 const Header = styled.div`
     position: sticky;
-    background: ${({ theme }) => theme.BG_GREY};
-    top: ${SECONDARY_PANEL_HEIGHT};
+    top: ${SUBPAGE_NAV_HEIGHT};
     padding-top: 8px;
     padding-bottom: 8px;
     padding-right: 24px;
@@ -20,7 +20,7 @@ const Header = styled.div`
     color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
     font-weight: ${variables.FONT_WEIGHT.DEMI_BOLD};
     text-transform: uppercase;
-    z-index: ${variables.Z_INDEX.SECONDARY_STICKY_BAR};
+    z-index: ${zIndices.secondaryStickyBar};
 `;
 
 const Wrapper = styled(Card)`
@@ -35,7 +35,7 @@ const Wrapper = styled(Card)`
     margin: 8px 0 32px;
 
     /* height of secondary panel and a gap between transactions and graph */
-    scroll-margin-top: calc(${SECONDARY_PANEL_HEIGHT} + 115px);
+    scroll-margin-top: calc(${SUBPAGE_NAV_HEIGHT} + 115px);
 
     @media (max-width: ${variables.SCREEN_SIZE.SM}) {
         padding: 0 16px;

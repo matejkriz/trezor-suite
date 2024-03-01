@@ -1,9 +1,9 @@
 import { useEffect, ReactElement } from 'react';
-import styled from 'styled-components';
+import styled, { css } from 'styled-components';
 import { FieldValues } from 'react-hook-form';
 import { getInputState } from '@suite-common/wallet-utils';
 import { useCoinmarketExchangeFormContext } from 'src/hooks/wallet/useCoinmarketExchangeForm';
-import { NumberInput, NumberInputProps } from 'src/components/suite';
+import { NumberInput, NumberInputProps, Translation } from 'src/components/suite';
 import SendCryptoSelect from './SendCryptoSelect';
 import { formInputsMaxLength } from '@suite-common/validators';
 import { CRYPTO_INPUT, CRYPTO_TOKEN, FIAT_INPUT } from 'src/types/wallet/coinmarketExchangeForm';
@@ -17,14 +17,18 @@ import {
     validateReserveOrBalance,
 } from 'src/utils/suite/validation';
 import { useFormatters } from '@suite-common/formatters';
+import { spacingsPx } from '@trezor/theme';
 
 const StyledInput = styled(NumberInput)<{ isToken: boolean }>`
     ${({ isToken }) =>
-        !isToken && {
-            'border-top-right-radius': 0,
-            'border-bottom-right-radius': 0,
-            'padding-right': '105px',
-        }}
+        !isToken &&
+        css`
+            input {
+                border-top-right-radius: 0;
+                border-bottom-right-radius: 0;
+                border-right: ${spacingsPx.xxxs} solid ${({ theme }) => theme.borderOnElevation1};
+            }
+        `}
 ` as <T extends FieldValues>(props: NumberInputProps<T> & { isToken: boolean }) => ReactElement; // Styled wrapper doesn't preserve type argument, see https://github.com/styled-components/styled-components/issues/1803#issuecomment-1181765843
 
 const SendCryptoInput = () => {
@@ -89,13 +93,13 @@ const SendCryptoInput = () => {
                 setValue('setMaxOutputId', undefined, { shouldDirty: true });
                 composeRequest();
             }}
-            inputState={getInputState(amountError || fiatError, amount)}
+            label={<Translation id="TR_FROM" />}
+            inputState={getInputState(amountError || fiatError)}
             name={CRYPTO_INPUT}
-            noTopLabel
             maxLength={formInputsMaxLength.amount}
             isToken={!!tokenData}
             rules={cryptoInputRules}
-            bottomText={amountError?.message}
+            bottomText={amountError?.message || null}
             innerAddon={<SendCryptoSelect />}
         />
     );

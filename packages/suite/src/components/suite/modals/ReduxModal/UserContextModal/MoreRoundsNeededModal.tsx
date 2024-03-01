@@ -1,6 +1,6 @@
-import styled from 'styled-components';
+import styled, { useTheme } from 'styled-components';
 import { useDispatch } from 'src/hooks/suite';
-import { Button, Icon, useTheme, variables } from '@trezor/components';
+import { Button, Icon, variables } from '@trezor/components';
 import { onCancel as closeModal } from 'src/actions/suite/modalActions';
 import { Modal, Translation } from 'src/components/suite';
 
@@ -40,7 +40,7 @@ export const MoreRoundsNeededModal = () => {
 
     return (
         <StyledModal
-            bottomBar={
+            bottomBarComponents={
                 <StyledButton variant="secondary" onClick={close}>
                     <Translation id="TR_OK" />
                 </StyledButton>

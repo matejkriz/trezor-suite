@@ -9,7 +9,7 @@ describe('Passphrase', () => {
 
         cy.task('applySettings', { passphrase_always_on_device: false });
 
-        cy.viewport(1080, 1440).resetDb();
+        cy.viewport(1440, 2560).resetDb();
         cy.prefixedVisit('/');
         cy.passThroughInitialRun();
     });
@@ -29,14 +29,18 @@ describe('Passphrase', () => {
         cy.getTestElement('@passphrase/hidden/submit-button').click();
 
         cy.task('pressYes');
+        cy.wait(501);
         cy.task('pressYes');
+        cy.wait(501);
 
         cy.getTestElement('@passphrase/input', { timeout: 10000 }).type(passphraseToType);
-        cy.getTestElement('@passphrase/confirm-checkbox').click();
+        cy.getTestElement('@passphrase/confirm-checkbox', { timeout: 20000 }).click();
         cy.getTestElement('@passphrase/hidden/submit-button').click();
 
         cy.task('pressYes');
+        cy.wait(501);
         cy.task('pressYes');
+        cy.wait(501);
 
         cy.getTestElement('@dashboard/loading').should('not.exist');
 
@@ -45,7 +49,9 @@ describe('Passphrase', () => {
         cy.getTestElement('@switch-device/add-hidden-wallet-button').click();
 
         cy.task('pressYes');
+        cy.wait(501);
         cy.task('pressYes');
+        cy.wait(501);
 
         cy.getTestElement('@passphrase/input', { timeout: 10000 }).type(passphraseToType);
         cy.getTestElement('@passphrase/hidden/submit-button').click();

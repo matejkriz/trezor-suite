@@ -19,6 +19,7 @@ describe('CoinjoinBackendClient', () => {
         let lastBackend = '';
         jest.spyOn((client as any).websockets, 'getOrCreate').mockImplementation(args => {
             [lastBackend] = (args as any).url.split('/');
+
             return new Proxy({}, { get: (_, b, c) => b !== 'then' && (() => c) });
         });
 
@@ -30,7 +31,6 @@ describe('CoinjoinBackendClient', () => {
         expect(prevIndex).toBeGreaterThanOrEqual(0);
 
         for (let i = 0; i < 10; ++i) {
-            // eslint-disable-next-line no-await-in-loop
             await client.fetchBlock(123456);
             const index = shuffledBackends.indexOf(lastBackend);
             expect(index).toEqual((prevIndex + 1) % shuffledBackends.length);
@@ -43,6 +43,7 @@ describe('CoinjoinBackendClient', () => {
         jest.spyOn((client as any).websockets, 'getOrCreate').mockImplementation(args => {
             const { identity } = args as any;
             identities.push(identity);
+
             return Promise.reject(new Error(identity === 'is' ? 'unknown' : WS_ERROR_403));
         });
 
@@ -86,6 +87,7 @@ describe('CoinjoinBackendClient', () => {
             const { url, identity } = args as any;
             urls.push(url);
             identities.push(identity);
+
             return Promise.reject(
                 new Error(url.includes('.onion') ? WS_ERROR_TIMEOUT : WS_ERROR_403),
             );

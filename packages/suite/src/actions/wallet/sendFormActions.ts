@@ -8,6 +8,7 @@ import {
     replaceTransactionThunk,
     syncAccountsWithBlockchainThunk,
     selectDevice,
+    selectSpecificTokenDefinition,
 } from '@suite-common/wallet-core';
 import { notificationsActions } from '@suite-common/toast-notifications';
 import {
@@ -178,6 +179,7 @@ export const composeTransaction =
         if (account.networkType === 'solana') {
             return dispatch(sendFormSolanaActions.composeTransaction(formValues, formState));
         }
+
         return Promise.resolve(undefined);
     };
 
@@ -199,6 +201,7 @@ export const cancelSignTx = () => (dispatch: Dispatch, getState: GetState) => {
     // if transaction is not signed yet interrupt signing in TrezorConnect
     if (!signedTx) {
         TrezorConnect.cancel('tx-cancelled');
+
         return;
     }
     // otherwise just close modal
@@ -351,6 +354,7 @@ const pushTransaction =
                             value: label,
                             defaultValue: '',
                         };
+
                         return metadata;
                     })
                     // filter out empty values AFTER creating metadata objects (see outputs mapping above)
@@ -386,7 +390,7 @@ export const signTransaction =
     ) =>
     async (dispatch: Dispatch, getState: GetState) => {
         const device = selectDevice(getState());
-        const { account, network } = getState().wallet.selectedAccount;
+        const { account } = getState().wallet.selectedAccount;
 
         if (!device || !account) return;
 
@@ -424,20 +428,17 @@ export const signTransaction =
         }
 
         if (
-            account.networkType === 'ethereum' &&
             !isCardanoTx(account, enhancedTxInfo) &&
-            enhancedTxInfo.token?.contract &&
-            network?.chainId
+            account.networkType === 'ethereum' &&
+            enhancedTxInfo.token?.contract
         ) {
-            const isTokenKnown = await fetch(
-                `https://data.trezor.io/firmware/eth-definitions/chain-id/${
-                    network.chainId
-                }/token-${enhancedTxInfo.token.contract.substring(2).toLowerCase()}.dat`,
-            )
-                .then(response => response.ok)
-                .catch(() => false);
+            const tokenDefinition = selectSpecificTokenDefinition(
+                getState(),
+                account.symbol,
+                enhancedTxInfo.token.contract,
+            );
 
-            enhancedTxInfo.isTokenKnown = isTokenKnown;
+            enhancedTxInfo.isTokenKnown = !!tokenDefinition?.isTokenKnown;
         }
 
         // store formValues and transactionInfo in send reducer to be used by TransactionReviewModal
@@ -490,6 +491,7 @@ export const signTransaction =
         if (!serializedTx) {
             // close modal manually since UI.CLOSE_UI.WINDOW was blocked
             dispatch(modalActions.onCancel());
+
             return;
         }
 

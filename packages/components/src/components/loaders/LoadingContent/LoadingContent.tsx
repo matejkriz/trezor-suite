@@ -1,6 +1,5 @@
 import { ReactNode } from 'react';
-import styled, { css } from 'styled-components';
-import { useTheme } from '../../../utils';
+import styled, { css, useTheme } from 'styled-components';
 import { Icon } from '../../assets/Icon/Icon';
 import { Spinner } from '../Spinner/Spinner';
 
@@ -12,6 +11,7 @@ const LoadingWrapper = styled.div`
 const LoaderCell = styled.div<Required<Omit<LoadingContentProps, 'isSuccessful'>>>`
     width: ${({ size }) => 1.5 * size}px;
     transition: all 0.25s ease-out 0.5s;
+
     ${({ isLoading }) =>
         !isLoading &&
         css`
@@ -19,7 +19,7 @@ const LoaderCell = styled.div<Required<Omit<LoadingContentProps, 'isSuccessful'>
             opacity: 0;
         `}
     svg {
-        fill: ${({ theme }) => theme.TYPE_GREEN};
+        fill: ${({ theme }) => theme.iconPrimaryDefault};
     }
 `;
 
@@ -47,7 +47,7 @@ export const LoadingContent = ({
                     <Icon
                         icon={isSuccessful ? 'CHECK' : 'CROSS'}
                         size={size}
-                        color={isSuccessful ? theme.TYPE_GREEN : theme.TYPE_RED}
+                        color={isSuccessful ? theme.iconPrimaryDefault : theme.iconAlertRed}
                     />
                 )}
             </LoaderCell>

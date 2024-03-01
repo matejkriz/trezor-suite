@@ -1,15 +1,15 @@
 // @group:suite
 // @retry=2
 
-describe('unacquried device', () => {
+describe('unacquired device', () => {
     beforeEach(() => {
-        cy.viewport(1080, 1440).resetDb();
+        cy.viewport(1440, 2560).resetDb();
         cy.task('startEmu', { wipe: true });
         cy.task('setupEmu', { passphrase_protection: true, pin_protection: false });
         cy.task('startBridge');
     });
 
-    it('somone steals session, device status turns inactive', () => {
+    it('someone steals session, device status turns inactive', () => {
         cy.prefixedVisit('/');
         cy.passThroughInitialRun();
         cy.getTestElement('@passphrase-type/standard').click();
@@ -17,13 +17,14 @@ describe('unacquried device', () => {
 
         // simulate stolen session from another window. device receives indicative button
         cy.task('stealBridgeSession');
-        cy.getTestElement('@menu/switch-device/refresh-button').click();
+        cy.getTestElement('@menu/switch-device').click();
+        cy.getTestElement('@switch-device/1/solve-issue-button').click();
         cy.getTestElement('@deviceStatus-connected');
 
-        // when user reloads app while device is ancquired, suite will not try to acquire device so that it
-        // does not interfers with somebody else's session
+        // when user reloads app while device is acquired, suite will not try to acquire device so that it
+        // does not interferes with somebody else's session
         cy.task('stealBridgeSession');
-        cy.getTestElement('@menu/switch-device/refresh-button');
+        cy.getTestElement('@switch-device/1/solve-issue-button');
         cy.reload();
         cy.getTestElement('@device-acquire').click();
         cy.getTestElement('@passphrase-type/standard').click();

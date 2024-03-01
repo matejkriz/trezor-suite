@@ -32,16 +32,6 @@ export const RippleOptions = () => {
 
     return (
         <Wrapper>
-            {destinationEnabled && (
-                <DestinationTag
-                    close={() => {
-                        resetDefaultValue('rippleDestinationTag');
-                        // close additional form
-                        toggleOption('rippleDestinationTag');
-                        composeTransaction();
-                    }}
-                />
-            )}
             <Left>
                 {!destinationEnabled && (
                     <Tooltip
@@ -50,6 +40,7 @@ export const RippleOptions = () => {
                     >
                         <StyledButton
                             variant="tertiary"
+                            size="small"
                             icon="DATA"
                             onClick={() => {
                                 // open additional form
@@ -65,6 +56,7 @@ export const RippleOptions = () => {
                 <Tooltip content={<Translation id="BROADCAST_TOOLTIP" />} cursor="pointer">
                     <StyledButton
                         variant="tertiary"
+                        size="small"
                         icon="BROADCAST"
                         onClick={() => {
                             toggleOption('broadcast');
@@ -76,6 +68,17 @@ export const RippleOptions = () => {
                     </StyledButton>
                 </Tooltip>
             </Left>
+
+            {destinationEnabled && (
+                <DestinationTag
+                    close={() => {
+                        resetDefaultValue('rippleDestinationTag');
+                        // close additional form
+                        toggleOption('rippleDestinationTag');
+                        composeTransaction();
+                    }}
+                />
+            )}
         </Wrapper>
     );
 };

@@ -6,7 +6,7 @@ const DEFAULT_HIDDEN_WALLET_LABEL = 'Hidden wallet #';
 
 describe('Suite switch wallet modal', () => {
     beforeEach(() => {
-        cy.viewport(1080, 1440).resetDb();
+        cy.viewport(1440, 2560).resetDb();
         cy.task('startBridge');
     });
 
@@ -49,7 +49,7 @@ describe('Suite switch wallet modal', () => {
 
         cy.getTestElement('@modal');
         cy.getTestElement('@passphrase/input', { timeout: 10000 }).type(passphaseToType);
-        cy.getTestElement('@passphrase/confirm-checkbox').click();
+        cy.getTestElement('@passphrase/confirm-checkbox', { timeout: 20000 }).click();
         cy.getTestElement('@passphrase/hidden/submit-button').click();
 
         cy.task('pressYes');

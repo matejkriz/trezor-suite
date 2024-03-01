@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState, useMemo, ReactNode } from 'react';
 
 import styled from 'styled-components';
 
-import { PostMessage, UI, UI_REQUEST, POPUP, createPopupMessage } from '@trezor/connect';
+import { UI, UI_REQUEST, POPUP, CoreRequestMessage } from '@trezor/connect';
+import { storage, OriginBoundState } from '@trezor/connect-common';
 
 // views
 import { Transport } from './views/Transport';
@@ -38,7 +39,7 @@ const Layout = styled.div`
 `;
 
 type ConnectUIProps = {
-    postMessage: PostMessage;
+    postMessage: (message: CoreRequestMessage) => void;
     clearLegacyView: () => void;
 };
 
@@ -52,6 +53,10 @@ export const ConnectUI = ({ postMessage, clearLegacyView }: ConnectUIProps) => {
         // set state
         if (message?.type === 'state-update') {
             setState(message.payload);
+
+            // do not add state-update messages to the list of messages
+            // it would mean Component gets set to null
+            return;
         }
 
         // set current view
@@ -67,7 +72,30 @@ export const ConnectUI = ({ postMessage, clearLegacyView }: ConnectUIProps) => {
     useEffect(() => {
         reactEventBus.dispatch({ type: 'connect-ui-rendered' });
         initAnalytics();
+
+        // subscribe to changes
+        storage.on('changed', storageNextState => {
+            setState(prevState => ({ ...prevState, ...storageNextState }));
+        });
     }, []);
+
+    useEffect(() => {
+        if (!state?.settings?.origin) return;
+
+        const data = storage.loadForOrigin(state.settings.origin);
+
+        const getNextState = (prevState: State, originBoundState: OriginBoundState) => ({
+            ...prevState,
+            ...originBoundState,
+        });
+
+        // load initial data
+        setState(prevState => getNextState(prevState, data));
+
+        return () => {
+            storage.removeAllListeners();
+        };
+    }, [state?.settings?.origin]);
 
     const [Component, Notifications] = useMemo(() => {
         let component: ReactNode | null;
@@ -108,6 +136,7 @@ export const ConnectUI = ({ postMessage, clearLegacyView }: ConnectUIProps) => {
             } else if (message?.type === 'phishing-domain') {
                 notifications[message.type] = <SuspiciousOriginNotification key={message.type} />;
             }
+
             return notifications;
         });
 
@@ -148,9 +177,10 @@ export const ConnectUI = ({ postMessage, clearLegacyView }: ConnectUIProps) => {
 
                         <BottomRightFloatingBar
                             onAnalyticsConfirm={enabled => {
-                                postMessage(
-                                    createPopupMessage(POPUP.ANALYTICS_RESPONSE, { enabled }),
-                                );
+                                postMessage({
+                                    type: POPUP.ANALYTICS_RESPONSE,
+                                    payload: { enabled },
+                                });
                             }}
                         />
                     </Layout>

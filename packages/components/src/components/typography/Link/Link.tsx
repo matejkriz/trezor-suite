@@ -1,21 +1,13 @@
 import { ReactNode, MouseEvent } from 'react';
-import styled, { css } from 'styled-components';
+import styled, { css, useTheme } from 'styled-components';
 import { Icon, IconProps } from '../../assets/Icon/Icon';
-import { useTheme } from '../../../utils';
-import { FONT_SIZE } from '../../../config/variables';
-import { ParagraphSize } from '../../../support/types';
-
-const A_SIZES = {
-    normal: FONT_SIZE.NORMAL,
-    small: FONT_SIZE.SMALL,
-    tiny: FONT_SIZE.TINY,
-};
+import { TypographyStyle, spacings, typography, typographyStylesBase } from '@trezor/theme';
 
 const A = styled.a<LinkProps>`
-    font-size: ${props => (props.size ? A_SIZES[props.size] : 'inherit')};
+    ${({ type }) => (type ? typography[type] : typography.body)}
     text-decoration: none;
     cursor: pointer;
-    color: ${({ theme }) => theme.TYPE_DARK_GREY};
+    color: ${({ theme }) => theme.textDefault};
     font-weight: 500;
     display: inline-flex;
     align-items: center;
@@ -35,6 +27,7 @@ const A = styled.a<LinkProps>`
         css`
             color: inherit;
             font-weight: inherit;
+
             &:visited,
             &:active,
             &:hover {
@@ -45,49 +38,53 @@ const A = styled.a<LinkProps>`
 `;
 
 const IconWrapper = styled.div`
-    margin-left: 4px;
+    margin-left: ${spacings.xxs};
 `;
 
 interface LinkProps {
     href?: string;
     to?: any;
     target?: string;
-    size?: ParagraphSize;
+    type?: TypographyStyle;
     onClick?: (event: MouseEvent<any>) => void;
     children?: ReactNode;
     className?: string;
     variant?: 'default' | 'nostyle' | 'underline';
     icon?: IconProps['icon'];
     iconProps?: IconProps;
+    'data-test'?: string;
 }
 
-const Link = ({ icon, iconProps, ...props }: LinkProps) => {
+const Link = ({
+    href,
+    target,
+    icon,
+    iconProps,
+    type,
+    onClick,
+    'data-test': dataTest,
+    ...props
+}: LinkProps) => {
     const theme = useTheme();
+
+    const iconSize = typographyStylesBase[type || 'body'].fontSize;
+
     return (
         <A
-            href={props.href}
-            target={props.target || '_blank'}
+            href={href}
+            target={target || '_blank'}
             rel="noreferrer noopener"
-            {...props} // make sure {...props} is passed before calling onCLick()
+            data-test={dataTest}
             onClick={(e: MouseEvent<any>) => {
-                // if the user passed custom onClick action, run it first
-                if (props.onClick) {
-                    props.onClick(e);
-                }
-                // Prevent events from bubbling to the parent element.
-                // E.g. we don't want the checkbox to be checked when user clicks on link in checkbox label
                 e.stopPropagation();
+                onClick?.(e);
             }}
+            {...props}
         >
             {props.children}
             {icon && (
                 <IconWrapper>
-                    <Icon
-                        size={props.size ? Number(A_SIZES[props.size].replace('px', '')) : 24}
-                        icon={icon}
-                        color={theme.TYPE_DARK_GREY}
-                        {...iconProps}
-                    />
+                    <Icon size={iconSize} icon={icon} color={theme.iconSubdued} {...iconProps} />
                 </IconWrapper>
             )}
         </A>

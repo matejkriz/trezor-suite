@@ -1,5 +1,3 @@
-/* eslint-disable camelcase */
-
 // This class is a 1:1 copy of trezor-firmware tx weight calculation.
 // It is used to verify that compose process returns correct values in estimated tx virtual bytes.
 // multisig and external is not used for now in therefore its not 100% done.
@@ -54,6 +52,7 @@ const NONSEGWIT_INPUT_SCRIPT_TYPES = ['SPENDADDRESS', 'SPENDMULTISIG'];
 function getVarIntSize(length: number) {
     if (length < 253) return 1;
     if (length < 65536) return 3;
+
     return 5;
 }
 
@@ -61,6 +60,7 @@ function getOpPushSize(length: number) {
     if (length < 76) return 1;
     if (length < 256) return 2;
     if (length < 65536) return 3;
+
     return 5;
 }
 

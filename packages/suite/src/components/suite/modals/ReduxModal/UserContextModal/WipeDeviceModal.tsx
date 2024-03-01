@@ -4,6 +4,7 @@ import { Button, Image } from '@trezor/components';
 import { Translation, CheckItem, Modal } from 'src/components/suite';
 import { wipeDevice } from 'src/actions/settings/deviceSettingsActions';
 import { useDevice, useDispatch } from 'src/hooks/suite';
+import { spacings } from '@trezor/theme';
 
 const Row = styled.div`
     display: flex;
@@ -14,6 +15,7 @@ const Col = styled.div`
     display: flex;
     flex-direction: column;
     align-items: center;
+    gap: ${spacings.xs};
 `;
 
 const CheckItems = styled(Row)`
@@ -54,9 +56,9 @@ export const WipeDeviceModal = ({ onCancel }: WipeDeviceModalProps) => {
             onCancel={onCancel}
             heading={<Translation id="TR_WIPE_DEVICE_HEADING" />}
             description={<Translation id="TR_WIPE_DEVICE_TEXT" />}
-            bottomBar={
+            bottomBarComponents={
                 <Button
-                    variant="danger"
+                    variant="destructive"
                     onClick={handleWipeDevice}
                     isDisabled={isLocked() || !checkbox1 || !checkbox2}
                     data-test="@wipe/wipe-button"

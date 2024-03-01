@@ -1,8 +1,13 @@
 import { memoizeWithArgs } from 'proxy-memoize';
 
 import { Account, WalletAccountTransaction, AccountKey } from '@suite-common/wallet-types';
-import { findTransaction, getConfirmations, isPending } from '@suite-common/wallet-utils';
-import { getIsZeroValuePhishing } from '@suite-common/suite-utils';
+import {
+    findTransaction,
+    getConfirmations,
+    isPending,
+    getIsPhishingTransaction,
+} from '@suite-common/wallet-utils';
+import { isClaimTx, isStakeTx, isStakeTypeTx, isUnstakeTx } from '@suite-common/suite-utils';
 import { createReducerWithExtraDeps } from '@suite-common/redux-utils';
 
 import { accountsActions } from '../accounts/accountsActions';
@@ -11,6 +16,8 @@ import {
     selectBlockchainHeightBySymbol,
     BlockchainRootState,
 } from '../blockchain/blockchainReducer';
+import { selectTokenDefinitions } from '../token-definitions/tokenDefinitionsSelectors';
+import { TokenDefinitionsRootState } from '../token-definitions/tokenDefinitionsTypes';
 
 export interface TransactionsState {
     isLoading: boolean;
@@ -40,6 +47,7 @@ const initializeAccount = (state: TransactionsState, accountKey: AccountKey) => 
     if (!state.transactions[accountKey]) {
         state.transactions[accountKey] = [];
     }
+
     return state.transactions[accountKey];
 };
 
@@ -178,6 +186,7 @@ export const selectAccountTransactionsWithNulls = (
 export const selectAccountTransactions = memoizeWithArgs(
     (state: TransactionsRootState, accountKey: AccountKey | null): WalletAccountTransaction[] => {
         const transactions = selectAccountTransactionsWithNulls(state, accountKey);
+
         return transactions.filter(t => t !== null);
     },
     { size: EXPECTED_MAX_NUMBER_OF_ACCOUNTS },
@@ -189,10 +198,11 @@ export const selectPendingAccountAddresses = memoizeWithArgs(
         const pendingAddresses: string[] = [];
         const pendingTxs = accountTransactions.filter(isPending);
         pendingTxs.forEach(t =>
-            t.targets.forEach(
-                target => target.addresses?.forEach(a => pendingAddresses.unshift(a)),
+            t.targets.forEach(target =>
+                target.addresses?.forEach(a => pendingAddresses.unshift(a)),
             ),
         );
+
         return pendingAddresses;
     },
     { size: EXPECTED_MAX_NUMBER_OF_ACCOUNTS },
@@ -200,9 +210,11 @@ export const selectPendingAccountAddresses = memoizeWithArgs(
 
 export const selectAllPendingTransactions = (state: TransactionsRootState) => {
     const { transactions } = state.wallet.transactions;
+
     return Object.keys(transactions).reduce(
         (response, accountKey) => {
             response[accountKey] = transactions[accountKey].filter(isPending);
+
             return response;
         },
         {} as typeof transactions,
@@ -216,6 +228,7 @@ export const selectTransactionByTxidAndAccountKey = (
     accountKey: AccountKey,
 ) => {
     const transactions = selectAccountTransactions(state, accountKey);
+
     return transactions.find(tx => tx?.txid === txid) ?? null;
 };
 
@@ -228,6 +241,7 @@ export const selectTransactionBlockTimeById = (
     if (transaction?.blockTime) {
         return transaction.blockTime * 1000;
     }
+
     return null;
 };
 
@@ -237,6 +251,7 @@ export const selectTransactionTargets = (
     accountKey: AccountKey,
 ) => {
     const transaction = selectTransactionByTxidAndAccountKey(state, txid, accountKey);
+
     return transaction?.targets;
 };
 
@@ -246,6 +261,7 @@ export const selectTransactionFirstTargetAddress = (
     accountKey: AccountKey,
 ) => {
     const transactionTargets = selectTransactionTargets(state, txid, accountKey);
+
     return transactionTargets?.[0]?.addresses?.[0];
 };
 
@@ -255,6 +271,7 @@ export const selectIsTransactionPending = (
     accountKey: AccountKey,
 ): boolean => {
     const transaction = selectTransactionByTxidAndAccountKey(state, txid, accountKey);
+
     return transaction ? isPending(transaction) : false;
 };
 
@@ -267,11 +284,12 @@ export const selectTransactionConfirmations = (
     if (!transaction) return 0;
 
     const blockchainHeight = selectBlockchainHeightBySymbol(state, transaction.symbol);
+
     return getConfirmations(transaction, blockchainHeight);
 };
 
-export const selectIsTransactionZeroValuePhishing = (
-    state: TransactionsRootState,
+export const selectIsPhishingTransaction = (
+    state: TokenDefinitionsRootState & TransactionsRootState,
     txid: string,
     accountKey: AccountKey,
 ) => {
@@ -279,5 +297,45 @@ export const selectIsTransactionZeroValuePhishing = (
 
     if (!transaction) return false;
 
-    return getIsZeroValuePhishing(transaction);
+    const tokenDefinitions = selectTokenDefinitions(state, transaction.symbol);
+
+    if (!tokenDefinitions) return false;
+
+    return getIsPhishingTransaction(transaction, tokenDefinitions);
+};
+
+export const selectAccountStakeTypeTransactions = (
+    state: TransactionsRootState,
+    accountKey: AccountKey,
+) => {
+    const transactions = selectAccountTransactions(state, accountKey);
+
+    return transactions.filter(tx => isStakeTypeTx(tx.ethereumSpecific?.parsedData?.methodId));
+};
+
+export const selectAccountStakeTransactions = (
+    state: TransactionsRootState,
+    accountKey: AccountKey,
+) => {
+    const transactions = selectAccountTransactions(state, accountKey);
+
+    return transactions.filter(tx => isStakeTx(tx.ethereumSpecific?.parsedData?.methodId));
+};
+
+export const selectAccountUnstakeTransactions = (
+    state: TransactionsRootState,
+    accountKey: AccountKey,
+) => {
+    const transactions = selectAccountTransactions(state, accountKey);
+
+    return transactions.filter(tx => isUnstakeTx(tx.ethereumSpecific?.parsedData?.methodId));
+};
+
+export const selectAccountClaimTransactions = (
+    state: TransactionsRootState,
+    accountKey: AccountKey,
+) => {
+    const transactions = selectAccountTransactions(state, accountKey);
+
+    return transactions.filter(tx => isClaimTx(tx.ethereumSpecific?.parsedData?.methodId));
 };

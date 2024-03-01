@@ -1,10 +1,10 @@
 export default {
     rootDir: './',
     moduleFileExtensions: ['ts', 'js'],
-    modulePathIgnorePatterns: ['node_modules'],
-    setupFilesAfterEnv: ['<rootDir>/jest.setup.js', '<rootDir>/common.setup.js'],
-    globalSetup: '<rootDir>/jest.globalSetup.js',
-    globalTeardown: '<rootDir>/jest.globalTeardown.js',
+    modulePathIgnorePatterns: ['node_modules', '__mocks__'],
+    setupFilesAfterEnv: ['<rootDir>/e2e/jest.setup.js', '<rootDir>/e2e/common.setup.js'],
+    globalSetup: '<rootDir>/e2e/jest.globalSetup.js',
+    globalTeardown: '<rootDir>/e2e/jest.globalTeardown.js',
     transform: {
         '\\.(js|ts)$': [
             'babel-jest',

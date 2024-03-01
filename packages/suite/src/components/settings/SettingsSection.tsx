@@ -1,47 +1,64 @@
 import { ReactNode, ReactElement } from 'react';
-import styled from 'styled-components';
-import { Card, variables, P, Icon, types, useTheme } from '@trezor/components';
+import styled, { useTheme } from 'styled-components';
+import { Paragraph, Icon, IconType, H3, Card } from '@trezor/components';
+import { spacings, spacingsPx } from '@trezor/theme';
+import { breakpointMediaQueries } from '@trezor/styles';
 
 const Wrapper = styled.div`
-    margin-bottom: 40px;
+    margin-bottom: ${spacingsPx.xxxl};
+    display: flex;
+
+    ${breakpointMediaQueries.below_lg} {
+        display: block;
+    }
 `;
 
 const Header = styled.div`
-    padding: 4px 12px 12px 0;
-    margin-bottom: 12px;
+    min-width: 250px;
+    max-width: 270px;
+    margin-right: ${spacingsPx.xxxl};
+    margin-bottom: ${spacingsPx.xs};
+    ${breakpointMediaQueries.below_lg} {
+        margin-bottom: ${spacingsPx.md};
+    }
 `;
 
 const Title = styled.div`
     display: flex;
     align-items: center;
-    font-size: ${variables.FONT_SIZE.TINY};
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    text-transform: uppercase;
-    font-weight: ${variables.FONT_WEIGHT.DEMI_BOLD};
+    gap: ${spacingsPx.sm};
 `;
 
-const StyledIcon = styled(Icon)`
-    margin-right: 6px;
+const Description = styled(Paragraph)`
+    padding-left: ${spacings.xl + spacings.sm}px;
+    color: ${({ theme }) => theme.textSubdued};
+
+    ${breakpointMediaQueries.below_lg} {
+        margin-bottom: ${spacingsPx.lg};
+    }
 `;
 
-const Description = styled(P)`
-    margin-top: 4px;
+const StyledCard = styled(Card)`
+    gap: ${spacingsPx.xxl};
+    flex: 1;
 `;
 
 interface SettingsSectionProps {
     customHeader?: ReactNode;
     title?: string | ReactElement;
-    icon?: types.IconType;
+    icon?: IconType;
     description?: string | ReactElement;
+    className?: string;
     children?: ReactNode;
 }
 
 export const SettingsSection = ({
-    children,
     title,
     icon,
     description,
     customHeader,
+    className,
+    children,
 }: SettingsSectionProps) => {
     const theme = useTheme();
 
@@ -51,16 +68,16 @@ export const SettingsSection = ({
                 {!title && customHeader}
                 {title && !customHeader && (
                     <Title>
-                        {icon && <StyledIcon icon={icon} size={16} color={theme.TYPE_LIGHT_GREY} />}
-                        {title}
+                        {icon && <Icon icon={icon} size={24} color={theme.iconDefault} />}
+                        <H3>{title}</H3>
                     </Title>
                 )}
                 {description && !customHeader && (
-                    <Description size="tiny">{description}</Description>
+                    <Description type="label">{description}</Description>
                 )}
             </Header>
 
-            <Card noPadding>{children}</Card>
+            <StyledCard className={className}>{children}</StyledCard>
         </Wrapper>
     );
 };

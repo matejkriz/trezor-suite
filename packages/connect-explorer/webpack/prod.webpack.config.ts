@@ -58,7 +58,7 @@ const config: webpack.Configuration = {
             },
         ],
     },
-    // todo: this block is identical in connect-web, connect-explorer, and connect-explorer-webextension
+    // todo: this block is identical in connect-web and connect-explorer
     resolve: {
         extensions: ['.ts', '.tsx', '.js', '.jsx'],
         modules: ['node_modules'],
@@ -80,9 +80,9 @@ const config: webpack.Configuration = {
             minify: false,
         }),
         new webpack.DefinePlugin({
-            // eslint-disable-next-line no-underscore-dangle
             'process.env.__TREZOR_CONNECT_SRC': JSON.stringify(process.env.__TREZOR_CONNECT_SRC),
             'process.env.COMMIT_HASH': JSON.stringify(commitHash),
+            'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
         }),
         new CopyPlugin({
             patterns: [

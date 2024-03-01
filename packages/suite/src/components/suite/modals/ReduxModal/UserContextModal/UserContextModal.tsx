@@ -34,10 +34,15 @@ import {
     AuthenticateDeviceModal,
     AuthenticateDeviceFailModal,
     DeviceAuthenticityOptOutModal,
+    StakeEthInANutshellModal,
+    StakeModal,
+    UnstakeModal,
+    ClaimModal,
 } from 'src/components/suite/modals';
 import type { AcquiredDevice } from 'src/types/suite';
 import { openXpubModal, showXpub } from 'src/actions/wallet/publicKeyActions';
 import type { ReduxModalProps } from '../ReduxModal';
+import { CryptoSymbol } from 'invity-api';
 
 /** Modals opened as a result of user action */
 export const UserContextModal = ({
@@ -110,7 +115,7 @@ export const UserContextModal = ({
                     type="BUY"
                     decision={payload.decision}
                     provider={payload.provider}
-                    cryptoCurrency={payload.cryptoCurrency}
+                    cryptoCurrency={payload.cryptoCurrency as CryptoSymbol}
                 />
             );
         }
@@ -121,7 +126,7 @@ export const UserContextModal = ({
                     type="SELL"
                     decision={payload.decision}
                     provider={payload.provider}
-                    cryptoCurrency={payload.cryptoCurrency}
+                    cryptoCurrency={payload.cryptoCurrency as CryptoSymbol}
                 />
             );
 
@@ -132,8 +137,8 @@ export const UserContextModal = ({
                     type="EXCHANGE"
                     decision={payload.decision}
                     provider={payload.provider}
-                    toCryptoCurrency={payload.toCryptoCurrency}
-                    fromCryptoCurrency={payload.fromCryptoCurrency}
+                    toCryptoCurrency={payload.toCryptoCurrency as CryptoSymbol}
+                    fromCryptoCurrency={payload.fromCryptoCurrency as CryptoSymbol}
                 />
             );
         case 'coinmarket-exchange-dex-terms':
@@ -143,8 +148,8 @@ export const UserContextModal = ({
                     type="EXCHANGE_DEX"
                     decision={payload.decision}
                     provider={payload.provider}
-                    toCryptoCurrency={payload.toCryptoCurrency}
-                    fromCryptoCurrency={payload.fromCryptoCurrency}
+                    toCryptoCurrency={payload.toCryptoCurrency as CryptoSymbol}
+                    fromCryptoCurrency={payload.fromCryptoCurrency as CryptoSymbol}
                 />
             );
         case 'coinmarket-savings-terms':
@@ -163,7 +168,7 @@ export const UserContextModal = ({
                     type="P2P"
                     decision={payload.decision}
                     provider={payload.provider}
-                    cryptoCurrency={payload.cryptoCurrency}
+                    cryptoCurrency={payload.cryptoCurrency as CryptoSymbol}
                 />
             );
         case 'import-transaction':
@@ -202,6 +207,14 @@ export const UserContextModal = ({
             return <AuthenticateDeviceModal />;
         case 'authenticate-device-fail':
             return <AuthenticateDeviceFailModal />;
+        case 'stake-eth-in-a-nutshell':
+            return <StakeEthInANutshellModal onCancel={onCancel} />;
+        case 'stake':
+            return <StakeModal onCancel={onCancel} />;
+        case 'unstake':
+            return <UnstakeModal onCancel={onCancel} />;
+        case 'claim':
+            return <ClaimModal onCancel={onCancel} />;
         default:
             return null;
     }

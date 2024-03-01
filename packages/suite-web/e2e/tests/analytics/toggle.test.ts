@@ -1,4 +1,4 @@
-// @group:suite
+// @group:other
 // @retry=2
 
 import { EventType } from '@trezor/suite-analytics';
@@ -14,7 +14,7 @@ describe('Analytics Toggle - Enablement and Disablement', () => {
         cy.task('startEmu', { wipe: true });
         cy.task('setupEmu');
         cy.task('startBridge');
-        cy.viewport(1080, 1440).resetDb();
+        cy.viewport(1440, 2560).resetDb();
 
         requests = [];
     });
@@ -49,7 +49,7 @@ describe('Analytics Toggle - Enablement and Disablement', () => {
         // reload app (important, app needs time to save initialRun flag into storage) to change session id
         cy.getTestElement('@suite/loading').should('not.exist');
         cy.discoveryShouldFinish();
-        cy.reload();
+        cy.safeReload();
         cy.discoveryShouldFinish();
 
         // go to settings, analytics should not enabled and no additional analytics requests should be fired

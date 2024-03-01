@@ -1,5 +1,7 @@
 import styled from 'styled-components';
-import { FlagType } from '../../../support/types';
+import { FLAGS } from './flags';
+
+export type FlagType = keyof typeof FLAGS;
 
 const Wrapper = styled.div`
     display: flex;
@@ -15,7 +17,6 @@ export interface FlagProps {
 export const Flag = ({ size = 24, country, className }: FlagProps) => (
     <Wrapper>
         <img
-            // eslint-disable-next-line global-require, import/no-dynamic-require
             src={require(`../../../images/flags/${country.toLowerCase()}.svg`)}
             width={`${size}px`}
             alt={`flag-${country}`}

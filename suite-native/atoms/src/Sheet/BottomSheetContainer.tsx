@@ -17,13 +17,13 @@ const ContentWrapperStyle = prepareNativeStyle(_ => ({ flex: 1 }));
  * To fix that, components need to be wrapped with gestureHandlerRootHOC (it's no-op on iOS and web).
  * See more details: https://docs.swmansion.com/react-native-gesture-handler/docs/installation/#usage-with-modals-on-android
  */
-// @ts-expect-error https://github.com/software-mansion/react-native-gesture-handler/issues/2412
 const BottomSheetGestureHandler = gestureHandlerRootHOC<{ children: ReactNode }>(({ children }) => (
     <>{children}</>
 ));
 
 export const BottomSheetContainer = ({ children, isVisible, onClose }: SheetProps) => {
     const { applyStyle } = useNativeStyles();
+
     return (
         <RNModal transparent visible={isVisible} onRequestClose={onClose}>
             <BottomSheetGestureHandler>

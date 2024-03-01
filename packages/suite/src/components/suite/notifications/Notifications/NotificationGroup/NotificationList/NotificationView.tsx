@@ -1,13 +1,13 @@
 import styled from 'styled-components';
 
 import type { NotificationEntry } from '@suite-common/toast-notifications';
-import { Button, Icon, P, ButtonProps, IconProps } from '@trezor/components';
+import { Button, Icon, ButtonProps, IconProps, Paragraph } from '@trezor/components';
 import { Translation, FormattedDateWithBullet } from 'src/components/suite';
 import { getNotificationIcon } from 'src/utils/suite/notification';
 import { useLayoutSize } from 'src/hooks/suite';
 import type { ExtendedMessageDescriptor, ToastNotificationVariant } from 'src/types/suite';
 
-const TextP = styled(P)<{ $seen?: boolean }>`
+const TextP = styled(Paragraph)<{ $seen?: boolean }>`
     opacity: ${({ $seen }) => ($seen ? 0.7 : 1)};
 `;
 
@@ -81,10 +81,10 @@ export const NotificationView = ({
                 </SeenWrapper>
             )}
             <Text>
-                <TextP size="small" weight={seen ? 'normal' : 'bold'} $seen={seen}>
+                <TextP type={seen ? 'hint' : 'callout'} $seen={seen}>
                     <Translation id={message} values={messageValues} />
                 </TextP>
-                <DateP size="tiny" $seen={seen}>
+                <DateP type="label" $seen={seen}>
                     <FormattedDateWithBullet value={id} />
                 </DateP>
             </Text>
@@ -93,7 +93,7 @@ export const NotificationView = ({
                 (isMobileLayout ? (
                     <Icon icon="ARROW_RIGHT" onClick={action.onClick} size={18} />
                 ) : (
-                    <ActionButton variant="tertiary" onClick={action.onClick}>
+                    <ActionButton variant="tertiary" size="tiny" onClick={action.onClick}>
                         <Translation id={action.label} />
                     </ActionButton>
                 ))}

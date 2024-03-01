@@ -27,6 +27,7 @@ const initStore = (state: State) => {
         // add action back to stack
         store.getActions().push(action);
     });
+
     return store;
 };
 
@@ -41,6 +42,7 @@ const setFetchMock = (mock: any) => {
                         if (mock.reject) {
                             return reject(mock.reject);
                         }
+
                         return resolve(mock.response);
                     }),
             });
@@ -146,16 +148,16 @@ describe('Coinmarket Buy Actions', () => {
                     },
                 },
                 supportedCryptoCurrencies: new Set([
-                    'bch',
-                    'eth',
-                    'ltc',
-                    'xrp',
-                    'zec',
-                    'bat',
-                    'btc',
-                    'dai',
-                    'trx',
-                    'usdt20',
+                    'BCH',
+                    'ETH',
+                    'LTC',
+                    'XRP',
+                    'ZEC',
+                    'BAT',
+                    'BTC',
+                    'DAI',
+                    'TRX',
+                    'USDT20',
                 ]),
                 supportedFiatCurrencies: new Set(['eur', 'usd', 'czk', 'pln', 'gbp', 'rub']),
             });

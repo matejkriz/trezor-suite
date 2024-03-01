@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import styled from 'styled-components';
+import styled, { useTheme } from 'styled-components';
 
 import { getConnectedDeviceStatus } from '@suite-common/suite-utils';
 import { selectDevice } from '@suite-common/wallet-core';
-import { Icon, Tooltip, variables, useTheme, H1 } from '@trezor/components';
+import { Icon, Tooltip, variables, H2 } from '@trezor/components';
 import { DeviceModelInternal } from '@trezor/connect';
 
 import { goto } from 'src/actions/suite/routerActions';
@@ -17,6 +17,7 @@ import { SecurityCheckFail } from './SecurityCheckFail';
 import { SecurityCheckButton } from './SecurityCheckButton';
 import { DeviceAuthenticity } from './DeviceAuthenticity';
 import { selectIsOnboadingActive } from 'src/reducers/onboarding/onboardingReducer';
+import { typography } from '@trezor/theme';
 
 const StyledCard = styled(CollapsibleOnboardingCard)`
     max-width: 840px;
@@ -37,13 +38,12 @@ const DeviceNameSection = styled.div`
 `;
 
 const DeviceName = styled.div`
-    font-size: ${variables.FONT_SIZE.H1};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-    color: ${({ theme }) => theme.TYPE_GREEN};
+    ${typography.titleMedium}
+    color: ${({ theme }) => theme.backgroundPrimaryDefault};
     margin-top: 12px;
 `;
 
-const StyledH1 = styled(H1)`
+const StyledH2 = styled(H2)`
     font-size: 28px;
     font-weight: ${variables.FONT_WEIGHT.DEMI_BOLD};
     margin: 24px 0 0;
@@ -61,10 +61,11 @@ const TimeEstimateWrapper = styled.div`
     justify-content: center;
     align-items: center;
     opacity: 0.66;
+    margin-top: 1px;
 `;
 
 const IconWrapper = styled.div`
-    margin-right: 6px;
+    margin: 0 1px 2px 6px;
 `;
 
 const Buttons = styled.div`
@@ -111,7 +112,12 @@ const noFirmwareChecklist = [
                 id="TR_ONBOARDING_DEVICE_CHECK_1"
                 values={{
                     strong: chunks => (
-                        <StyledTooltip placement="left" rich content={<Hologram />}>
+                        <StyledTooltip
+                            placement="left"
+                            isLarge
+                            title={<Translation id="TR_HOLOGRAM_STEP_HEADING" />}
+                            content={<Hologram />}
+                        >
                             <Underline>{chunks}</Underline>
                         </StyledTooltip>
                     ),
@@ -225,13 +231,13 @@ export const SecurityCheck = () => {
                                 <Translation id="TR_CONNECTED_DIFFERENT_DEVICE" />
                             </OnboardingButtonSkip>
                         </DeviceNameSection>
-                        <StyledH1>
+                        <StyledH2>
                             <Translation id={headingText} />
-                        </StyledH1>
+                        </StyledH2>
                         <SecurityChecklist items={checklistItems} />
                     </Content>
                     <Buttons>
-                        <StyledSecurityCheckButton variant="secondary" onClick={toggleView}>
+                        <StyledSecurityCheckButton variant="tertiary" onClick={toggleView}>
                             <Translation id={secondaryButtonText} />
                         </StyledSecurityCheckButton>
                         {initialized ? (
@@ -252,7 +258,7 @@ export const SecurityCheck = () => {
                                         <Icon
                                             size={12}
                                             icon="CLOCK_ACTIVE"
-                                            color={theme.TYPE_WHITE}
+                                            color={theme.iconOnPrimary}
                                         />
                                     </IconWrapper>
                                     <Translation id="TR_TAKES_N_MINUTES" />

@@ -1,5 +1,3 @@
-/* eslint-disable no-restricted-syntax,no-loop-func */
-
 import { test, expect, Page, devices } from '@playwright/test';
 import { ensureDirectoryExists } from '@trezor/node-utils';
 import { TrezorUserEnvLink } from '@trezor/trezor-user-env-link';
@@ -42,7 +40,7 @@ test('unsupported browser', async ({ browser }) => {
     popup = await openPopup(page);
     await popup.waitForSelector('text=Unsupported browser');
     await popup.screenshot({ path: `${dir}/browser-not-supported.png` });
-    await popup.close();
+    await popup.close({ runBeforeUnload: true });
     await page.close();
     await context.close();
 });
@@ -65,7 +63,7 @@ test('outdated-browser', async ({ browser }) => {
     // only after this check react renders
     await popup.waitForSelector('#reactRenderIn');
     await popup.waitForSelector('text=Pair devices');
-    await popup.close();
+    await popup.close({ runBeforeUnload: true });
     await page.close();
     await context.close();
 });

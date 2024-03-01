@@ -223,7 +223,7 @@ describe('selectRound', () => {
             options: server?.requestOptions,
         });
 
-        expect(spy).toBeCalledTimes(6);
+        expect(spy).toHaveBeenCalledTimes(6);
         expect(result).toBeUndefined();
     });
 
@@ -278,7 +278,7 @@ describe('selectRound', () => {
             options: server?.requestOptions,
         });
 
-        expect(spy).toBeCalledTimes(1); // middleware was called once for account3
+        expect(spy).toHaveBeenCalledTimes(1); // middleware was called once for account3
         expect(result).toBeUndefined();
     });
 
@@ -313,7 +313,7 @@ describe('selectRound', () => {
             options: server?.requestOptions,
         });
 
-        expect(spy).toBeCalledTimes(1); // middleware was called once
+        expect(spy).toHaveBeenCalledTimes(1); // middleware was called once
         expect(result).toBeUndefined();
     });
 
@@ -347,7 +347,7 @@ describe('selectRound', () => {
             options: server?.requestOptions,
         });
 
-        expect(spy).toBeCalledTimes(1); // middleware was called once
+        expect(spy).toHaveBeenCalledTimes(1); // middleware was called once
         expect(result).toBeUndefined();
     });
 
@@ -357,6 +357,7 @@ describe('selectRound', () => {
             if (url.endsWith('/select-inputs-for-round')) {
                 const Indices = data.Utxos.flatMap((utxo: any, i: number) => {
                     if (utxo.Amount < data.MiningFeeRate) return [];
+
                     return i;
                 });
                 resolve({ Indices });
@@ -421,6 +422,7 @@ describe('selectRound', () => {
                 spy();
                 const Indices = data.Utxos.flatMap((utxo: any, i: number) => {
                     if (utxo.Amount < 1000 + data.MiningFeeRate) return [];
+
                     return i;
                 });
 
@@ -495,7 +497,7 @@ describe('selectRound', () => {
             runningAffiliateServer: true,
         });
 
-        expect(spy).toBeCalledTimes(9);
+        expect(spy).toHaveBeenCalledTimes(9);
 
         ['AA', 'AB', 'AC', 'CA'].forEach((outpoint, index) => {
             expect(result!.inputs[index].outpoint).toEqual(outpoint);
@@ -553,7 +555,7 @@ describe('selectRound', () => {
             runningAffiliateServer: true,
         });
 
-        expect(spy).toBeCalledTimes(0); // middleware was not called, detained inputs were used
+        expect(spy).toHaveBeenCalledTimes(0); // middleware was not called, detained inputs were used
         expect(result?.inputs.length).toBe(2);
         expect(result).toMatchObject({
             id: '02',

@@ -3,7 +3,7 @@ import { lazy, Suspense, useState } from 'react';
 import styled from 'styled-components';
 
 import { HELP_CENTER_QR_CODE_URL } from '@trezor/urls';
-import { Icon, colors, P, Button, Textarea, SelectBar } from '@trezor/components';
+import { Icon, colors, Paragraph, Button, Textarea, SelectBar } from '@trezor/components';
 import { UserContextPayload } from '@suite-common/suite-types';
 
 import { TrezorLink, Translation, Modal, BundleLoader } from 'src/components/suite';
@@ -55,7 +55,7 @@ const Error = styled.div`
     padding: 10px 0;
 `;
 
-const ErrorTitle = styled(P)`
+const ErrorTitle = styled(Paragraph)`
     text-align: center;
     color: ${colors.TYPE_RED};
 `;
@@ -172,7 +172,7 @@ export const QrScannerModal = ({ onCancel, decision, allowPaste }: QrScannerModa
                             <Translation id="TR_FOR_EASIER_AND_SAFER_INPUT" />
                             <TrezorLink
                                 icon="EXTERNAL_LINK"
-                                size="small"
+                                type="hint"
                                 href={HELP_CENTER_QR_CODE_URL}
                             >
                                 <Translation id="TR_LEARN_MORE" />
@@ -181,7 +181,7 @@ export const QrScannerModal = ({ onCancel, decision, allowPaste }: QrScannerModa
                     )}
                 </DescriptionWrapper>
             }
-            bottomBar={
+            bottomBarComponents={
                 isPasteMode ? (
                     <ActionButton isDisabled={!text} onClick={() => handleScan(text)}>
                         <Translation id="TR_CONFIRM" />
@@ -192,7 +192,6 @@ export const QrScannerModal = ({ onCancel, decision, allowPaste }: QrScannerModa
             {isPasteMode && (
                 <ContentWrapper show>
                     <StyledTextarea
-                        noTopLabel
                         placeholder={`${translationString('TR_PASTE_URI')}…`}
                         onChange={e => {
                             setText(e.target.value);

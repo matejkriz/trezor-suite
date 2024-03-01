@@ -17,13 +17,13 @@ import {
     EthereumNetworkInfo,
     EthereumSignTransaction as EthereumSignTransactionSchema,
 } from '../../../types';
-import type { EthereumDefinitions } from '@trezor/protobuf/lib/messages-schema';
+import { MessagesSchema } from '@trezor/protobuf';
 import { Assert } from '@trezor/schema-utils';
 
 type Params = {
     path: number[];
     network?: EthereumNetworkInfo;
-    definitions?: EthereumDefinitions;
+    definitions?: MessagesSchema.EthereumDefinitions;
     chunkify: boolean;
 } & (
     | {
@@ -42,6 +42,7 @@ const strip = deepTransform(value => {
     if (stripped.length % 2 !== 0) {
         stripped = `0${stripped}`;
     }
+
     return stripped;
 });
 

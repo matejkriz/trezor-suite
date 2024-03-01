@@ -7,11 +7,11 @@
     "main": "src/index",
     "scripts": {
         "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "test:unit": "jest -c ../../jest.config.base.js --passWithNoTests",
-        "type-check": "tsc --build"
+        "test:unit": "jest -c ../../jest.config.base.js",
+        "type-check": "yarn g:tsc --build"
     },
-    "devDependencies": {
-        "jest": "29.5.0",
-        "typescript": "5.3.2"
+    "dependencies": {
+        "@trezor/type-utils": "workspace:*",
+        "@trezor/utils": "workspace:*"
     }
 }

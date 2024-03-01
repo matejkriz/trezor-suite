@@ -1,8 +1,10 @@
+import { borders } from '@trezor/theme';
 import styled from 'styled-components';
 
 const Wrapper = styled.div`
-    background: ${({ theme }) => theme.STROKE_GREY};
+    background: ${({ theme }) => theme.backgroundNeutralSubdued};
     width: 100%;
+    border-radius: ${borders.radii.full};
 `;
 
 type ValueProps = {
@@ -16,17 +18,17 @@ const Value = styled.div.attrs<ValueProps>(({ $max, $value }) => ({
         width: `${(100 / $max) * $value}%`,
     },
 }))<ValueProps>`
-    background: ${({ theme, isRed }) => (isRed ? theme.BG_RED : theme.BG_GREEN)};
+    background: ${({ theme, isRed }) => (isRed ? theme.borderAlertRed : theme.borderSecondary)};
     height: 5px;
     max-width: 100%;
     transition: width 0.5s;
 `;
 
-type ProgressBarProps = {
+export interface ProgressBarProps {
     max?: number;
     value: number;
     isRed?: boolean;
-};
+}
 
 // HTML progress element is not used because styling is browser-dependent (no consistent way to override styles
 // from parent component, no straightforward way to add width transition in Firefox)

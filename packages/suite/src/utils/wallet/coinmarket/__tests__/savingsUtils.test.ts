@@ -6,7 +6,7 @@ import {
     getPaymentFrequencyOptions,
     getStatusMessage,
 } from '../savingsUtils';
-import { FIAT_RATES, SELECTED_PROVIDER } from '../__fixtures__/savingsUtils';
+import { FIAT_AMOUNT, SELECTED_PROVIDER, USD_BITCOIN_PRICE } from '../__fixtures__/savingsUtils';
 
 describe('coinmarket/savings utils', () => {
     it('getStatusMessage', () => {
@@ -25,44 +25,37 @@ describe('coinmarket/savings utils', () => {
         expect(getFiatAmountEffective(CustomPaymentAmountKey, 'FAKE')).toBe('0');
     });
     it('calculateAnnualSavings', () => {
-        expect(calculateAnnualSavings('Daily', '100', undefined, 'usd', FIAT_RATES)).toStrictEqual({
+        expect(
+            calculateAnnualSavings('Daily', FIAT_AMOUNT, undefined, USD_BITCOIN_PRICE),
+        ).toStrictEqual({
             annualSavingsFiatAmount: 36500,
             annualSavingsCryptoAmount: '0.67193167',
         });
-        expect(calculateAnnualSavings('Weekly', '100', undefined, 'usd', FIAT_RATES)).toStrictEqual(
-            {
-                annualSavingsFiatAmount: 5200,
-                annualSavingsCryptoAmount: '0.09572725',
-            },
-        );
         expect(
-            calculateAnnualSavings('Biweekly', '100', undefined, 'usd', FIAT_RATES),
+            calculateAnnualSavings('Weekly', FIAT_AMOUNT, undefined, USD_BITCOIN_PRICE),
+        ).toStrictEqual({
+            annualSavingsFiatAmount: 5200,
+            annualSavingsCryptoAmount: '0.09572725',
+        });
+        expect(
+            calculateAnnualSavings('Biweekly', FIAT_AMOUNT, undefined, USD_BITCOIN_PRICE),
         ).toStrictEqual({
             annualSavingsFiatAmount: 2600,
             annualSavingsCryptoAmount: '0.04786363',
         });
         expect(
-            calculateAnnualSavings('Monthly', '100', undefined, 'usd', FIAT_RATES),
+            calculateAnnualSavings('Monthly', FIAT_AMOUNT, undefined, USD_BITCOIN_PRICE),
         ).toStrictEqual({
             annualSavingsFiatAmount: 1200,
             annualSavingsCryptoAmount: '0.0220909',
         });
         expect(
-            calculateAnnualSavings('Quarterly', '100', undefined, 'usd', FIAT_RATES),
+            calculateAnnualSavings('Quarterly', FIAT_AMOUNT, undefined, USD_BITCOIN_PRICE),
         ).toStrictEqual({
             annualSavingsFiatAmount: 400,
             annualSavingsCryptoAmount: '0.00736363',
         });
-
-        expect(
-            calculateAnnualSavings('Weekly', '1234', undefined, 'fake', FIAT_RATES),
-        ).toStrictEqual({
-            annualSavingsFiatAmount: 0,
-            annualSavingsCryptoAmount: '0',
-        });
-        expect(
-            calculateAnnualSavings(undefined, undefined, undefined, undefined, FIAT_RATES),
-        ).toStrictEqual({
+        expect(calculateAnnualSavings(undefined, undefined, undefined, undefined)).toStrictEqual({
             annualSavingsFiatAmount: 0,
             annualSavingsCryptoAmount: '0',
         });

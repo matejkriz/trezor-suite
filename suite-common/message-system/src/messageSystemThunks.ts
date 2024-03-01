@@ -1,6 +1,6 @@
 import { decode, verify } from 'jws';
 
-import { isCodesignBuild, getEnvironment } from '@trezor/env-utils';
+import { getEnvironment, isCodesignBuild } from '@trezor/env-utils';
 import { scheduleAction } from '@trezor/utils';
 import { createThunk } from '@suite-common/redux-utils';
 import { MessageSystem } from '@suite-common/suite-types';
@@ -20,6 +20,7 @@ import {
     selectMessageSystemTimestamp,
     selectMessageSystemCurrentSequence,
 } from './messageSystemSelectors';
+import { jws as configJwsLocal } from '../files/config.v1';
 
 const isMobile = () => getEnvironment() === 'mobile';
 
@@ -46,10 +47,8 @@ const getConfigJws = async () => {
     } catch (error) {
         console.error(`Fetching of remote JWS config failed: ${error}`);
 
-        const { jws } = await import('../files/config.v1');
-
         return {
-            configJws: jws,
+            configJws: configJwsLocal,
             isRemote: false,
         };
     }

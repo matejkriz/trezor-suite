@@ -1,8 +1,7 @@
+import { useTheme } from 'styled-components';
 import { FormattedDate } from 'react-intl';
 
 import { differenceInMonths } from 'date-fns';
-
-import { useTheme } from '@trezor/components';
 import { GraphRange } from 'src/types/wallet/graph';
 
 const getFormattedDate = (range: GraphRange, date: Date) => {
@@ -20,6 +19,7 @@ const getFormattedDate = (range: GraphRange, date: Date) => {
             if (differenceInMonths(range.endDate, range.startDate) <= 1) {
                 return <FormattedDate value={date} day="2-digit" month="short" />;
             }
+
             return <FormattedDate value={date} month="short" year="numeric" />;
         // no default
     }

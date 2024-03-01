@@ -7,8 +7,8 @@
     "main": "src/index",
     "scripts": {
         "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "test:unit": "jest -c ../../jest.config.native.js --passWithNoTests",
-        "type-check": "tsc --build"
+        "test:unit": "yarn g:jest -c ../../jest.config.native.js",
+        "type-check": "yarn g:tsc --build"
     },
     "dependencies": {
         "@mobily/ts-belt": "^3.13.1",
@@ -16,14 +16,12 @@
         "@suite-native/alerts": "workspace:*",
         "@suite-native/analytics": "workspace:*",
         "@suite-native/atoms": "workspace:*",
+        "@suite-native/intl": "workspace:*",
         "@suite-native/storage": "workspace:*",
         "@trezor/styles": "workspace:*",
-        "expo-local-authentication": "13.7.0",
+        "expo-local-authentication": "13.8.0",
         "jotai": "1.9.1",
         "react": "18.2.0",
-        "react-native": "0.71.8"
-    },
-    "devDependencies": {
-        "jest": "29.5.0"
+        "react-native": "0.73.2"
     }
 }

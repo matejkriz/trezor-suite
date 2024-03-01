@@ -10,7 +10,7 @@ describe.skip('Passphrase - legacy flow', () => {
         cy.task('setupEmu', { mnemonic: 'all all all all all all all all all all all all' });
         cy.task('startBridge');
 
-        cy.viewport(1080, 1440).resetDb();
+        cy.viewport(1440, 2560).resetDb();
         cy.prefixedVisit('/');
         cy.passThroughInitialRun();
     });
@@ -40,7 +40,7 @@ describe.skip('Passphrase - legacy flow', () => {
         // this passphrase is empty -> has a prompt for another passphrase entry
         cy.getTestElement('@modal/confirm-empty-hidden-wallet');
         cy.task('clickEmu', { x: 120, y: 180 });
-        cy.getTestElement('@passphrase/confirm-checkbox').click();
+        cy.getTestElement('@passphrase/confirm-checkbox', { timeout: 20000 }).click();
         cy.getTestElement('@passphrase/input').type('b{enter}');
         cy.getTestElement('@dashboard/wallet-ready');
 

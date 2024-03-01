@@ -1,4 +1,4 @@
-# @trezor/suite-native
+# @suite-native/app
 
 Trezor Suite native application.
 
@@ -30,28 +30,11 @@ Transport layer not working for iOS but it's possible to run app in watch-only m
 3. Open `ios/TrezorSuite.xcworkspace` in Xcode
 4. Hit ▶️ `Run` button
 
-## Debugging
+## Debugging with Flipper - deprecated
 
 Because of usage of new Fabric architecture, it is not possible to use Chrome debugger anymore. We are compiling our own version of Hermes core with added functions.
 
 Best way how to debug app is download [Flipper](https://fbflipper.com).
-
-## Dependencies, version locks
-
-1. `simple-plist` - some internal dependency of RN wants to use version `1.3.0`, but in this version there is some error that dependabot doesn't like. Error is not valid for us, but adding `1.3.1` to dev dependencies will fix this warning.
-
-## Updating fonts
-
-1. Place updated fonts to `packages/theme/fonts`
-1. Run `yarn react-native link`
-
-## Distribution
-
-Fastlane is the easiest way to automate beta deployments and releases for iOS and Android apps.
-
-More information about _fastlane_ can be found on [fastlane.tools](https://fastlane.tools).
-
-The documentation of _fastlane_ can be found on [docs.fastlane.tools](https://docs.fastlane.tools).
 
 ### Installation
 
@@ -60,69 +43,3 @@ Make sure you have the latest version of the Xcode command line tools installed:
 ```sh
 xcode-select --install
 ```
-
-For _fastlane_ installation instructions, see [Installing _fastlane_](https://docs.fastlane.tools/#installing-fastlane)
-
-### Available Actions
-
-#### iOS
-
-##### iOS develop
-
-```sh
-[bundle exec] fastlane ios develop
-```
-
-Push a new beta build to TestFlight for develop build schema.
-
----
-
-##### iOS staging
-
-```sh
-[bundle exec] fastlane ios staging
-```
-
-Push a new beta build to TestFlight for staging build schema.
-
----
-
-##### iOS production
-
-```sh
-[bundle exec] fastlane ios production
-```
-
-TODO
-
----
-
-#### Android
-
-##### android develop
-
-```sh
-[bundle exec] fastlane android develop
-```
-
-Build and upload the app (develop) to Firebase App Distribution for testing in a small group of testers.
-
----
-
-##### android staging
-
-```sh
-[bundle exec] fastlane android staging
-```
-
-Build and upload the app (staging) to Google Play Store for internal testing.
-
----
-
-##### android production
-
-```sh
-[bundle exec] fastlane android production
-```
-
-Build and upload the app (production) to Google Play Store for internal testing.

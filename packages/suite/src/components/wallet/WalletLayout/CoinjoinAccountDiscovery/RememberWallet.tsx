@@ -1,12 +1,14 @@
 import styled from 'styled-components';
 
-import { Card, Translation } from 'src/components/suite';
-import { Image, Note, Switch, variables } from '@trezor/components';
+import { spacingsPx } from '@trezor/theme';
+
+import { Card, Image, Note, Paragraph, Switch } from '@trezor/components';
+import { Translation } from 'src/components/suite';
 
 const Container = styled(Card)`
     align-items: center;
-    display: flex;
-    gap: 32px;
+    flex-direction: row;
+    gap: ${spacingsPx.xxl};
 `;
 
 const StyledImage = styled(Image)`
@@ -16,17 +18,11 @@ const StyledImage = styled(Image)`
 const Middle = styled.div`
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: ${spacingsPx.xxs};
 `;
 
-const Title = styled.p`
-    font-weight: ${variables.FONT_WEIGHT.DEMI_BOLD};
-`;
-
-const Description = styled.p`
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    font-size: ${variables.FONT_SIZE.SMALL};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
+const StyledSwitch = styled(Switch)`
+    margin-left: auto;
 `;
 
 interface RememberWalletProps {
@@ -38,17 +34,16 @@ export const RememberWallet = ({ isChecked, onChange }: RememberWalletProps) => 
     <Container>
         <StyledImage image="FOLDER" width={50} />
         <Middle>
-            <Title>
+            <Paragraph type="titleSmall">
                 <Translation id="TR_REMEMBER_WALLET_TITLE" />
-            </Title>
+            </Paragraph>
             <Note>
                 <Translation id="TR_REMEMBER_WALLET_NOTE" />
             </Note>
-            <Description>
+            <Paragraph>
                 <Translation id="TR_REMEMBER_WALLET_DESCRIPTION" />
-            </Description>
+            </Paragraph>
         </Middle>
-
-        <Switch isChecked={isChecked} onChange={onChange} />
+        <StyledSwitch isChecked={isChecked} onChange={onChange} />
     </Container>
 );

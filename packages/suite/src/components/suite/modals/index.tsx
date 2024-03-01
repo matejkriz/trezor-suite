@@ -16,6 +16,7 @@ export { ConfirmXpubModal } from './ReduxModal/ConfirmXpubModal';
 export { NoBackupModal } from './ReduxModal/DeviceConfirmationModal/NoBackupModal';
 export { TransactionReviewModal } from './ReduxModal/TransactionReviewModal/TransactionReviewModal';
 export { ImportTransactionModal } from './ReduxModal/UserContextModal/ImportTransactionModal/ImportTransactionModal';
+export { ConfirmEvmExplanationModal } from './ConfirmEvmExplanationModal';
 export { ConfirmUnverifiedModal } from './ReduxModal/UserContextModal/ConfirmUnverifiedModal';
 export { ConfirmUnverifiedAddressModal } from './ReduxModal/UserContextModal/ConfirmUnverifiedAddressModal';
 export { AddAccountModal } from './ReduxModal/UserContextModal/AddAccountModal/AddAccountModal';
@@ -40,3 +41,7 @@ export { UnecoCoinjoinModal } from './ReduxModal/UserContextModal/UnecoCoinjoinM
 export { AuthenticateDeviceModal } from './ReduxModal/UserContextModal/AuthenticateDeviceModal';
 export { AuthenticateDeviceFailModal } from './ReduxModal/UserContextModal/AuthenticateDeviceFailModal';
 export { DeviceAuthenticityOptOutModal } from './ReduxModal/UserContextModal/DeviceAuthenticityOptOutModal';
+export { StakeEthInANutshellModal } from './ReduxModal/UserContextModal/StakeEthInANutshellModal';
+export { StakeModal } from './ReduxModal/UserContextModal/StakeModal/StakeModal';
+export { UnstakeModal } from './ReduxModal/UserContextModal/UnstakeModal/UnstakeModal';
+export { ClaimModal } from './ReduxModal/UserContextModal/ClaimModal/ClaimModal';

@@ -10,6 +10,7 @@ let server: Awaited<ReturnType<typeof createServer>>;
 
 jest.mock('@trezor/utils', () => {
     const originalModule = jest.requireActual('@trezor/utils');
+
     return {
         __esModule: true,
         ...originalModule,
@@ -89,7 +90,7 @@ describe('connectionConfirmation', () => {
         });
 
         // confirmation request sent only for second input
-        expect(spy).toBeCalledTimes(1);
+        expect(spy).toHaveBeenCalledTimes(1);
         expect(spy).toHaveBeenLastCalledWith('01B1-01b1');
     });
 
@@ -134,7 +135,7 @@ describe('connectionConfirmation', () => {
         );
 
         // confirmation request called twice for each input
-        expect(spy).toBeCalledTimes(4);
+        expect(spy).toHaveBeenCalledTimes(4);
         response.inputs.forEach(input => {
             // inputs are not confirmed, deadline reached (~2.5 sec: phaseDeadline + connectionConfirmationTimeout)
             expect(input.error?.message).toMatch(/Aborted by deadline/);
@@ -180,13 +181,14 @@ describe('connectionConfirmation', () => {
             server?.requestOptions,
         ).promise;
 
-        expect(spy).toBeCalledTimes(4);
+        expect(spy).toHaveBeenCalledTimes(4);
 
         timestamps
             .map((a, i) => {
                 if (i > 0) {
                     return a - timestamps[i - 1];
                 }
+
                 return 0;
             })
             .forEach(ts => {

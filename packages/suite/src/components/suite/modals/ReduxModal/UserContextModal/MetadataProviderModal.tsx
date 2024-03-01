@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import styled from 'styled-components';
-import { P, Button, variables } from '@trezor/components';
+import { Paragraph, Button, variables } from '@trezor/components';
 
 import { Translation, Modal } from 'src/components/suite';
 import { useDispatch } from 'src/hooks/suite';
@@ -8,8 +8,15 @@ import { connectProvider } from 'src/actions/suite/metadataProviderActions';
 import type { Deferred } from '@trezor/utils';
 import { MetadataProviderType } from 'src/types/suite/metadata';
 import { isFeatureFlagEnabled } from '@suite-common/suite-utils';
+import { spacingsPx } from '@trezor/theme';
 
-const { FONT_SIZE, FONT_WEIGHT, SCREEN_SIZE } = variables;
+const { FONT_SIZE, FONT_WEIGHT } = variables;
+
+const Wrapper = styled.div`
+    display: flex;
+    flex-wrap: wrap;
+    gap: ${spacingsPx.sm};
+`;
 
 const Error = styled.div`
     margin-top: 8px;
@@ -21,23 +28,15 @@ const Error = styled.div`
 // background-color is not even in components color palette
 const StyledButton = styled(Button)`
     padding: 10px;
-    margin: 0 16px;
     font-size: ${FONT_SIZE.NORMAL};
     background-color: ${({ theme }) => theme.BG_GREY};
     font-weight: ${FONT_WEIGHT.DEMI_BOLD};
     height: 42px;
-
-    @media (min-width: ${SCREEN_SIZE.SM}) {
-        width: 210px;
-    }
 `;
 
 // todo: typography shall be unified and these ad hoc styles removed..
-const StyledP = styled(P)`
+const StyledP = styled(Paragraph)`
     color: ${({ theme }) => theme.TYPE_DARK_GREY};
-    margin-bottom: 25px;
-    font-size: ${FONT_SIZE.SMALL};
-    font-weight: ${FONT_WEIGHT.REGULAR};
 `;
 
 const StyledModal = styled(Modal)`
@@ -67,12 +66,14 @@ export const MetadataProviderModal = ({ onCancel, decision }: MetadataProviderMo
         // window close indicates user action, user knows what happened, no need to show an error message
         if (result === 'window closed') {
             setIsLoading('');
+
             // stop here, user might have changed his decision and wants to use another provider
             return;
         }
         if (typeof result === 'string') {
             setError(result);
             setIsLoading('');
+
             return;
         }
 
@@ -86,8 +87,8 @@ export const MetadataProviderModal = ({ onCancel, decision }: MetadataProviderMo
             onCancel={onModalCancel}
             heading={<Translation id="METADATA_MODAL_HEADING" />}
             data-test="@modal/metadata-provider"
-            bottomBar={
-                <>
+            bottomBarComponents={
+                <Wrapper>
                     <StyledButton
                         variant="tertiary"
                         onClick={() => connect('dropbox')}
@@ -121,13 +122,13 @@ export const MetadataProviderModal = ({ onCancel, decision }: MetadataProviderMo
                             isDisabled={!!isLoading}
                             data-test="@modal/metadata-provider/file-system-button"
                         >
-                            Local file system
+                            <Translation id="TR_LOCAL_FILE_SYSTEM" />
                         </StyledButton>
                     )}
-                </>
+                </Wrapper>
             }
         >
-            <StyledP>
+            <StyledP type="hint">
                 <Translation id="METADATA_MODAL_DESCRIPTION" />
             </StyledP>
             {error && <Error>{error}</Error>}

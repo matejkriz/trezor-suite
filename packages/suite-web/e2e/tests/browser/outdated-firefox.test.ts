@@ -1,4 +1,4 @@
-// @group:browser
+// @group:other
 // @retry=2
 // @user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/101.0
 
@@ -6,7 +6,7 @@
 
 describe('Ubuntu with outdated firefox ', () => {
     before(() => {
-        cy.viewport(1080, 1440);
+        cy.viewport(1440, 2560);
         cy.resetDb();
     });
 

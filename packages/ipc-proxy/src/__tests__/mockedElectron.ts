@@ -1,4 +1,3 @@
-/* eslint-disable max-classes-per-file */
 import { EventEmitter } from 'events';
 
 class IpcRendererMock extends EventEmitter {
@@ -60,6 +59,7 @@ class IpcMainMock extends EventEmitter {
 
     on(event: string, listener: any) {
         this.setup();
+
         return super.on(event, listener);
     }
 }

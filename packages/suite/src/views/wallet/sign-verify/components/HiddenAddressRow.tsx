@@ -1,33 +1,22 @@
-import styled, { DefaultTheme } from 'styled-components';
-import { variables } from '@trezor/components';
+import styled from 'styled-components';
+import { GradientOverlay, useElevation } from '@trezor/components';
 import type { AddressItem } from 'src/hooks/wallet/sign-verify/useSignAddressOptions';
+import { borders, nextElevation, spacingsPx } from '@trezor/theme';
 
-type OverlayVariant = 'option' | 'option-focused' | 'input';
-
-const getOverlayColor = ({ theme, variant }: { theme: DefaultTheme; variant: OverlayVariant }) => {
-    if (variant === 'option-focused') return theme.BG_WHITE_ALT_HOVER;
-
-    if (variant === 'option') return theme.BG_WHITE_ALT;
-
-    return theme.BG_WHITE;
-};
-
-const Overlay = styled.div<{ variant: OverlayVariant }>`
-    position: absolute;
-    inset: 0;
-    margin: -8px;
-    border-radius: 3px;
-    background-image: linear-gradient(to right, rgb(0 0 0 / 0%) 0%, ${getOverlayColor} 160px);
+const StyledGradientOverlay = styled(GradientOverlay)`
+    margin: -${spacingsPx.xs};
+    border-radius: ${borders.radii.xxs};
 `;
 
 const DerivationPathColumn = styled.div`
     min-width: 36px;
-    padding-right: 12px;
+    padding-right: ${spacingsPx.sm};
     opacity: 0.4;
 `;
 
 const AddressColumn = styled.div`
     position: relative;
+    cursor: pointer;
 `;
 
 const Wrapper = styled.div`
@@ -35,22 +24,31 @@ const Wrapper = styled.div`
     align-items: center;
     width: 100%;
     max-width: 250px;
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
 `;
 
 interface HiddenAddressRowProps {
     item: AddressItem;
-    variant: OverlayVariant;
+    isElevated?: boolean;
     className?: string;
 }
 
-export const HiddenAddressRow = ({ item, variant, className }: HiddenAddressRowProps) => (
-    <Wrapper className={className}>
-        <DerivationPathColumn>/{item.value.split('/').pop()}</DerivationPathColumn>
+export const HiddenAddressRow = ({
+    item,
+    isElevated = false,
+    className,
+}: HiddenAddressRowProps) => {
+    const { elevation } = useElevation();
 
-        <AddressColumn>
-            <Overlay variant={variant} />
-            {item.label}
-        </AddressColumn>
-    </Wrapper>
-);
+    const currentElevation = isElevated ? nextElevation[elevation] : elevation;
+
+    return (
+        <Wrapper className={`${className} react-select__single-value`}>
+            <DerivationPathColumn>/{item.value.split('/').pop()}</DerivationPathColumn>
+
+            <AddressColumn>
+                <StyledGradientOverlay forcedElevation={currentElevation} hiddenFrom="160px" />
+                {item.label}
+            </AddressColumn>
+        </Wrapper>
+    );
+};

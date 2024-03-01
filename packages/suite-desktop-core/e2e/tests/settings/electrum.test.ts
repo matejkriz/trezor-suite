@@ -1,9 +1,4 @@
-import {
-    test as testPlaywright,
-    expect as expectPlaywright,
-    ElectronApplication,
-    Page,
-} from '@playwright/test';
+import { test as testPlaywright, ElectronApplication, Page } from '@playwright/test';
 
 import { TrezorUserEnvLink } from '@trezor/trezor-user-env-link';
 
@@ -21,7 +16,6 @@ testPlaywright.describe.serial('Suite works with Electrum server', () => {
         await TrezorUserEnvLink.api.stopBridge();
         await TrezorUserEnvLink.api.trezorUserEnvConnect();
         await TrezorUserEnvLink.api.startEmu({ wipe: true });
-        await TrezorUserEnvLink.api.startBridge();
         await TrezorUserEnvLink.api.setupEmu({
             needs_backup: true,
             mnemonic: 'all all all all all all all all all all all all',
@@ -49,9 +43,8 @@ testPlaywright.describe.serial('Suite works with Electrum server', () => {
         await onTopBar.openDashboard(window);
         await onDashboardPage.discoveryShouldFinish(window);
 
-        expectPlaywright(
-            await onDashboardPage.getFirstNetworkValueOnDashboard(window, 'regtest'),
-        ).toBeTruthy();
+        await onDashboardPage.assertHasVisibleBalanceOnFirstAccount(window, 'regtest');
+
         electronApp.close();
     });
 });

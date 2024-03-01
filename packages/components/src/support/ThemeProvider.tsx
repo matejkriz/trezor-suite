@@ -1,6 +1,5 @@
 import { createContext } from 'react';
-import { THEME } from '../config/colors';
-import { SuiteThemeColors } from './types';
+import { SuiteThemeColors, THEME } from '../config/colors';
 
 const ThemeContext = createContext<SuiteThemeColors>(THEME.light);
 
@@ -13,6 +12,7 @@ const ThemeProvider = ({ children, theme }: ThemeProviderProps) => {
     if (!children) {
         return null;
     }
+
     return <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>;
 };
 

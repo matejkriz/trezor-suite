@@ -28,7 +28,6 @@ import type {
     Output,
     UseSendFormState,
     RbfTransactionParams,
-    CoinFiatRates,
     Account,
     CurrencyOption,
     ExcludedUtxos,
@@ -42,11 +41,14 @@ export const calculateTotal = (amount: string, fee: string): string => {
         const total = new BigNumber(amount).plus(fee);
         if (total.isNaN()) {
             console.error('calculateTotal: Amount is not a number', amount, fee);
+
             return '0';
         }
+
         return total.toString();
     } catch (error) {
         console.error('calculateTotal: error', error);
+
         return '0';
     }
 };
@@ -56,12 +58,15 @@ export const calculateMax = (availableBalance: string, fee: string): string => {
         const max = new BigNumber(availableBalance).minus(fee);
         if (max.isNaN()) {
             console.error('calculateMax: Amount is not a number', availableBalance, fee);
+
             return '0';
         }
         if (max.isLessThan(0)) return '0';
+
         return max.toFixed();
     } catch (error) {
         console.error('calculateMax: error', error);
+
         return '0';
     }
 };
@@ -78,6 +83,7 @@ export const calculateEthFee = (gasPrice?: string, gasLimit?: string): string =>
     try {
         const result = new BigNumber(gasPrice).times(gasLimit);
         if (result.isNaN()) throw new Error('NaN');
+
         return result.toFixed();
     } catch (error) {
         return '0';
@@ -93,6 +99,7 @@ const getSerializedErc20Transfer = (token: TokenInfo, to: string, amount: string
     const tokenAmount = amountToSatoshi(amount, token.decimals);
     // 32 bytes amount paramter, remove '0x' prefix
     const erc20amount = padLeft(toHex(tokenAmount), 64).substring(2);
+
     // join data
     return `0x${ERC20_TRANSFER}${erc20recipient}${erc20amount}`;
 };
@@ -162,6 +169,7 @@ export const getFeeLevels = (networkType: Network['networkType'], feeInfo: FeeIn
                 level.label !== 'custom' && gwei.lt(feeInfo.minFee)
                     ? feeInfo.minFee.toString()
                     : gwei.integerValue(BigNumber.ROUND_FLOOR).toString();
+
             return {
                 ...level,
                 feePerUnit,
@@ -175,30 +183,21 @@ export const getFeeLevels = (networkType: Network['networkType'], feeInfo: FeeIn
 
 export const getInputState = (
     error?: FieldError | Merge<FieldError, FieldErrorsImpl<FieldValues>>,
-    value?: string,
 ) => {
     if (error) {
         return 'error';
-    }
-
-    if (value && value.length > 0 && !error) {
-        return 'success';
     }
 };
 
 export const isLowAnonymityWarning = (error?: Merge<FieldError, FieldErrorsImpl<Output>>) =>
     error?.amount?.type === COMPOSE_ERROR_TYPES.ANONYMITY;
 
-export const getFiatRate = (fiatRates: CoinFiatRates | undefined, currency: string) => {
-    if (!fiatRates || !fiatRates.current || !fiatRates.current.rates) return;
-    return fiatRates.current.rates[currency];
-};
-
 export const getFeeUnits = (networkType: NetworkType) => {
     if (networkType === 'ethereum') return 'GWEI';
     if (networkType === 'ripple') return 'Drops';
     if (networkType === 'cardano') return 'Lovelaces/B';
     if (networkType === 'solana') return 'Lamports';
+
     return 'sat/B';
 };
 
@@ -229,11 +228,13 @@ export const findComposeErrors = <T extends FieldValues>(
             }
         }
     });
+
     return composeErrors;
 };
 
 export const findToken = (tokens: Account['tokens'], address?: string | null) => {
     if (!address || !tokens) return;
+
     return tokens.find(t => t.contract === address);
 };
 
@@ -365,6 +366,7 @@ export const restoreOrigOutputsOrder = (
     origTxid: string,
 ) => {
     const usedIndex: number[] = []; // collect used indexes to avoid duplicates
+
     return outputs
         .map(output => {
             const index = origOutputs.findIndex((prevOutput, i) => {
@@ -374,12 +376,15 @@ export const restoreOrigOutputsOrder = (
                 if (prevOutput.type === 'change' && output.address_n) return true;
                 if (prevOutput.type === 'payment' && output.address === prevOutput.address)
                     return true;
+
                 return false;
             });
             if (index >= 0) {
                 usedIndex.push(index);
+
                 return { ...output, orig_index: index, orig_hash: origTxid };
             }
+
             return output;
         })
         .sort((a, b) => {
@@ -387,6 +392,7 @@ export const restoreOrigOutputsOrder = (
                 return 0;
             if (typeof b.orig_index === 'undefined') return -1;
             if (typeof a.orig_index === 'undefined') return 1;
+
             return a.orig_index - b.orig_index;
         });
 };
@@ -448,6 +454,7 @@ export const getExcludedUtxos = ({
             excludedUtxos[outpoint] = 'low-anonymity';
         }
     });
+
     return excludedUtxos;
 };
 

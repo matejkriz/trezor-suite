@@ -1,8 +1,7 @@
 import { memo, useMemo } from 'react';
 import styled from 'styled-components';
-import { Dropdown } from '@trezor/components';
+import { Dropdown, Card } from '@trezor/components';
 import {
-    Card,
     GraphScaleDropdownItem,
     GraphSkeleton,
     QuestionTooltip,
@@ -10,7 +9,7 @@ import {
 } from 'src/components/suite';
 import { DashboardSection } from 'src/components/dashboard';
 import { useDiscovery, useDispatch, useSelector } from 'src/hooks/suite';
-import { useFastAccounts, useFiatValue } from 'src/hooks/wallet';
+import { useFastAccounts } from 'src/hooks/wallet';
 import { goto } from 'src/actions/suite/routerActions';
 import { setFlag } from 'src/actions/suite/suiteActions';
 import { getTotalFiatBalance } from '@suite-common/wallet-utils';
@@ -19,10 +18,8 @@ import { Header } from './components/Header';
 import { Exception } from './components/Exception';
 import { EmptyWallet } from './components/EmptyWallet';
 import { DashboardGraph } from './components/DashboardGraph';
-
-const StyledCard = styled(Card)`
-    flex-direction: column;
-`;
+import { selectFiatRates } from '@suite-common/wallet-core';
+import { selectLocalCurrency } from 'src/reducers/wallet/settingsReducer';
 
 const Body = styled.div`
     align-items: center;
@@ -30,6 +27,11 @@ const Body = styled.div`
     padding: 0 20px;
     min-height: 329px;
     flex: 1;
+`;
+
+const StyledDropdown = styled(Dropdown)`
+    display: flex;
+    height: 38px;
 `;
 
 const SkeletonTransactionsGraphWrapper = styled.div`
@@ -44,14 +46,15 @@ const Wrapper = styled.div`
 `;
 
 const PortfolioCard = memo(() => {
-    const { coins, localCurrency } = useFiatValue();
+    const rates = useSelector(selectFiatRates);
+    const localCurrency = useSelector(selectLocalCurrency);
     const { discovery, getDiscoveryStatus, isDiscoveryRunning } = useDiscovery();
     const accounts = useFastAccounts();
     const { dashboardGraphHidden } = useSelector(s => s.suite.flags);
     const dispatch = useDispatch();
 
     const isDeviceEmpty = useMemo(() => accounts.every(a => a.empty), [accounts]);
-    const portfolioValue = getTotalFiatBalance(accounts, localCurrency, coins).toString();
+    const fiatAmount = getTotalFiatBalance(accounts, localCurrency, rates).toString();
 
     const discoveryStatus = getDiscoveryStatus();
 
@@ -104,18 +107,17 @@ const PortfolioCard = memo(() => {
             }
             actions={
                 !isWalletEmpty && !isWalletLoading && !isWalletError ? (
-                    <Dropdown
-                        alignMenu="right"
+                    <StyledDropdown
+                        alignMenu="bottom-right"
                         items={[
                             {
                                 key: 'group1',
                                 label: 'Graph View',
                                 options: [
                                     {
-                                        noHover: true,
                                         key: 'graphView',
                                         label: <GraphScaleDropdownItem />,
-                                        callback: () => false,
+                                        shouldCloseOnClick: false,
                                     },
                                     {
                                         key: 'hide',
@@ -125,15 +127,14 @@ const PortfolioCard = memo(() => {
                                         ) : (
                                             <Translation id="TR_HIDE_GRAPH" />
                                         ),
-                                        callback: () => {
+                                        shouldCloseOnClick: false,
+                                        onClick: () =>
                                             dispatch(
                                                 setFlag(
                                                     'dashboardGraphHidden',
                                                     !dashboardGraphHidden,
                                                 ),
-                                            );
-                                            return true;
-                                        },
+                                            ),
                                     },
                                 ],
                             },
@@ -142,12 +143,12 @@ const PortfolioCard = memo(() => {
                 ) : undefined
             }
         >
-            <StyledCard noPadding>
+            <Card paddingType="none">
                 {discoveryStatus && discoveryStatus.status === 'exception' ? null : (
                     <Header
                         showGraphControls={showGraphControls}
                         hideBorder={!body}
-                        portfolioValue={portfolioValue}
+                        fiatAmount={fiatAmount}
                         localCurrency={localCurrency}
                         isWalletEmpty={isWalletEmpty}
                         isWalletLoading={isWalletLoading}
@@ -157,8 +158,9 @@ const PortfolioCard = memo(() => {
                         buyClickHandler={goToBuy}
                     />
                 )}
+
                 {body && <Body>{body}</Body>}
-            </StyledCard>
+            </Card>
         </DashboardSection>
     );
 });

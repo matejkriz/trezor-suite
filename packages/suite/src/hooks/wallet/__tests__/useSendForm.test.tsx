@@ -18,6 +18,12 @@ import SendIndex from 'src/views/wallet/send';
 import * as fixtures from '../__fixtures__/useSendForm';
 import { useSendFormContext } from '../useSendForm';
 
+global.ResizeObserver = class MockedResizeObserver {
+    observe = jest.fn();
+    unobserve = jest.fn();
+    disconnect = jest.fn();
+};
+
 // sendFormActions.signTransaction fetch ethereum definitions
 jest.mock('cross-fetch', () => ({
     __esModule: true,
@@ -108,13 +114,15 @@ const actionCallback = (
 
     // validate number of calls to '@trezor/connect'
     if (typeof result.composeTransactionCalls === 'number') {
-        expect(TrezorConnect.composeTransaction).toBeCalledTimes(result.composeTransactionCalls);
+        expect(TrezorConnect.composeTransaction).toHaveBeenCalledTimes(
+            result.composeTransactionCalls,
+        );
     }
     if (typeof result.estimateFeeCalls === 'number') {
-        expect(TrezorConnect.blockchainEstimateFee).toBeCalledTimes(result.estimateFeeCalls);
+        expect(TrezorConnect.blockchainEstimateFee).toHaveBeenCalledTimes(result.estimateFeeCalls);
     }
     if (typeof result.getAccountInfoCalls === 'number') {
-        expect(TrezorConnect.getAccountInfo).toBeCalledTimes(result.getAccountInfoCalls);
+        expect(TrezorConnect.getAccountInfo).toHaveBeenCalledTimes(result.getAccountInfoCalls);
     }
 
     // validate '@trezor/connect' params

@@ -42,6 +42,7 @@ const createMockedDevice = (optional = {}) => ({
             '3f23230002000000060a046d656f7700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
             'hex',
         );
+
         return Promise.resolve({
             data: buffer,
         });
@@ -382,15 +383,15 @@ describe('Usb', () => {
 
             // count encoded/sent chunks
             await send(64); // default usb
-            expect(writeSpy).toBeCalledTimes(4);
+            expect(writeSpy).toHaveBeenCalledTimes(4);
             writeSpy.mockClear();
 
             await send(16); // smaller chunks
-            expect(writeSpy).toBeCalledTimes(15);
+            expect(writeSpy).toHaveBeenCalledTimes(15);
             writeSpy.mockClear();
 
             await send(128); // bigger chunks
-            expect(writeSpy).toBeCalledTimes(2);
+            expect(writeSpy).toHaveBeenCalledTimes(2);
             writeSpy.mockClear();
         });
 

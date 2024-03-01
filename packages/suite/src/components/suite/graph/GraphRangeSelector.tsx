@@ -103,7 +103,7 @@ const getFormattedLabel = (rangeLabel: GraphRange['label']) => {
 interface GraphRangeSelectorProps {
     onSelectedRange?: (range: GraphRange) => void;
     className?: string;
-    align?: 'left' | 'right';
+    align?: 'bottom-left' | 'bottom-right';
 }
 
 export const GraphRangeSelector = ({
@@ -156,35 +156,20 @@ export const GraphRangeSelector = ({
             ))}
             <Dropdown
                 ref={dropdownRef}
-                topPadding={0}
-                bottomPadding={0}
                 alignMenu={align}
-                items={[
-                    {
-                        key: 'dropdown',
-                        options: [
-                            {
-                                noPadding: true,
-                                noHover: true,
-                                key: 'timerange',
-                                label: (
-                                    <Timerange
-                                        onSubmit={(startDate: Date, endDate: Date) =>
-                                            setCustomTimerange(startDate, endDate)
-                                        }
-                                        startDate={customTimerangeStart}
-                                        endDate={customTimerangeEnd}
-                                        onCancel={() => dropdownRef.current!.close()}
-                                        ctaSubmit={<Translation id="TR_CONFIRM" />}
-                                        ctaCancel={<Translation id="TR_CANCEL" />}
-                                        locale={locale}
-                                    />
-                                ),
-                                callback: () => false,
-                            },
-                        ],
-                    },
-                ]}
+                content={
+                    <Timerange
+                        onSubmit={(startDate: Date, endDate: Date) =>
+                            setCustomTimerange(startDate, endDate)
+                        }
+                        startDate={customTimerangeStart}
+                        endDate={customTimerangeEnd}
+                        onCancel={() => dropdownRef.current!.close()}
+                        ctaSubmit={<Translation id="TR_CONFIRM" />}
+                        ctaCancel={<Translation id="TR_CANCEL" />}
+                        locale={locale}
+                    />
+                }
             >
                 <RangeItem selected={selectedRange.label === 'range'} separated>
                     <Translation id="TR_RANGE" />

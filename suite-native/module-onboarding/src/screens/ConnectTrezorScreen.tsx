@@ -17,7 +17,10 @@ import { OnboardingScreen } from '../components/OnboardingScreen';
 const ANIMATION_HEIGHT = Dimensions.get('screen').height * 0.35;
 
 const animationStyle = prepareNativeStyle(() => ({
+    // Both height and width has to be set https://github.com/lottie-react-native/lottie-react-native/blob/master/MIGRATION-5-TO-6.md#updating-the-style-props
     height: ANIMATION_HEIGHT,
+    width: '100%',
+    borderColor: 'transparent',
 }));
 
 export const ConnectTrezorScreen = () => {

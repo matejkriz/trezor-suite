@@ -1,11 +1,9 @@
-/* eslint-disable no-underscore-dangle, @typescript-eslint/no-use-before-define */
+/* eslint-disable @typescript-eslint/no-use-before-define */
 
 // origin: https://github.com/trezor/connect/blob/develop/src/js/iframe/iframe.js
 
 import {
-    CORE_EVENT,
     RESPONSE_EVENT,
-    UI_EVENT,
     DEVICE_EVENT,
     TRANSPORT_EVENT,
     TRANSPORT,
@@ -19,10 +17,10 @@ import {
     createPopupMessage,
     IFrameInit,
     DeviceEvent,
-    CoreMessage,
-    PostMessageEvent,
+    CoreRequestMessage,
+    CoreEventMessage,
 } from '@trezor/connect';
-import { Core, initCore, initTransport } from '@trezor/connect/src/core';
+import { Core, initCore } from '@trezor/connect/src/core';
 import { DataManager } from '@trezor/connect/src/data/DataManager';
 import { config } from '@trezor/connect/src/data/config';
 import { initLog, LogWriter } from '@trezor/connect/src/utils/debug';
@@ -48,12 +46,11 @@ let _popupMessagePort: (MessagePort | BroadcastChannel) | undefined;
 
 // since iframe.html needs to send message via window.postMessage
 // we need to listen to events from Core and convert it to simple objects possible to send over window.postMessage
-
-const handleMessage = async (event: PostMessageEvent) => {
+const handleMessage = async (event: MessageEvent<CoreRequestMessage>) => {
     // ignore messages from myself (chrome bug?)
     if (event.source === window || !event.data) return;
     const { data } = event;
-    const id = typeof data.id === 'number' ? data.id : 0;
+    const id = 'id' in data && typeof data.id === 'number' ? data.id : 0;
 
     const fail = (error: string) => {
         postMessage(createResponseMessage(id, false, { error }));
@@ -64,6 +61,7 @@ const handleMessage = async (event: PostMessageEvent) => {
         if (logWriterProxy) {
             logWriterProxy.add(data.payload);
         }
+
         return;
     }
 
@@ -71,12 +69,14 @@ const handleMessage = async (event: PostMessageEvent) => {
     // TODO: instead of error _core should be initialized automatically
     if (!_core && data.type === IFRAME.CALL) {
         fail('Core not initialized yet!');
+
         return;
     }
 
     // catch first message from window.opener
     if (data.type === IFRAME.INIT) {
         init(data.payload, event.origin);
+
         return;
     }
 
@@ -88,6 +88,7 @@ const handleMessage = async (event: PostMessageEvent) => {
         if (event.target !== _popupMessagePort) {
             if (event.ports?.length < 1) {
                 fail('POPUP.HANDSHAKE: popupMessagePort not found');
+
                 return;
             }
             // reassign to current MessagePort
@@ -96,6 +97,7 @@ const handleMessage = async (event: PostMessageEvent) => {
 
         if (!_core) {
             fail('POPUP.HANDSHAKE: Core not initialized');
+
             return;
         }
 
@@ -110,39 +112,36 @@ const handleMessage = async (event: PostMessageEvent) => {
         );
         _log.debug('loading current method');
         const method = await _core.getCurrentMethod();
-        (method.initAsyncPromise ? method.initAsyncPromise : Promise.resolve()).finally(() => {
-            if (method.info) {
-                postMessage(
-                    createPopupMessage(POPUP.METHOD_INFO, {
-                        method: method.name,
-                        info: method.info, // method.info might change based on initAsync
-                    }),
-                );
-            }
 
-            // eslint-disable-next-line camelcase
-            const { tracking_enabled, tracking_id } = storage.load();
-
-            analytics.init(tracking_enabled, {
-                // eslint-disable-next-line camelcase
-                instanceId: tracking_id,
-                commitId: process.env.COMMIT_HASH || '',
-                isDev: process.env.NODE_ENV === 'development',
-            });
-
-            analytics.report({
-                type: EventType.AppReady,
-                payload: {
-                    version: settings?.version,
-                    origin: settings?.origin,
-                    referrerApp: settings?.manifest?.appUrl,
-                    referrerEmail: settings?.manifest?.email,
+        if (method?.info) {
+            postMessage(
+                createPopupMessage(POPUP.METHOD_INFO, {
                     method: method.name,
-                    payload: method.payload ? Object.keys(method.payload) : undefined,
-                    transportType: transport?.type,
-                    transportVersion: transport?.version,
-                },
-            });
+                    info: method.info, // method.info might change based on initAsync
+                }),
+            );
+        }
+
+        const { tracking_enabled, tracking_id } = storage.load();
+
+        analytics.init(tracking_enabled, {
+            instanceId: tracking_id,
+            commitId: process.env.COMMIT_HASH || '',
+            isDev: process.env.NODE_ENV === 'development',
+        });
+
+        analytics.report({
+            type: EventType.AppReady,
+            payload: {
+                version: settings?.version,
+                origin: settings?.origin,
+                referrerApp: settings?.manifest?.appUrl,
+                referrerEmail: settings?.manifest?.email,
+                method: method?.name,
+                payload: method?.payload ? Object.keys(method.payload) : undefined,
+                transportType: transport?.type,
+                transportVersion: transport?.version,
+            },
         });
     }
 
@@ -174,13 +173,13 @@ const handleMessage = async (event: PostMessageEvent) => {
     )
         return;
 
-    const message = parseMessage(data);
+    const message = parseMessage<CoreRequestMessage>(data);
 
     // prevent from passing event up
     event.preventDefault();
     event.stopImmediatePropagation();
 
-    const safeMessages: CoreMessage['type'][] = [
+    const safeMessages: CoreRequestMessage['type'][] = [
         IFRAME.CALL,
         POPUP.CLOSED,
         // UI.CHANGE_SETTINGS,
@@ -199,7 +198,7 @@ const handleMessage = async (event: PostMessageEvent) => {
 };
 
 // Communication with 3rd party window and Trezor Popup.
-const postMessage = (message: CoreMessage) => {
+const postMessage = (message: CoreEventMessage) => {
     _log.debug('postMessage', message);
 
     const usingPopup = DataManager.getSettings('popup');
@@ -209,7 +208,8 @@ const postMessage = (message: CoreMessage) => {
     // popup handshake is resolved automatically
     if (!usingPopup) {
         if (_core && message.type === UI.REQUEST_UI_WINDOW) {
-            _core.handleMessage({ event: UI_EVENT, type: POPUP.HANDSHAKE });
+            _core.handleMessage({ type: POPUP.HANDSHAKE });
+
             return;
         }
         if (message.type === POPUP.CANCEL_POPUP_REQUEST) {
@@ -239,13 +239,14 @@ const postMessage = (message: CoreMessage) => {
     if (!usingPopup || shouldUiEventBeSentToHost(message)) {
         let origin = DataManager.getSettings('origin');
         if (!origin || origin.indexOf('file://') >= 0) origin = '*';
+        message.channel = { here: '@trezor/connect-iframe', peer: '@trezor/connect-web' };
         window.parent.postMessage(message, origin);
     }
 };
 
-const shouldUiEventBeSentToHost = (message: CoreMessage) => {
+const shouldUiEventBeSentToHost = (message: CoreEventMessage) => {
     // whitelistedMessages are messages that are sent to 3rd party/host/parent.
-    const whitelistedMessages: CoreMessage['type'][] = [
+    const whitelistedMessages: CoreEventMessage['type'][] = [
         IFRAME.LOADED,
         IFRAME.ERROR,
         POPUP.CANCEL_POPUP_REQUEST,
@@ -260,6 +261,7 @@ const shouldUiEventBeSentToHost = (message: CoreMessage) => {
         DEVICE.DISCONNECT,
         DEVICE.BUTTON,
     ];
+
     return whitelistedMessages.includes(message.type);
 };
 
@@ -268,17 +270,22 @@ const filterDeviceEvent = (message: DeviceEvent) => {
     const features =
         'device' in message.payload ? message.payload.device.features : message.payload.features;
     if (features) {
-        const savedPermissions = storage.load().permissions || storage.load(true).permissions;
+        const origin = DataManager.getSettings('origin')!;
+
+        const savedPermissions =
+            storage.loadForOrigin(origin)?.permissions ||
+            storage.loadForOrigin(origin, true)?.permissions ||
+            [];
+
         if (savedPermissions) {
             const devicePermissions = savedPermissions.filter(
-                p =>
-                    p.origin === DataManager.getSettings('origin') &&
-                    p.type === 'read' &&
-                    p.device === features.device_id,
+                p => p.type === 'read' && p.device === features.device_id,
             );
+
             return devicePermissions.length > 0;
         }
     }
+
     return false;
 };
 
@@ -318,11 +325,7 @@ const init = async (payload: IFrameInit['payload'], origin: string) => {
 
     try {
         // initialize core
-        _core = await initCore(parsedSettings, logWriterFactory);
-        _core.on(CORE_EVENT, postMessage);
-
-        // initialize transport and wait for the first transport event (start or error)
-        await initTransport(parsedSettings);
+        _core = await initCore(parsedSettings, postMessage, logWriterFactory);
         postMessage(
             createIFrameMessage(IFRAME.LOADED, {
                 useBroadcastChannel: !!_popupMessagePort,

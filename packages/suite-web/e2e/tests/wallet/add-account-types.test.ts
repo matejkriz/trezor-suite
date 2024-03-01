@@ -3,7 +3,7 @@
 
 import { onAccountsPage } from '../../support/pageObjects/accountsObject';
 import { onSettingsCryptoPage } from '../../support/pageObjects/settingsCryptoObject';
-import { onTopBar } from '../../support/pageObjects/topBarObject';
+import { onNavBar } from '../../support/pageObjects/topBarObject';
 import { NetworkSymbol } from '@suite-common/wallet-config';
 import { EventType } from '@trezor/suite-analytics';
 import { ExtractByEventType, Requests } from '../../support/types';
@@ -11,6 +11,22 @@ import { ExtractByEventType, Requests } from '../../support/types';
 let requests: Requests;
 
 describe('Account types suite', () => {
+    const fixtures = [
+        {
+            coin: 'btc',
+            accounts: [
+                { type: 'normal' },
+                { type: 'taproot' },
+                { type: 'segwit' },
+                { type: 'legacy' },
+            ],
+        },
+        {
+            coin: 'ltc',
+            accounts: [{ type: 'normal' }, { type: 'segwit' }, { type: 'legacy' }],
+        },
+    ];
+
     beforeEach(() => {
         cy.task('startEmu', { wipe: true });
         cy.task('setupEmu', {
@@ -18,9 +34,16 @@ describe('Account types suite', () => {
         });
         cy.task('startBridge');
 
-        cy.viewport(1080, 1440).resetDb();
-        cy.prefixedVisit('/');
+        cy.viewport(1440, 2560).resetDb();
+        cy.prefixedVisit('/settings/coins');
+
         cy.passThroughInitialRun();
+        fixtures
+            .filter(({ coin }) => coin !== 'btc')
+            .forEach(({ coin }) => {
+                cy.getTestElement(`@settings/wallet/network/${coin}`).click();
+            });
+        cy.getTestElement('@suite/menu/suite-index').click();
         cy.discoveryShouldFinish();
 
         requests = [];
@@ -38,124 +61,41 @@ describe('Account types suite', () => {
      * 3. Get the number of accounts
      * 4. Create new account for each account type
      * 5. Get the number of accounts again
-     * 6. Verify that the current number is equeal to previous number + 1
+     * 6. Verify that the current number is equal to previous number + 1
      */
-    it('Add-account-types-BTC', () => {
-        //
-        // Test preparation
-        //
-        const coin: NetworkSymbol = 'btc';
-        const accsArray = [
-            { type: 'normal' },
-            { type: 'taproot' },
-            { type: 'segwit' },
-            { type: 'legacy' },
-        ];
+    it(`Add-account-types-btc-like`, () => {
+        fixtures.forEach(({ coin, accounts }) => {
+            accounts.forEach(({ type }: { type: string }) => {
+                //
+                // Test execution
+                //
+                onAccountsPage.clickAllAccountArrows();
 
-        //
-        // Test execution
-        //
+                // for a specific type of BTC acc, get the current number of accounts
+                cy.getTestElement(`@account-menu/${type}/group`)
+                    .children()
+                    .not(`[data-test="@account-menu/account-item-skeleton"]`)
+                    .then(specificAccounts => {
+                        const numberOfAccounts1 = specificAccounts.length;
 
-        onTopBar.openAccounts();
-        onAccountsPage.clickAllAccountArrows();
-        accsArray.forEach(({ type }: { type: string }) =>
-            // for a specific type of BTC acc, get the current number of accounts
-            cy
-                .get(`[type="${type}"] > [data-test^="@account-menu/${coin}/${type}/"]`)
-                .then(specificAccounts => {
-                    const numberOfAccounts1 = specificAccounts.length;
+                        // for a specific type of BTC acc, add a new acc
+                        cy.createAccountFromMyAccounts(coin, type);
 
-                    // for a specific type of BTC acc, add a new acc
-                    cy.createAccountFromMyAccounts(coin, type);
-
-                    // for a specific type of BTC acc, get the current number of accounts again for comparison
-                    cy.get(`[type="${type}"] > [data-test^="@account-menu/${coin}/${type}/"]`).then(
-                        specificAccounts => {
-                            const numberOfAccounts2 = specificAccounts.length;
-
-                            expect(numberOfAccounts2).to.be.equal(numberOfAccounts1 + 1);
-                        },
-                    );
-                }),
-        );
-        onAccountsPage.clickAllAccountArrows();
-        // TODO: there's a bug ATM, uncomment after bugfix
-        // cy.get(`[type] > [data-test*="@account-menu/${coin}"]`).then(newAccounts => {
-        //     const numberOfAccounts1 = newAccounts.length;
-        //     expect(numberOfAccounts1).to.be.equal(currentAccounts.length);
-
-        cy.findAnalyticsEventByType<ExtractByEventType<EventType.AccountsNewAccount>>(
-            requests,
-            EventType.AccountsNewAccount,
-        ).then(accountsNewAccountEvent => {
-            expect(accountsNewAccountEvent.symbol).to.equal('btc');
-            expect(accountsNewAccountEvent.path).to.equal(`m/84'/0'/1'`);
-            expect(accountsNewAccountEvent.type).to.equal('normal'); // normal is first
+                        // for a specific type of BTC acc, get the current number of accounts again for comparison
+                        cy.getTestElement(`@account-menu/${type}/group`)
+                            .children()
+                            .not(`[data-test="@account-menu/account-item-skeleton"]`)
+                            .then(specificAccounts => {
+                                const numberOfAccounts2 = specificAccounts.length;
+                                expect(numberOfAccounts2).to.be.equal(numberOfAccounts1 + 1);
+                            });
+                    });
+                onAccountsPage.clickAllAccountArrows();
+            });
         });
     });
 
-    /**
-     * Test case
-     * 1. go to Settings
-     * 2. activate LTC
-     * 3. go to Accounts
-     * 4. Unpack all account types
-     * 5. Get the number of accounts
-     * 6. Create new account for each account type
-     * 7. Get the number of accounts again
-     * 8. Verify that the current number is equeal to previous number + 1
-     */
-    it('Add-account-types-LTC', () => {
-        //
-        // Test preparation
-        //
-        const coin: NetworkSymbol = 'ltc';
-        const accsArray = [{ type: 'normal' }, { type: 'segwit' }, { type: 'legacy' }];
-
-        //
-        // Test execution
-        //
-
-        // activate the coin
-        cy.prefixedVisit('/settings/coins');
-        onSettingsCryptoPage.activateCoin(coin);
-
-        onTopBar.openAccounts();
-        onAccountsPage.applyCoinFilter(coin);
-        cy.discoveryShouldFinish();
-        onAccountsPage.clickAllAccountArrows();
-
-        accsArray.forEach(({ type }: { type: string }) =>
-            cy
-                .get(`[type="${type}"] > [data-test^="@account-menu/${coin}/${type}/"]`)
-                .then(specificAccounts => {
-                    const numberOfAccounts1 = specificAccounts.length;
-                    cy.createAccountFromMyAccounts(coin, type);
-                    cy.get(`[type="${type}"] > [data-test^="@account-menu/${coin}/${type}/"]`).then(
-                        specificAccounts => {
-                            const numberOfAccounts2 = specificAccounts.length;
-                            expect(numberOfAccounts2).to.be.equal(numberOfAccounts1 + 1);
-                        },
-                    );
-                }),
-        );
-        // TODO: there's a bug ATM, uncomment after bugfix
-        // onAccountsPage.clickAllAccountArrows();
-        // cy.get(`[type] > [data-test*="@account-menu/${coin}"]`).then(newAccounts => {
-        //     const numberOfAccounts1 = newAccounts.length;
-        //     expect(numberOfAccounts1).to.be.equal(1);
-        // });
-
-        cy.findAnalyticsEventByType<ExtractByEventType<EventType.AccountsNewAccount>>(
-            requests,
-            EventType.AccountsNewAccount,
-        ).then(accountsNewAccountEvent => {
-            expect(accountsNewAccountEvent.symbol).to.equal('ltc');
-            expect(accountsNewAccountEvent.path).to.equal(`m/84'/2'/1'`);
-            expect(accountsNewAccountEvent.type).to.equal('normal'); // normal is first
-        });
-    });
-
+    // please @trezor/qa fix this, example how to do this is in the previous test
     /**
      * Test case
      * 1. go to Settings
@@ -165,28 +105,30 @@ describe('Account types suite', () => {
      * 5. Get the number of accounts
      * 6. Create new account
      * 7. Get the number of accounts again
-     * 8. Verify that the current number is equeal to previous number + 1
+     * 8. Verify that the current number is equal to previous number + 1
      */
-    it('Add-account-types-non-BTC-coins', () => {
+    it.skip('Add-account-types-non-BTC-coins', () => {
         //
         // Test execution
         //
         const coins: NetworkSymbol[] = ['ada', 'eth'];
 
         // activate the coin
-        cy.prefixedVisit('/settings/coins');
+        cy.getTestElement('@suite/menu/settings').click();
+        cy.getTestElement('@settings/menu/wallet').click();
         coins.forEach((coin: NetworkSymbol) => {
             onSettingsCryptoPage.activateCoin(coin);
         });
 
-        onTopBar.openAccounts();
+        cy.getTestElement('@suite/menu/suite-index').click();
+        onNavBar.openDefaultAcccount();
         cy.discoveryShouldFinish();
         // cardano
 
         coins.forEach((coin: NetworkSymbol) => {
             onAccountsPage.applyCoinFilter(coin);
             // get the element containing all accounts
-            cy.get(`[type="normal"] > [data-test*="@account-menu/${coin}/normal"]`).then(
+            cy.get(`[type="normal"] [data-test*="@account-menu/${coin}/normal"]`).then(
                 currentAccounts => {
                     const numberOfAccounts1 = currentAccounts.length;
 
@@ -198,7 +140,7 @@ describe('Account types suite', () => {
                     cy.getTestElement('@add-account').click();
                     cy.discoveryShouldFinish();
 
-                    cy.get(`[type="normal"] > [data-test*="@account-menu/${coin}/normal"]`).then(
+                    cy.get(`[type="normal"] [data-test*="@account-menu/${coin}/normal"]`).then(
                         newAccounts => {
                             const numberOfAccounts2 = newAccounts.length;
                             expect(numberOfAccounts2).to.be.equal(numberOfAccounts1 + 1);

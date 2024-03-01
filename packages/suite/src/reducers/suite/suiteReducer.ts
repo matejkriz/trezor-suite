@@ -2,9 +2,8 @@ import produce from 'immer';
 
 import { discoveryActions, DeviceRootState, selectDevice } from '@suite-common/wallet-core';
 import type { InvityServerEnvironment } from '@suite-common/invity';
-import { getNumberFromPixelString, versionUtils } from '@trezor/utils';
-import { isWeb, getWindowWidth } from '@trezor/env-utils';
-import { variables } from '@trezor/components';
+import { versionUtils } from '@trezor/utils';
+import { isWeb } from '@trezor/env-utils';
 import { SuiteThemeVariant } from '@trezor/suite-desktop-api';
 import { TRANSPORT, TransportInfo, ConnectSettings } from '@trezor/connect';
 
@@ -16,6 +15,7 @@ import { SUITE, STORAGE } from 'src/actions/suite/constants';
 import { Action, Lock, TorBootstrap, TorStatus } from 'src/types/suite';
 import { getExcludedPrerequisites, getPrerequisiteName } from 'src/utils/suite/prerequisites';
 import { RouterRootState, selectRouter } from './routerReducer';
+import { Network } from '@suite-common/wallet-config';
 
 export interface SuiteRootState {
     suite: SuiteState;
@@ -64,6 +64,11 @@ export interface Flags {
     dashboardAssetsGridMode: boolean; // dashboard UI
     showDashboardT2B1PromoBanner: boolean;
     showSettingsDesktopAppPromoBanner: boolean;
+    stakeEthBannerClosed: boolean; // banner in account view (Overview tab) presenting ETH staking feature
+}
+
+export interface EvmSettings {
+    confirmExplanationModalClosed: Partial<Record<Network['symbol'], Record<string, boolean>>>;
 }
 
 export interface SuiteSettings {
@@ -88,6 +93,7 @@ export interface SuiteState {
     transport?: Partial<TransportInfo>;
     locks: Lock[];
     flags: Flags;
+    evmSettings: EvmSettings;
     settings: SuiteSettings;
 }
 
@@ -107,10 +113,13 @@ const initialState: SuiteState = {
         firmwareTypeBannerClosed: false,
         securityStepsHidden: false,
         dashboardGraphHidden: false,
-        dashboardAssetsGridMode:
-            getWindowWidth() < getNumberFromPixelString(variables.SCREEN_SIZE.SM),
+        dashboardAssetsGridMode: true,
         showDashboardT2B1PromoBanner: true,
         showSettingsDesktopAppPromoBanner: true,
+        stakeEthBannerClosed: false,
+    },
+    evmSettings: {
+        confirmExplanationModalClosed: {},
     },
     settings: {
         theme: {
@@ -157,6 +166,10 @@ const suiteReducer = (state: SuiteState = initialState, action: Action): SuiteSt
                     ...draft.flags,
                     ...action.payload.suiteSettings?.flags,
                 };
+                draft.evmSettings = {
+                    ...draft.evmSettings,
+                    ...action.payload.suiteSettings?.evmSettings,
+                };
                 draft.settings = {
                     ...draft.settings,
                     ...action.payload.suiteSettings?.settings,
@@ -186,6 +199,19 @@ const suiteReducer = (state: SuiteState = initialState, action: Action): SuiteSt
 
             case SUITE.SET_FLAG:
                 setFlag(draft, action.key, action.value);
+                break;
+
+            case SUITE.EVM_CONFIRM_EXPLANATION_MODAL:
+                draft.evmSettings = {
+                    ...draft.evmSettings,
+                    confirmExplanationModalClosed: {
+                        ...draft.evmSettings.confirmExplanationModalClosed,
+                        [action.symbol]: {
+                            ...draft.evmSettings.confirmExplanationModalClosed[action.symbol],
+                            [action.route]: true,
+                        },
+                    },
+                };
                 break;
 
             case SUITE.SET_THEME:
@@ -263,6 +289,7 @@ const suiteReducer = (state: SuiteState = initialState, action: Action): SuiteSt
 
 export const selectTorState = (state: SuiteRootState) => {
     const { torStatus, torBootstrap } = state.suite;
+
     return {
         isTorEnabled: getIsTorEnabled(torStatus),
         isTorLoading: getIsTorLoading(torStatus),
@@ -316,5 +343,8 @@ export const selectIsDashboardT2B1PromoBannerShown = (state: SuiteRootState) =>
 
 export const selectIsSettingsDesktopAppPromoBannerShown = (state: SuiteRootState) =>
     state.suite.flags.showSettingsDesktopAppPromoBanner;
+
+export const selectIsLoggedOut = (state: SuiteRootState & DeviceRootState) =>
+    state.suite.flags.initialRun || state.device?.selectedDevice?.mode !== 'normal';
 
 export default suiteReducer;

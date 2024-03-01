@@ -1,7 +1,7 @@
 import styled from 'styled-components';
 import { ToastContainer as BaseToastContainer, Slide } from 'react-toastify';
 
-import { variables } from '@trezor/components';
+import { borders, zIndices } from '@trezor/theme';
 
 // A set of required styles copied from 'react-toastify/dist/ReactToastify.css'
 // Note: lib styles are ready only for a current setup, if you want to change e.g. transition, copy additional styles
@@ -10,11 +10,11 @@ const StyledContainer = styled(BaseToastContainer)`
     & {
         min-width: 330px;
         max-width: 430px;
-        z-index: ${variables.Z_INDEX.TOOLTIP};
+        z-index: ${zIndices.tooltip};
         position: fixed;
         padding: 4px;
         box-sizing: border-box;
-        border-radius: 8px;
+        border-radius: ${borders.radii.xs};
         top: 11px;
         right: 11px;
 
@@ -29,13 +29,13 @@ const StyledContainer = styled(BaseToastContainer)`
     }
 
     .Toastify__toast {
-        border-radius: 8px;
+        border-radius: ${borders.radii.xs};
         box-shadow: 0 2px 5px 0 rgb(0 0 0 / 19%);
         color: ${({ theme }) => theme.TYPE_DARK_GREY};
         background: ${({ theme }) => theme.BG_WHITE};
         padding: 0;
         font-family:
-            'TT Hoves',
+            'TT Satoshi',
             -apple-system,
             BlinkMacSystemFont,
             'Segoe UI',
@@ -132,7 +132,6 @@ export const ToastContainer = () => (
         draggable={false}
         closeButton={false}
         hideProgressBar
-        closeOnClick={false}
         position="top-right"
         transition={Slide}
     />

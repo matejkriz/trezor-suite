@@ -1,49 +1,60 @@
 import { ReactNode, SyntheticEvent } from 'react';
-import styled from 'styled-components';
-import { darken } from 'polished';
-import { Icon, IconProps, variables, useTheme, Checkbox } from '@trezor/components';
+import styled, { useTheme } from 'styled-components';
+import { Icon, IconProps, variables, Checkbox, Card } from '@trezor/components';
+import { spacingsPx, typography } from '@trezor/theme';
 
 const StyledCheckbox = styled(Checkbox)`
+    /* so the entire card acts as a checkbox */
     position: absolute;
-    right: 0;
-    top: 20px;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
 
-    ${variables.SCREEN_QUERY.MOBILE} {
-        top: auto;
+    > div {
+        position: absolute;
+
+        /* Card padding */
+        top: ${spacingsPx.lg};
+        left: ${spacingsPx.sm};
+    }
+
+    ${variables.SCREEN_QUERY.ABOVE_MOBILE} {
+        > div {
+            top: auto;
+            bottom: ${spacingsPx.md};
+            left: ${spacingsPx.lg};
+        }
     }
 `;
 
-const Card = styled.div<{ checked: boolean }>`
+const Container = styled(Card)<{ checked: boolean }>`
     position: relative;
-    padding: 24px;
-    border-radius: 10px;
-    border: solid 1.5px ${({ theme, checked }) => (checked ? theme.TYPE_GREEN : theme.STROKE_GREY)};
+
+    /* space for the checkbox */
+    padding-bottom: ${spacingsPx.xxxxl};
+    border: solid 1px
+        ${({ theme, checked }) => (checked ? theme.borderSecondary : theme.borderOnElevation1)};
     transition:
         box-shadow 0.2s ease-in-out,
-        border 0.2s ease-in-out;
+        border 0.1s;
     cursor: pointer;
 
     :hover {
-        box-shadow: 0 4px 10px 0 ${({ theme }) => theme.BOX_SHADOW_OPTION_CARD};
-        border: 1.5px solid ${({ theme, checked }) => (checked ? theme.TYPE_GREEN : 'transparent')};
-
-        ${StyledCheckbox} > :first-child {
-            border: ${({ theme }) =>
-                `2px solid ${darken(theme.HOVER_DARKEN_FILTER, theme.STROKE_GREY)}`};
-        }
+        box-shadow: ${({ theme }) => theme.boxShadowElevated};
     }
 
     ${variables.SCREEN_QUERY.MOBILE} {
-        display: flex;
-        align-items: center;
-        padding-right: 56px;
+        flex-direction: row-reverse;
+        gap: ${spacingsPx.md};
+        padding-bottom: ${spacingsPx.sm};
+        padding-left: ${spacingsPx.xxxxl};
     }
 `;
 
 const Label = styled.span`
-    color: ${({ theme }) => theme.TYPE_DARK_GREY};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-    font-size: ${variables.FONT_SIZE.NORMAL};
+    color: ${({ theme }) => theme.textDefault};
+    ${typography.body};
 `;
 
 const Content = styled.div`
@@ -92,16 +103,16 @@ export const BackupSeedCard = ({
     };
 
     return (
-        <Card checked={isChecked} onClick={onClick} data-test={dataTest}>
+        <Container forceElevation={2} checked={isChecked} data-test={dataTest}>
             <Content>
                 <IconWrapper>
-                    <Icon icon={icon} color={theme.TYPE_DARK_GREY} />
+                    <Icon icon={icon} color={theme.iconDefault} />
                 </IconWrapper>
 
                 <Label>{label}</Label>
             </Content>
 
-            <StyledCheckbox isChecked={isChecked} onClick={handleCheckboxClick} />
-        </Card>
+            <StyledCheckbox variant="primary" isChecked={isChecked} onClick={handleCheckboxClick} />
+        </Container>
     );
 };

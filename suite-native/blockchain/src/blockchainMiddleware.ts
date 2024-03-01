@@ -1,4 +1,3 @@
-/* eslint-disable no-case-declarations */
 import { createMiddleware } from '@suite-common/redux-utils';
 import {
     TransactionsRootState,
@@ -16,6 +15,7 @@ import {
 
 export const selectNetworksWithPendingTransactions = (state: TransactionsRootState) => {
     const pendingTransactions = selectAllPendingTransactions(state);
+
     return Object.keys(pendingTransactions)
         .filter(accountKey => pendingTransactions[accountKey].length > 0)
         .map(accountKey => pendingTransactions[accountKey][0].symbol);
@@ -30,9 +30,8 @@ export const blockchainMiddleware = createMiddleware(
 
                 break;
             case TREZOR_CONNECT_BLOCKCHAIN_ACTIONS.BLOCK:
-                const networksWithPendingTransactions = selectNetworksWithPendingTransactions(
-                    getState(),
-                );
+                const networksWithPendingTransactions =
+                    selectNetworksWithPendingTransactions(getState());
                 const symbol = action.payload.coin.shortcut.toLowerCase() as NetworkSymbol;
 
                 if (networksWithPendingTransactions.includes(symbol)) {

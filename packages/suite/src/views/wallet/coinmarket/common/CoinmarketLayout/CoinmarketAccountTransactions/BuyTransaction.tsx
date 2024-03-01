@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import styled from 'styled-components';
+import styled, { useTheme } from 'styled-components';
 import { BuyProviderInfo, BuyTradeQuoteRequest } from 'invity-api';
 
 import invityAPI from 'src/services/suite/invityAPI';
@@ -11,7 +11,7 @@ import {
     saveQuotes,
     saveTransactionDetailId,
 } from 'src/actions/wallet/coinmarketBuyActions';
-import { useTheme, variables, Icon, Button } from '@trezor/components';
+import { variables, Icon, Button } from '@trezor/components';
 import { CoinmarketPaymentType, CoinmarketProviderInfo } from 'src/views/wallet/coinmarket/common';
 import { Account } from 'src/types/wallet';
 import {
@@ -25,6 +25,7 @@ import { TradeBuy } from 'src/types/wallet/coinmarketCommonTypes';
 import { useDispatch, useSelector } from 'src/hooks/suite';
 import { useCoinmarketNavigation } from 'src/hooks/wallet/useCoinmarketNavigation';
 import { CoinmarketTransactionStatus } from './CoinmarketTransactionStatus';
+import { cryptoToCoinSymbol } from 'src/utils/wallet/coinmarket/cryptoSymbolUtils';
 
 const Wrapper = styled.div`
     display: flex;
@@ -60,16 +61,13 @@ const Column = styled.div`
 
 const BuyColumn = styled(Column)`
     display: flex;
-    align-items: center;
     justify-content: center;
     font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-    max-width: 130px;
+    flex: 0 1 auto;
 
     @media screen and (max-width: ${variables.SCREEN_SIZE.SM}) {
         border-left: 0;
     }
-
-    border-left: 1px solid ${({ theme }) => theme.STROKE_GREY};
 `;
 
 const ProviderColumn = styled(Column)`
@@ -154,7 +152,7 @@ export const BuyTransaction = ({ trade, providers, account }: BuyTransactionProp
         setIsGettingOffers(true);
         const request: BuyTradeQuoteRequest = {
             fiatCurrency: fiatCurrency || '',
-            receiveCurrency: receiveCurrency || '',
+            receiveCurrency: receiveCurrency!,
             fiatStringAmount: fiatStringAmount || '',
             wantCrypto: false,
             country,
@@ -188,7 +186,10 @@ export const BuyTransaction = ({ trade, providers, account }: BuyTransactionProp
                     <Arrow>
                         <Icon color={theme.TYPE_LIGHT_GREY} size={13} icon="ARROW_RIGHT" />
                     </Arrow>
-                    <FormattedCryptoAmount value={receiveStringAmount} symbol={receiveCurrency} />
+                    <FormattedCryptoAmount
+                        value={receiveStringAmount}
+                        symbol={cryptoToCoinSymbol(receiveCurrency!)}
+                    />
                     {/* TODO FIX THIS LOGO */}
                     {/* <StyledCoinLogo size={13} symbol={symbol} /> */}
                 </Row>
@@ -212,6 +213,7 @@ export const BuyTransaction = ({ trade, providers, account }: BuyTransactionProp
             <BuyColumn>
                 {statusMessage === 'TR_BUY_STATUS_SUCCESS' ? (
                     <Button
+                        size="small"
                         variant="tertiary"
                         onClick={getOffers}
                         isLoading={isGettingOffers}
@@ -220,7 +222,7 @@ export const BuyTransaction = ({ trade, providers, account }: BuyTransactionProp
                         <Translation id="TR_BUY_BUY_AGAIN" />
                     </Button>
                 ) : (
-                    <Button variant="tertiary" onClick={handleViewDetailsButtonClick}>
+                    <Button size="small" variant="tertiary" onClick={handleViewDetailsButtonClick}>
                         <Translation id="TR_BUY_VIEW_DETAILS" />
                     </Button>
                 )}

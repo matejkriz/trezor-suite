@@ -1,10 +1,10 @@
 import styled from 'styled-components';
-import { P } from '@trezor/components';
+import { Paragraph } from '@trezor/components';
 import { useSelector } from 'src/hooks/suite';
 import { Translation } from 'src/components/suite/Translation';
 import type { Network } from 'src/types/wallet';
 
-const Wrapper = styled(P)`
+const Wrapper = styled(Paragraph)`
     display: flex;
     flex-direction: column;
     text-align: left;
@@ -18,8 +18,9 @@ const ConnectionInfo = ({ coin }: ConnectionInfoProps) => {
     const blockchain = useSelector(state => state.wallet.blockchain);
 
     const { connected, url, blockHash: hash, blockHeight: height, version } = blockchain[coin];
+
     return (
-        <Wrapper size="small">
+        <Wrapper type="hint">
             {connected ? (
                 <>
                     <Translation id="SETTINGS_ADV_COIN_CONN_INFO_URL" values={{ url }} />

@@ -1,4 +1,3 @@
-import { darken } from 'polished';
 import styled from 'styled-components';
 
 import { TREZOR_FORUM_URL, TREZOR_SUPPORT_URL } from '@trezor/urls';
@@ -14,6 +13,7 @@ import { setView } from 'src/actions/suite/guideActions';
 import { useDispatch, useSelector } from 'src/hooks/suite';
 import { GuideViewWrapper, GuideHeader, GuideContent } from 'src/components/guide';
 import { UpdateState } from 'src/reducers/suite/desktopUpdateReducer';
+import { borders } from '@trezor/theme';
 
 const Section = styled.div`
     & + & {
@@ -31,20 +31,21 @@ const SectionHeader = styled.h3`
 const SectionButton = styled.button<{ hasBackground?: boolean }>`
     left: auto;
     cursor: pointer;
-    border-radius: 8px;
+    border-radius: ${borders.radii.xs};
     width: 100%;
     margin: 0 0 10px;
     display: flex;
     align-items: center;
     padding: 13px;
-    background: ${({ hasBackground, theme }) => (hasBackground ? theme.BG_GREY_ALT : 'none')};
-    border: 2px solid ${({ theme }) => theme.BG_GREY_ALT};
+    background: ${({ hasBackground, theme }) =>
+        hasBackground ? theme.backgroundSurfaceElevation1 : 'none'};
+    border: 0;
 
     transition: ${({ theme }) =>
         `background ${theme.HOVER_TRANSITION_TIME} ${theme.HOVER_TRANSITION_EFFECT}`};
 
     &:hover {
-        background: ${({ theme }) => darken(theme.HOVER_DARKEN_FILTER, theme.BG_GREY_ALT)};
+        background: ${({ theme }) => theme.backgroundTertiaryPressedOnElevation1};
     }
 `;
 

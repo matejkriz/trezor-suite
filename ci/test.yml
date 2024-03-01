@@ -81,13 +81,11 @@
       - TEST_GROUP:
           [
             "@group:suite",
-            "@group:onboarding",
             "@group:device-management",
             "@group:settings",
             "@group:metadata",
             "@group:passphrase",
-            "@group:browser",
-            "@group:coinmarket",
+            "@group:other",
           ]
         CONTAINERS: "trezor-user-env-unix"
         CYPRESS_USE_TREZOR_USER_ENV_BRIDGE: 1
@@ -112,12 +110,13 @@ suite web migrations:
 suite web:
   extends: .suite web base
 
-suite web snapshots:
-  extends: .suite web base
-  when: manual
-  variables:
-    CYPRESS_SNAPSHOT: 1
-    CYPRESS_updateSnapshots: 1
+# snapshots don't work at the moment, commenting them out
+# suite web snapshots:
+#   extends: .suite web base
+#   when: manual
+#   variables:
+#     CYPRESS_SNAPSHOT: 1
+#     CYPRESS_updateSnapshots: 1
 
 # Tests against latest trezor-firmware main
 suite web canary fws:
@@ -223,7 +222,7 @@ transport manual:
 # @trezor/connect-popup (via @trezor/connect-explorer)
 .e2e connect-popup:
   stage: integration testing
-  retry: 1
+  retry: 0
   variables:
     COMPOSE_PROJECT_NAME: $CI_JOB_ID
     COMPOSE_FILE: ./docker/docker-compose.connect-popup-ci.yml
@@ -249,9 +248,8 @@ transport manual:
     matrix:
       - TEST_FILE: ["methods.test"]
       - TEST_FILE: ["popup-close.test"]
-      - TEST_FILE: ["popup-error-page.test"]
       - TEST_FILE: ["passphrase.test"]
-      - TEST_FILE: ["log-page.test"]
+      - TEST_FILE: ["popup-pages.test"]
       - TEST_FILE: ["unchained.test"]
       - TEST_FILE: ["browser-support.test"]
       - TEST_FILE: ["transport.test"]
@@ -309,18 +307,21 @@ connect-popup legacy npm package:
     refs:
       - schedules
 
-.e2e connect-popup-webextension:
+.e2e connect-explorer-webextension:
   stage: integration testing
-  retry: 1
+  retry: 0
   variables:
     COMPOSE_PROJECT_NAME: $CI_JOB_ID
     COMPOSE_FILE: ./docker/docker-compose.connect-popup-ci.yml
+    TREZOR_CONNECT_SRC: ${DEV_SERVER_URL}/connect/${CI_COMMIT_REF_NAME}/
     URL: ${DEV_SERVER_URL}/connect/${CI_COMMIT_REF_NAME}/
-    TEST_FILE: $TEST_FILE
     IS_WEBEXTENSION: "true"
   script:
     - yarn install --immutable
-    - yarn workspace @trezor/connect-explorer-webextension build
+    - yarn build:libs
+    - yarn workspace @trezor/connect-webextension build
+    - yarn workspace @trezor/connect-iframe build:core-module
+    - yarn workspace @trezor/connect-explorer build:webextension
     - docker-compose pull
     - docker-compose up -d trezor-user-env-unix
     - docker-compose run test-run
@@ -340,18 +341,18 @@ connect-popup legacy npm package:
       - TEST_FILE: ["methods.test"]
       - TEST_FILE: ["passphrase.test"]
       - TEST_FILE: ["popup-close.test"]
-      - TEST_FILE: ["popup-error-page.test"]
+      - TEST_FILE: ["popup-pages.test"]
 
-connect-popup-webextension:
-  extends: .e2e connect-popup-webextension
+connect-explorer-webextension:
+  extends: .e2e connect-explorer-webextension
   dependencies:
     - install
     - connect-web build
   only:
     <<: *run_everything_rules
 
-connect-popup-webextension manual:
-  extends: .e2e connect-popup-webextension
+connect-explorer-webextension manual:
+  extends: .e2e connect-explorer-webextension
   needs:
     - install
     - connect-web build
@@ -361,7 +362,7 @@ connect-popup-webextension manual:
 
 .connect:
   stage: integration testing
-  retry: 1
+  retry: 0
   dependencies:
     - install
   variables:

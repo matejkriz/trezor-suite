@@ -1,7 +1,6 @@
-/* eslint-disable camelcase */
 import { desktopApi } from '@trezor/suite-desktop-api';
 import { getPrefixedURL } from 'src/utils/suite/router';
-import { METADATA } from 'src/actions/suite/constants';
+import { METADATA_PROVIDER } from 'src/actions/suite/constants';
 import { Deferred, createDeferred } from '@trezor/utils';
 import { urlHashParams, urlSearchParams } from 'src/utils/suite/metadata';
 
@@ -12,6 +11,7 @@ export const getOauthReceiverUrl = () => {
     if (!desktopApi.available) {
         return `${window.location.origin}${getPrefixedURL('/static/oauth/oauth_receiver.html')}`;
     }
+
     return desktopApi.getHttpReceiverAddress('/oauth');
 };
 
@@ -47,6 +47,7 @@ const openWindowOnAnotherDomain = (
             closeCallback();
         }
     }, 1000);
+
     return win;
 };
 
@@ -108,6 +109,7 @@ const getDesktopHandlerInstance = (
             },
         );
     };
+
     return desktopHandlerInstance;
 };
 
@@ -134,6 +136,7 @@ const getWebHandlerInstance = (
             },
         );
     };
+
     return webHandlerInstance;
 };
 
@@ -149,13 +152,13 @@ export const extractCredentialsFromAuthorizationFlow = (url: string) => {
         desktopApi.removeAllListeners('oauth/response');
         // this listener may never be called in some cases
         desktopApi.once('oauth/response', getDesktopHandlerInstance(dfd, originalParams));
-        window.open(url, METADATA.AUTH_WINDOW_TITLE, METADATA.AUTH_WINDOW_PROPS);
+        window.open(url, METADATA_PROVIDER.AUTH_WINDOW_TITLE, METADATA_PROVIDER.AUTH_WINDOW_PROPS);
     } else {
         window.addEventListener('message', getWebHandlerInstance(dfd, originalParams));
         openWindowOnAnotherDomain(
             url,
-            METADATA.AUTH_WINDOW_TITLE,
-            METADATA.AUTH_WINDOW_PROPS,
+            METADATA_PROVIDER.AUTH_WINDOW_TITLE,
+            METADATA_PROVIDER.AUTH_WINDOW_PROPS,
             () => {
                 // note that this rejection happens even on successful authorization.
                 // 'window closed' error message may be used to differentiate between errors

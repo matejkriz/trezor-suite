@@ -6,7 +6,7 @@
  * in case our authorization server (which holds a client secret necessary for the authorization code flow) is not available.
  */
 
-import { METADATA } from 'src/actions/suite/constants';
+import { METADATA_PROVIDER } from 'src/actions/suite/constants';
 import { isDesktop } from '@trezor/env-utils';
 import { OAuthServerEnvironment, Tokens } from 'src/types/suite/metadata';
 import {
@@ -128,14 +128,14 @@ class Client {
                     // the app has two sets of credentials to enable both OAuth flows
                     Client.clientId =
                         Client.flow === 'code'
-                            ? METADATA.GOOGLE_CODE_FLOW_CLIENT_ID
-                            : METADATA.GOOGLE_IMPLICIT_FLOW_CLIENT_ID;
+                            ? METADATA_PROVIDER.GOOGLE_CODE_FLOW_CLIENT_ID
+                            : METADATA_PROVIDER.GOOGLE_IMPLICIT_FLOW_CLIENT_ID;
                     resolve(Client);
                 });
             } else {
                 // code flow with loopback IP address does not work unless redirect_uri is localhost (Google returns redirect_uri_mismatch)
                 Client.flow = 'implicit';
-                Client.clientId = METADATA.GOOGLE_IMPLICIT_FLOW_CLIENT_ID;
+                Client.clientId = METADATA_PROVIDER.GOOGLE_IMPLICIT_FLOW_CLIENT_ID;
                 resolve(Client);
             }
         });
@@ -164,6 +164,7 @@ class Client {
                 await Client.forceImplicitFlow();
             }
         }
+
         return Client.accessToken;
     }
 
@@ -246,7 +247,7 @@ class Client {
     static async forceImplicitFlow() {
         if (Client.flow === 'code') {
             Client.flow = 'implicit';
-            Client.clientId = METADATA.GOOGLE_IMPLICIT_FLOW_CLIENT_ID;
+            Client.clientId = METADATA_PROVIDER.GOOGLE_IMPLICIT_FLOW_CLIENT_ID;
             await Client.authorize();
         }
     }
@@ -264,6 +265,7 @@ class Client {
         );
         Client.accessToken = '';
         Client.refreshToken = '';
+
         return promise;
     }
 
@@ -273,6 +275,7 @@ class Client {
             { method: 'GET' },
             {},
         );
+
         return response.json();
     }
 
@@ -320,6 +323,7 @@ class Client {
             },
             params,
         );
+
         return response.text();
     }
 
@@ -338,6 +342,7 @@ class Client {
             },
             params,
         );
+
         return response.json();
     }
 
@@ -356,6 +361,7 @@ class Client {
             },
             params,
         );
+
         return response.json;
     }
 
@@ -370,6 +376,7 @@ class Client {
             },
             params,
         );
+
         return response.json;
     }
 
@@ -390,6 +397,7 @@ class Client {
             if (Client.listPromise) {
                 await Client.listPromise;
                 Client.listPromise = undefined; // unset
+
                 return Client.nameIdMap[name];
             }
             // refresh nameIdMap
@@ -455,10 +463,12 @@ class Client {
                 const error = await response.json();
                 throw error;
             }
+
             return response;
         };
 
         const response = await getTokenAndFetch();
+
         return response;
     }
 }

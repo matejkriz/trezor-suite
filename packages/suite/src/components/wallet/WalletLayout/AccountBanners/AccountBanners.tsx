@@ -9,13 +9,15 @@ import { AccountImported } from './AccountImported';
 import { AccountOutOfSync } from './AccountOutOfSync';
 import { TorDisconnected } from './TorDisconnected';
 import { CoinjoinContextMessage } from './CoinjoinContextMessage';
+import { StakeEthBanner } from './StakeEthBanner';
+import { spacingsPx } from '@trezor/theme';
 
 const BannersWrapper = styled.div`
     display: flex;
     flex-direction: column;
 
     > div:last-child {
-        margin-bottom: 24px;
+        margin-bottom: ${spacingsPx.xl};
     }
 `;
 
@@ -33,5 +35,6 @@ export const AccountBanners = ({ account }: AccountBannersProps) => (
         <XRPReserve account={account} />
         <AccountImported account={account} />
         <AccountOutOfSync account={account} />
+        <StakeEthBanner />
     </BannersWrapper>
 );

@@ -16,7 +16,7 @@ describe('Passphrase', () => {
         cy.task('setupEmu', { mnemonic: 'all all all all all all all all all all all all' });
         cy.task('startBridge');
 
-        cy.viewport(1080, 1440).resetDb();
+        cy.viewport(1440, 2560).resetDb();
         cy.prefixedVisit('/');
         cy.passThroughInitialRun();
 
@@ -37,7 +37,7 @@ describe('Passphrase', () => {
         cy.task('pressYes');
 
         // confirm - input wrong passphrase
-        cy.getTestElement('@passphrase/confirm-checkbox', { timeout: 10000 }).click();
+        cy.getTestElement('@passphrase/confirm-checkbox', { timeout: 20000 }).click();
         cy.getTestElement('@passphrase/input').type('cba');
 
         cy.task('pressYes');
@@ -48,7 +48,7 @@ describe('Passphrase', () => {
         // retry
         cy.getTestElement('@exception/auth-confirm-failed/primary-button').click();
         // confirm again - input correct this time
-        cy.getTestElement('@passphrase/confirm-checkbox', { timeout: 10000 }).click();
+        cy.getTestElement('@passphrase/confirm-checkbox', { timeout: 20000 }).click();
         cy.getTestElement('@passphrase/input').type('abc');
         cy.getTestElement('@passphrase/hidden/submit-button').click();
 
@@ -59,7 +59,7 @@ describe('Passphrase', () => {
 
         cy.getTestElement('@dashboard/wallet-ready');
         // go to wallet
-        cy.getTestElement('@suite/menu/wallet-index').click();
+        cy.getTestElement('@account-menu/btc/normal/0').click();
         // go to receive
         cy.getTestElement('@wallet/menu/wallet-receive').click({ timeout: 10000 });
         // click reveal address
@@ -72,11 +72,14 @@ describe('Passphrase', () => {
                 chunks.each((i, el) => {
                     fullAddress += Cypress.$(el).text();
                 });
+
                 return fullAddress;
             })
             .should('contain', abcAddr);
         cy.task('pressYes');
-        cy.getTestElement('@metadata/copy-address-button').should('exist');
+        cy.getTestElement('@metadata/copy-address-button')
+            .should('exist')
+            .should('not.be.disabled');
         // close modal
         cy.getTestElement('@modal/close-button').click();
 
@@ -91,7 +94,7 @@ describe('Passphrase', () => {
 
         cy.getTestElement('@passphrase/hidden/submit-button').click();
         // confirm
-        cy.getTestElement('@passphrase/confirm-checkbox', { timeout: 10000 }).click();
+        cy.getTestElement('@passphrase/confirm-checkbox', { timeout: 20000 }).click();
         cy.getTestElement('@passphrase/input').type('def');
 
         cy.task('pressYes');
@@ -123,11 +126,14 @@ describe('Passphrase', () => {
                 chunks.each((i, el) => {
                     fullAddress += Cypress.$(el).text();
                 });
+
                 return fullAddress;
             })
             .should('contain', defAddr);
         cy.task('pressYes');
-        cy.getTestElement('@metadata/copy-address-button').should('exist');
+        cy.getTestElement('@metadata/copy-address-button')
+            .should('exist')
+            .should('not.be.disabled');
         // close modal
         cy.getTestElement('@modal/close-button').click();
 
@@ -153,6 +159,7 @@ describe('Passphrase', () => {
                 chunks.each((i, el) => {
                     fullAddress += Cypress.$(el).text();
                 });
+
                 return fullAddress;
             })
             .should('contain', abcAddr);

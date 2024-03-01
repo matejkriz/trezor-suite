@@ -82,6 +82,7 @@ const initStore = (state: State) => {
         // add action back to stack
         store.getActions().push(action);
     });
+
     return store;
 };
 
@@ -113,8 +114,8 @@ describe('coinmarketMiddleware', () => {
             { type: COINMARKET_COMMON.SET_LOADING, isLoading: true, lastLoadedTimestamp: 0 },
             { type: COINMARKET_COMMON.LOAD_DATA },
         ]);
-        expect(getCurrentAccountDescriptorMock).toBeCalledTimes(1);
-        expect(setInvityServersEnvironmentMock).toBeCalledTimes(1);
+        expect(getCurrentAccountDescriptorMock).toHaveBeenCalledTimes(1);
+        expect(setInvityServersEnvironmentMock).toHaveBeenCalledTimes(1);
     });
 
     it('loadData - outdated data', () => {
@@ -140,8 +141,8 @@ describe('coinmarketMiddleware', () => {
             { type: COINMARKET_COMMON.SET_LOADING, isLoading: true, lastLoadedTimestamp: 0 },
             { type: COINMARKET_COMMON.LOAD_DATA },
         ]);
-        expect(getCurrentAccountDescriptorMock).toBeCalledTimes(1);
-        expect(setInvityServersEnvironmentMock).toBeCalledTimes(1);
+        expect(getCurrentAccountDescriptorMock).toHaveBeenCalledTimes(1);
+        expect(setInvityServersEnvironmentMock).toHaveBeenCalledTimes(1);
     });
 
     it('loadData - keep current data', () => {
@@ -167,7 +168,7 @@ describe('coinmarketMiddleware', () => {
 
         store.dispatch({ type: COINMARKET_COMMON.LOAD_DATA });
         expect(store.getActions()).toEqual([{ type: COINMARKET_COMMON.LOAD_DATA }]);
-        expect(getCurrentAccountDescriptorMock).toBeCalledTimes(1);
-        expect(setInvityServersEnvironmentMock).toBeCalledTimes(0);
+        expect(getCurrentAccountDescriptorMock).toHaveBeenCalledTimes(1);
+        expect(setInvityServersEnvironmentMock).toHaveBeenCalledTimes(0);
     });
 });

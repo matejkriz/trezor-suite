@@ -27,6 +27,7 @@ import * as fixtures from '../__fixtures__/coinjoinClientActions';
 const TrezorConnect = testMocks.getTrezorConnectMock();
 jest.mock('src/services/coinjoin/coinjoinService', () => {
     const mock = jest.requireActual('../__fixtures__/mockCoinjoinService');
+
     return mock.mockCoinjoinService();
 });
 
@@ -79,6 +80,7 @@ const initStore = ({ accounts, coinjoin, device, selectedAccount, suite }: Walle
         }),
         middleware: [coinjoinMiddleware],
     });
+
     return store;
 };
 
@@ -114,7 +116,9 @@ describe('coinjoinClientActions', () => {
             expect(actions.map(a => a.type)).toEqual(f.result.actions);
 
             if (typeof f.result.trezorConnectCalledTimes === 'number') {
-                expect(TrezorConnect.setBusy).toBeCalledTimes(f.result.trezorConnectCalledTimes);
+                expect(TrezorConnect.setBusy).toHaveBeenCalledTimes(
+                    f.result.trezorConnectCalledTimes,
+                );
             }
             if (f.result.trezorConnectCallsWith) {
                 expect(TrezorConnect.setBusy).toHaveBeenLastCalledWith(
@@ -133,7 +137,7 @@ describe('coinjoinClientActions', () => {
 
             expect(response).toMatchObject(f.result.response);
 
-            expect(TrezorConnect.getOwnershipProof).toBeCalledTimes(
+            expect(TrezorConnect.getOwnershipProof).toHaveBeenCalledTimes(
                 f.result.trezorConnectCalledTimes,
             );
         });
@@ -148,7 +152,7 @@ describe('coinjoinClientActions', () => {
                 onCoinjoinClientRequest([f.params as any]), // params are incomplete
             );
 
-            expect(TrezorConnect.signTransaction).toBeCalledTimes(
+            expect(TrezorConnect.signTransaction).toHaveBeenCalledTimes(
                 f.result.trezorConnectCalledTimes,
             );
 
@@ -301,17 +305,17 @@ describe('coinjoinClientActions', () => {
 
         store.dispatch(clientEmitException('Some exception'));
 
-        expect(cli1.client.emit).toBeCalledTimes(1);
-        expect(cli2.client.emit).toBeCalledTimes(1);
-        expect(cli2.client.emit).toBeCalledWith('log', {
+        expect(cli1.client.emit).toHaveBeenCalledTimes(1);
+        expect(cli2.client.emit).toHaveBeenCalledTimes(1);
+        expect(cli2.client.emit).toHaveBeenCalledWith('log', {
             level: 'error',
             payload: 'Some exception',
         });
 
         store.dispatch(clientEmitException('Other exception', { symbol: 'btc' }));
 
-        expect(cli1.client.emit).toBeCalledTimes(2);
-        expect(cli2.client.emit).toBeCalledTimes(1);
+        expect(cli1.client.emit).toHaveBeenCalledTimes(2);
+        expect(cli2.client.emit).toHaveBeenCalledTimes(1);
     });
 
     it('clientEmitException from coinjoinMiddleware', async () => {
@@ -343,7 +347,7 @@ describe('coinjoinClientActions', () => {
         if (!cli) throw new Error('Client not initialized');
 
         store.dispatch({ type: '@suite/online-status', payload: false });
-        expect(cli.client.emit).toBeCalledTimes(1);
+        expect(cli.client.emit).toHaveBeenCalledTimes(1);
 
         // restore session after previous action, and set phase to critical again
         // NOTE: dispatching { type: '@suite/tor-status', payload: 'Enabled' } requires a lot more fixtures
@@ -360,11 +364,11 @@ describe('coinjoinClientActions', () => {
 
         restoreSession();
         store.dispatch({ type: '@suite/tor-status', payload: 'Disabled' });
-        expect(cli.client.emit).toBeCalledTimes(2);
+        expect(cli.client.emit).toHaveBeenCalledTimes(2);
 
         restoreSession();
         store.dispatch({ type: 'device-disconnect', payload: { id: 'device-id' } });
-        expect(cli.client.emit).toBeCalledTimes(3);
+        expect(cli.client.emit).toHaveBeenCalledTimes(3);
 
         // previous action stops the session
         const store2 = initializeStore();
@@ -373,7 +377,7 @@ describe('coinjoinClientActions', () => {
             type: '@common/wallet-core/accounts/removeAccount',
             payload: [{ key: 'btc-account1' }],
         });
-        expect(cli.client.emit).toBeCalledTimes(4);
+        expect(cli.client.emit).toHaveBeenCalledTimes(4);
     });
 
     // for coverage: edge cases, missing data etc...
@@ -407,7 +411,7 @@ describe('coinjoinClientActions', () => {
 
         store.dispatch(stopCoinjoinSession('account-A'));
 
-        expect(TrezorConnect.cancelCoinjoinAuthorization).toBeCalledTimes(1);
+        expect(TrezorConnect.cancelCoinjoinAuthorization).toHaveBeenCalledTimes(1);
     });
 
     it('stopCoinjoinSession but not cancel authorization', async () => {
@@ -441,7 +445,7 @@ describe('coinjoinClientActions', () => {
 
         store.dispatch(stopCoinjoinSession('account-A'));
 
-        expect(TrezorConnect.cancelCoinjoinAuthorization).toBeCalledTimes(0);
+        expect(TrezorConnect.cancelCoinjoinAuthorization).toHaveBeenCalledTimes(0);
     });
 
     it('CoinjoinClient events', async () => {

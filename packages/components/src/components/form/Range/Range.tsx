@@ -1,4 +1,3 @@
-import { variables } from '../../../config';
 import {
     useLayoutEffect,
     useRef,
@@ -8,44 +7,46 @@ import {
     ChangeEventHandler,
 } from 'react';
 import styled, { css, CSSObject } from 'styled-components';
-import { useTheme } from '../../../utils';
 
-const track = css<Pick<RangeProps, 'trackStyle'>>`
-    background: ${({ theme }) => theme.BG_GREEN};
-    height: 3px;
+import { borders, spacingsPx, typography } from '@trezor/theme';
+
+const track = css<Pick<RangeProps, 'trackStyle' | 'disabled'>>`
+    height: ${spacingsPx.xxs};
+    background: ${({ theme, disabled }) =>
+        disabled ? theme.backgroundNeutralDisabled : theme.backgroundPrimaryDefault};
+    border-radius: ${borders.radii.full};
 
     ${({ trackStyle }) => trackStyle}
 `;
 
-const thumb = css<Pick<RangeProps, 'disabled' | 'thumbStyle'>>`
+const thumb = css<Pick<RangeProps, 'disabled'>>`
     appearance: none;
-    background: ${({ theme }) => theme.TYPE_WHITE};
-    border-radius: 50%;
-    box-shadow: 0 0 2px 2px ${({ theme }) => theme.BOX_SHADOW_RANGE};
+    background: white;
+    border-radius: ${borders.radii.full};
+    box-shadow: 0 0 4px 0 rgb(0 0 0 / 50%);
+    margin-top: calc((${spacingsPx.xxs} - ${spacingsPx.xl}) / 2);
+    width: ${spacingsPx.xl};
+    height: ${spacingsPx.xl};
     cursor: ${({ disabled }) => !disabled && 'grab'};
-    height: 26px;
-    margin-top: -12px;
-    width: 26px;
 
     ${({ disabled }) =>
         !disabled &&
         css`
             :active {
-                box-shadow: 0 0 1px 1px ${({ theme }) => theme.BOX_SHADOW_RANGE};
+                box-shadow: 0 0 2px 0 rgb(0 0 0 / 50%);
                 cursor: grabbing;
             }
         `}
-
-    ${({ thumbStyle }) => thumbStyle}
 `;
 
-const largeBoxShadow = css`
-    box-shadow: 0 0 3px 3px ${({ theme }) => theme.BOX_SHADOW_RANGE};
+const focusStyle = css`
+    border: ${({ theme }) => `1px solid ${theme.backgroundAlertBlueBold}`};
+    box-shadow: ${({ theme }) => theme.boxShadowFocused};
 `;
 
-const Input = styled.input<Pick<RangeProps, 'disabled' | 'thumbStyle' | 'trackStyle'>>`
-    margin-top: 16px;
-    padding: 14px 0;
+const Input = styled.input<Pick<RangeProps, 'disabled' | 'trackStyle'>>`
+    margin: ${spacingsPx.sm} 0 ${spacingsPx.xs};
+    padding: 10px 0;
     width: 100%;
     vertical-align: top; /* prevent extra bottom space in Firefox */
     background: none;
@@ -55,22 +56,26 @@ const Input = styled.input<Pick<RangeProps, 'disabled' | 'thumbStyle' | 'trackSt
     ::-webkit-slider-runnable-track {
         ${track};
     }
+
     ::-webkit-slider-thumb {
         ${thumb};
     }
+
     ::-moz-range-track {
         ${track}
     }
+
     ::-moz-range-thumb {
         ${thumb};
     }
 
     :focus-visible {
         ::-webkit-slider-thumb {
-            ${largeBoxShadow};
+            ${focusStyle}
         }
+
         ::-moz-range-thumb {
-            ${largeBoxShadow};
+            ${focusStyle}
         }
     }
 `;
@@ -78,12 +83,11 @@ const Input = styled.input<Pick<RangeProps, 'disabled' | 'thumbStyle' | 'trackSt
 const Label = styled.div<{ disabled?: boolean; $width?: number }>`
     position: relative;
     justify-self: center;
-    padding-top: 2px;
+    padding-top: ${spacingsPx.xxxs};
     min-width: ${({ $width }) => `${$width}px`};
     text-align: center;
-    font-size: ${variables.FONT_SIZE.TINY};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-    opacity: 0.5;
+    color: ${({ theme }) => theme.textSubdued};
+    ${typography.label}
     cursor: ${({ disabled }) => (disabled ? 'default' : 'pointer')};
 
     :first-child {
@@ -108,7 +112,6 @@ export interface RangeProps {
     onKeyDown?: KeyboardEventHandler;
     onLabelClick?: (value: number) => void;
     step?: string;
-    thumbStyle?: CSSObject;
     trackStyle?: CSSObject;
     value: number;
 }
@@ -124,10 +127,6 @@ export const Range = ({
     const [labelsElWidth, setLabelsElWidth] = useState<number>();
 
     const lastLabelRef = useRef<HTMLParagraphElement>(null);
-
-    const theme = useTheme();
-
-    const disabledTrackStyle = { background: theme.STROKE_GREY };
 
     const handleLabelClick: RangeProps['onLabelClick'] = value => {
         if (disabled || !onLabelClick) return;
@@ -157,12 +156,7 @@ export const Range = ({
 
     return (
         <div className={className}>
-            <Input
-                {...props}
-                type="range"
-                disabled={disabled}
-                trackStyle={disabled ? disabledTrackStyle : trackStyle}
-            />
+            <Input {...props} type="range" disabled={disabled} trackStyle={trackStyle} />
             {labels?.length && (
                 <LabelsWrapper count={labels.length} $width={labelsElWidth}>
                     {labelComponents}

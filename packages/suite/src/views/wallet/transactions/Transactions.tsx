@@ -11,6 +11,15 @@ import { TransactionSummary } from './components/TransactionSummary';
 import { CoinjoinExplanation } from './CoinjoinExplanation/CoinjoinExplanation';
 import { CoinjoinSummary } from './CoinjoinSummary/CoinjoinSummary';
 import { TradeBox } from './TradeBox/TradeBox';
+import { EvmExplanationBanner } from 'src/views/wallet/transactions/components/EvmExplanationBanner';
+import styled from 'styled-components';
+import { spacingsPx } from '@trezor/theme';
+
+const AccountLayout = styled(WalletLayout)`
+    display: flex;
+    flex-direction: column;
+    gap: ${spacingsPx.xxl};
+`;
 
 interface LayoutProps {
     selectedAccount: AppState['wallet']['selectedAccount'];
@@ -19,13 +28,13 @@ interface LayoutProps {
 }
 
 const Layout = ({ selectedAccount, showEmptyHeaderPlaceholder = false, children }: LayoutProps) => (
-    <WalletLayout
+    <AccountLayout
         title="TR_NAV_TRANSACTIONS"
         account={selectedAccount}
         showEmptyHeaderPlaceholder={showEmptyHeaderPlaceholder}
     >
         {children}
-    </WalletLayout>
+    </AccountLayout>
 );
 
 export const Transactions = () => {
@@ -71,6 +80,7 @@ export const Transactions = () => {
 
     if (accountTransactions.length > 0 || transactionsIsLoading) {
         const networksWithoutTxSummary = ['ripple', 'solana'];
+
         return (
             <Layout selectedAccount={selectedAccount}>
                 {!networksWithoutTxSummary.includes(account.networkType) && (
@@ -92,6 +102,7 @@ export const Transactions = () => {
     if (account.empty) {
         return (
             <Layout selectedAccount={selectedAccount} showEmptyHeaderPlaceholder>
+                <EvmExplanationBanner account={selectedAccount.account} />
                 <AccountEmpty account={selectedAccount.account} />
             </Layout>
         );

@@ -10,7 +10,7 @@ describe('Import a BTC csv file', () => {
         cy.task('startBridge');
         cy.task('metadataStartProvider', 'dropbox');
 
-        cy.viewport(1080, 1440).resetDb();
+        cy.viewport(1440, 2560).resetDb();
         cy.prefixedVisit('/', {
             onBeforeLoad: (win: Window) => {
                 cy.stub(win, 'open').callsFake(stubOpen(win));
@@ -34,7 +34,6 @@ describe('Import a BTC csv file', () => {
         //
         // Test preparation
         //
-        cy.getTestElement('@suite/menu/wallet-index').click();
         cy.getTestElement('@account-menu/btc/normal/0').click();
         cy.hoverTestElement("@metadata/accountLabel/m/84'/0'/0'/hover-container");
         cy.getTestElement("@metadata/accountLabel/m/84'/0'/0'/add-label-button")
@@ -48,7 +47,7 @@ describe('Import a BTC csv file', () => {
         // Test execution
         //
         cy.getTestElement('@send/header-dropdown').click();
-        cy.contains('Import').click();
+        cy.getTestElement('@send/header-dropdown/import').click();
         cy.getTestElement('@modal').then(fileUploadModal => {
             cy.wrap(fileUploadModal)
                 .find('input[type=file]')

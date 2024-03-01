@@ -10,6 +10,7 @@ import { RbfFees } from './RbfFees';
 import { AffectedTransactions } from './AffectedTransactions';
 import { DecreasedOutputs } from './DecreasedOutputs';
 import { ReplaceTxButton } from './ReplaceTxButton';
+import { borders } from '@trezor/theme';
 
 const Wrapper = styled.div`
     margin: 12px 0;
@@ -20,7 +21,7 @@ const Box = styled.div`
     flex-direction: column;
     padding: 18px 26px;
     border: 1px solid ${({ theme }) => theme.STROKE_GREY};
-    border-radius: 8px;
+    border-radius: ${borders.radii.xs};
 `;
 
 const Inner = styled.div`
@@ -53,7 +54,7 @@ const RateWrapper = styled.div`
 
 const Rate = styled.div`
     margin: 1px 20px 0 0;
-    font-size: ${variables.NEUE_FONT_SIZE.SMALL};
+    font-size: ${variables.FONT_SIZE.SMALL};
     color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
 `;
 
@@ -69,12 +70,12 @@ const Amount = styled.div`
 `;
 
 const StyledCryptoAmount = styled.div`
-    font-size: ${variables.NEUE_FONT_SIZE.NORMAL};
+    font-size: ${variables.FONT_SIZE.NORMAL};
     font-weight: ${variables.FONT_WEIGHT.MEDIUM};
 `;
 
 const StyledFiatValue = styled.div`
-    font-size: ${variables.NEUE_FONT_SIZE.SMALL};
+    font-size: ${variables.FONT_SIZE.SMALL};
     color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
 `;
 
@@ -89,7 +90,7 @@ const FinalizeWarning = styled(Card)`
     justify-content: center;
     color: ${({ theme }) => theme.TYPE_DARK_GREY};
     background: ${({ theme }) => theme.BG_GREY};
-    font-size: ${variables.NEUE_FONT_SIZE.SMALL};
+    font-size: ${variables.FONT_SIZE.SMALL};
     font-weight: ${variables.FONT_WEIGHT.MEDIUM};
 `;
 
@@ -176,6 +177,7 @@ export const ChangeFee = (props: Omit<ChangeFeeProps, 'selectedAccount' | 'rbfPa
     if (selectedAccount.status !== 'loaded' || !props.tx.rbfParams) {
         return null;
     }
+
     return (
         <ChangeFeeLoaded
             selectedAccount={selectedAccount}

@@ -10,7 +10,7 @@ describe('Look up a BTC account', () => {
         });
         cy.task('startBridge');
 
-        cy.viewport(1080, 1440).resetDb();
+        cy.viewport(1440, 2560).resetDb();
         cy.prefixedVisit('/settings/coins');
         cy.passThroughInitialRun();
     });
@@ -32,7 +32,7 @@ describe('Look up a BTC account', () => {
         //
         // Test execution
         //
-        cy.getTestElement('@suite/menu/wallet-index').click();
+        cy.getTestElement('@suite/menu/suite-index').click();
         cy.discoveryShouldFinish();
         cy.getTestElement('@account-menu/search-input').type('bitcoin');
         //

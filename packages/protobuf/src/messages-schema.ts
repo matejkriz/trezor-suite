@@ -1,4 +1,3 @@
-/* eslint-disable camelcase */
 import { Type, Static } from '@trezor/schema-utils';
 
 export enum DeviceModelInternal {
@@ -1780,6 +1779,23 @@ export const ApplySettings = Type.Object({
     hide_passphrase_from_host: Type.Optional(Type.Boolean()),
 });
 
+export type ChangeLanguage = Static<typeof ChangeLanguage>;
+export const ChangeLanguage = Type.Object({
+    data_length: Type.Number(),
+    show_display: Type.Optional(Type.Boolean()),
+});
+
+export type TranslationDataRequest = Static<typeof TranslationDataRequest>;
+export const TranslationDataRequest = Type.Object({
+    data_length: Type.Number(),
+    data_offset: Type.Number(),
+});
+
+export type TranslationDataAck = Static<typeof TranslationDataAck>;
+export const TranslationDataAck = Type.Object({
+    data_chunk: Type.String(),
+});
+
 export type ApplyFlags = Static<typeof ApplyFlags>;
 export const ApplyFlags = Type.Object({
     flags: Type.Number(),
@@ -1954,6 +1970,7 @@ export type RebootToBootloader = Static<typeof RebootToBootloader>;
 export const RebootToBootloader = Type.Object({
     boot_command: Type.Optional(EnumBootCommand),
     firmware_header: Type.Optional(Type.String()),
+    language_data_length: Type.Optional(Type.Number()),
 });
 
 export type GetNonce = Static<typeof GetNonce>;
@@ -2433,6 +2450,12 @@ export const StellarBumpSequenceOp = Type.Object({
     bump_to: Type.Uint(),
 });
 
+export type StellarClaimClaimableBalanceOp = Static<typeof StellarClaimClaimableBalanceOp>;
+export const StellarClaimClaimableBalanceOp = Type.Object({
+    source_account: Type.Optional(Type.String()),
+    balance_id: Type.String(),
+});
+
 export type StellarSignedTx = Static<typeof StellarSignedTx>;
 export const StellarSignedTx = Type.Object({
     public_key: Type.String(),
@@ -2762,6 +2785,9 @@ export const MessageType = Type.Object({
     SetBusy,
     EndSession,
     ApplySettings,
+    ChangeLanguage,
+    TranslationDataRequest,
+    TranslationDataAck,
     ApplyFlags,
     ChangePin,
     ChangeWipeCode,
@@ -2842,6 +2868,7 @@ export const MessageType = Type.Object({
     StellarAccountMergeOp,
     StellarManageDataOp,
     StellarBumpSequenceOp,
+    StellarClaimClaimableBalanceOp,
     StellarSignedTx,
     TezosGetAddress,
     TezosAddress,

@@ -1,133 +1,141 @@
-import { darken } from 'polished';
-import styled, { css } from 'styled-components';
-import { FONT_FAMILY, FONT_WEIGHT, NEUE_FONT_SIZE } from '../../config/variables';
-import { InputState, InputVariant, SuiteThemeColors } from '../../support/types';
+import styled, { css, DefaultTheme } from 'styled-components';
+import {
+    borders,
+    spacingsPx,
+    typography,
+    Elevation,
+    mapElevationToBackground,
+} from '@trezor/theme';
 
-export const INPUT_HEIGHTS: Record<InputVariant, number> = {
-    small: 32,
-    large: 48,
+import { FONT_WEIGHT, FONT_SIZE } from '../../config/variables';
+import { InputState, InputSize } from './inputTypes';
+import { motionEasingStrings } from '../../config/motion';
+
+export const INPUT_HEIGHTS: Record<InputSize, number> = {
+    small: 36,
+    large: 56,
 };
 
-export const INPUT_BORDER_RADIUS = 8;
-export const INPUT_BORDER_WIDTH = 1;
+export const INPUT_BORDER_WIDTH = Number.parseFloat(borders.widths.large);
 
-export const getInputStateTextColor = (state: InputState | undefined, theme: SuiteThemeColors) => {
+export const getInputStateTextColor = (state: InputState | undefined, theme: DefaultTheme) => {
     switch (state) {
         case 'warning':
-            return theme.TYPE_ORANGE;
+            return theme.textAlertYellow;
         case 'error':
-            return theme.TYPE_RED;
+            return theme.textAlertRed;
         default:
-            return theme.TYPE_DARK_GREY;
+            return theme.textSubdued;
     }
 };
 
-export const getInputStateBorderColor = (
+export const getInputStateBorderColor = (state: InputState | undefined, theme: DefaultTheme) => {
+    switch (state) {
+        case 'warning':
+            return theme.textAlertYellow;
+        case 'error':
+            return theme.borderAlertRed;
+        default:
+            return 'transparent';
+    }
+};
+
+export const getInputStateBgColor = (
     state: InputState | undefined,
-    theme: SuiteThemeColors,
+    theme: DefaultTheme,
+    elevation: Elevation,
 ) => {
     switch (state) {
-        case 'success':
-            return theme.TYPE_LIGHT_GREY;
         case 'warning':
-            return theme.TYPE_ORANGE;
+            return theme.backgroundAlertYellowSubtleOnElevation1;
         case 'error':
-            return theme.TYPE_RED;
+            return theme.backgroundAlertRedSubtleOnElevation1;
         default:
-            return theme.STROKE_GREY;
+            return mapElevationToBackground({ theme, elevation });
     }
 };
 
-export const getInputStateBgColor = (state: InputState | undefined, theme: SuiteThemeColors) => {
-    switch (state) {
-        case 'warning':
-            return theme.TYPE_LIGHT_ORANGE;
-        case 'error':
-            return theme.BG_LIGHT_RED;
-        default:
-            return theme.BG_WHITE;
-    }
-};
+export const INPUT_PADDING_TOP = '18px';
 
 export interface BaseInputProps {
     inputState?: InputState;
-    isMonospace?: boolean;
     disabled?: boolean;
+    isWithLabel?: boolean;
+    elevation: Elevation;
 }
 
 export const baseInputStyle = css<BaseInputProps>`
-    background-color: ${({ theme, inputState }) => getInputStateBgColor(inputState, theme)};
-    border-radius: ${INPUT_BORDER_RADIUS}px;
+    width: 100%;
+    padding-top: ${({ isWithLabel }) => isWithLabel && INPUT_PADDING_TOP};
+    background-color: ${({ elevation, theme, inputState }) =>
+        getInputStateBgColor(inputState, theme, elevation)};
+    border-radius: ${borders.radii.sm};
     border: solid ${INPUT_BORDER_WIDTH}px;
     border-color: ${({ inputState, theme }) => getInputStateBorderColor(inputState, theme)};
-    color: ${({ inputState, theme }) => getInputStateTextColor(inputState, theme)};
-    font-family: ${FONT_FAMILY.TTHOVES};
-    font-size: ${NEUE_FONT_SIZE.SMALL};
-    font-weight: ${FONT_WEIGHT.MEDIUM};
-    transition: border-color 0.1s ease-in-out;
+    color: ${({ theme }) => theme.textDefault};
+    ${typography.body}
+    transition: border-color 0.1s;
     outline: none;
-    font-variant-numeric: ${({ isMonospace }) => isMonospace && 'slashed-zero tabular-nums'};
+    font-variant-numeric: slashed-zero tabular-nums;
 
     ::placeholder {
-        color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
+        color: ${({ theme }) => theme.textSubdued};
     }
 
     :read-only:not(:disabled) {
-        background: ${({ theme }) => theme.BG_GREY};
-        color: ${({ theme }) => theme.TYPE_DARK_GREY};
+        background: ${mapElevationToBackground};
+        color: ${({ theme }) => theme.textDisabled};
     }
 
-    :hover {
-        border-color: ${({ inputState, theme }) =>
-            darken(
-                theme.HOVER_DARKEN_FILTER,
-                inputState ? getInputStateTextColor(inputState, theme) : theme.STROKE_GREY,
-            )};
-    }
-
-    :focus {
-        border-color: ${({ inputState, theme }) =>
-            darken(
-                theme.HOVER_DARKEN_FILTER,
-                inputState ? getInputStateTextColor(inputState, theme) : theme.TYPE_LIGHT_GREY,
-            )};
+    :focus,
+    :focus-within {
+        border-color: ${({ theme }) =>
+            theme.borderOnElevation0}; /* Todo: make it based on elevation */
     }
 
     ${({ disabled }) =>
         disabled &&
         css`
-            background: ${({ theme }) => theme.BG_GREY};
             box-shadow: none;
-            color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
+            background: ${({ theme }) => theme.backgroundNeutralDisabled};
+            color: ${({ theme }) => theme.textDisabled};
             pointer-events: none;
             cursor: default;
         `}
 `;
 
-export const Label = styled.div`
+export const InputWrapper = styled.div`
     display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    min-height: 30px;
+    position: relative;
+    width: 100%;
 `;
 
 export const LabelLeft = styled.label`
     margin-bottom: 8px;
-    font-size: ${NEUE_FONT_SIZE.SMALL};
+    font-size: ${FONT_SIZE.SMALL};
     font-weight: ${FONT_WEIGHT.MEDIUM};
     color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
 `;
 
-export const LabelAddon = styled.div<{ isVisible?: boolean }>`
-    visibility: ${({ isVisible }) => !isVisible && 'hidden'};
-`;
-
-export const LabelRight = styled.div`
+export const RightLabel = styled.div`
     display: flex;
     align-items: center;
-    margin-bottom: 6px;
+    padding-left: 5px;
 `;
 
-export const RightLabel = styled.div`
-    padding-left: 5px;
+export const LABEL_TRANSFORM = 'translate(0px, -10px) scale(0.75)';
+
+export const Label = styled.label<{ $size?: InputSize; isDisabled?: boolean }>`
+    position: absolute;
+    left: calc(${spacingsPx.md} + ${INPUT_BORDER_WIDTH}px);
+    color: ${({ theme, isDisabled }) => (isDisabled ? theme.textDisabled : theme.textSubdued)};
+    ${typography.body};
+    line-height: ${({ $size }) => $size && `${INPUT_HEIGHTS[$size as InputSize]}px`};
+    transition:
+        transform 0.12s ${motionEasingStrings.enter},
+        font-size 0.12s ${motionEasingStrings.enter};
+    transform-origin: 0;
+
+    /* breaks tooltips at the moment – could be solved by building tooltip into the label component */
+    pointer-events: none;
 `;

@@ -7,12 +7,12 @@
     "main": "src/index",
     "scripts": {
         "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "test:unit": "jest -c ../../jest.config.native.js --passWithNoTests",
-        "type-check": "tsc --build"
+        "test:unit": "yarn g:jest -c ../../jest.config.native.js",
+        "type-check": "yarn g:tsc --build"
     },
     "dependencies": {
         "@mobily/ts-belt": "^3.13.1",
-        "@react-navigation/native": "^6.1.9",
+        "@react-navigation/native": "6.1.10",
         "@suite-common/formatters": "workspace:*",
         "@suite-common/icons": "workspace:*",
         "@suite-common/redux-utils": "workspace:*",
@@ -24,6 +24,7 @@
         "@suite-common/wallet-utils": "workspace:*",
         "@suite-native/atoms": "workspace:*",
         "@suite-native/ethereum-tokens": "workspace:*",
+        "@suite-native/feature-flags": "workspace:*",
         "@suite-native/fiat-rates": "workspace:*",
         "@suite-native/formatters": "workspace:*",
         "@suite-native/forms": "workspace:*",
@@ -34,11 +35,8 @@
         "@trezor/theme": "workspace:*",
         "proxy-memoize": "2.0.2",
         "react": "18.2.0",
-        "react-native": "0.71.8",
+        "react-native": "0.73.2",
         "react-native-reanimated": "3.7.0-nightly-20240101-9d365ae7b",
         "react-redux": "8.0.7"
-    },
-    "devDependencies": {
-        "jest": "29.5.0"
     }
 }

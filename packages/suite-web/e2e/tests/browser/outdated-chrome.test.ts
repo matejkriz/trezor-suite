@@ -1,4 +1,4 @@
-// @group:browser
+// @group:other
 // @retry=2
 // @user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472 Safari/537.36
 
@@ -6,7 +6,7 @@
 
 describe('Windows 7 with outdated chrome ', () => {
     before(() => {
-        cy.viewport(1080, 1440);
+        cy.viewport(1440, 2560);
         cy.resetDb();
     });
 

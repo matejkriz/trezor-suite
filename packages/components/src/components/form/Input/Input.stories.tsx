@@ -1,7 +1,8 @@
 import { ChangeEvent } from 'react';
 import { useArgs } from '@storybook/client-api';
+import { Meta, StoryObj } from '@storybook/react';
 
-import { Input as InputComponent } from './Input';
+import { Input as InputComponent, InputProps } from './Input';
 
 export default {
     title: 'Form/Input',
@@ -9,13 +10,17 @@ export default {
         value: 'Input',
         label: 'Label',
         bottomText: '',
-        placeholder: '',
         isDisabled: false,
-        isMonospace: false,
         inputState: null,
         variant: null,
     },
     argTypes: {
+        labelRight: {
+            type: 'string',
+        },
+        placeholder: {
+            type: 'string',
+        },
         state: {
             control: {
                 options: {
@@ -34,9 +39,9 @@ export default {
             },
         },
     },
-};
+} as Meta;
 
-export const Input = {
+export const Input: StoryObj<InputProps> = {
     render: ({ ...args }) => {
         // eslint-disable-next-line
         const [{ value }, updateArgs] = useArgs();
@@ -44,18 +49,6 @@ export const Input = {
             updateArgs({ value: e.target.value });
         };
 
-        return (
-            <InputComponent
-                isDisabled={args.isDisabled}
-                inputState={args.state}
-                variant={args.variant}
-                label={args.label}
-                bottomText={args.bottomText}
-                placeholder={args.placeholder}
-                isMonospace={args.isMonospace}
-                value={value}
-                onChange={handleValue}
-            />
-        );
+        return <InputComponent value={value} onChange={handleValue} {...args} />;
     },
 };

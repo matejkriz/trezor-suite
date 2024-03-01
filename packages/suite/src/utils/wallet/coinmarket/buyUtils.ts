@@ -1,11 +1,14 @@
 import { v4 as uuidv4 } from 'uuid';
 import { desktopApi } from '@trezor/suite-desktop-api';
 import { Account } from 'src/types/wallet';
-import { AppState } from 'src/types/suite';
 import { AmountLimits } from 'src/types/wallet/coinmarketCommonTypes';
-import { BuyTrade, BuyTradeQuoteRequest, BuyTradeStatus } from 'invity-api';
-import { invityApiSymbolToSymbol } from 'src/utils/wallet/coinmarket/coinmarketUtils';
+import { BuyTrade, BuyTradeQuoteRequest, BuyTradeStatus, CryptoSymbol } from 'invity-api';
 import { isDesktop, getLocationOrigin } from '@trezor/env-utils';
+import {
+    cryptoToNetworkSymbol,
+    cryptoToCoinSymbol,
+    networkToCryptoSymbol,
+} from 'src/utils/wallet/coinmarket/cryptoSymbolUtils';
 
 // loop through quotes and if all quotes are either with error below minimum or over maximum, return the limits
 export function getAmountLimits(
@@ -14,7 +17,7 @@ export function getAmountLimits(
 ): AmountLimits | undefined {
     let minAmount: number | undefined;
     let maxAmount: number | undefined;
-    // eslint-disable-next-line no-restricted-syntax
+
     for (const quote of quotes) {
         // if at least one quote succeeded do not return any message
         if (!quote.error) {
@@ -83,6 +86,7 @@ export const createQuoteLink = async (request: BuyTradeQuoteRequest, account: Ac
 
     if (isDesktop()) {
         const url = await desktopApi.getHttpReceiverAddress('/buy-redirect');
+
         return `${url}?p=${encodeURIComponent(`/coinmarket-redirect/${params}`)}`;
     }
 
@@ -96,6 +100,7 @@ export const createTxLink = async (trade: BuyTrade, account: Account) => {
 
     if (isDesktop()) {
         const url = await desktopApi.getHttpReceiverAddress('/buy-redirect');
+
         return `${url}?p=${encodeURIComponent(`/coinmarket-redirect/${params}`)}`;
     }
 
@@ -122,34 +127,32 @@ export const getStatusMessage = (status: BuyTradeStatus) => {
 };
 
 export const getCryptoOptions = (
-    symbol: Account['symbol'],
-    networkType: Account['networkType'],
-    supportedCoins: Set<string>,
-    coinInfo: AppState['wallet']['coinmarket']['exchange']['exchangeCoinInfo'],
+    networkSymbol: Account['symbol'],
+    supportedSymbols: Set<CryptoSymbol>,
 ) => {
-    const uppercaseSymbol = symbol.toUpperCase();
-    const options: { value: string; label: string }[] = [
-        { value: uppercaseSymbol, label: uppercaseSymbol },
+    const cryptoSymbol = networkToCryptoSymbol(networkSymbol);
+    if (!cryptoSymbol) {
+        return [];
+    }
+
+    const options: { value: string; label: string; cryptoSymbol: CryptoSymbol }[] = [
+        { value: cryptoSymbol, label: cryptoSymbol, cryptoSymbol },
     ];
 
-    if (networkType === 'ethereum') {
-        // cycle through all coins, locate ERC20 tokens and if it is in supportedCoins, add it as option
-        coinInfo?.forEach(coin => {
-            if (coin.category === 'Ethereum ERC20 tokens') {
-                const ticker = coin.ticker.toLowerCase();
-                if (ticker.toLowerCase() === 'usdt20') {
-                    // temporary solution; invity-api renamed USDT20 => USDT and sends both codes (USDT and USDT20) to maintain backward compatibility with old versions of suite
-                    return;
-                }
-                if (supportedCoins.has(ticker)) {
-                    options.push({
-                        label: invityApiSymbolToSymbol(ticker).toUpperCase(),
-                        value: coin.ticker,
-                    });
-                }
-            }
+    // add network coin and tokens
+    supportedSymbols.forEach(symbol => {
+        if (symbol === cryptoSymbol || cryptoToNetworkSymbol(symbol) !== networkSymbol) {
+            return;
+        }
+
+        const tokenSymbol = cryptoToCoinSymbol(symbol);
+
+        options.push({
+            label: tokenSymbol,
+            value: tokenSymbol,
+            cryptoSymbol: symbol,
         });
-    }
+    });
 
     return options;
 };

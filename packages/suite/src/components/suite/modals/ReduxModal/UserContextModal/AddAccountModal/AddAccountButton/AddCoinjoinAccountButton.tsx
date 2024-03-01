@@ -99,6 +99,7 @@ export const AddCoinjoinAccountButton = ({ network }: AddCoinjoinAccountProps) =
             }
             if (continueWithTor === RequestEnableTorResponse.Skip) {
                 await createAccount();
+
                 return;
             }
 
@@ -117,6 +118,7 @@ export const AddCoinjoinAccountButton = ({ network }: AddCoinjoinAccountProps) =
             disabledMessage={disabledMessage}
             handleClick={onCreateCoinjoinAccountClick}
             isLoading={isLoading}
+            networkName={network.name}
         />
     );
 };

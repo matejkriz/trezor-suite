@@ -4,7 +4,7 @@ import styled from 'styled-components';
 
 import { Translation } from 'src/components/suite';
 import { useSelector } from 'src/hooks/suite/useSelector';
-import { Card, RadioButton, motionAnimation, motionEasing, Warning } from '@trezor/components';
+import { Card, Radio, motionAnimation, motionEasing, Warning } from '@trezor/components';
 import { coinjoinAccountUpdateSetupOption } from 'src/actions/wallet/coinjoinAccountActions';
 import { AnonymityLevelSetup } from './AnonymityLevelSetup';
 import { MaxMiningFeeSetup } from './MaxMiningFeeSetup';
@@ -13,6 +13,10 @@ import { selectCoinjoinAccountByKey } from 'src/reducers/wallet/coinjoinReducer'
 
 const SetupContainer = styled.div`
     padding: 18px;
+`;
+
+const StyledCard = styled(Card)`
+    padding: 8px;
 `;
 
 const SetupOptions = styled.div`
@@ -54,7 +58,7 @@ export const CoinjoinSetup = ({ accountKey }: CoinjoinSetupProps) => {
     const setCustomSetup = () => handleSetupOptionChange(false);
 
     return (
-        <Card customPadding="8px">
+        <StyledCard>
             {hasSession && (
                 <Warning variant="info">
                     <Translation id="TR_DISABLED_ANONYMITY_CHANGE_MESSAGE" />
@@ -62,20 +66,20 @@ export const CoinjoinSetup = ({ accountKey }: CoinjoinSetupProps) => {
             )}
             <SetupContainer>
                 <SetupOptions>
-                    <RadioButton
+                    <Radio
                         isChecked={!coinjoinAccount.setup}
                         onClick={setRecommendedSetup}
-                        disabled={hasSession}
+                        isDisabled={hasSession}
                     >
                         <Translation id="TR_RECOMMENDED" />
-                    </RadioButton>
-                    <RadioButton
+                    </Radio>
+                    <Radio
                         isChecked={!!coinjoinAccount.setup}
                         onClick={setCustomSetup}
-                        disabled={hasSession}
+                        isDisabled={hasSession}
                     >
                         <Translation id="TR_CUSTOM" />
-                    </RadioButton>
+                    </Radio>
                 </SetupOptions>
                 <AnimatePresence initial={!coinjoinAccount.setup}>
                     {coinjoinAccount.setup && (
@@ -101,6 +105,6 @@ export const CoinjoinSetup = ({ accountKey }: CoinjoinSetupProps) => {
                     )}
                 </AnimatePresence>
             </SetupContainer>
-        </Card>
+        </StyledCard>
     );
 };

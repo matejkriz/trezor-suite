@@ -18,6 +18,7 @@ const Component = ({
 }) => {
     const modal = useFilteredModal(...params);
     callback(modal);
+
     return null;
 };
 
@@ -29,12 +30,7 @@ describe('Modal filtering', () => {
             const { unmount } = render(
                 <Provider store={store}>
                     {filters.map((params, i) => (
-                        <Component
-                            /* eslint-disable-next-line react/no-array-index-key */
-                            key={i}
-                            params={params}
-                            callback={res => (results[i] = res)}
-                        />
+                        <Component key={i} params={params} callback={res => (results[i] = res)} />
                     ))}
                 </Provider>,
             );

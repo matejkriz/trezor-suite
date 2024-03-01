@@ -1,4 +1,9 @@
-import { discoveryActions, accountsActions, blockchainActions } from '@suite-common/wallet-core';
+import {
+    discoveryActions,
+    accountsActions,
+    blockchainActions,
+    stakeActions,
+} from '@suite-common/wallet-core';
 import { ArrayElement } from '@trezor/type-utils';
 
 import { ReceiveAction } from 'src/actions/wallet/receiveActions';
@@ -19,13 +24,14 @@ import { PollingAction } from 'src/actions/wallet/pollingActions';
 import { CoinjoinAccountAction } from 'src/actions/wallet/coinjoinAccountActions';
 import { CoinjoinClientAction } from 'src/actions/wallet/coinjoinClientActions';
 import { NETWORKS } from 'src/config/wallet';
+import { CoinmarketInfoAction } from 'src/actions/wallet/coinmarketInfoActions';
 
 export type Network = ArrayElement<typeof NETWORKS>;
 export type NetworkSymbol = Network['symbol'];
 // reexport
 export type { Icon } from './iconTypes';
 export type { BackendType, CustomBackend } from './backend';
-export type { CoinFiatRates, TickerId } from 'src/types/wallet/fiatRates';
+export type { TickerId } from 'src/types/wallet/fiatRates';
 export type { Discovery } from '@suite-common/wallet-types';
 export type DiscoveryStatusType =
     | {
@@ -56,6 +62,7 @@ this action union types are bad, we need it only for legacy reason.
 type AccountsAction = ReturnType<(typeof accountsActions)[keyof typeof accountsActions]>;
 type BlockchainAction = ReturnType<(typeof blockchainActions)[keyof typeof blockchainActions]>;
 type DiscoveryAction = ReturnType<(typeof discoveryActions)[keyof typeof discoveryActions]>;
+type StakeAction = ReturnType<(typeof stakeActions)[keyof typeof stakeActions]>;
 
 export type WalletAction =
     | BlockchainAction
@@ -63,6 +70,7 @@ export type WalletAction =
     | SignVerifyAction
     | GraphAction
     | DiscoveryAction
+    | CoinmarketInfoAction
     | CoinmarketExchangeAction
     | CoinmarketBuyAction
     | CoinMarketSpendAction
@@ -77,4 +85,5 @@ export type WalletAction =
     | PollingAction
     | CoinjoinAccountAction
     | CoinjoinClientAction
-    | AccountsAction;
+    | AccountsAction
+    | StakeAction;

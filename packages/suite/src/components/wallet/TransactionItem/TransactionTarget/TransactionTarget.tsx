@@ -1,4 +1,3 @@
-import { getIsZeroValuePhishing } from '@suite-common/suite-utils';
 import { notificationsActions, ToastPayload } from '@suite-common/toast-notifications';
 import {
     getTxOperation,
@@ -29,23 +28,24 @@ interface BaseTransfer {
 interface TokenTransferProps extends BaseTransfer {
     transfer: ArrayElement<WalletAccountTransaction['tokens']>;
     transaction: WalletAccountTransaction;
+    isPhishingTransaction: boolean;
 }
 
 export const TokenTransfer = ({
     transfer,
     transaction,
+    isPhishingTransaction,
     ...baseLayoutProps
 }: TokenTransferProps) => {
     const operation = getTxOperation(transfer.type);
     const isNft = isNftTokenTransfer(transfer);
-    const isZeroValuePhishing = getIsZeroValuePhishing(transaction);
 
     return (
         <TransactionTargetLayout
             {...baseLayoutProps}
             addressLabel={
                 <TokenTransferAddressLabel
-                    isZeroValuePhishing={isZeroValuePhishing}
+                    isPhishingTransaction={isPhishingTransaction}
                     transfer={transfer}
                     type={transaction.type}
                 />
@@ -111,6 +111,7 @@ interface TransactionTargetProps extends BaseTransfer {
     accountKey: string;
     accountMetadata?: AccountLabels;
     isActionDisabled?: boolean;
+    isPhishingTransaction: boolean;
 }
 
 export const TransactionTarget = ({
@@ -119,6 +120,7 @@ export const TransactionTarget = ({
     accountMetadata,
     accountKey,
     isActionDisabled,
+    isPhishingTransaction,
     ...baseLayoutProps
 }: TransactionTargetProps) => {
     const dispatch = useDispatch();
@@ -162,7 +164,7 @@ export const TransactionTarget = ({
                     }
                     dropdownOptions={[
                         {
-                            callback: copyAddress,
+                            onClick: copyAddress,
                             label: <Translation id="TR_ADDRESS_MODAL_CLIPBOARD" />,
                             key: 'copy-address',
                         },

@@ -1,9 +1,9 @@
 // original file https://github.com/trezor/connect/blob/develop/src/js/device/Device.js
-import { TypedEmitter } from '@trezor/utils/lib/typedEventEmitter';
-import { createDeferred, Deferred } from '@trezor/utils/lib/createDeferred';
-import * as versionUtils from '@trezor/utils/lib/versionUtils';
+import { TypedEmitter } from '@trezor/utils';
+import { createDeferred, Deferred } from '@trezor/utils';
+import { versionUtils } from '@trezor/utils';
 import { TransportProtocol, v1 as v1Protocol, bridge as bridgeProtocol } from '@trezor/protocol';
-import { DeviceCommands } from './DeviceCommands';
+import { DeviceCommands, PassphrasePromptResponse } from './DeviceCommands';
 import { PROTO, ERRORS, NETWORK } from '../constants';
 import { DEVICE, DeviceButtonRequestPayload, UI } from '../events';
 import { getAllNetworks } from '../data/coinInfo';
@@ -53,6 +53,7 @@ export type RunOptions = {
 
 const parseRunOptions = (options?: RunOptions): RunOptions => {
     if (!options) options = {};
+
     return options;
 };
 
@@ -67,7 +68,10 @@ export interface DeviceEvents {
         b: PROTO.WordRequestType,
         callback: (err: any, word: string) => void,
     ) => void;
-    [DEVICE.PASSPHRASE]: (device: Device, callback: (response: any) => void) => void;
+    [DEVICE.PASSPHRASE]: (
+        device: Device,
+        callback: (response: PassphrasePromptResponse) => void,
+    ) => void;
     [DEVICE.PASSPHRASE_ON_DEVICE]: () => void;
     [DEVICE.BUTTON]: (device: Device, payload: DeviceButtonRequestPayload) => void;
     [DEVICE.ACQUIRED]: () => void;
@@ -129,6 +133,8 @@ export class Device extends TypedEmitter<DeviceEvents> {
 
     color?: string;
 
+    availableTranslations: string[] = [];
+
     constructor(transport: Transport, descriptor: Descriptor) {
         super();
 
@@ -150,6 +156,7 @@ export class Device extends TypedEmitter<DeviceEvents> {
         const descriptor = { ...originalDescriptor, session: null };
         try {
             const device: Device = new Device(transport, descriptor);
+
             return device;
         } catch (error) {
             _log.error('Device.fromDescriptor', error);
@@ -164,6 +171,7 @@ export class Device extends TypedEmitter<DeviceEvents> {
     ) {
         const device = new Device(transport, descriptor);
         device.unreadableError = unreadableError;
+
         return device;
     }
 
@@ -345,10 +353,12 @@ export class Device extends TypedEmitter<DeviceEvents> {
                     // if GetFeatures fails try again
                     // this time add empty "fn" param to force Initialize message
                     this.inconsistent = true;
+
                     return this._runInner(() => Promise.resolve({}), options);
                 }
                 this.inconsistent = true;
                 delete this.runPromise;
+
                 return Promise.reject(
                     ERRORS.TypedError(
                         'Device_InitializeFailed',
@@ -406,6 +416,7 @@ export class Device extends TypedEmitter<DeviceEvents> {
         if (!this.commands) {
             throw ERRORS.TypedError('Runtime', `Device: commands not defined`);
         }
+
         return this.commands;
     }
 
@@ -549,6 +560,8 @@ export class Device extends TypedEmitter<DeviceEvents> {
             this.unavailableCapabilities = getUnavailableCapabilities(feat, getAllNetworks());
             this.firmwareStatus = getFirmwareStatus(feat);
             this.firmwareRelease = getRelease(feat);
+
+            this.availableTranslations = this.firmwareRelease?.translations ?? [];
         }
 
         this.features = feat;
@@ -576,6 +589,7 @@ export class Device extends TypedEmitter<DeviceEvents> {
 
         this.name = deviceInfo.name;
 
+        // todo: move to 553
         if (feat?.unit_color) {
             const deviceUnitColor = feat.unit_color.toString();
 
@@ -616,6 +630,7 @@ export class Device extends TypedEmitter<DeviceEvents> {
 
     getVersion() {
         if (!this.features) return [];
+
         return [
             this.features.major_version,
             this.features.minor_version,
@@ -627,6 +642,7 @@ export class Device extends TypedEmitter<DeviceEvents> {
         if (!this.features) return false;
         const modelVersion =
             typeof versions === 'string' ? versions : versions[this.features.major_version - 1];
+
         return versionUtils.isNewerOrEqual(this.getVersion().join('.'), modelVersion);
     }
 
@@ -681,6 +697,7 @@ export class Device extends TypedEmitter<DeviceEvents> {
                 return UI.NOT_IN_BOOTLOADER;
             }
         }
+
         return null;
     }
 
@@ -707,6 +724,7 @@ export class Device extends TypedEmitter<DeviceEvents> {
         if (this.features.bootloader_mode) return 'bootloader';
         if (!this.features.initialized) return 'initialize';
         if (this.features.no_backup) return 'seedless';
+
         return 'normal';
     }
 
@@ -734,6 +752,7 @@ export class Device extends TypedEmitter<DeviceEvents> {
             this.features.label === '' || !this.features.label ? defaultLabel : this.features.label;
         let status: DeviceStatus = this.isUsedElsewhere() ? 'occupied' : 'available';
         if (this.featuresNeedsReload) status = 'used';
+
         return {
             type: 'acquired',
             id: this.features.device_id || null,
@@ -749,6 +768,7 @@ export class Device extends TypedEmitter<DeviceEvents> {
             firmwareType: this.firmwareType,
             features: this.features,
             unavailableCapabilities: this.unavailableCapabilities,
+            availableTranslations: this.availableTranslations,
         };
     }
 

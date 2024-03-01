@@ -1,11 +1,12 @@
 {
-    "extends": "../../tsconfig.json",
+    "extends": "../../tsconfig.base.json",
     "compilerOptions": { "outDir": "libDev" },
     "references": [
         { "path": "../../suite-common/icons" },
         { "path": "../alerts" },
         { "path": "../analytics" },
         { "path": "../atoms" },
+        { "path": "../intl" },
         { "path": "../storage" },
         { "path": "../../packages/styles" }
     ]

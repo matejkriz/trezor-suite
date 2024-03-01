@@ -41,8 +41,11 @@ jest.mock('@trezor/blockchain-link', () => ({
             const [type, fn] = args;
             this.listeners[type] = fn;
         }
+        listenerCount() {
+            return 0;
+        }
         connect() {
-            this.listeners.connected();
+            return true;
         }
         disconnect() {}
         removeAllListeners() {}
@@ -155,7 +158,7 @@ describe('useRbfForm hook', () => {
 
             // validate number of calls to '@trezor/connect'
             if (typeof f.composeTransactionCalls === 'number') {
-                expect(composeTransactionSpy).toBeCalledTimes(f.composeTransactionCalls);
+                expect(composeTransactionSpy).toHaveBeenCalledTimes(f.composeTransactionCalls);
             }
 
             if (f.decreasedOutputs) {
@@ -181,12 +184,12 @@ describe('useRbfForm hook', () => {
             if (f.signedTx) {
                 // send and check signTransaction params
                 await sendAction();
-                expect(signTransactionMock).toBeCalledTimes(1);
+                expect(signTransactionMock).toHaveBeenCalledTimes(1);
                 const params = signTransactionMock.mock.calls[0][0];
                 expect(params).toMatchObject(f.signedTx);
             } else {
                 await expect(sendAction()).rejects.toThrow('Unable to perform pointer interaction'); // button `pointer-events: none`
-                expect(signTransactionMock).toBeCalledTimes(0);
+                expect(signTransactionMock).toHaveBeenCalledTimes(0);
             }
 
             unmount();

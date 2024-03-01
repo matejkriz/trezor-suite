@@ -3,7 +3,6 @@ import {
     CustomPaymentAmountKey,
     PaymentFrequencyAnnualCoefficient,
 } from 'src/constants/wallet/coinmarket/savings';
-import type { CurrentFiatRates } from 'src/types/wallet/fiatRates';
 import BigNumber from 'bignumber.js';
 import type { PaymentFrequencyOption } from 'src/types/wallet/coinmarketCommonTypes';
 import { isDesktop } from '@trezor/env-utils';
@@ -40,8 +39,10 @@ export const getFiatAmountEffective = (
         ) {
             return '0';
         }
+
         return customFiatAmount || '0';
     }
+
     return fiatAmount || '0';
 };
 
@@ -49,22 +50,18 @@ export const calculateAnnualSavings = (
     paymentFrequency?: PaymentFrequency,
     fiatAmount?: string,
     customFiatAmount?: string,
-    fiatCurrency?: string,
-    currentFiatRates?: CurrentFiatRates,
+    rate?: number,
 ) => {
     let annualSavingsFiatAmount = 0;
     let annualSavingsCryptoAmount = '0';
-    if (paymentFrequency && currentFiatRates && (fiatAmount || customFiatAmount) && fiatCurrency) {
-        const rate = currentFiatRates.rates[fiatCurrency.toLowerCase()];
-        if (rate) {
-            const fiatAmountEffective = getFiatAmountEffective(fiatAmount, customFiatAmount);
-            annualSavingsFiatAmount =
-                Number(fiatAmountEffective) * PaymentFrequencyAnnualCoefficient[paymentFrequency];
-            annualSavingsCryptoAmount = new BigNumber(annualSavingsFiatAmount)
-                .dividedBy(rate)
-                .decimalPlaces(8)
-                .toString();
-        }
+    if (paymentFrequency && rate && (fiatAmount || customFiatAmount)) {
+        const fiatAmountEffective = getFiatAmountEffective(fiatAmount, customFiatAmount);
+        annualSavingsFiatAmount =
+            Number(fiatAmountEffective) * PaymentFrequencyAnnualCoefficient[paymentFrequency];
+        annualSavingsCryptoAmount = new BigNumber(annualSavingsFiatAmount)
+            .dividedBy(rate)
+            .decimalPlaces(8)
+            .toString();
     }
 
     return {
@@ -94,6 +91,7 @@ export const createReturnLink = async () => {
 
     if (isDesktop()) {
         const url = await desktopApi.getHttpReceiverAddress('/buy-redirect');
+
         return `${url}?p=${encodeURIComponent(href)}`;
     }
 

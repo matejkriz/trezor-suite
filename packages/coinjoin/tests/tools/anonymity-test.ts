@@ -1,5 +1,4 @@
 /* eslint-disable no-console */
-/* eslint-disable @typescript-eslint/no-var-requires */
 
 import fs from 'fs';
 import http from 'http';
@@ -51,6 +50,7 @@ const CACHE_PARAMS = `${CACHE_DIR}/anonymityScoreParams.json`;
             const originalWrite = req.write.bind(req);
             req.write = (chunk: Buffer) => {
                 chunks.push(chunk);
+
                 return originalWrite(chunk);
             };
 

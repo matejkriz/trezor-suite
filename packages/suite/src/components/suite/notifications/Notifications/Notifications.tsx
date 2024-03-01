@@ -1,8 +1,7 @@
-import { useState } from 'react';
-import styled from 'styled-components';
-
-import { Icon, useTheme, variables } from '@trezor/components';
 import { useSelector } from 'src/hooks/suite';
+import { Icon, variables } from '@trezor/components';
+import { useState } from 'react';
+import styled, { useTheme } from 'styled-components';
 import { Translation } from 'src/components/suite';
 import { SETTINGS } from 'src/config/suite';
 import { NotificationGroup } from './NotificationGroup/NotificationGroup';
@@ -26,7 +25,7 @@ const TabSelector = styled.div`
 const TabButton = styled.button<{ selected: boolean }>`
     border: none;
     background-color: inherit;
-    font-size: ${variables.NEUE_FONT_SIZE.NORMAL};
+    font-size: ${variables.FONT_SIZE.NORMAL};
     font-weight: ${variables.FONT_WEIGHT.MEDIUM};
     padding-top: 16px;
     padding-bottom: 12px;

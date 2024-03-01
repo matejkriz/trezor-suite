@@ -25,7 +25,7 @@ import RouterHandler from 'src/support/suite/Router';
 import { ConnectedThemeProvider } from 'src/support/suite/ConnectedThemeProvider';
 import { LoadingScreen } from 'src/support/suite/screens/LoadingScreen';
 import { ErrorScreen } from 'src/support/suite/screens/ErrorScreen';
-import { useFormattersConfig } from 'src/hooks/suite';
+import { useDebugLanguageShortcut, useFormattersConfig } from 'src/hooks/suite';
 import history from 'src/support/history';
 import { ModalContextProvider } from 'src/support/suite/ModalContext';
 import { desktopHandshake } from 'src/actions/suite/suiteActions';
@@ -37,6 +37,7 @@ import { TorLoadingScreen } from './support/screens/TorLoadingScreen';
 
 const Main = () => {
     useTor();
+    useDebugLanguageShortcut();
     const formattersConfig = useFormattersConfig();
 
     return (
@@ -114,6 +115,7 @@ export const init = async (container: HTMLElement) => {
     if (!loadModules.success) {
         // loading failed, render error with theme provider without redux and do not continue
         root.render(<ErrorScreen error={loadModules.error} />);
+
         return;
     }
 

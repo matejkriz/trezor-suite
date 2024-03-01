@@ -18,7 +18,7 @@ import ErrorBoundary from 'src/support/suite/ErrorBoundary';
 import RouterHandler from 'src/support/suite/Router';
 import { ConnectedThemeProvider } from 'src/support/suite/ConnectedThemeProvider';
 import { LoadingScreen } from 'src/support/suite/screens/LoadingScreen';
-import { useFormattersConfig } from 'src/hooks/suite';
+import { useDebugLanguageShortcut, useFormattersConfig } from 'src/hooks/suite';
 import history from 'src/support/history';
 import { ModalContextProvider } from 'src/support/suite/ModalContext';
 
@@ -29,6 +29,7 @@ import { FormatterProvider } from '@suite-common/formatters';
 const Main = () => {
     useCypress();
     useTor();
+    useDebugLanguageShortcut();
     const formattersConfig = useFormattersConfig();
 
     return (

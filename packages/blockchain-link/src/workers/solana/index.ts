@@ -9,7 +9,6 @@ import type {
     SolanaValidParsedTxWithMeta,
     ParsedTransactionWithMeta,
     SolanaTokenAccountInfo,
-    TokenDetailByMint,
 } from '@trezor/blockchain-link-types/lib/solana';
 import type * as MessageTypes from '@trezor/blockchain-link-types/lib/messages';
 import { CustomError } from '@trezor/blockchain-link-types/lib/constants/errors';
@@ -22,7 +21,7 @@ import {
     transformTokenInfo,
     TOKEN_PROGRAM_PUBLIC_KEY,
 } from '@trezor/blockchain-link-utils/lib/solana';
-import { TOKEN_ACCOUNT_LAYOUT, fetchCoingeckoTokenDetailByMint } from './tokenUtils';
+import { TOKEN_ACCOUNT_LAYOUT } from './tokenUtils';
 
 export type SolanaAPI = Connection;
 
@@ -44,11 +43,10 @@ const getAllSignatures = async (
 
     const limit = 100;
     while (keepFetching) {
-        const signaturesInfos = // eslint-disable-next-line no-await-in-loop
-            await api.getSignaturesForAddress(new PublicKey(descriptor), {
-                before: lastSignature?.signature,
-                limit,
-            });
+        const signaturesInfos = await api.getSignaturesForAddress(new PublicKey(descriptor), {
+            before: lastSignature?.signature,
+            limit,
+        });
 
         const signatures = signaturesInfos.map(info => ({
             signature: info.signature,
@@ -58,6 +56,7 @@ const getAllSignatures = async (
         keepFetching = signatures.length === limit;
         allSignatures = [...allSignatures, ...signatures];
     }
+
     return allSignatures;
 };
 
@@ -73,6 +72,7 @@ const fetchTransactionPage = async (
             resultArray[chunkIndex] = []; // start a new chunk
         }
         resultArray[chunkIndex].push(item);
+
         return resultArray;
     }, [] as string[][]);
 
@@ -95,6 +95,7 @@ const pushTransaction = async (request: Request<MessageTypes.PushTransaction>) =
     const rawTx = request.payload.startsWith('0x') ? request.payload.slice(2) : request.payload;
     const api = await request.connect();
     const payload = await api.sendRawTransaction(Buffer.from(rawTx, 'hex'));
+
     return {
         type: RESPONSES.PUSH_TRANSACTION,
         payload,
@@ -113,7 +114,6 @@ const getAccountInfo = async (request: Request<MessageTypes.GetAccountInfo>) => 
     const getTransactionPage = async (
         txIds: string[],
         tokenAccountsInfos: SolanaTokenAccountInfo[],
-        tokenDetailByMint: TokenDetailByMint,
     ) => {
         const transactionsPage = await fetchTransactionPage(api, txIds);
 
@@ -126,7 +126,6 @@ const getAccountInfo = async (request: Request<MessageTypes.GetAccountInfo>) => 
                             tx,
                             payload.descriptor,
                             tokenAccountsInfos,
-                            tokenDetailByMint,
                         ),
                     ),
             )
@@ -163,24 +162,16 @@ const getAccountInfo = async (request: Request<MessageTypes.GetAccountInfo>) => 
         decimals: a.account.data.parsed?.info?.tokenAmount?.decimals as number | undefined,
     }));
 
-    // Fetch token info only if the account owns tokens
-    const shouldFetchTokens =
-        tokenAccounts.value.length > 0 &&
-        (details === 'tokens' || details === 'txs' || details === 'tokenBalances');
-    let tokens: TokenInfo[] = [];
-    let tokenDetailByMint: TokenDetailByMint = {};
-    if (shouldFetchTokens) {
-        tokenDetailByMint = await fetchCoingeckoTokenDetailByMint(
-            tokenAccountsInfos.map(a => a.mint).filter((mint): mint is string => !!mint),
-        );
-
-        tokens = transformTokenInfo(tokenAccounts.value, tokenDetailByMint);
-    }
-
     const transactionPage =
-        details === 'txs'
-            ? await getTransactionPage(txIdPage, tokenAccountsInfos, tokenDetailByMint)
-            : undefined;
+        details === 'txs' ? await getTransactionPage(txIdPage, tokenAccountsInfos) : undefined;
+
+    // Fetch token info only if the account owns tokens
+    let tokens: TokenInfo[] = [];
+    if (tokenAccounts.value.length > 0) {
+        const tokenMetadata = await solanaUtils.getTokenMetadata();
+
+        tokens = transformTokenInfo(tokenAccounts.value, tokenMetadata);
+    }
 
     const balance = await api.getBalance(publicKey);
 
@@ -243,6 +234,7 @@ const getInfo = async (request: Request<MessageTypes.GetInfo>) => {
         version: (await api.getVersion())['solana-core'],
         decimals: 9,
     };
+
     return {
         type: RESPONSES.GET_INFO,
         payload: { ...serverInfo },
@@ -339,14 +331,12 @@ const findTokenAccountOwner = (
     accounts: SubscriptionAccountInfo[],
     accountDescriptor: string,
 ): SubscriptionAccountInfo | undefined =>
-    accounts.find(
-        account =>
-            account.tokens?.find(
-                token =>
-                    token.accounts?.find(
-                        tokenAccount => tokenAccount.publicKey.toString() === accountDescriptor,
-                    ),
+    accounts.find(account =>
+        account.tokens?.find(token =>
+            token.accounts?.find(
+                tokenAccount => tokenAccount.publicKey.toString() === accountDescriptor,
             ),
+        ),
     );
 
 const subscribeAccounts = async (
@@ -386,7 +376,7 @@ const subscribeAccounts = async (
                 return;
             }
 
-            const tx = await solanaUtils.transformTransaction(lastTx, a.descriptor, [], {});
+            const tx = await solanaUtils.transformTransaction(lastTx, a.descriptor, []);
 
             // For token accounts we need to emit an event with the owner account's descriptor
             // since we don't store token accounts in the user's accounts.
@@ -408,6 +398,7 @@ const subscribeAccounts = async (
         });
         state.addAccounts([{ ...a, subscriptionId }]);
     });
+
     return { subscribed: newAccounts.length > 0 };
 };
 
@@ -452,6 +443,7 @@ const subscribe = async (request: Request<MessageTypes.Subscribe>) => {
         default:
             throw new CustomError('worker_unknown_request', `+${request.type}`);
     }
+
     return {
         type: RESPONSES.SUBSCRIBE,
         payload: response,
@@ -470,6 +462,7 @@ const unsubscribe = (request: Request<MessageTypes.Unsubscribe>) => {
         default:
             throw new CustomError('worker_unknown_request', `+${request.type}`);
     }
+
     return {
         type: RESPONSES.UNSUBSCRIBE,
         payload: { subscribed: request.state.getAccounts().length > 0 },
@@ -503,6 +496,7 @@ class SolanaWorker extends BaseWorker<SolanaAPI> {
     tryConnect(url: string): Promise<SolanaAPI> {
         const api = new Connection(url, { wsEndpoint: url.replace('https', 'wss') });
         this.post({ id: -1, type: RESPONSES.CONNECTED });
+
         return Promise.resolve(api);
     }
 

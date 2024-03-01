@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import styled from 'styled-components';
+import styled, { useTheme } from 'styled-components';
 import useTimeoutFn from 'react-use/lib/useTimeoutFn';
-import { variables, CoinLogo, Select, Icon, useTheme } from '@trezor/components';
+import { variables, CoinLogo, Select, Icon } from '@trezor/components';
 import {
     FiatValue,
     Translation,
@@ -133,12 +133,13 @@ export const ReceiveOptions = (props: ReceiveOptionsProps) => {
             value={selectedAccountOption}
             isClearable={false}
             options={selectAccountOptions}
-            minWidth="70px"
+            minValueWidth="70px"
             formatOptionLabel={(option: AccountSelectOption) => {
                 switch (option.type) {
                     case 'SUITE': {
                         if (!option.account) return null;
                         const { symbol, formattedBalance } = option.account;
+
                         return (
                             <Option>
                                 <LogoWrapper>

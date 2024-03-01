@@ -1,3 +1,32 @@
+# 0.0.29
+
+-   fix: from g:tsx to local tsx in prepublish script (d21d698b2)
+-   fix(connect-common): remove confusing log in AbstractMessageChannel (6d3b60c73)
+-   chore(repo): remove build:lib for some simple packages (#11276) (7febd10cf)
+-   chore(suite): autofix newlines (c82455e74)
+-   chore(utils): remove build step requirement from @trezor/utils (#11176) (6cd3d3c81)
+-   fix(connect-web): workaround to work with older content-script (5da505b02)
+-   fix(connect-web): reconnect message channel (ee98bb51c)
+-   chore(connect-web): refactor popupmanager (af1723e4f)
+-   chore: use global tsx (c21d81f66)
+-   chore: update typescript and use global tsc (84bc9b8bd)
+-   chore: use global rimraf (5a6759eff)
+-   chore: use global jest (a7e68797d)
+-   chore: upgrade jest to 29.7.0 (3c656dc0b)
+-   chore: upgrade jest (004938e24)
+-   chore: update root dependencies (fac6d99ec)
+
+# 0.0.28
+
+-   feat(suite): Rename Polygon to Polygon PoS (15a7fd38dc)
+-   feat(suite): add Polygon (8c569ca580)
+-   chore(connect-common): remove es5 target (fails with TypedEmitter) (0a19580f63)
+-   feat(connect-common): store is event emitter, saves permissions and preferred device (db0e9631da)
+
+# 0.0.27
+
+-   feat(connect-common): message channel to allow lazy handshake (79be923e67)
+
 # 0.0.26
 
 -   feat(connect-common): add resolve messages promises to abstract (f9e6f304f)

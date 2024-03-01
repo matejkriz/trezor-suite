@@ -1,128 +1,100 @@
-import { useCallback, useState, Ref, ReactNode, ReactElement, InputHTMLAttributes } from 'react';
-import styled, { css } from 'styled-components';
+import { useState, Ref, ReactNode, ReactElement, InputHTMLAttributes } from 'react';
+import styled, { useTheme } from 'styled-components';
+import { useMeasure } from 'react-use';
+import { spacingsPx, spacings, typography } from '@trezor/theme';
 
-import { FONT_SIZE, Z_INDEX } from '../../../config/variables';
-import { InputState, InputVariant } from '../../../support/types';
-import { useTheme } from '../../../utils';
 import { Icon } from '../../assets/Icon/Icon';
 import {
-    Label,
-    LabelLeft,
-    LabelRight,
-    RightLabel,
     baseInputStyle,
     INPUT_HEIGHTS,
-    getInputStateTextColor,
-    LabelAddon,
+    BaseInputProps,
+    Label,
+    LABEL_TRANSFORM,
 } from '../InputStyles';
+import { BOTTOM_TEXT_MIN_HEIGHT, BottomText } from '../BottomText';
+import { InputState, InputSize } from '../inputTypes';
+import { TopAddons } from '../TopAddons';
+import { useElevation } from '../../ElevationContext/ElevationContext';
+import { UIHorizontalAlignment } from 'packages/components/src/config/types';
 
-const Wrapper = styled.div<Pick<InputProps, 'width'>>`
+const Wrapper = styled.div<Pick<InputProps, 'width'> & { hasBottomPadding: boolean }>`
     display: inline-flex;
     flex-direction: column;
     width: ${({ width }) => (width ? `${width}px` : '100%')};
+    padding-bottom: ${({ hasBottomPadding }) =>
+        hasBottomPadding ? `${BOTTOM_TEXT_MIN_HEIGHT}px` : '0'};
 `;
 
-interface StyledInputProps extends InputProps {
+interface StyledInputProps extends BaseInputProps {
+    $size: InputSize;
     leftAddonWidth?: number;
     rightAddonWidth?: number;
 }
 
-const StyledInput = styled.input<StyledInputProps>`
-    ${baseInputStyle}
+const getExtraAddonPadding = (size: InputSize) =>
+    (size === 'small' ? spacings.sm : spacings.md) + spacings.xs;
 
-    width: 100%;
-    height: ${({ variant }) => `${INPUT_HEIGHTS[variant as InputVariant]}px`};
-    padding: 1px 16px 0 16px;
-    padding-left: ${({ leftAddonWidth }) =>
-        leftAddonWidth ? `${leftAddonWidth + 19}px` : undefined};
-    padding-right: ${({ rightAddonWidth }) =>
-        rightAddonWidth ? `${rightAddonWidth + 19}px` : undefined};
+const StyledInput = styled.input<StyledInputProps & { isWithLabel: boolean }>`
+    padding: 0 ${spacingsPx.md};
+    padding-left: ${({ leftAddonWidth, $size }) =>
+        leftAddonWidth ? `${leftAddonWidth + getExtraAddonPadding($size)}px` : undefined};
+    padding-right: ${({ rightAddonWidth, $size }) =>
+        rightAddonWidth ? `${rightAddonWidth + getExtraAddonPadding($size)}px` : undefined};
+    height: ${({ $size }) => `${INPUT_HEIGHTS[$size as InputSize]}px`};
+    ${baseInputStyle}
+    ${({ $size }) => $size === 'small' && typography.hint};
 `;
 
 const InputWrapper = styled.div`
     display: flex;
     position: relative;
+    width: 100%;
 `;
 
-const InputAddon = styled.div<{ align: AddonAlignment; variant: InputVariant }>`
+const getInputAddonPadding = (size: InputSize) =>
+    size === 'small' ? spacingsPx.sm : spacingsPx.md;
+
+const InputAddon = styled.div<{ align: innerAddonAlignment; size: InputSize }>`
     position: absolute;
-    top: 1px;
-    bottom: 1px;
-    right: ${({ align, variant }) => align === 'right' && (variant === 'small' ? '10px' : '16px')};
-    left: ${({ align, variant }) => align === 'left' && (variant === 'small' ? '10px' : '16px')};
+    inset: 0 ${({ align, size }) => (align === 'right' ? getInputAddonPadding(size) : 'auto')} 0
+        ${({ align, size }) => (align === 'left' ? getInputAddonPadding(size) : 'auto')};
     display: flex;
     align-items: center;
 `;
 
-const BottomText = styled.div<Pick<InputProps, 'errorPosition' | 'inputState'>>`
-    display: flex;
-    font-size: ${FONT_SIZE.TINY};
-    color: ${({ inputState, theme }) => getInputStateTextColor(inputState, theme)};
-
-    ${({ errorPosition }) =>
-        errorPosition === 'right' &&
-        css`
-            align-items: flex-end;
-            margin-bottom: 4px;
-            margin-left: 12px;
-        `}
-
-    ${({ errorPosition }) =>
-        errorPosition === 'bottom' &&
-        css`
-            padding: 6px 10px 0 10px;
-            min-height: 22px;
-        `}
+const InputLabel = styled(Label)`
+    /* move up when input is focused OR has a placeholder OR has value  */
+    input:focus ~ &,
+    input:not(:placeholder-shown) ~ &,
+    input:not([placeholder='']):placeholder-shown ~ & {
+        transform: ${LABEL_TRANSFORM};
+    }
 `;
 
-const Overlay = styled.div`
-    bottom: 1px;
-    top: 1px;
-    left: 1px;
-    right: 1px;
-    border: 1px solid transparent;
-    border-radius: 3px;
-    position: absolute;
-    background-image: linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(255, 255, 255, 1) 220px);
-    z-index: ${Z_INDEX.BASE};
-`;
+type innerAddonAlignment = Extract<UIHorizontalAlignment, 'left' | 'right'>;
 
-const Row = styled.div<Pick<InputProps, 'errorPosition'>>`
-    display: flex;
-    flex-direction: column;
-    flex-direction: ${({ errorPosition }) => errorPosition === 'right' && 'row'};
-`;
-
-type AddonAlignment = 'left' | 'right';
-
-export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
     value?: string;
     innerRef?: Ref<HTMLInputElement>;
     label?: ReactElement | string;
-    labelAddon?: ReactElement;
+    labelHoverAddon?: ReactElement;
     labelRight?: ReactElement;
     innerAddon?: ReactElement;
-    topLabelRight?: ReactNode;
+    /**
+     * @description pass `null` if bottom text can be `undefined`
+     */
     bottomText?: ReactNode;
-    isMonospace?: boolean;
     isDisabled?: boolean;
-    variant?: InputVariant;
+    size?: InputSize;
     className?: string;
-    autoComplete?: string;
-    autoCorrect?: string;
-    autoCapitalize?: string;
-    spellCheck?: boolean;
     dataTest?: string;
-    isPartiallyHidden?: boolean;
-    wrapperProps?: Record<string, any>;
-    inputState?: InputState;
-    addonAlign?: AddonAlignment;
-    errorPosition?: 'bottom' | 'right';
-    noError?: boolean;
-    noTopLabel?: boolean;
-    labelAddonIsVisible?: boolean;
-    clearButton?: 'hover' | 'always';
-    width?: number;
+    inputState?: InputState; // TODO: do we need this? we only have the error state right now
+    innerAddonAlign?: innerAddonAlignment;
+    hasBottomPadding?: boolean;
+    /**
+     * @description the clear button replaces the addon on the right side
+     */
+    showClearButton?: 'hover' | 'always';
     onClear?: () => void;
 }
 
@@ -130,124 +102,99 @@ const Input = ({
     value,
     innerRef,
     inputState,
-    width,
     label,
-    labelAddon,
+    labelHoverAddon,
     labelRight,
     innerAddon,
-    topLabelRight,
+    innerAddonAlign = 'right',
     bottomText,
-    variant = 'large',
+    size = 'large',
     isDisabled,
-    className,
-    autoComplete = 'off',
-    autoCorrect = 'off',
-    autoCapitalize = 'off',
-    isMonospace,
-    labelAddonIsVisible,
     dataTest,
-    isPartiallyHidden,
-    clearButton,
+    showClearButton,
+    placeholder,
     onClear,
-    addonAlign = 'right',
-    errorPosition = 'bottom',
-    noError = false,
-    noTopLabel = false,
+    hasBottomPadding = true,
+    className,
     ...rest
 }: InputProps) => {
     const [isHovered, setIsHovered] = useState(false);
-    const [leftAddonWidth, setLeftAddonWidth] = useState(0);
-    const [rightAddonWidth, setRightAddonWidth] = useState(0);
 
     const theme = useTheme();
+    const { elevation } = useElevation();
 
-    const hasClearButton =
-        (clearButton === 'always' || (clearButton === 'hover' && isHovered)) &&
+    const hasShowClearButton =
+        (showClearButton === 'always' || (showClearButton === 'hover' && isHovered)) &&
         value &&
         value?.length > 0;
 
-    const measureLeftAddon = useCallback((element: HTMLDivElement) => {
-        const elementWidth = element?.getBoundingClientRect().width ?? 0;
-
-        setLeftAddonWidth(elementWidth);
-    }, []);
-
-    const measureRightAddon = useCallback((element: HTMLDivElement) => {
-        const elementWidth = element?.getBoundingClientRect().width ?? 0;
-
-        setRightAddonWidth(elementWidth);
-    }, []);
+    const [measureLeftAddon, { width: leftAddonWidth }] = useMeasure<HTMLDivElement>();
+    const [measureRightAddon, { width: rightAddonWidth }] = useMeasure<HTMLDivElement>();
 
     return (
         <Wrapper
-            width={width}
-            data-test={dataTest}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
+            hasBottomPadding={hasBottomPadding === true && bottomText === null}
+            className={className}
         >
-            {!noTopLabel && (
-                <Label>
-                    <LabelLeft>{label}</LabelLeft>
-                    <LabelRight>
-                        <LabelAddon isVisible={labelAddonIsVisible || isHovered}>
-                            {labelAddon}
-                        </LabelAddon>
-                        {labelRight && <RightLabel>{labelRight}</RightLabel>}
-                    </LabelRight>
-                </Label>
-            )}
+            <TopAddons isHovered={isHovered} hoverAddon={labelHoverAddon} addonRight={labelRight} />
 
-            <Row errorPosition={errorPosition}>
-                <InputWrapper>
-                    {innerAddon && addonAlign === 'left' && (
-                        <InputAddon align="left" ref={measureLeftAddon} variant={variant}>
-                            {innerAddon}
-                        </InputAddon>
-                    )}
-
-                    {((innerAddon && addonAlign === 'right') || hasClearButton) && (
-                        <InputAddon align="right" ref={measureRightAddon} variant={variant}>
-                            {addonAlign === 'right' && !hasClearButton && innerAddon}
-
-                            {hasClearButton && (
-                                <Icon
-                                    icon="CANCEL"
-                                    size={12}
-                                    onClick={onClear}
-                                    color={theme.TYPE_DARK_GREY}
-                                    useCursorPointer
-                                />
-                            )}
-                        </InputAddon>
-                    )}
-
-                    {isPartiallyHidden && <Overlay />}
-
-                    <StyledInput
-                        className={className}
-                        value={value}
-                        autoComplete={autoComplete}
-                        autoCorrect={autoCorrect}
-                        autoCapitalize={autoCapitalize}
-                        spellCheck={false}
-                        inputState={inputState}
-                        disabled={isDisabled}
-                        variant={variant}
-                        isMonospace={isMonospace}
-                        ref={innerRef}
-                        data-lpignore="true"
-                        leftAddonWidth={leftAddonWidth}
-                        rightAddonWidth={rightAddonWidth}
-                        {...rest}
-                    />
-                </InputWrapper>
-
-                {!noError && (
-                    <BottomText errorPosition={errorPosition} inputState={inputState}>
-                        {bottomText}
-                    </BottomText>
+            <InputWrapper>
+                {innerAddon && innerAddonAlign === 'left' && (
+                    <InputAddon align="left" ref={measureLeftAddon} size={size}>
+                        {innerAddon}
+                    </InputAddon>
                 )}
-            </Row>
+
+                {((innerAddon && innerAddonAlign === 'right') || hasShowClearButton) && (
+                    <InputAddon align="right" ref={measureRightAddon} size={size}>
+                        {!hasShowClearButton && innerAddon}
+
+                        {hasShowClearButton && (
+                            <Icon
+                                icon="CANCEL"
+                                size={16}
+                                onClick={onClear}
+                                color={theme.TYPE_DARK_GREY}
+                                useCursorPointer
+                            />
+                        )}
+                    </InputAddon>
+                )}
+
+                <StyledInput
+                    elevation={elevation}
+                    value={value}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    inputState={inputState}
+                    disabled={isDisabled}
+                    $size={size}
+                    ref={innerRef}
+                    data-lpignore="true"
+                    leftAddonWidth={leftAddonWidth}
+                    rightAddonWidth={rightAddonWidth}
+                    isWithLabel={!!label}
+                    placeholder={placeholder || ''} // needed for uncontrolled inputs
+                    data-test={dataTest}
+                    {...rest}
+                />
+
+                {label && (
+                    <InputLabel $size={size} isDisabled={isDisabled}>
+                        {label}
+                    </InputLabel>
+                )}
+            </InputWrapper>
+
+            {bottomText && (
+                <BottomText inputState={inputState} isDisabled={isDisabled}>
+                    {bottomText}
+                </BottomText>
+            )}
         </Wrapper>
     );
 };

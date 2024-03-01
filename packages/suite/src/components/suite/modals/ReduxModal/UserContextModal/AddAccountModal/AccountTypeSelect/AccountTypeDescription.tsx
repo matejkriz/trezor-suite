@@ -1,15 +1,13 @@
 import styled from 'styled-components';
-import { P } from '@trezor/components';
+import { Paragraph } from '@trezor/components';
 import { Network } from 'src/types/wallet';
-import { Translation, TrezorLink } from 'src/components/suite';
+import { Translation } from 'src/components/suite';
 import { getAccountTypeDesc, getAccountTypeUrl } from '@suite-common/wallet-utils';
+import { spacingsPx } from '@trezor/theme';
+import { LearnMoreButton } from 'src/components/suite/LearnMoreButton';
 
-const Info = styled(P).attrs(() => ({
-    size: 'small',
-    textAlign: 'left',
-}))`
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    margin: 20px 0;
+const Info = styled(Paragraph)`
+    margin: ${spacingsPx.md} 0 ${spacingsPx.xs};
 `;
 
 interface AccountTypeDescriptionProps {
@@ -26,16 +24,11 @@ export const AccountTypeDescription = ({
     const accountTypeDesc = getAccountTypeDesc(bip43Path);
 
     return (
-        <Info>
-            <Translation id={accountTypeDesc} />
-            {accountTypeUrl && (
-                <>
-                    {' '}
-                    <TrezorLink icon="EXTERNAL_LINK" href={accountTypeUrl} size="small">
-                        <Translation id="TR_LEARN_MORE" />
-                    </TrezorLink>
-                </>
-            )}
-        </Info>
+        <>
+            <Info>
+                <Translation id={accountTypeDesc} />
+            </Info>
+            {accountTypeUrl && <LearnMoreButton url={accountTypeUrl} />}
+        </>
     );
 };

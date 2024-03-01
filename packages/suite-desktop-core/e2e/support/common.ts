@@ -12,7 +12,7 @@ export const launchSuite = async () => {
         args: [
             path.join(appDir, './dist/app.js'),
             `--log-level=${desiredLogLevel}`,
-            '--bridge-test',
+            '--bridge-node-test',
         ],
         // when testing electron, video needs to be setup like this. it works locally but not in docker
         // recordVideo: { dir: 'test-results' },
@@ -26,6 +26,7 @@ export const launchSuite = async () => {
             // This runs in the main Electron process.
             // override global variable defined in app.ts
             global.resourcesPath = resourcesPath;
+
             return global.resourcesPath;
         },
         [path.join(appDir, 'build/static')],

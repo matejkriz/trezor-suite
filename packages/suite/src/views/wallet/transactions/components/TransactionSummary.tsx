@@ -17,6 +17,7 @@ import { variables, Button, Card } from '@trezor/components';
 import { TransactionSummaryDropdown } from './TransactionSummaryDropdown';
 import { SummaryCards } from './SummaryCards';
 import { aggregateBalanceHistory, getMinMaxValueFromData } from 'src/utils/wallet/graph';
+import { selectLocalCurrency } from 'src/reducers/wallet/settingsReducer';
 
 const Wrapper = styled.div`
     display: flex;
@@ -32,7 +33,6 @@ const ContentWrapper = styled.div`
 const GraphWrapper = styled(Card)`
     flex-direction: row;
     display: flex;
-    padding: 14px 16px;
     height: 320px;
 `;
 
@@ -56,20 +56,13 @@ const ErrorMessage = styled.div`
     text-align: center;
 `;
 
-const Divider = styled.div`
-    width: 100%;
-    height: 1px;
-    background: ${({ theme }) => theme.STROKE_GREY};
-    margin: 24px 0;
-`;
-
 interface TransactionSummaryProps {
     account: Account;
 }
 
 export const TransactionSummary = ({ account }: TransactionSummaryProps) => {
     const selectedRange = useSelector(state => state.wallet.graph.selectedRange);
-    const localCurrency = useSelector(state => state.wallet.settings.localCurrency);
+    const localCurrency = useSelector(selectLocalCurrency);
     const dispatch = useDispatch();
 
     const intervalGraphData = dispatch(getGraphDataForInterval({ account }));
@@ -111,7 +104,7 @@ export const TransactionSummary = ({ account }: TransactionSummaryProps) => {
     return (
         <Wrapper>
             <Actions>
-                <GraphRangeSelector onSelectedRange={onSelectedRange} align="left" />
+                <GraphRangeSelector onSelectedRange={onSelectedRange} align="bottom-left" />
                 <TransactionSummaryDropdown />
             </Actions>
             <ContentWrapper>
@@ -125,7 +118,7 @@ export const TransactionSummary = ({ account }: TransactionSummaryProps) => {
                         </ErrorMessage>
                     </GraphWrapper>
                 ) : (
-                    <HiddenPlaceholder intensity={7}>
+                    <HiddenPlaceholder enforceIntensity={8}>
                         <GraphWrapper>
                             <TransactionsGraph
                                 hideToolbar
@@ -155,7 +148,6 @@ export const TransactionSummary = ({ account }: TransactionSummaryProps) => {
                     isLoading={isLoading}
                 />
             </ContentWrapper>
-            <Divider />
         </Wrapper>
     );
 };

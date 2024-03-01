@@ -239,6 +239,50 @@ export const NotificationRenderer = ({ notification, render }: NotificationRende
                     }}
                 />
             );
+        case 'tx-staked':
+            return (
+                <TransactionRenderer
+                    render={render}
+                    notification={notification}
+                    icon="SEND"
+                    variant="success"
+                    message="TOAST_TX_STAKED"
+                    messageValues={{
+                        amount: notification.formattedAmount,
+                        account: notification.descriptor,
+                    }}
+                />
+            );
+        case 'tx-unstaked':
+            return (
+                <TransactionRenderer
+                    render={render}
+                    notification={notification}
+                    icon="SEND"
+                    variant="success"
+                    message="TOAST_TX_UNSTAKED"
+                    messageValues={{
+                        amount: notification.formattedAmount,
+                    }}
+                />
+            );
+        case 'tx-claimed':
+            return (
+                <TransactionRenderer
+                    render={render}
+                    notification={notification}
+                    icon="SEND"
+                    variant="success"
+                    message="TOAST_TX_CLAIMED"
+                    messageValues={{
+                        amount: notification.formattedAmount,
+                    }}
+                />
+            );
+        case 'successful-claim':
+            return success(render, notification, 'TOAST_SUCCESSFUL_CLAIM', 'CHECK', {
+                symbol: notification.symbol,
+            });
         default:
             return info(render, notification, 'TR_404_DESCRIPTION');
     }

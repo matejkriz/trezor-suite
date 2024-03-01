@@ -70,6 +70,7 @@ export const transformUserOutputs = (
         const amount =
             output.amount === '' ? undefined : networkAmountToSatoshi(output.amount, symbol);
         const tokenDecimals = accountTokens?.find(t => t.contract === output.token)?.decimals ?? 0;
+
         return {
             address: output.address === '' ? undefined : output.address,
             amount: output.token ? undefined : amount,
@@ -90,6 +91,7 @@ export const transformUserOutputs = (
 export const getShortFingerprint = (fingerprint: string) => {
     const firstPart = fingerprint.substring(0, 10);
     const lastPart = fingerprint.substring(fingerprint.length - 10);
+
     return `${firstPart}…${lastPart}`;
 };
 
@@ -102,6 +104,7 @@ export const parseAsset = (
     const policyIdSize = 56;
     const policyId = hex.slice(0, policyIdSize);
     const assetNameInHex = hex.slice(policyIdSize);
+
     return {
         policyId,
         assetNameInHex,
@@ -140,9 +143,9 @@ export const isPoolOverSaturated = (pool: StakePool, additionalStake?: string) =
 export const getStakePoolForDelegation = (trezorPools: PoolsResponse, accountBalance: string) => {
     let pool = trezorPools.next;
     if (isPoolOverSaturated(pool, accountBalance)) {
-        // eslint-disable-next-line prefer-destructuring
         pool = trezorPools.pools[0];
     }
+
     return pool;
 };
 // Type guard to differentiate between PrecomposedTransactionFinal and PrecomposedTransactionFinalCardano

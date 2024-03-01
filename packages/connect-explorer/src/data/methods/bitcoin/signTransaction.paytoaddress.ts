@@ -1,4 +1,3 @@
-/* eslint-disable no-bitwise */
 import { select } from './common';
 
 const name = 'signTransaction';
@@ -180,6 +179,7 @@ export default [
                 affect: ['inputs', 'outputs'],
                 data: select.map(v => {
                     const example = examples[v.value];
+
                     return {
                         ...v,
                         affectedValue: example ? [example.inputs, example.outputs] : undefined,

@@ -1,7 +1,6 @@
 // origin: https://github.com/trezor/connect/blob/develop/src/js/core/methods/CardanoSignTransaction.js
 
 // allow for...of statements
-/* eslint-disable no-restricted-syntax */
 
 import { trezorUtils } from '@fivebinaries/coin-selection';
 
@@ -36,7 +35,7 @@ import {
 import { gatherWitnessPaths } from '../cardanoWitnesses';
 import type { AssetGroupWithTokens } from '../cardanoTokenBundle';
 import { tokenBundleToProto } from '../cardanoTokenBundle';
-import { Assert, Type } from '@trezor/schema-utils';
+import { AssertWeak, Type } from '@trezor/schema-utils';
 
 // todo: remove when listed firmwares become mandatory for cardanoSignTransaction
 const CardanoSignTransactionFeatures = Object.freeze({
@@ -134,7 +133,11 @@ export default class CardanoSignTransaction extends AbstractMethod<
         }
 
         // validate incoming parameters
-        Assert(Type.Union([CardanoSignTransactionSchema, CardanoSignTransactionExtended]), payload);
+        // TODO: weak assert for compatibility purposes (issue #10841)
+        AssertWeak(
+            Type.Union([CardanoSignTransactionSchema, CardanoSignTransactionExtended]),
+            payload,
+        );
 
         const inputsWithPath = payload.inputs.map(transformInput);
 

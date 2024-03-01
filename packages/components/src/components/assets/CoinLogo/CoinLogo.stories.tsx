@@ -1,13 +1,37 @@
-import { CoinLogo, variables } from '../../../index';
-import { storiesOf } from '@storybook/react';
-import { number, select } from '@storybook/addon-knobs';
+import styled from 'styled-components';
+import { Meta, StoryObj } from '@storybook/react';
+import { CoinLogo as CoinLogoComponent, CoinLogoProps, variables } from '../../../index';
 
-storiesOf('Assets/CoinLogos', module).add('CoinLogo', () => {
-    const coinsObject: any = {};
-    variables.COINS.forEach((coin: string) => {
-        coinsObject[coin] = coin;
-    });
-    const coinSelect = select('symbol', coinsObject, 'ada');
-    const size = number('size', 32);
-    return <CoinLogo size={size} symbol={coinSelect} />;
-});
+const Center = styled.div`
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    padding: 100px 0;
+`;
+
+export default {
+    title: 'Assets/CoinLogos',
+    component: CoinLogoComponent,
+} as Meta;
+
+export const CoinLogo: StoryObj<CoinLogoProps> = {
+    render: ({ symbol, size }) => (
+        <Center>
+            <CoinLogoComponent symbol={symbol} size={size} />
+        </Center>
+    ),
+    args: {
+        symbol: 'ada',
+    },
+    argTypes: {
+        size: {
+            type: 'number',
+        },
+        symbol: {
+            options: variables.COINS,
+            control: {
+                type: 'select',
+            },
+        },
+    },
+};

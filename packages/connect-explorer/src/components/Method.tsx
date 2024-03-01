@@ -25,6 +25,7 @@ const getArray = (field: FieldWithBundle<any>, props: Props) => (
         {field.items?.map((batch, index) => {
             const key = `${field.name}-${index}`;
             const children = batch.map((batchField: any) => getField(batchField, props));
+
             return (
                 <BatchWrapper key={key} onRemove={() => props.actions.onBatchRemove(field, batch)}>
                     {children}
@@ -41,7 +42,14 @@ export const getField = (field: Field<any> | FieldWithBundle<any>, props: Props)
         case 'input':
         case 'input-long':
         case 'number':
-            return <Input key={field.name} field={field} onChange={props.actions.onFieldChange} />;
+            return (
+                <Input
+                    dataTest={`@input/${field.name}`}
+                    key={field.name}
+                    field={field}
+                    onChange={props.actions.onFieldChange}
+                />
+            );
         case 'address':
             return <Input key={field.name} field={field} onChange={props.actions.onFieldChange} />;
 
@@ -64,15 +72,6 @@ export const getField = (field: Field<any> | FieldWithBundle<any>, props: Props)
             return (
                 <CoinSelect key={field.name} field={field} onChange={props.actions.onFieldChange} />
             );
-        // case 'select-async':
-        //     return (
-        //         <AsyncSelect
-        //             key={field.name}
-        //             field={field}
-        //             onDataChange={props.actions.onFieldDataChange}
-        //             onChange={props.actions.onFieldChange}
-        //         />
-        //     );
         case 'file':
             return <File key={field.name} field={field} onChange={props.actions.onFieldChange} />;
         default:

@@ -1,14 +1,36 @@
-import { DefaultTheme } from 'styled-components';
-import { darken } from 'polished';
+import { css, DefaultTheme } from 'styled-components';
 
-type Options = {
+type InputColorOptions = {
     checked?: boolean;
     disabled?: boolean;
 };
 
-export const getInputColor = (theme: DefaultTheme, { checked, disabled }: Options) => {
-    if (!checked) {
-        return theme.STROKE_GREY;
-    }
-    return disabled ? darken(theme.DARKEN_20_PERCENT_FILTER, theme.STROKE_GREY) : theme.BG_GREEN;
+type LabelColorOptions = {
+    disabled?: boolean;
+    alert?: boolean;
 };
+
+export const getInputColor = (theme: DefaultTheme, { checked, disabled }: InputColorOptions) => {
+    if (!checked) {
+        return theme.backgroundNeutralDisabled;
+    }
+
+    return disabled ? theme.backgroundPrimarySubtleOnElevation0 : theme.backgroundPrimaryDefault;
+};
+
+export const getLabelColor = (theme: DefaultTheme, { alert, disabled }: LabelColorOptions) => {
+    if (alert) {
+        return theme.borderAlertRed;
+    }
+
+    return disabled ? theme.textDisabled : theme.textDefault;
+};
+
+export const focusStyleTransition = 'box-shadow 0.1s ease-out, border-color 0.1s ease-out';
+
+export const getFocusShadowStyle = (selector = ':focus-visible') => css`
+    ${selector} {
+        border-color: ${({ theme }) => theme.backgroundAlertBlueBold};
+        box-shadow: ${({ theme }) => theme.boxShadowFocused};
+    }
+`;

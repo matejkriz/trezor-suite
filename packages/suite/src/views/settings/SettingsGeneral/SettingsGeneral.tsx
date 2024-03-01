@@ -22,7 +22,7 @@ import { Theme } from './Theme';
 import { Analytics } from './Analytics';
 import { ShowApplicationLog } from './ShowApplicationLog';
 import { ClearStorage } from './ClearStorage';
-import { VersionWithUpdate } from './VersionWithUpdate/VersionWithUpdate';
+import { VersionWithUpdate } from './VersionWithUpdate';
 import { EarlyAccess } from './EarlyAccess';
 import { BitcoinAmountUnit } from './BitcoinAmountUnit';
 import { DesktopSuiteBanner } from './DesktopSuiteBanner';
@@ -37,7 +37,6 @@ export const SettingsGeneral = () => {
     const enabledNetworks = useSelector(selectEnabledNetworks);
     const desktopUpdate = useSelector(state => state.desktopUpdate);
     const metadata = useSelector(state => state.metadata);
-
     const { isMobileLayout } = useLayoutSize();
 
     const hasBitcoinNetworks = NETWORKS.some(

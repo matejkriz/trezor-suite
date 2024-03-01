@@ -1,7 +1,7 @@
 import { Dimensions, Platform } from 'react-native';
-import Config from 'react-native-config';
 
 import { getLocales } from 'expo-localization';
+import Constants from 'expo-constants';
 
 import { EnvUtils } from './types';
 
@@ -25,9 +25,9 @@ const getDeviceType = () => '';
 
 const getOsVersion = () => `${Platform.Version}`;
 
-const getSuiteVersion = () => Config.VERSION || '';
+const getSuiteVersion = () => Constants.expoConfig?.version || '';
 
-const getCommitHash = () => Config.COMMIT_HASH || '';
+const getCommitHash = () => Constants.expoConfig?.extra?.commitHash;
 
 const isFirefox = () => false;
 
@@ -60,7 +60,7 @@ const isAndroid = () => getPlatform() === 'android';
 
 const isLinux = () => false;
 
-const isCodesignBuild = () => Config.CODESIGN_BUILD === 'true';
+const isCodesignBuild = () => process.env.EXPO_PUBLIC_CODESIGN_BUILD === 'true';
 
 const getPlatformLanguages = () => getLocales().map(language => language.languageTag);
 

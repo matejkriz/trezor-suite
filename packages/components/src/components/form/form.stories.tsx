@@ -1,6 +1,7 @@
 import styled from 'styled-components';
+import { Meta, StoryObj } from '@storybook/react';
 
-import { Input, Textarea, Select, Checkbox, RadioButton, Switch, Button, Range } from '../../index';
+import { Input, Textarea, Select, Checkbox, Radio, Switch, Button, Range } from '../../index';
 import { StoryColumn } from '../../support/Story';
 
 const Heading = styled.h2``;
@@ -28,9 +29,9 @@ const SELECT_OPTIONS = [
 
 export default {
     title: 'Form/All',
-};
+} as Meta;
 
-export const All = {
+export const All: StoryObj = {
     render: () => (
         <>
             <StoryColumn minWidth={520}>
@@ -53,19 +54,14 @@ export const All = {
                         />
                     }
                 />
-                <Input variant="small" value="Small input" dataTest="input-default-small" />
+                <Input size="small" value="Small input" dataTest="input-default-small" />
                 <Input inputState="error" value="Input with error" dataTest="input-default-error" />
                 <Input
                     inputState="warning"
                     value="Input with warning"
                     dataTest="input-default-warning"
                 />
-                <Input
-                    inputState="success"
-                    value="Input with success"
-                    dataTest="input-default-success"
-                />
-                <Input disabled value="Disabled input" dataTest="input-default-disabled" />
+                <Input isDisabled value="Disabled input" dataTest="input-default-disabled" />
                 <SubHeading>Monospace with button</SubHeading>
                 <Input
                     value="0x3Ebf31732F5A987b4f130Eb359B0975EBcbd68c8"
@@ -75,12 +71,11 @@ export const All = {
                 <Input
                     value="0x3Ebf31732F5A987b4f130Eb359B0975EBcbd68c8"
                     dataTest="input-block-monospace-hidden"
-                    isPartiallyHidden
                 />
                 <SubHeading>With label &amp; bottom text</SubHeading>
                 <Input value="Input label" dataTest="input-label" bottomText="bottom text" />
                 <Input
-                    variant="small"
+                    size="small"
                     value="Small input label"
                     dataTest="input-small-label"
                     bottomText="bottom text"
@@ -96,34 +91,14 @@ export const All = {
                     value="Input label with warning"
                     dataTest="input-warning-label"
                     bottomText="bottom text"
-                    labelAddon={
+                    labelHoverAddon={
                         <Button variant="tertiary" icon="QR" onClick={() => {}}>
                             Scan QR code
                         </Button>
                     }
                 />
                 <Input
-                    inputState="success"
-                    value="Input label with success"
-                    dataTest="input-success-label"
-                    bottomText="bottom text"
-                    labelAddonIsVisible
-                    label={<Label>Label left</Label>}
-                    labelRight={<Label>Label right</Label>}
-                    labelAddon={
-                        <Button
-                            variant="tertiary"
-                            icon="QR"
-                            onClick={() => {
-                                console.log('aaa');
-                            }}
-                        >
-                            Scan QR code
-                        </Button>
-                    }
-                />
-                <Input
-                    disabled
+                    isDisabled
                     value="Disabled input label"
                     dataTest="input-disabled-label"
                     label={<Label>label</Label>}
@@ -133,44 +108,32 @@ export const All = {
             <StoryColumn minWidth={300} maxWidth={400}>
                 <Heading>Textarea</Heading>
                 <SubHeading>Default</SubHeading>
-                <Textarea value="test value" wrapperProps={{ 'data-test': 'textarea-default' }} />
-                <Textarea
-                    value="test value"
-                    inputState="success"
-                    wrapperProps={{ 'data-test': 'textarea-success' }}
-                    label="Top label"
-                    bottomText="bottom text"
-                />
+                <Textarea value="test value" />
                 <Textarea
                     value="test value"
                     inputState="warning"
-                    wrapperProps={{ 'data-test': 'textarea-warning' }}
                     label="Top label"
                     bottomText="bottom text"
                 />
                 <Textarea
                     value="test value"
                     inputState="error"
-                    wrapperProps={{ 'data-test': 'textarea-error' }}
                     label="Top label"
                     bottomText="bottom text"
                 />
-                <Textarea
-                    wrapperProps={{ 'data-test': 'textarea-label' }}
-                    label="Top label"
-                    bottomText="bottom text"
-                />
-                <Textarea
-                    value="test value"
-                    disabled
-                    wrapperProps={{ 'data-test': 'textarea-disabled' }}
-                />
+                <Textarea label="Top label" bottomText="bottom text" />
+                <Textarea value="test value" disabled />
             </StoryColumn>
             <StoryColumn maxWidth={200}>
                 <Heading>Switch</Heading>
 
                 <SubHeading>Off</SubHeading>
-                <Switch dataTest="switch-off" onChange={() => {}} isChecked={false} />
+                <Switch
+                    dataTest="switch-off"
+                    onChange={() => {}}
+                    isChecked={false}
+                    label="Headline"
+                />
 
                 <SubHeading>Off disabled</SubHeading>
                 <Switch
@@ -178,16 +141,35 @@ export const All = {
                     isDisabled
                     onChange={() => {}}
                     isChecked={false}
+                    label="Headline"
                 />
 
                 <SubHeading>On</SubHeading>
-                <Switch isChecked onChange={() => {}} isDisabled dataTest="switch-on" />
+                <Switch
+                    isChecked
+                    onChange={() => {}}
+                    isDisabled
+                    dataTest="switch-on"
+                    label="Headline"
+                />
 
                 <SubHeading>On disabled</SubHeading>
-                <Switch dataTest="switch-on-disabled" isDisabled onChange={() => {}} isChecked />
+                <Switch
+                    dataTest="switch-on-disabled"
+                    isDisabled
+                    onChange={() => {}}
+                    isChecked
+                    label="Headline"
+                />
 
                 <SubHeading>Off small</SubHeading>
-                <Switch onChange={() => {}} isChecked={false} isSmall dataTest="switch-off-small" />
+                <Switch
+                    onChange={() => {}}
+                    isChecked={false}
+                    isSmall
+                    dataTest="switch-off-small"
+                    label="Headline"
+                />
 
                 <SubHeading>Off small disabled</SubHeading>
                 <Switch
@@ -196,10 +178,17 @@ export const All = {
                     isChecked={false}
                     isSmall
                     dataTest="switch-off-small-disabled"
+                    label="Headline"
                 />
 
                 <SubHeading>On small</SubHeading>
-                <Switch onChange={() => {}} isChecked isSmall dataTest="switch-on-small" />
+                <Switch
+                    onChange={() => {}}
+                    isChecked
+                    isSmall
+                    dataTest="switch-on-small"
+                    label="Headline"
+                />
 
                 <SubHeading>On small disabled</SubHeading>
                 <Switch
@@ -208,6 +197,45 @@ export const All = {
                     isChecked
                     isSmall
                     dataTest="switch-on-small-disabled"
+                    label="Headline"
+                />
+
+                <SubHeading>Off alert</SubHeading>
+                <Switch
+                    onChange={() => {}}
+                    isChecked={false}
+                    isAlert
+                    dataTest="switch-off-alert"
+                    label="Headline"
+                />
+
+                <SubHeading>Off alert disabled</SubHeading>
+                <Switch
+                    isDisabled
+                    onChange={() => {}}
+                    isChecked={false}
+                    isAlert
+                    dataTest="switch-off-alert-disabled"
+                    label="Headline"
+                />
+
+                <SubHeading>On alert</SubHeading>
+                <Switch
+                    onChange={() => {}}
+                    isChecked
+                    isAlert
+                    dataTest="switch-on-alert"
+                    label="Headline"
+                />
+
+                <SubHeading>On alert disabled</SubHeading>
+                <Switch
+                    isDisabled
+                    onChange={() => {}}
+                    isChecked
+                    isAlert
+                    dataTest="switch-on-alert-disabled"
+                    label="Headline"
                 />
             </StoryColumn>
             <StoryColumn maxWidth={200}>
@@ -224,23 +252,17 @@ export const All = {
             <StoryColumn maxWidth={200}>
                 <Heading>Radio Buttons</Heading>
                 <SubHeading>Unchecked</SubHeading>
-                <RadioButton onClick={() => {}} data-test="radio-button">
+                <Radio onClick={() => {}} data-test="radio-button">
                     Label
-                </RadioButton>
+                </Radio>
                 <SubHeading>Checked</SubHeading>
-                <RadioButton onClick={() => {}} isChecked data-test="radio-button-checked">
+                <Radio onClick={() => {}} isChecked data-test="radio-button-checked">
                     Label
-                </RadioButton>
+                </Radio>
             </StoryColumn>
             <StoryColumn maxWidth={200}>
                 <Heading>Select</Heading>
-                <Select
-                    options={SELECT_OPTIONS}
-                    label="Not selected"
-                    wrapperProps={{
-                        'data-test': 'select',
-                    }}
-                />
+                <Select options={SELECT_OPTIONS} label="Not selected" />
                 <Select
                     options={SELECT_OPTIONS}
                     value={{
@@ -248,9 +270,6 @@ export const All = {
                         value: 'value-one',
                     }}
                     label="Selected"
-                    wrapperProps={{
-                        'data-test': 'select-selected',
-                    }}
                 />
                 <Select
                     options={SELECT_OPTIONS}
@@ -259,19 +278,10 @@ export const All = {
                         value: 'value-one',
                     }}
                     label="Small"
-                    wrapperProps={{
-                        'data-test': 'select-small',
-                    }}
-                    variant="small"
+                    size="small"
                 />
 
-                <Select
-                    isDisabled
-                    label="Disabled"
-                    wrapperProps={{
-                        'data-test': 'select-disabled',
-                    }}
-                />
+                <Select isDisabled label="Disabled" />
             </StoryColumn>
             <StoryColumn>
                 <Heading>Range</Heading>

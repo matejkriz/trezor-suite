@@ -1,4 +1,3 @@
-/* eslint-disable max-classes-per-file */
 import TinyWorker from 'tiny-worker';
 import BlockchainLink from '../../src';
 
@@ -113,12 +112,14 @@ describe('Worker', () => {
                     const blob = new Blob([js], {
                         type: 'application/javascript',
                     });
+
                     return new Worker(URL.createObjectURL(blob));
                 }
+
                 return new TinyWorker(() => {
                     setTimeout(() => {
                         // @ts-expect-error self is not typed
-                        // eslint-disable-next-line no-restricted-globals
+
                         self.onerror(new Error('runtime error'));
                     }, 100);
                 });
@@ -157,15 +158,16 @@ describe('Worker', () => {
                     const blob = new Blob([js], {
                         type: 'application/javascript',
                     });
+
                     return new Worker(URL.createObjectURL(blob));
                 }
+
                 return new TinyWorker(() => {
-                    // eslint-disable-next-line no-restricted-globals
                     self.onmessage = () => {
                         // @ts-expect-error undefined "x"
                         const r = 1 / x;
                     };
-                    // eslint-disable-next-line no-restricted-globals
+
                     self.postMessage({ type: 'm_handshake' });
                 });
             };

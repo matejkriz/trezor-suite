@@ -6,7 +6,7 @@ import { Translation } from 'src/components/suite';
 const Wrapper = styled.div`
     display: flex;
     align-items: center;
-    min-height: 32px; /* Input height */
+    min-height: 36px; /* Input height */
     margin-top: 16px;
 `;
 
@@ -15,6 +15,11 @@ const Label = styled.span`
     color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
     font-size: ${variables.FONT_SIZE.SMALL};
     font-weight: ${variables.FONT_WEIGHT.MEDIUM};
+    white-space: nowrap;
+`;
+
+const StyledInput = styled(Input)`
+    width: 120px;
 `;
 
 interface DelimiterFormProps {
@@ -36,7 +41,6 @@ export const DelimiterForm = ({ value, onChange }: DelimiterFormProps) => {
     return (
         <Wrapper>
             <Switch
-                isSmall
                 onChange={() => {
                     if (custom) {
                         // reset delimiter value in parent component
@@ -56,12 +60,8 @@ export const DelimiterForm = ({ value, onChange }: DelimiterFormProps) => {
                 />
             </Label>
             {custom && (
-                <Input
-                    noTopLabel
-                    noError
-                    variant="small"
-                    isMonospace
-                    width={120}
+                <StyledInput
+                    size="small"
                     onChange={({ target }) => onChange(target.value)}
                     defaultValue={value}
                     innerRef={inputRef}

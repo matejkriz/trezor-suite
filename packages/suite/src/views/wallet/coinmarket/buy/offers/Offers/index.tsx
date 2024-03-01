@@ -1,17 +1,14 @@
 import styled from 'styled-components';
 
-import {
-    CoinmarketFooter,
-    CoinmarketBuyTopPanel,
-    NoOffers,
-} from 'src/views/wallet/coinmarket/common';
+import { CoinmarketFooter, NoOffers } from 'src/views/wallet/coinmarket/common';
 import { variables } from '@trezor/components';
 import { Translation } from 'src/components/suite';
 import { useLayout } from 'src/hooks/suite';
 import { useCoinmarketBuyOffersContext } from 'src/hooks/wallet/useCoinmarketBuyOffers';
 import { useCoinmarketNavigation } from 'src/hooks/wallet/useCoinmarketNavigation';
-import List from './List';
+import { PageHeader } from 'src/components/suite/layouts/SuiteLayout';
 import SelectedOffer from './SelectedOffer';
+import { BuyQuoteList } from './List/BuyQuoteList';
 
 const Wrapper = styled.div`
     padding: 16px 32px 32px;
@@ -66,10 +63,11 @@ const Offers = () => {
         useCoinmarketBuyOffersContext();
     const { navigateToBuyForm } = useCoinmarketNavigation(account);
 
-    useLayout('Trezor Suite | Trade', CoinmarketBuyTopPanel);
+    useLayout('Trezor Suite | Trade', () => <PageHeader backRoute="wallet-coinmarket-buy" />);
 
     const hasLoadingFailed = !(quotes && alternativeQuotes);
     const noOffers = hasLoadingFailed || (quotes.length === 0 && alternativeQuotes.length === 0);
+
     return (
         <Wrapper>
             {!selectedQuote && (
@@ -84,7 +82,7 @@ const Offers = () => {
                         />
                     ) : (
                         <>
-                            <List quotes={quotes} />
+                            {quotes.length > 0 && <BuyQuoteList quotes={quotes} />}
                             {alternativeQuotes.length > 0 && (
                                 <>
                                     <Divider>
@@ -95,7 +93,7 @@ const Offers = () => {
                                         </DividerMiddle>
                                         <DividerRight />
                                     </Divider>
-                                    <List isAlternative quotes={alternativeQuotes} />
+                                    <BuyQuoteList isAlternative quotes={alternativeQuotes} />
                                 </>
                             )}
                         </>

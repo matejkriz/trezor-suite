@@ -6,15 +6,14 @@ import {
     getAccountTypeUrl,
     getAccountTypeDesc,
 } from '@suite-common/wallet-utils';
-import { P, variables } from '@trezor/components';
+import { Paragraph, variables, Card } from '@trezor/components';
 
-import { ActionButton, ActionColumn, Card, TextColumn, Translation } from 'src/components/suite';
+import { ActionButton, ActionColumn, TextColumn, Translation } from 'src/components/suite';
 
 import { HELP_CENTER_BIP32_URL, HELP_CENTER_XPUB_URL } from '@trezor/urls';
 import { showXpub } from 'src/actions/wallet/publicKeyActions';
 import { WalletLayout } from 'src/components/wallet';
 import { NETWORKS } from 'src/config/wallet';
-import { CARD_PADDING_SIZE } from 'src/constants/suite/layout';
 import { useDevice, useDispatch, useSelector } from 'src/hooks/suite';
 import { CoinjoinLogs } from './CoinjoinLogs';
 import { CoinjoinSetup } from './CoinjoinSetup/CoinjoinSetup';
@@ -48,16 +47,18 @@ const AccountTypeLabel = styled.div`
 
 const StyledCard = styled(Card)`
     flex-direction: column;
-    padding-top: ${CARD_PADDING_SIZE};
-    padding-bottom: ${CARD_PADDING_SIZE};
 
-    :first-child {
+    > :first-child {
         padding-top: 0;
     }
 
-    :last-child {
+    > :last-child {
         padding-bottom: 0;
     }
+`;
+
+const StyledActionButton = styled(ActionButton)`
+    min-width: 170px;
 `;
 
 const NoWrap = styled.span`
@@ -109,7 +110,7 @@ const Details = () => {
                     </>
                 )}
 
-                <StyledCard largePadding>
+                <StyledCard>
                     <Row>
                         <TextColumn
                             title={<Translation id="TR_ACCOUNT_DETAILS_TYPE_HEADER" />}
@@ -118,15 +119,15 @@ const Details = () => {
                         />
                         <AccountTypeLabel>
                             {accountTypeName && (
-                                <P size="small" weight="medium">
+                                <Paragraph type="hint">
                                     <NoWrap>
                                         <Translation id={accountTypeName} />
                                     </NoWrap>
-                                </P>
+                                </Paragraph>
                             )}
-                            <P size="tiny">
+                            <Paragraph type="label">
                                 (<Translation id={accountTypeTech} />)
-                            </P>
+                            </Paragraph>
                         </AccountTypeLabel>
                     </Row>
                     <Row>
@@ -136,9 +137,7 @@ const Details = () => {
                             buttonLink={HELP_CENTER_BIP32_URL}
                         />
                         <AccountTypeLabel>
-                            <P size="small" weight="medium">
-                                {account.path}
-                            </P>
+                            <Paragraph type="hint">{account.path}</Paragraph>
                         </AccountTypeLabel>
                     </Row>
                     {!isCoinjoinAccount ? (
@@ -149,7 +148,7 @@ const Details = () => {
                                 buttonLink={HELP_CENTER_XPUB_URL}
                             />
                             <ActionColumn>
-                                <ActionButton
+                                <StyledActionButton
                                     variant="secondary"
                                     data-test="@wallets/details/show-xpub-button"
                                     onClick={handleXpubClick}
@@ -157,7 +156,7 @@ const Details = () => {
                                     isLoading={locked}
                                 >
                                     <Translation id="TR_ACCOUNT_DETAILS_XPUB_BUTTON" />
-                                </ActionButton>
+                                </StyledActionButton>
                             </ActionColumn>
                         </Row>
                     ) : (

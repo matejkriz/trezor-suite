@@ -18,6 +18,7 @@ import {
     getCommitHash,
     getSuiteVersion,
 } from '@trezor/env-utils';
+import { spacingsPx } from '@trezor/theme';
 
 const Headline = styled.div`
     font-size: ${variables.FONT_SIZE.TINY};
@@ -77,6 +78,10 @@ const AnonymousDataItem = styled.li`
     font-size: ${variables.FONT_SIZE.SMALL};
     font-weight: ${variables.FONT_WEIGHT.MEDIUM};
     color: ${({ theme }) => theme.TYPE_DARK_GREY};
+`;
+
+const StyledTextarea = styled(Textarea)`
+    margin-bottom: ${spacingsPx.md};
 `;
 
 type RatingItem = {
@@ -280,13 +285,12 @@ export const Feedback = ({ type }: FeedbackProps) => {
                     </Headline>
                 )}
 
-                <Textarea
+                <StyledTextarea
                     rows={8}
                     value={description}
                     onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
                         setDescription(e.target.value)
                     }
-                    noTopLabel
                     characterCount
                     data-test="@guide/feedback/suggestion-form"
                     maxLength={MESSAGE_CHARACTER_LIMIT}
@@ -305,9 +309,8 @@ export const Feedback = ({ type }: FeedbackProps) => {
                 </Submit>
 
                 <CollapsibleBox
-                    heading={<Translation id="TR_GUIDE_FEEDBACK_SYSTEM_INFO_NOTICE" />}
-                    headerJustifyContent="center"
-                    variant="tiny"
+                    subHeading={<Translation id="TR_GUIDE_FEEDBACK_SYSTEM_INFO_NOTICE" />}
+                    variant="small"
                 >
                     <AnonymousDataList>
                         <AnonymousDataItem>

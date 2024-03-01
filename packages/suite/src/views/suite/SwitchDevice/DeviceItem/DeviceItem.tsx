@@ -1,15 +1,10 @@
 import { useState } from 'react';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import styled from 'styled-components';
-import {
-    useTheme,
-    variables,
-    Icon,
-    Image,
-    motionAnimation,
-    DeviceAnimation,
-} from '@trezor/components';
+import styled, { useTheme } from 'styled-components';
+import { variables, Icon, Image, motionAnimation, DeviceAnimation } from '@trezor/components';
+import { DeviceModelInternal } from '@trezor/connect';
+import * as deviceUtils from '@suite-common/suite-utils';
 
 import {
     selectDevice,
@@ -29,8 +24,8 @@ import { DeviceHeaderButton } from './DeviceHeaderButton';
 
 import type { TrezorDevice, AcquiredDevice, ForegroundAppProps } from 'src/types/suite';
 import type { getBackgroundRoute } from 'src/utils/suite/router';
-import { DeviceModelInternal } from '@trezor/connect';
-import * as deviceUtils from '@suite-common/suite-utils';
+import { spacingsPx } from '@trezor/theme';
+import { DeviceStatusText } from './DeviceStatusText';
 
 const DeviceWrapper = styled.div`
     display: flex;
@@ -38,7 +33,7 @@ const DeviceWrapper = styled.div`
     width: 100%;
 
     & + & {
-        margin-top: 50px;
+        margin-top: ${spacingsPx.xxxl};
     }
 `;
 
@@ -51,14 +46,6 @@ const DeviceTitle = styled.span`
     font-size: ${variables.FONT_SIZE.NORMAL};
     font-weight: ${variables.FONT_WEIGHT.MEDIUM};
     color: ${({ theme }) => theme.TYPE_DARK_GREY};
-`;
-
-const DeviceStatus = styled.span<{ color: string }>`
-    font-size: ${variables.FONT_SIZE.TINY};
-    font-weight: 600;
-    text-transform: uppercase;
-    color: ${({ color }) => color};
-    margin-bottom: 2px;
 `;
 
 const DeviceActions = styled.div`
@@ -118,16 +105,16 @@ const DeviceImageWrapper = styled.div`
     margin-right: 16px;
 `;
 
-const ExpandIcon = styled(Icon)`
+const ExpandIcon = styled(Icon)<{ isActive: boolean }>`
     margin-left: 24px;
+
+    transform: ${({ isActive }) => (isActive ? 'rotate(0deg)' : 'rotate(180deg)')};
 `;
 
 // TODO: this is going to be a problem with different col headers length since they won't be aligned with the columns inside WalletInstance
-const ColRememberHeader = styled(ColHeader)`
-    margin: 0 24px;
-`;
+const ColRememberHeader = styled(ColHeader)``;
 const ColEjectHeader = styled(ColHeader)`
-    margin: 0 24px;
+    margin: 0 20px 0 32px;
 `;
 
 const StyledImage = styled(Image)`
@@ -150,7 +137,6 @@ export const DeviceItem = ({ device, instances, onCancel, backgroundRoute }: Dev
 
     const theme = useTheme();
     const [isExpanded, setIsExpanded] = useState(true);
-    const [animateArrow, setAnimateArrow] = useState(false);
 
     const deviceStatus = deviceUtils.getStatus(device);
     const deviceModelInternal = device.features?.internal_model;
@@ -218,7 +204,8 @@ export const DeviceItem = ({ device, instances, onCancel, backgroundRoute }: Dev
                             {deviceModelInternal === DeviceModelInternal.T2B1 && (
                                 <DeviceAnimation
                                     type="ROTATE"
-                                    size={36}
+                                    height="36px"
+                                    width="36px"
                                     deviceModelInternal={deviceModelInternal}
                                     deviceUnitColor={device?.features?.unit_color}
                                 />
@@ -229,21 +216,8 @@ export const DeviceItem = ({ device, instances, onCancel, backgroundRoute }: Dev
                         </DeviceImageWrapper>
                     )}
                     <Col grow={1}>
-                        <DeviceStatus
-                            color={device.connected ? theme.TYPE_GREEN : theme.TYPE_RED}
-                            data-test={
-                                device.connected
-                                    ? '@deviceStatus-connected'
-                                    : '@deviceStatus-disconnected'
-                            }
-                        >
-                            {device.connected ? (
-                                <Translation id="TR_CONNECTED" />
-                            ) : (
-                                <Translation id="TR_DISCONNECTED" />
-                            )}
-                        </DeviceStatus>
                         <DeviceTitle>{device.label}</DeviceTitle>
+                        <DeviceStatusText device={device} />
                     </Col>
 
                     <DeviceActions>
@@ -260,12 +234,8 @@ export const DeviceItem = ({ device, instances, onCancel, backgroundRoute }: Dev
                                 icon="ARROW_UP"
                                 color={theme.TYPE_LIGHT_GREY}
                                 hoverColor={theme.TYPE_LIGHTER_GREY}
-                                canAnimate={animateArrow}
                                 isActive={!isExpanded}
-                                onClick={() => {
-                                    setIsExpanded(!isExpanded);
-                                    setAnimateArrow(true);
-                                }}
+                                onClick={() => setIsExpanded(!isExpanded)}
                             />
                         )}
                     </DeviceActions>

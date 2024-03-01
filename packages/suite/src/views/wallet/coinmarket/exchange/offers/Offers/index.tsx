@@ -2,18 +2,19 @@ import styled from 'styled-components';
 import invityAPI from 'src/services/suite/invityAPI';
 import { FormattedCryptoAmount, Translation } from 'src/components/suite';
 import {
-    CoinmarketExchangeTopPanel,
     CoinmarketFooter,
     CoinmarketRefreshTime,
     NoOffers,
 } from 'src/views/wallet/coinmarket/common';
-import { variables, Icon, CoinLogo, H2 } from '@trezor/components';
+import { variables, Icon, H2 } from '@trezor/components';
 import { useLayout } from 'src/hooks/suite';
 import { useCoinmarketExchangeOffersContext } from 'src/hooks/wallet/useCoinmarketExchangeOffers';
 import { useCoinmarketNavigation } from 'src/hooks/wallet/useCoinmarketNavigation';
 import { InvityAPIReloadQuotesAfterSeconds } from 'src/constants/wallet/coinmarket/metadata';
-import List from './List';
+import { cryptoToCoinSymbol } from 'src/utils/wallet/coinmarket/cryptoSymbolUtils';
+import { PageHeader } from 'src/components/suite/layouts/SuiteLayout';
 import SelectedOffer from './SelectedOffer';
+import { ExchangeQuoteList } from './List/ExchangeQuoteList';
 
 const Wrapper = styled.div`
     padding: 0 32px 32px;
@@ -73,12 +74,8 @@ const Right = styled.div`
     }
 `;
 
-const StyledCoinLogo = styled(CoinLogo)`
-    padding: 0 10px 0 0;
-`;
-
 const InvityCoinLogo = styled.img`
-    height: 18px;
+    height: 21px;
     padding: 0 10px 0 0;
 `;
 
@@ -95,13 +92,14 @@ const Offers = () => {
     } = useCoinmarketExchangeOffersContext();
     const { navigateToExchangeForm } = useCoinmarketNavigation(account);
 
-    useLayout('Trezor Suite | Trade', CoinmarketExchangeTopPanel);
+    useLayout('Trezor Suite | Trade', () => <PageHeader backRoute="wallet-coinmarket-exchange" />);
 
     if (!quotesRequest) return null;
     const hasLoadingFailed = !(fixedQuotes && floatQuotes && dexQuotes);
     const noOffers =
         hasLoadingFailed ||
         (fixedQuotes.length === 0 && floatQuotes.length === 0 && dexQuotes.length === 0);
+
     return (
         <Wrapper>
             {!selectedQuote && (
@@ -119,20 +117,24 @@ const Offers = () => {
                             <Header>
                                 <SummaryRow>
                                     <Left>
-                                        <StyledCoinLogo size={21} symbol={account.symbol} />
+                                        <InvityCoinLogo
+                                            src={invityAPI.getCoinLogoUrl(
+                                                cryptoToCoinSymbol(quotesRequest.send),
+                                            )}
+                                        />
                                         <Text>
                                             <FormattedCryptoAmount
                                                 value={quotesRequest.sendStringAmount}
-                                                symbol={quotesRequest.send}
+                                                symbol={cryptoToCoinSymbol(quotesRequest.send)}
                                             />
                                         </Text>
                                         <StyledIcon icon="ARROW_RIGHT_LONG" />
                                         <InvityCoinLogo
-                                            src={`${invityAPI.getApiServerUrl()}/images/coins/suite/${
-                                                quotesRequest.receive
-                                            }.svg`}
+                                            src={invityAPI.getCoinLogoUrl(
+                                                cryptoToCoinSymbol(quotesRequest.receive),
+                                            )}
                                         />
-                                        <Text>{quotesRequest.receive}</Text>
+                                        <Text>{cryptoToCoinSymbol(quotesRequest.receive)}</Text>
                                     </Left>
                                     {!timer.isStopped && (
                                         <Right>
@@ -148,9 +150,15 @@ const Offers = () => {
                                     )}
                                 </SummaryRow>
                             </Header>
-                            {dexQuotes.length > 0 && <List quotes={dexQuotes} type="dex" />}
-                            {fixedQuotes.length > 0 && <List quotes={fixedQuotes} type="fixed" />}
-                            {floatQuotes.length > 0 && <List quotes={floatQuotes} type="float" />}
+                            {dexQuotes.length > 0 && (
+                                <ExchangeQuoteList quotes={dexQuotes} type="dex" />
+                            )}
+                            {fixedQuotes.length > 0 && (
+                                <ExchangeQuoteList quotes={fixedQuotes} type="fixed" />
+                            )}
+                            {floatQuotes.length > 0 && (
+                                <ExchangeQuoteList quotes={floatQuotes} type="float" />
+                            )}
                         </>
                     )}
                 </>

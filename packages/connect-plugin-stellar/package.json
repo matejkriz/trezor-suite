@@ -18,29 +18,28 @@
         "stellar"
     ],
     "sideEffects": false,
-    "main": "lib/index.js",
+    "main": "src/index.ts",
+    "publishConfig": {
+        "main": "lib/index.js"
+    },
     "files": [
         "lib/"
     ],
     "peerDependencies": {
+        "@stellar/stellar-sdk": "^11.2.2",
         "@trezor/connect": "9.x.x",
-        "stellar-sdk": "^v11.0.0-beta.3",
         "tslib": "^2.6.2"
     },
     "devDependencies": {
-        "jest": "29.5.0",
-        "rimraf": "^5.0.5",
-        "stellar-base": "v10.0.0-beta.2",
-        "stellar-sdk": "^v11.0.0-beta.3",
-        "typescript": "5.3.2"
+        "@stellar/stellar-sdk": "^11.2.2"
     },
     "dependencies": {
-        "bignumber.js": "^9.1.1"
+        "bignumber.js": "^9.1.2"
     },
     "scripts": {
         "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "test:unit": "jest -c ../../jest.config.base.js --passWithNoTests",
-        "type-check": "tsc --build tsconfig.json",
-        "build:lib": "rimraf ./lib && yarn tsc --build tsconfig.lib.json"
+        "test:unit": "jest -c ../../jest.config.base.js",
+        "type-check": "yarn g:tsc --build tsconfig.json",
+        "build:lib": "yarn g:rimraf ./lib && yarn g:tsc --build tsconfig.lib.json"
     }
 }

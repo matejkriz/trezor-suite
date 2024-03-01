@@ -67,6 +67,7 @@ export const composeTransaction =
             ? formValues.selectedUtxos?.map(u => ({ ...u, required: true }))
             : account.utxo.filter(u => {
                   const outpoint = getUtxoOutpoint(u);
+
                   return (u as any).required || (!excludedUtxos?.[outpoint] && !prison?.[outpoint]);
               });
 
@@ -105,6 +106,7 @@ export const composeTransaction =
                     error: response.payload.error,
                 }),
             );
+
             return;
         }
 
@@ -157,6 +159,7 @@ export const composeTransaction =
         // format errorMessage and catch unexpected error (other than AMOUNT_IS_NOT_ENOUGH)
         Object.keys(wrappedResponse).forEach(key => {
             const tx = wrappedResponse[key];
+
             if (tx.type !== 'error') {
                 // round to
                 tx.feePerByte = new BigNumber(tx.feePerByte).decimalPlaces(2).toString();
@@ -174,6 +177,7 @@ export const composeTransaction =
                     if (isLowAnonymity && !formValues.isCoinControlEnabled) {
                         return 'TR_NOT_ENOUGH_ANONYMIZED_FUNDS_WARNING';
                     }
+
                     return formValues.isCoinControlEnabled
                         ? 'TR_NOT_ENOUGH_SELECTED'
                         : 'AMOUNT_IS_NOT_ENOUGH';
@@ -250,6 +254,7 @@ export const signTransaction =
                 if (utxo[i]) {
                     return { ...input, orig_index: i, orig_hash: txid };
                 }
+
                 return input;
             });
             // NOTE: Rearranging of original outputs is not supported by the FW. Restoring original order.
@@ -301,6 +306,7 @@ export const signTransaction =
                     error: response.payload.error,
                 }),
             );
+
             return;
         }
 

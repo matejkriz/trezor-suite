@@ -8,8 +8,8 @@ import styled from 'styled-components';
 export const Row = styled.div`
     position: relative;
     display: flex;
-    align-items: flex-start;
     justify-content: center;
+    align-items: center;
 
     & + & {
         padding-top: 12px;
@@ -64,7 +64,7 @@ export const ButtonRow = ({
                     <StyledButton
                         variant="secondary"
                         icon="REFRESH"
-                        size={20}
+                        iconSize={20}
                         onClick={e => {
                             e.preventDefault();
                             resetForm();
@@ -77,7 +77,7 @@ export const ButtonRow = ({
                         <StyledButton
                             variant={isCompleteHovered ? 'primary' : 'secondary'}
                             icon={isCompleteHovered ? undefined : 'CHECK'}
-                            size={20}
+                            iconSize={20}
                             onClick={() => closeScreen(true)}
                             onMouseOver={() => {
                                 setIsCompleteHovered(true);
@@ -94,7 +94,7 @@ export const ButtonRow = ({
                         <StyledButton
                             variant={isCompleteHovered ? 'primary' : 'secondary'}
                             icon={isCompleteHovered ? undefined : 'CHECK'}
-                            size={20}
+                            iconSize={20}
                             onClick={() => closeScreen()}
                             onMouseOver={() => {
                                 setIsCompleteHovered(true);
@@ -113,7 +113,7 @@ export const ButtonRow = ({
                 <StyledButton
                     type="submit"
                     variant="primary"
-                    size={20}
+                    iconSize={20}
                     isDisabled={isTrezorLocked}
                     isLoading={isSubmitting}
                     data-test="@sign-verify/submit"

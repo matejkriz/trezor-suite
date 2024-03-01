@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import styled from 'styled-components';
 
-import { analytics, EventType } from '@trezor/suite-analytics';
 import { DeviceModelInternal } from '@trezor/connect';
 import { HOMESCREEN_EDITOR_URL } from '@trezor/urls';
 
@@ -12,7 +11,7 @@ import {
     TextColumn,
     Translation,
 } from 'src/components/suite';
-import { Tooltip, variables } from '@trezor/components';
+import { Button, ButtonGroup, Tooltip, variables } from '@trezor/components';
 import { useDevice, useDispatch } from 'src/hooks/suite';
 import { openModal } from 'src/actions/suite/modalActions';
 import { applySettings } from 'src/actions/settings/deviceSettingsActions';
@@ -22,19 +21,10 @@ import {
     fileToDataUrl,
     ImageValidationError,
     validateImage,
-    dataUrlToImage,
     isHomescreenSupportedOnDevice,
 } from 'src/utils/suite/homescreen';
 import { useAnchor } from 'src/hooks/suite/useAnchor';
 import { SettingsAnchor } from 'src/constants/suite/anchors';
-
-const StyledActionButton = styled(ActionButton)`
-    &:not(:first-of-type) {
-        @media (max-width: ${variables.SCREEN_SIZE.SM}) {
-            margin-top: 10px;
-        }
-    }
-`;
 
 const HiddenInput = styled.input`
     display: none;
@@ -49,20 +39,6 @@ const ValidationMessage = styled.div`
     font-size: ${variables.FONT_SIZE.NORMAL};
     font-weight: ${variables.FONT_WEIGHT.MEDIUM};
 `;
-
-export const reportImageUploadToAnalytics = async (dataUrl: string, file: File) => {
-    const image = await dataUrlToImage(dataUrl);
-
-    analytics.report({
-        type: EventType.SettingsDeviceBackground,
-        payload: {
-            format: file.type,
-            size: file.size,
-            resolutionWidth: image.width,
-            resolutionHeight: image.height,
-        },
-    });
-};
 
 interface HomescreenProps {
     isDeviceLocked: boolean;
@@ -103,8 +79,6 @@ export const Homescreen = ({ isDeviceLocked }: HomescreenProps) => {
 
         const dataUrl = await fileToDataUrl(file);
         setCustomHomescreen(dataUrl);
-
-        reportImageUploadToAnalytics(dataUrl, file);
     };
 
     const onChangeHomescreen = async () => {
@@ -163,31 +137,26 @@ export const Homescreen = ({ isDeviceLocked }: HomescreenProps) => {
                             )
                         }
                     >
-                        <StyledActionButton
-                            onClick={() => fileInputElement?.current?.click()}
-                            isDisabled={isDeviceLocked || !isSupportedHomescreen}
-                            variant="secondary"
-                            data-test="@settings/device/homescreen-upload"
-                        >
-                            <Translation id="TR_DEVICE_SETTINGS_HOMESCREEN_UPLOAD_IMAGE" />
-                        </StyledActionButton>
-                    </Tooltip>
-                    <Tooltip
-                        maxWidth={285}
-                        content={
-                            !isSupportedHomescreen && (
-                                <Translation id="TR_UPDATE_FIRMWARE_HOMESCREEN_TOOLTIP" />
-                            )
-                        }
-                    >
-                        <StyledActionButton
-                            onClick={openGallery}
-                            isDisabled={isDeviceLocked || !isSupportedHomescreen}
-                            data-test="@settings/device/homescreen-gallery"
-                            variant="secondary"
-                        >
-                            <Translation id="TR_DEVICE_SETTINGS_HOMESCREEN_SELECT_FROM_GALLERY" />
-                        </StyledActionButton>
+                        <ButtonGroup size="small">
+                            <Button
+                                onClick={() => fileInputElement?.current?.click()}
+                                isDisabled={isDeviceLocked || !isSupportedHomescreen}
+                                variant="secondary"
+                                data-test="@settings/device/homescreen-upload"
+                                key="@settings/device/homescreen-upload"
+                            >
+                                <Translation id="TR_DEVICE_SETTINGS_HOMESCREEN_UPLOAD_IMAGE" />
+                            </Button>
+                            <Button
+                                onClick={openGallery}
+                                isDisabled={isDeviceLocked || !isSupportedHomescreen}
+                                data-test="@settings/device/homescreen-gallery"
+                                key="@settings/device/homescreen-gallery"
+                                variant="secondary"
+                            >
+                                <Translation id="TR_DEVICE_SETTINGS_HOMESCREEN_SELECT_FROM_GALLERY" />
+                            </Button>
+                        </ButtonGroup>
                     </Tooltip>
                 </ActionColumn>
             </SectionItem>

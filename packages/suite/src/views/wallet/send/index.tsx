@@ -1,33 +1,49 @@
 import { ReactNode } from 'react';
 import styled from 'styled-components';
+import { Warning } from '@trezor/components';
 
-import { Card, Translation } from 'src/components/suite';
 import { useSelector } from 'src/hooks/suite';
 import { WalletLayout } from 'src/components/wallet';
 import { useSendForm, SendContext, UseSendFormProps } from 'src/hooks/wallet/useSendForm';
 import { Header } from './components/Header';
-import Outputs from './components/Outputs';
+import { Outputs } from './components/Outputs';
 import { Options } from './components/Options/Options';
 import { SendFees } from './components/SendFees';
 import { TotalSent } from './components/TotalSent';
-import { ReviewButton } from './components/ReviewButton';
-import Raw from './components/Raw';
+import { Raw } from './components/Raw';
 import {
     selectTargetAnonymityByAccountKey,
     selectRegisteredUtxosByAccountKey,
 } from 'src/reducers/wallet/coinjoinReducer';
-import { Warning } from '@trezor/components';
-import { selectCoinsLegacy } from '@suite-common/wallet-core';
+import { Translation } from 'src/components/suite';
+import { spacingsPx } from '@trezor/theme';
+import { breakpointMediaQueries } from '@trezor/styles';
+import { ConfirmEvmExplanationModal } from 'src/components/suite/modals';
 
-const StyledCard = styled(Card)`
+const SendLayout = styled(WalletLayout)`
     display: flex;
     flex-direction: column;
-    margin-bottom: 8px;
-    padding: 0;
+    gap: ${spacingsPx.md};
 `;
 
-const StyledWarning = styled(Warning)`
-    margin-top: 8px;
+const FormGrid = styled.div`
+    display: grid;
+    grid-template-columns: minmax(500px, auto) minmax(340px, 420px);
+    gap: ${spacingsPx.md};
+
+    > :not(:last-child) {
+        grid-column: 1;
+    }
+
+    > :last-child {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    ${breakpointMediaQueries.below_xl} {
+        display: flex;
+        flex-direction: column;
+    }
 `;
 
 interface SendProps {
@@ -52,36 +68,42 @@ const SendLoaded = ({ children, selectedAccount }: SendLoadedProps) => {
         prison: selectRegisteredUtxosByAccountKey(state, selectedAccount.account.key),
     }));
 
-    const coins = useSelector(selectCoinsLegacy);
-
-    const sendContextValues = useSendForm({ ...props, selectedAccount, coins });
+    const sendContextValues = useSendForm({ ...props, selectedAccount });
 
     const { symbol } = selectedAccount.account;
 
+    if (props.sendRaw) {
+        return (
+            <WalletLayout title="TR_NAV_SEND" isSubpage account={selectedAccount}>
+                <Raw network={selectedAccount.network} />
+            </WalletLayout>
+        );
+    }
+
     return (
-        <WalletLayout title="TR_NAV_SEND" account={selectedAccount}>
+        <SendLayout title="TR_NAV_SEND" isSubpage account={selectedAccount}>
             <SendContext.Provider value={sendContextValues}>
                 <Header />
-                {!props.sendRaw && (
-                    <>
-                        <StyledCard data-test="@wallet/send/outputs-and-options">
-                            <Outputs disableAnim={!!children} />
-                            <Options />
-                        </StyledCard>
-                        <SendFees />
-                        <TotalSent />
-                        {symbol === 'dsol' && (
-                            <StyledWarning withIcon>
-                                <Translation id="TR_SOLANA_DEVNET_SHORTCUT_WARNING" />
-                            </StyledWarning>
-                        )}
-                        <ReviewButton />
-                        {children}
-                    </>
-                )}
+
+                <FormGrid data-test="@wallet/send/outputs-and-options">
+                    <Outputs disableAnim={!!children} />
+                    <Options />
+                    <SendFees />
+
+                    {symbol === 'dsol' && (
+                        <Warning withIcon>
+                            <Translation id="TR_SOLANA_DEVNET_SHORTCUT_WARNING" />
+                        </Warning>
+                    )}
+
+                    <TotalSent />
+                </FormGrid>
+
+                {children}
             </SendContext.Provider>
-            {props.sendRaw && <Raw network={selectedAccount.network} />}
-        </WalletLayout>
+
+            <ConfirmEvmExplanationModal account={selectedAccount.account} route="wallet-send" />
+        </SendLayout>
     );
 };
 

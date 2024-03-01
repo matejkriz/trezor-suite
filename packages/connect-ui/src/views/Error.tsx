@@ -1,5 +1,4 @@
-/* eslint-disable react/no-unused-prop-types */
-
+/* eslint-disable react/jsx-key */
 import { ReactNode } from 'react';
 
 import styled from 'styled-components';
@@ -10,6 +9,10 @@ import { isFirefox } from '@trezor/env-utils';
 const WhiteCollapsibleBox = styled(CollapsibleBox)`
     background: ${({ theme }) => theme.BG_WHITE};
     width: 500px;
+
+    ${CollapsibleBox.Content} {
+        padding: 0;
+    }
 `;
 
 export interface ErrorViewProps {
@@ -212,6 +215,7 @@ const Text = styled.div`
 
 const TipsContainer = styled.div`
     margin-top: 40px;
+    margin-bottom: 20px;
 `;
 
 const StyledIcon = styled(Icon)`
@@ -254,7 +258,7 @@ export const ErrorView = (props: ErrorViewProps) => {
                 <TipsContainer>
                     {tips.map(tip => (
                         <WhiteCollapsibleBox
-                            opened={tips.length === 1}
+                            isOpen={tips.length === 1}
                             key={tip.title}
                             heading={
                                 <Heading>
@@ -265,11 +269,9 @@ export const ErrorView = (props: ErrorViewProps) => {
                                 </Heading>
                             }
                             variant="large"
-                            noContentPadding
                         >
                             <StepsList>
                                 {tip.detail.steps.map((step, index) => (
-                                    // eslint-disable-next-line react/no-array-index-key
                                     <li key={index}>{step}</li>
                                 ))}
                             </StepsList>

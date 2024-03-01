@@ -375,6 +375,8 @@ export type TxOutputType =
           orig_index?: number;
           payment_req_index?: number;
       }
+    // NOTE: the type was loosened for compatibility (issue #10474)
+    // It is not originally intended to use address instead of address_n with change output
     | {
           address: string;
           address_n?: typeof undefined;
@@ -1627,6 +1629,23 @@ export type ApplySettings = {
     hide_passphrase_from_host?: boolean;
 };
 
+// ChangeLanguage
+export type ChangeLanguage = {
+    data_length: number;
+    show_display?: boolean;
+};
+
+// TranslationDataRequest
+export type TranslationDataRequest = {
+    data_length: number;
+    data_offset: number;
+};
+
+// TranslationDataAck
+export type TranslationDataAck = {
+    data_chunk: string;
+};
+
 // ApplyFlags
 export type ApplyFlags = {
     flags: number;
@@ -1788,6 +1807,7 @@ export enum BootCommand {
 export type RebootToBootloader = {
     boot_command?: BootCommand;
     firmware_header?: string;
+    language_data_length?: number;
 };
 
 // GetNonce
@@ -2225,6 +2245,12 @@ export type StellarBumpSequenceOp = {
     bump_to: UintType;
 };
 
+// StellarClaimClaimableBalanceOp
+export type StellarClaimClaimableBalanceOp = {
+    source_account?: string;
+    balance_id: string;
+};
+
 // StellarSignedTx
 export type StellarSignedTx = {
     public_key: string;
@@ -2539,6 +2565,9 @@ export type MessageType = {
     SetBusy: SetBusy;
     EndSession: EndSession;
     ApplySettings: ApplySettings;
+    ChangeLanguage: ChangeLanguage;
+    TranslationDataRequest: TranslationDataRequest;
+    TranslationDataAck: TranslationDataAck;
     ApplyFlags: ApplyFlags;
     ChangePin: ChangePin;
     ChangeWipeCode: ChangeWipeCode;
@@ -2619,6 +2648,7 @@ export type MessageType = {
     StellarAccountMergeOp: StellarAccountMergeOp;
     StellarManageDataOp: StellarManageDataOp;
     StellarBumpSequenceOp: StellarBumpSequenceOp;
+    StellarClaimClaimableBalanceOp: StellarClaimClaimableBalanceOp;
     StellarSignedTx: StellarSignedTx;
     TezosGetAddress: TezosGetAddress;
     TezosAddress: TezosAddress;

@@ -1,117 +1,138 @@
-import styled from 'styled-components';
+import styled, { useTheme } from 'styled-components';
+import { forwardRef } from 'react';
 
+import { spacingsPx } from '@trezor/theme';
 import { NetworkSymbol } from '@suite-common/wallet-config';
-import { isTestnet } from '@suite-common/wallet-utils';
-import { CoinLogo, H1, H3 } from '@trezor/components';
+import { CoinLogo, Icon, SkeletonCircle, SkeletonRectangle } from '@trezor/components';
 
-import { Account } from 'src/types/wallet';
 import {
-    Ticker,
-    FiatValue,
-    AccountLabeling,
-    AppNavigationPanel,
     FormattedCryptoAmount,
-    MetadataLabeling,
     AmountUnitSwitchWrapper,
-    SkeletonCircle,
-    SkeletonRectangle,
-    SkeletonStack,
+    StakeAmountWrapper,
 } from 'src/components/suite';
 import { useSelector } from 'src/hooks/suite';
-import { AccountNavigation } from './AccountNavigation';
-import { selectLabelingDataForSelectedAccount } from 'src/reducers/suite/metadataReducer';
+import { FiatHeader } from 'src/views/dashboard/components/FiatHeader';
+import { selectLocalCurrency } from 'src/reducers/wallet/settingsReducer';
+import { useFiatFromCryptoValue } from 'src/hooks/suite/useFiatFromCryptoValue';
+import { globalPaddingEraserStyle } from 'src/components/suite/layouts/SuiteLayout/utils';
+import { STAKE_SYMBOLS } from 'src/constants/suite/ethStaking';
+import { selectIsDebugModeActive } from 'src/reducers/suite/suiteReducer';
+import { selectSelectedAccountAutocompoundBalance } from 'src/reducers/wallet/selectedAccountReducer';
+import { mapTestnetSymbol } from 'src/utils/wallet/coinmarket/coinmarketUtils';
 
-const Balance = styled(H1)`
-    height: 32px;
-    white-space: nowrap;
-    margin-left: 8px;
+export const ACCOUNT_INFO_HEIGHT = 80;
+
+const Container = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: ${spacingsPx.xxs};
+    width: fit-content;
+    min-height: ${ACCOUNT_INFO_HEIGHT}px;
+
+    ${globalPaddingEraserStyle}
 `;
 
-const FiatBalanceWrapper = styled(H3)`
-    height: 24px;
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    margin-left: 1ch;
+const AccountCryptoBalance = styled.div`
+    display: flex;
+    align-items: center;
+    gap: ${spacingsPx.xxs};
+    color: ${({ theme }) => theme.textSubdued};
+`;
+
+const AmountsWrapper = styled.div`
+    display: flex;
+    gap: ${spacingsPx.lg};
+    flex-wrap: wrap;
 `;
 
 interface AccountTopPanelSkeletonProps {
     animate?: boolean;
-    account?: Account;
     symbol?: NetworkSymbol;
 }
 
-const AccountTopPanelSkeleton = ({ animate, account, symbol }: AccountTopPanelSkeletonProps) => (
-    <AppNavigationPanel
-        maxWidth="small"
-        title={
-            account ? (
-                <AccountLabeling account={account} />
-            ) : (
-                <SkeletonRectangle width="260px" height="34px" animate={animate} />
-            )
-        }
-        navigation={<AccountNavigation />}
-    >
-        <SkeletonStack alignItems="center">
-            {symbol ? <CoinLogo size={24} symbol={symbol} /> : <SkeletonCircle size="24px" />}
+const AccountTopPanelSkeleton = ({ animate, symbol }: AccountTopPanelSkeletonProps) => (
+    <Container>
+        <AccountCryptoBalance>
+            {symbol ? <CoinLogo size={16} symbol={symbol} /> : <SkeletonCircle size="20px" />}
+            <SkeletonRectangle height={20} animate={animate} />
+        </AccountCryptoBalance>
 
-            <Balance noMargin>
-                <SkeletonRectangle width="160px" height="32px" animate={animate} />
-            </Balance>
-        </SkeletonStack>
-    </AppNavigationPanel>
+        <SkeletonRectangle width={100} height={50} animate={animate} />
+    </Container>
 );
 
-export const AccountTopPanel = () => {
+export const AccountTopPanel = forwardRef<HTMLDivElement>((_, ref) => {
+    const theme = useTheme();
     const { account, loader, status } = useSelector(state => state.wallet.selectedAccount);
-    const selectedAccountLabels = useSelector(selectLabelingDataForSelectedAccount);
+    const localCurrency = useSelector(selectLocalCurrency);
+    const autocompoundBalance = useSelector(selectSelectedAccountAutocompoundBalance);
+    const isDebug = useSelector(selectIsDebugModeActive);
+
+    // TODO: move this to FiatHeader
+    const { fiatAmount } = useFiatFromCryptoValue({
+        amount: account?.formattedBalance || '',
+        symbol: account?.symbol || '',
+    });
+
+    const mappedSymbol = account?.symbol ? mapTestnetSymbol(account?.symbol) : '';
+    const { fiatAmount: fiatStakeAmount } = useFiatFromCryptoValue({
+        amount: autocompoundBalance,
+        symbol: mappedSymbol,
+    });
+
     if (status !== 'loaded' || !account) {
         return (
             <AccountTopPanelSkeleton
                 animate={loader === 'account-loading'}
-                account={account}
                 symbol={account?.symbol}
             />
         );
     }
 
     const { symbol, formattedBalance } = account;
+    // TODO: remove isDebug for staking release
+    const isStakeShown = STAKE_SYMBOLS.includes(symbol) && isDebug;
 
     return (
-        <AppNavigationPanel
-            maxWidth="small"
-            title={
-                <MetadataLabeling
-                    defaultVisibleValue={<AccountLabeling account={account} />}
-                    payload={{
-                        type: 'accountLabel',
-                        entityKey: account.key,
-                        defaultValue: account.path,
-                        value: selectedAccountLabels.accountLabel,
-                    }}
-                />
-            }
-            navigation={<AccountNavigation />}
-            titleContent={() =>
-                !isTestnet(symbol) ? <Ticker symbol={symbol} tooltipPos="bottom" /> : undefined
-            }
-        >
-            <AmountUnitSwitchWrapper symbol={symbol}>
-                <CoinLogo size={24} symbol={symbol} />
+        <Container ref={ref}>
+            <AmountsWrapper>
+                <div>
+                    <AmountUnitSwitchWrapper symbol={symbol}>
+                        <AccountCryptoBalance>
+                            <CoinLogo size={16} symbol={symbol} />
 
-                <Balance noMargin>
-                    <FormattedCryptoAmount value={formattedBalance} symbol={symbol} />
-                </Balance>
+                            <FormattedCryptoAmount value={formattedBalance} symbol={symbol} />
+                        </AccountCryptoBalance>
+                    </AmountUnitSwitchWrapper>
 
-                <FiatValue
-                    amount={account.formattedBalance}
-                    symbol={symbol}
-                    showApproximationIndicator
-                >
-                    {({ value }) =>
-                        value ? <FiatBalanceWrapper noMargin>{value}</FiatBalanceWrapper> : null
-                    }
-                </FiatValue>
-            </AmountUnitSwitchWrapper>
-        </AppNavigationPanel>
+                    <FiatHeader
+                        size="large"
+                        localCurrency={localCurrency}
+                        fiatAmount={fiatAmount ?? '0'}
+                    />
+                </div>
+
+                {isStakeShown && (
+                    <div>
+                        <StakeAmountWrapper>
+                            <AccountCryptoBalance>
+                                <Icon icon="PIGGY_BANK" color={theme.TYPE_DARK_GREY} size={16} />
+
+                                <FormattedCryptoAmount
+                                    value={autocompoundBalance}
+                                    symbol={symbol}
+                                />
+                            </AccountCryptoBalance>
+                        </StakeAmountWrapper>
+
+                        <FiatHeader
+                            size="large"
+                            localCurrency={localCurrency}
+                            fiatAmount={fiatStakeAmount ?? '0'}
+                        />
+                    </div>
+                )}
+            </AmountsWrapper>
+        </Container>
     );
-};
+});

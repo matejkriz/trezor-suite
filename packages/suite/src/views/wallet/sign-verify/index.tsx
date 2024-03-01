@@ -12,7 +12,7 @@ import {
     Tooltip,
 } from '@trezor/components';
 
-import { WalletLayout, WalletLayoutHeader } from 'src/components/wallet';
+import { WalletLayout, WalletSubpageHeading } from 'src/components/wallet';
 import { Translation } from 'src/components/suite';
 import { useDevice, useDispatch, useSelector, useTranslation } from 'src/hooks/suite';
 import { sign, verify } from 'src/actions/wallet/signVerifyActions';
@@ -30,6 +30,7 @@ import {
     MAX_LENGTH_SIGNATURE,
 } from 'src/hooks/wallet/sign-verify/useSignVerifyForm';
 import { getInputState } from '@suite-common/wallet-utils';
+import { spacingsPx } from '@trezor/theme';
 
 const SwitchWrapper = styled.label`
     display: flex;
@@ -61,21 +62,21 @@ const FormatDescription = styled.p`
 `;
 
 const StyledSelectBar = styled(SelectBar)`
-    margin: 12px 0 20px;
+    margin: ${spacingsPx.sm} 0 ${spacingsPx.lg};
 
     @media (min-width: ${variables.SCREEN_SIZE.SM}) {
         width: 320px;
-        margin: 0 0 0 20px;
+        margin: ${spacingsPx.sm} 0 0 ${spacingsPx.lg};
     }
 
     @media (min-width: ${variables.SCREEN_SIZE.MD}) and (max-width: ${variables.SCREEN_SIZE.LG}) {
         width: 100%;
-        margin: 12px 0 20px;
+        margin: ${spacingsPx.sm} 0 ${spacingsPx.lg};
     }
 
     @media (min-width: ${variables.SCREEN_SIZE.LG}) {
         width: 320px;
-        margin: 0 0 0 20px;
+        margin: ${spacingsPx.xs} 0 0 20px;
     }
 `;
 
@@ -108,6 +109,10 @@ const tooltipContent = (
         }}
     />
 );
+
+const MultilineRow = styled(Row)`
+    align-items: start;
+`;
 
 const SignVerify = () => {
     const [page, setPage] = useState<NavPages>('sign');
@@ -151,9 +156,7 @@ const SignVerify = () => {
 
     const signatureProps = {
         label: translationString('TR_SIGNATURE'),
-        inputState: getInputState(formErrors.signature, formValues.signature) as ReturnType<
-            typeof getInputState
-        >,
+        inputState: getInputState(formErrors.signature) as ReturnType<typeof getInputState>,
         bottomText: signatureError,
         'data-test': '@sign-verify/signature',
         innerRef: signatureRef,
@@ -191,16 +194,16 @@ const SignVerify = () => {
     };
 
     return (
-        <WalletLayout title="TR_NAV_SIGN_VERIFY" account={selectedAccount}>
-            <WalletLayoutHeader title="TR_NAV_SIGN_VERIFY">
+        <WalletLayout title="TR_NAV_SIGN_VERIFY" isSubpage account={selectedAccount}>
+            <WalletSubpageHeading title="TR_NAV_SIGN_VERIFY">
                 {isFormDirty && (
                     <Button type="button" variant="tertiary" onClick={resetForm}>
                         <Translation id="TR_CLEAR_ALL" />
                     </Button>
                 )}
-            </WalletLayoutHeader>
+            </WalletSubpageHeading>
 
-            <Card noPadding>
+            <Card paddingType="none">
                 <Navigation page={page} setPage={setPage} />
 
                 <Form onSubmit={formSubmit(onSubmit)}>
@@ -210,32 +213,31 @@ const SignVerify = () => {
                             labelRight={
                                 <SwitchWrapper>
                                     <Translation id="TR_HEX_FORMAT" />
-                                    <Switch {...hexField} isSmall />
+                                    <Switch {...hexField} />
                                 </SwitchWrapper>
                             }
-                            inputState={getInputState(formErrors.message, formValues.message)}
+                            inputState={getInputState(formErrors.message)}
                             characterCount={{
                                 current: formValues.message?.length,
                                 max: MAX_LENGTH_MESSAGE,
                             }}
-                            bottomText={messageError}
+                            bottomText={messageError || null}
                             rows={4}
-                            maxRows={4}
                             data-test="@sign-verify/message"
                             innerRef={messageRef}
                             {...messageField}
                         />
                     </Row>
 
-                    <Row>
+                    <MultilineRow>
                         {isSignPage ? (
                             <SignAddressInput
                                 name="path"
                                 label={<Translation id="TR_ADDRESS" />}
                                 account={selectedAccount.account}
                                 revealedAddresses={revealedAddresses}
-                                inputState={getInputState(formErrors.path, formValues.path)}
-                                bottomText={pathError}
+                                inputState={getInputState(formErrors.path)}
+                                bottomText={pathError || null}
                                 data-test="@sign-verify/sign-address"
                                 {...pathField}
                             />
@@ -244,8 +246,8 @@ const SignVerify = () => {
                                 name="address"
                                 label={<Translation id="TR_ADDRESS" />}
                                 type="text"
-                                inputState={getInputState(formErrors.address, formValues.address)}
-                                bottomText={addressError}
+                                inputState={getInputState(formErrors.address)}
+                                bottomText={addressError || null}
                                 data-test="@sign-verify/select-address"
                                 {...addressField}
                             />
@@ -259,12 +261,11 @@ const SignVerify = () => {
                                     </Tooltip>
                                 }
                                 options={formatOptions}
-                                isInLine={false}
                                 data-test="@sign-verify/format"
                                 {...isElectrumField}
                             />
                         )}
-                    </Row>
+                    </MultilineRow>
 
                     <Divider />
 
@@ -301,7 +302,6 @@ const SignVerify = () => {
                                     max: MAX_LENGTH_SIGNATURE,
                                 }}
                                 rows={4}
-                                maxRows={4}
                                 {...signatureProps}
                             />
                         )}

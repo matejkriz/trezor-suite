@@ -51,6 +51,7 @@ const getColor = (score: OptionalZXCVBNScore, password: string) => {
 
 const getPasswordScore = async (password: string) => {
     const zxcvbn = await import(/* webpackChunkName: "zxcvbn" */ 'zxcvbn');
+
     return zxcvbn.default(password).score;
 };
 
@@ -79,7 +80,6 @@ export const PasswordStrengthIndicator = ({ password }: PasswordStrengthIndicato
         <Wrapper>
             {[...Array(5)].map((_x, i) => (
                 <Line
-                    // eslint-disable-next-line react/no-array-index-key
                     key={i}
                     isFilled={score !== undefined && i <= score}
                     color={getColor(score, password)}

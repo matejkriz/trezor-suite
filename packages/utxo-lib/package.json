@@ -1,6 +1,6 @@
 {
     "name": "@trezor/utxo-lib",
-    "version": "2.0.4",
+    "version": "2.0.7",
     "author": "Trezor <info@trezor.io>",
     "homepage": "https://github.com/trezor/trezor-suite/tree/develop/packages/utxo-lib",
     "description": "Client-side Bitcoin-like JavaScript library",
@@ -29,9 +29,9 @@
     "typings": "lib/index.d.ts",
     "scripts": {
         "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "test:unit": "jest --verbose -c jest.config.js",
-        "type-check": "tsc --build tsconfig.json",
-        "build:lib": "rimraf lib && yarn tsc --build ./tsconfig.lib.json",
+        "test:unit": "yarn g:jest --verbose -c jest.config.js",
+        "type-check": "yarn g:tsc --build tsconfig.json",
+        "build:lib": "yarn g:rimraf lib && yarn g:tsc --build ./tsconfig.lib.json",
         "prepublishOnly": "yarn tsx ../../scripts/prepublishNPM.js",
         "prepublish": "yarn tsx ../../scripts/prepublish.js"
     },
@@ -57,16 +57,13 @@
     },
     "devDependencies": {
         "@types/bchaddrjs": "^0.4.2",
-        "@types/bs58": "^4.0.3",
+        "@types/bs58": "^4.0.4",
         "@types/bs58check": "^2.1.1",
-        "@types/create-hash": "^1.2.4",
+        "@types/create-hash": "^1.2.6",
         "@types/create-hmac": "^1.1.2",
-        "@types/wif": "^2.0.4",
-        "jest": "29.5.0",
+        "@types/wif": "^2.0.5",
         "minimaldata": "^1.0.2",
-        "rimraf": "^5.0.5",
-        "tsx": "^4.6.2",
-        "typescript": "5.3.2"
+        "tsx": "^4.7.0"
     },
     "peerDependencies": {
         "tslib": "^2.6.2"

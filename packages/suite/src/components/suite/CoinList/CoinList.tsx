@@ -4,10 +4,9 @@ import { getCoinUnavailabilityMessage } from '@suite-common/suite-utils';
 import { Tooltip } from '@trezor/components';
 import { getFirmwareVersion, isDeviceInBootloaderMode } from '@trezor/device-utils';
 import { versionUtils } from '@trezor/utils';
-import { selectDeviceSupportedNetworks } from '@suite-common/wallet-core';
 
 import { Translation } from 'src/components/suite';
-import { useDevice, useSelector } from 'src/hooks/suite';
+import { useDevice, useDiscovery, useSelector } from 'src/hooks/suite';
 import type { Network } from 'src/types/wallet';
 
 import { Coin } from './Coin';
@@ -36,14 +35,11 @@ export const CoinList = ({
 }: CoinListProps) => {
     const { device, isLocked } = useDevice();
     const blockchain = useSelector(state => state.wallet.blockchain);
-    const deviceSupportedNetworkSymbols = useSelector(selectDeviceSupportedNetworks);
-
-    const supportedNetworks = networks.filter(network =>
-        deviceSupportedNetworkSymbols.includes(network.symbol),
-    );
-
     const isDeviceLocked = !!device && isLocked();
-    const lockedTooltip = isDeviceLocked && 'TR_DISABLED_SWITCH_TOOLTIP';
+    const { isDiscoveryRunning } = useDiscovery();
+    const lockedTooltip = isDeviceLocked ? 'TR_DISABLED_SWITCH_TOOLTIP' : null;
+    const discoveryTooltip = isDiscoveryRunning ? 'TR_LOADING_ACCOUNTS' : null;
+
     const deviceModelInternal = device?.features?.internal_model;
     const isBootloaderMode = isDeviceInBootloaderMode(device);
     const firmwareVersion = getFirmwareVersion(device);
@@ -52,7 +48,7 @@ export const CoinList = ({
 
     return (
         <Wrapper>
-            {supportedNetworks.map(network => {
+            {networks.map(network => {
                 const { symbol, label, tooltip, name, support } = network;
 
                 const firmwareSupportRestriction =
@@ -76,7 +72,8 @@ export const CoinList = ({
                     !!unavailableReason &&
                     !isBootloaderMode &&
                     getCoinUnavailabilityMessage(unavailableReason);
-                const tooltipString = lockedTooltip || unavailabilityTooltip || tooltip;
+                const tooltipString =
+                    discoveryTooltip || lockedTooltip || unavailabilityTooltip || tooltip;
 
                 const coinLabel = blockchain[symbol].backends.selected
                     ? 'TR_CUSTOM_BACKEND'

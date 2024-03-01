@@ -6,39 +6,81 @@ import styled from 'styled-components';
 import { useSendFormContext } from 'src/hooks/wallet';
 import { Account } from 'src/types/wallet';
 import { Output } from 'src/types/wallet/sendForm';
-import {
-    getShortFingerprint,
-    enhanceTokensWithRates,
-    sortTokensWithRates,
-} from '@suite-common/wallet-utils';
 import { useSelector } from 'src/hooks/suite';
-import { selectCoinsLegacy } from '@suite-common/wallet-core';
+import { selectTokenDefinitions } from '@suite-common/wallet-core';
+import BigNumber from 'bignumber.js';
+import { TokenDefinitions } from '@suite-common/wallet-types';
+import { TooltipSymbol, Translation } from 'src/components/suite';
+import { getNetworkFeatures } from '@suite-common/wallet-config';
+import { enhanceTokensWithRates, sortTokensWithRates } from 'src/utils/wallet/tokenUtils';
+import { getShortFingerprint } from '@suite-common/wallet-utils';
+import { selectLocalCurrency } from 'src/reducers/wallet/settingsReducer';
+
+const UnrecognizedTokensHeading = styled.div`
+    display: flex;
+    align-items: center;
+`;
 
 interface Option {
-    label: string;
-    value: string | null;
-    fingerprint: string | undefined;
+    options: {
+        label: string;
+        value: string | null;
+        fingerprint?: string;
+    }[];
+    label?: React.ReactNode;
 }
 
-export const buildTokenOptions = (tokens: Account['tokens'], symbol: Account['symbol']) => {
+export const buildTokenOptions = (
+    tokens: Account['tokens'],
+    symbol: Account['symbol'],
+    tokenDefinitions: TokenDefinitions,
+) => {
     // ETH option
     const result: Option[] = [
         {
-            value: null,
-            fingerprint: undefined,
-            label: symbol.toUpperCase(),
+            options: [{ value: null, fingerprint: undefined, label: symbol.toUpperCase() }],
         },
     ];
 
     if (tokens) {
+        const unknownTokens: Option['options'] = [];
+        const hasNetworkFeatures = getNetworkFeatures(symbol).includes('token-definitions');
+
         tokens.forEach(token => {
+            if (new BigNumber(token?.balance || '').eq('0')) {
+                return;
+            }
+
             const tokenName = token.symbol || 'N/A';
-            result.push({
-                value: token.contract,
-                label: tokenName.toUpperCase(),
-                fingerprint: token.name,
-            });
+
+            if (tokenDefinitions[token.contract]?.isTokenKnown || !hasNetworkFeatures) {
+                result[0].options.push({
+                    value: token.contract,
+                    label: tokenName.toUpperCase(),
+                    fingerprint: token.name,
+                });
+            } else {
+                unknownTokens.push({
+                    value: token.contract,
+                    label: `${tokenName.toUpperCase().slice(0, 7)}…`,
+                    fingerprint: token.name,
+                });
+            }
         });
+
+        if (unknownTokens.length) {
+            result.push({
+                label: (
+                    <UnrecognizedTokensHeading>
+                        <Translation id="TR_TOKEN_UNRECOGNIZED_BY_TREZOR" />
+                        <TooltipSymbol
+                            content={<Translation id="TR_TOKEN_UNRECOGNIZED_BY_TREZOR_TOOLTIP" />}
+                        />
+                    </UnrecognizedTokensHeading>
+                ),
+                options: unknownTokens,
+            });
+        }
     }
 
     return result;
@@ -87,7 +129,6 @@ const CardanoOption = ({ tokenInputName, ...optionProps }: any) => (
                 {optionProps.data.fingerprint &&
                 optionProps.data.label.toLowerCase() ===
                     optionProps.data.fingerprint.toLowerCase() ? (
-                    // eslint-disable-next-line react/jsx-indent
                     <OptionEmptyName>No name</OptionEmptyName>
                 ) : (
                     optionProps.data.label
@@ -123,20 +164,20 @@ export const TokenSelect = ({ output, outputId }: TokenSelectProps) => {
         composeTransaction,
         watch,
     } = useSendFormContext();
-    const coins = useSelector(selectCoinsLegacy);
+    const tokenDefinitions = useSelector(state => selectTokenDefinitions(state, account.symbol));
+    const localCurrency = useSelector(selectLocalCurrency);
+    const tokensWithRates = enhanceTokensWithRates(account.tokens, localCurrency, account.symbol);
 
     const sortedTokens = useMemo(() => {
-        const tokensWithRates = enhanceTokensWithRates(account.tokens, coins);
-
         return tokensWithRates.sort(sortTokensWithRates);
-    }, [account.tokens, coins]);
+    }, [tokensWithRates]);
 
     const tokenInputName = `outputs.${outputId}.token` as const;
     const amountInputName = `outputs.${outputId}.amount` as const;
     const tokenValue = getDefaultValue(tokenInputName, output.token);
     const isSetMaxActive = getDefaultValue('setMaxOutputId') === outputId;
     const dataEnabled = getDefaultValue('options', []).includes('ethereumData');
-    const options = buildTokenOptions(sortedTokens, account.symbol);
+    const options = buildTokenOptions(sortedTokens, account.symbol, tokenDefinitions);
 
     // Amount needs to be re-validated again AFTER token change propagation (decimal places, available balance)
     // watch token change and use "useSendFormFields.setAmount" util for validation (if amount is set)
@@ -167,15 +208,16 @@ export const TokenSelect = ({ output, outputId }: TokenSelectProps) => {
             render={({ field: { onChange } }) => (
                 <Select
                     options={options}
-                    minWidth="58px"
+                    minValueWidth="58px"
                     isSearchable
-                    isDisabled={options.length === 1} // disable when account has no tokens to choose from
-                    hideTextCursor
-                    value={options.find(o => o.value === tokenValue)}
+                    isDisabled={options.length === 1 && options[0].options.length === 1} // disable when account has no tokens to choose from
+                    value={options
+                        .flatMap(group => group.options)
+                        .find(option => option.value === tokenValue)}
                     isClearable={false}
                     components={customComponents}
                     isClean
-                    onChange={(selected: Option) => {
+                    onChange={(selected: Option['options'][0]) => {
                         // change selected value
                         onChange(selected.value);
                         // clear errors in Amount input

@@ -1,7 +1,7 @@
 import { fiatCurrencies } from '@suite-common/suite-config';
 import { NumberInput } from 'src/components/suite';
 import { Select } from '@trezor/components';
-import { buildOption } from 'src/utils/wallet/coinmarket/coinmarketUtils';
+import { buildFiatOption } from 'src/utils/wallet/coinmarket/coinmarketUtils';
 import { Controller } from 'react-hook-form';
 import { useCoinmarketSellFormContext } from 'src/hooks/wallet/useCoinmarketSellForm';
 import { getInputState } from '@suite-common/wallet-utils';
@@ -26,7 +26,6 @@ const FiatInput = () => {
 
     const { translationString } = useTranslation();
 
-    const fiatInputValue = getValues(FIAT_INPUT);
     const tokenAddress = getValues('outputs.0.token');
     const tokenData = account.tokens?.find(t => t.contract === tokenAddress);
 
@@ -57,15 +56,14 @@ const FiatInput = () => {
     return (
         <NumberInput
             control={control}
-            noTopLabel
             defaultValue=""
             rules={fiatInputRules}
             onChange={onFiatAmountChange}
             isDisabled={tokenData !== undefined}
-            inputState={getInputState(errors.fiatInput, fiatInputValue)}
+            inputState={getInputState(errors.fiatInput)}
             name={FIAT_INPUT}
             maxLength={formInputsMaxLength.amount}
-            bottomText={errors[FIAT_INPUT]?.message}
+            bottomText={errors[FIAT_INPUT]?.message || null}
             innerAddon={
                 <Controller
                     control={control}
@@ -82,13 +80,12 @@ const FiatInput = () => {
                         <Select
                             options={Object.keys(fiatCurrencies)
                                 .filter(c => sellInfo?.supportedFiatCurrencies.has(c))
-                                .map((currency: string) => buildOption(currency))}
+                                .map((currency: string) => buildFiatOption(currency))}
                             isSearchable
                             value={value}
                             isClearable={false}
-                            minWidth="45px"
+                            minValueWidth="45px"
                             isClean
-                            hideTextCursor
                             onChange={(selected: any) => {
                                 onChange(selected);
                                 setAmountLimits(undefined);

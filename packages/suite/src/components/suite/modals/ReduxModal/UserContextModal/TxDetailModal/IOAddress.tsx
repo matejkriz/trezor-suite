@@ -1,15 +1,15 @@
 import { HiddenPlaceholder } from 'src/components/suite/HiddenPlaceholder';
-import { Icon, Link, useTheme } from '@trezor/components';
+import { Icon, Link } from '@trezor/components';
 import { useState } from 'react';
 import { copyToClipboard } from '@trezor/dom-utils';
-import styled, { css } from 'styled-components';
+import styled, { css, useTheme } from 'styled-components';
 
 const IconWrapper = styled.div`
     display: none;
     padding: 1px;
     border-radius: 2px;
     margin-left: 4px;
-    background-color: ${({ theme }) => theme.TYPE_DARK_GREY};
+    background-color: ${({ theme }) => theme.iconSubdued};
     height: 14px;
 
     :hover {
@@ -19,8 +19,8 @@ const IconWrapper = styled.div`
 
 const onHoverTextOverflowContainerHover = css`
     border-radius: 2px;
-    background-color: ${({ theme }) => theme.BG_GREY};
-    outline: 4px solid ${({ theme }) => theme.BG_GREY};
+    background-color: ${({ theme }) => theme.backgroundSurfaceElevation2};
+    outline: 4px solid ${({ theme }) => theme.backgroundSurfaceElevation2};
     z-index: 3;
 
     ${IconWrapper} {
@@ -28,23 +28,28 @@ const onHoverTextOverflowContainerHover = css`
     }
 `;
 
-const TextOverflowContainer = styled.div`
+const TextOverflowContainer = styled.div<{ shouldAllowCopy?: boolean }>`
     position: relative;
     display: inline-flex;
+    align-items: center;
     max-width: 100%;
     overflow: hidden;
-    color: ${({ theme }) => theme.TYPE_DARK_GREY};
-    cursor: pointer;
+    color: ${({ theme }) => theme.textSubdued};
+    cursor: ${({ shouldAllowCopy }) => (shouldAllowCopy ? 'pointer' : 'cursor')};
     user-select: none;
 
-    @media (hover: none) {
-        ${onHoverTextOverflowContainerHover}
-    }
+    ${({ shouldAllowCopy }) =>
+        shouldAllowCopy &&
+        css`
+            @media (hover: none) {
+                ${onHoverTextOverflowContainerHover}
+            }
 
-    :hover,
-    :focus {
-        ${onHoverTextOverflowContainerHover}
-    }
+            :hover,
+            :focus {
+                ${onHoverTextOverflowContainerHover}
+            }
+        `}
 `;
 
 const SpanTextStart = styled.span`
@@ -62,13 +67,23 @@ interface IOAddressProps {
     explorerUrl?: string;
     txAddress?: string;
     explorerUrlQueryString?: string;
+    shouldAllowCopy?: boolean;
 }
 
-export const IOAddress = ({ txAddress, explorerUrl, explorerUrlQueryString }: IOAddressProps) => {
+export const IOAddress = ({
+    txAddress,
+    explorerUrl,
+    explorerUrlQueryString,
+    shouldAllowCopy = true,
+}: IOAddressProps) => {
     const [isClicked, setIsClicked] = useState(false);
     const theme = useTheme();
 
     const copy = () => {
+        if (!shouldAllowCopy) {
+            return;
+        }
+
         copyToClipboard(txAddress || '');
 
         setIsClicked(true);
@@ -84,6 +99,7 @@ export const IOAddress = ({ txAddress, explorerUrl, explorerUrlQueryString }: IO
                 onMouseLeave={() => setIsClicked(false)}
                 data-test="@tx-detail/txid-value"
                 id={txAddress}
+                shouldAllowCopy={shouldAllowCopy}
             >
                 {txAddress.length <= 5 ? (
                     <SpanTextEnd onClick={copy}>{txAddress}</SpanTextEnd>
@@ -93,17 +109,23 @@ export const IOAddress = ({ txAddress, explorerUrl, explorerUrlQueryString }: IO
                         <SpanTextEnd onClick={copy}>{txAddress.slice(-4)}</SpanTextEnd>
                     </>
                 )}
-                <IconWrapper onClick={copy}>
-                    <Icon icon={isClicked ? 'CHECK' : 'COPY'} size={12} color={theme.BG_WHITE} />
-                </IconWrapper>
+                {shouldAllowCopy ? (
+                    <IconWrapper onClick={copy}>
+                        <Icon
+                            icon={isClicked ? 'CHECK' : 'COPY'}
+                            size={12}
+                            color={theme.iconOnPrimary}
+                        />
+                    </IconWrapper>
+                ) : null}
                 {explorerUrl ? (
                     <IconWrapper>
                         <Link
-                            size="tiny"
+                            type="label"
                             variant="nostyle"
                             href={`${explorerUrl}${txAddress}${explorerUrlQueryString}`}
                         >
-                            <Icon icon="EXTERNAL_LINK" size={12} color={theme.BG_WHITE} />
+                            <Icon icon="EXTERNAL_LINK" size={12} color={theme.iconOnPrimary} />
                         </Link>
                     </IconWrapper>
                 ) : null}

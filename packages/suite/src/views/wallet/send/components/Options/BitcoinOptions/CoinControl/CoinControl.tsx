@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react';
-import styled from 'styled-components';
+import styled, { useTheme } from 'styled-components';
 
+import { typography } from '@trezor/theme';
 import { COMPOSE_ERROR_TYPES } from '@suite-common/wallet-constants';
 import { fetchTransactionsThunk } from '@suite-common/wallet-core';
+import { getTxsPerPage } from '@suite-common/suite-utils';
 import { amountToSatoshi, formatNetworkAmount } from '@suite-common/wallet-utils';
 import { FormattedCryptoAmount, Translation } from 'src/components/suite';
 import { useDispatch, useSelector } from 'src/hooks/suite';
 import { Pagination } from 'src/components/wallet';
-import { useTheme, Checkbox, Icon, Switch, variables } from '@trezor/components';
+import { Card, Checkbox, Icon, Switch, variables } from '@trezor/components';
 import { useSendFormContext } from 'src/hooks/wallet';
 import { useBitcoinAmountUnit } from 'src/hooks/wallet/useBitcoinAmountUnit';
 import { selectCurrentTargetAnonymity } from 'src/reducers/wallet/coinjoinReducer';
 import { UtxoSelectionList } from './UtxoSelectionList';
-import { getTxsPerPage } from '@suite-common/suite-utils';
 
 const Row = styled.div`
     align-items: center;
@@ -28,7 +29,8 @@ const SecondRow = styled(Row)`
 `;
 
 const GreyText = styled.div`
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
+    ${typography.hint}
+    color: ${({ theme }) => theme.textSubdued};
 `;
 
 const StyledSwitch = styled(Switch)`
@@ -136,6 +138,7 @@ export const CoinControl = ({ close }: CoinControlProps) => {
     ].map(utxoCategory => {
         const lastIndexOnPage = currentPage * utxosPerPage - previousItemsLength;
         previousItemsLength += utxoCategory.length;
+
         // avoid negative values which may cause unintended results
         return utxoCategory.slice(
             Math.max(0, lastIndexOnPage - utxosPerPage),
@@ -156,6 +159,7 @@ export const CoinControl = ({ close }: CoinControlProps) => {
                 recursive: true,
             }),
         );
+
         return () => {
             promise.abort();
         };
@@ -166,25 +170,29 @@ export const CoinControl = ({ close }: CoinControlProps) => {
     };
 
     return (
-        <>
+        <Card>
             <Row>
                 <Translation id="TR_COIN_CONTROL" />
                 <StyledSwitch isChecked={!!isCoinControlEnabled} onChange={toggleCoinControl} />
                 <Icon size={24} icon="ARROW_UP" onClick={close} />
             </Row>
+
             <SecondRow>
                 <Checkbox
                     isChecked={allUtxosSelected}
                     isDisabled={!hasEligibleUtxos}
                     onClick={toggleCheckAllUtxos}
-                />
-                <GreyText>
-                    <Translation id="TR_SELECTED" values={{ amount: inputs.length }} />
-                </GreyText>
+                >
+                    <GreyText>
+                        <Translation id="TR_SELECTED" values={{ amount: inputs.length }} />
+                    </GreyText>
+                </Checkbox>
+
                 <AmountWrapper>
                     <GreyText>
                         <FormattedCryptoAmount value={formattedTotal} symbol={account.symbol} />
                     </GreyText>
+
                     <MissingToInput isVisible={isMissingVisible}>
                         <Translation id={missingToInputId} values={missingToInputValues} />
                     </MissingToInput>
@@ -237,6 +245,6 @@ export const CoinControl = ({ close }: CoinControlProps) => {
                     onPageSelected={setSelectedPage}
                 />
             )}
-        </>
+        </Card>
     );
 };

@@ -1,4 +1,4 @@
-// @group:coinmarket
+// @group:other
 
 describe('Coinmarket buy', () => {
     beforeEach(() => {
@@ -24,7 +24,7 @@ describe('Coinmarket buy', () => {
         cy.passThroughInitialRun();
         cy.discoveryShouldFinish();
         // navigate to buy
-        cy.getTestElement('@suite/menu/wallet-index').click();
+        cy.getTestElement('@account-menu/btc/normal/0').click();
         cy.getTestElement('@wallet/menu/wallet-coinmarket-buy').click();
     });
 
@@ -69,7 +69,9 @@ describe('Coinmarket buy', () => {
         );
 
         // Fills out the form
-        cy.getTestElement('@coinmarket/buy/fiat-input').type(testData.fiatInput);
+        cy.getTestElement('@coinmarket/buy/fiat-input').type(testData.fiatInput, {
+            force: true, // The Fiat input contains the inner select box, that partially covers the input.
+        });
         cy.getTestElement('@coinmarket/buy/compare-button').click();
 
         // Verifies the offers displayed match the mock
@@ -84,16 +86,16 @@ describe('Coinmarket buy', () => {
                 const valueFromFixtures = quotes.find(
                     (quote: any) => quote.exchange === provider[1],
                 );
-                cy.contains('[class*="Quote__Wrapper"]', provider[0], { matchCase: false })
+                cy.contains('[class*="BuyQuote__Details"]', provider[0], { matchCase: false })
                     .should('exist')
                     .find('[class*="CryptoAmount__Value"]') // Returns element handle
                     .invoke('text')
                     .then((readValue: string) => {
-                        const ethValueFromApp: number = parseFloat(readValue);
-                        const ethValueFromQuote: number = parseFloat(
+                        const coinValueFromApp: number = parseFloat(readValue);
+                        const coinValueFromQuote: number = parseFloat(
                             valueFromFixtures.receiveStringAmount,
                         );
-                        expect(ethValueFromApp).to.be.eq(ethValueFromQuote);
+                        expect(coinValueFromApp).to.be.eq(coinValueFromQuote);
                     });
             });
         });
@@ -155,7 +157,7 @@ describe('Coinmarket buy', () => {
             });
 
         // Goes back and verifies the transaction is listed under "Trade transactions"
-        cy.getTestElement('@coinmarket/back').click();
+        cy.getTestElement('@account-subpage/back').click();
         cy.get('[class*="BuyTransaction__Wrapper"]')
             .first()
             .should('exist')

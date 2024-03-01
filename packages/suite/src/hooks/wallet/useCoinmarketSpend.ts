@@ -18,6 +18,8 @@ import { useForm } from 'react-hook-form';
 import { DEFAULT_PAYMENT, DEFAULT_VALUES } from '@suite-common/wallet-constants';
 import type { AppState } from 'src/types/suite';
 import { useBitcoinAmountUnit } from 'src/hooks/wallet/useBitcoinAmountUnit';
+import { networkToCryptoSymbol } from 'src/utils/wallet/coinmarket/cryptoSymbolUtils';
+import { selectLanguage } from 'src/reducers/suite/suiteReducer';
 
 export const SpendContext = createContext<SpendContextValues | null>(null);
 SpendContext.displayName = 'CoinmarketSpendContext';
@@ -69,7 +71,7 @@ export const useCoinmarketSpend = ({
     const { account, network } = selectedAccount;
     const { shouldSendInSats } = useBitcoinAmountUnit(account.symbol);
     const sellInfo = useSelector(state => state.wallet.coinmarket.sell.sellInfo);
-    const language = useSelector(state => state.suite.settings.language);
+    const language = useSelector(selectLanguage);
     const fees = useSelector(state => state.wallet.fees);
 
     const country = sellInfo?.sellList?.country;
@@ -77,18 +79,18 @@ export const useCoinmarketSpend = ({
     const provider = sellInfo?.sellList?.providers.filter(p => p.type === 'Voucher')[0];
     const noProviders =
         !provider ||
-        !provider.tradedCoins.includes(account.symbol.toUpperCase()) ||
+        !provider.tradedCoins.includes(networkToCryptoSymbol(account.symbol)!) ||
         !voucherSiteUrl ||
         voucherSiteUrl === 'error';
 
     useEffect(() => {
         if (provider) {
-            if (provider.tradedCoins.includes(account.symbol.toUpperCase())) {
+            if (provider.tradedCoins.includes(networkToCryptoSymbol(account.symbol)!)) {
                 setVoucherSiteUrl(undefined);
                 invityAPI
                     .getVoucherQuotes({
                         country,
-                        cryptoCurrency: account.symbol.toUpperCase(),
+                        cryptoCurrency: networkToCryptoSymbol(account.symbol),
                         language,
                         refundAddress: getUnusedAddressFromAccount(account).address,
                     })
@@ -192,7 +194,7 @@ export const useCoinmarketSpend = ({
                 if (provider && provider.voucherSiteOrigin === event.origin) {
                     const trade = await invityAPI.requestVoucherTrade({
                         exchange: provider.name,
-                        cryptoCurrency: account.symbol.toUpperCase(),
+                        cryptoCurrency: networkToCryptoSymbol(account.symbol)!,
                         data: event.data,
                     });
 
@@ -244,6 +246,7 @@ export const useCoinmarketSpend = ({
             if (isDesktop()) {
                 // handle messages from desktop
                 desktopApi.on('spend/message', handleMessage);
+
                 return () => {
                     desktopApi.removeAllListeners('spend/message');
                 };
@@ -251,6 +254,7 @@ export const useCoinmarketSpend = ({
 
             // handle messages from web
             window.addEventListener('message', handleMessage);
+
             return () => {
                 window.removeEventListener('message', handleMessage);
             };
@@ -291,5 +295,6 @@ export const useCoinmarketSpend = ({
 export const useCoinmarketSpendContext = () => {
     const context = useContext(SpendContext);
     if (context === null) throw Error('SpendContext used without Context');
+
     return context;
 };

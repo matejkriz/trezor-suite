@@ -6,6 +6,7 @@ import { createCoinjoinRound } from '../fixtures/round.fixture';
 // mock random delay function
 jest.mock('@trezor/utils', () => {
     const originalModule = jest.requireActual('@trezor/utils');
+
     return {
         __esModule: true,
         ...originalModule,
@@ -211,6 +212,7 @@ describe('inputRegistration', () => {
             if (url.endsWith('/input-registration')) {
                 // respond after phaseDeadline
                 setTimeout(resolve, 4000);
+
                 return;
             }
             resolve();
@@ -279,7 +281,7 @@ describe('inputRegistration', () => {
 
         await Promise.all(response.inputs.map(input => input.getConfirmationInterval()?.promise));
 
-        expect(spy).toBeCalledTimes(3); // connection-confirmation was called 2 times: 10 sec phase deadline divided by 2 * 2.5 sec connectionConfirmationTimeout
+        expect(spy).toHaveBeenCalledTimes(3); // connection-confirmation was called 2 times: 10 sec phase deadline divided by 2 * 2.5 sec connectionConfirmationTimeout
     }, 10000);
 
     it('success. connection-confirmation returns realCredentials (coordinator is already in phase 1)', async () => {
@@ -304,7 +306,7 @@ describe('inputRegistration', () => {
 
         await Promise.all(response.inputs.map(input => input.getConfirmationInterval()?.promise));
 
-        expect(spy).toBeCalledTimes(1); // connection-confirmation was called 1 time and responded with real realCredentials (default response of MockedServer)
+        expect(spy).toHaveBeenCalledTimes(1); // connection-confirmation was called 1 time and responded with real realCredentials (default response of MockedServer)
         expect(response.inputs[0].confirmationData).toMatchObject({
             RealAmountCredentials: expect.any(Object),
         });

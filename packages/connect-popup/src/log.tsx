@@ -6,7 +6,7 @@ import { ErrorBoundary } from '@trezor/connect-ui/src/support/ErrorBoundary';
 import { GlobalStyle } from '@trezor/connect-ui/src/support/GlobalStyle';
 import { InfoPanel } from '@trezor/connect-ui/src/components/InfoPanel';
 import { View } from '@trezor/connect-ui/src/components/View';
-import { Button, P, THEME, variables } from '@trezor/components';
+import { Button, Paragraph, THEME } from '@trezor/components';
 import { LogMessage } from '@trezor/connect/src/utils/debug';
 
 interface ReactWrapperProps {
@@ -30,10 +30,8 @@ const Layout = styled.div`
     }
 `;
 
-const StyledP = styled(P)`
+const StyledP = styled(Paragraph)`
     margin: 0 20%;
-    font-size: 15px;
-    font-weight: ${variables.FONT_WEIGHT.LIGHT};
     color: #757575;
 `;
 
@@ -124,6 +122,7 @@ const useLogWorker = (setLogs: React.Dispatch<React.SetStateAction<any[]>>) => {
                             if (prevLogs.length > MAX_ENTRIES) {
                                 prevLogs.shift();
                             }
+
                             return [...prevLogs, data.payload];
                         });
                         break;

@@ -9,7 +9,7 @@ const metadataEl = '@metadata/addressLabel/bc1q7e6qu5smalrpgqrx9k2gnf0hgjyref5p3
 
 describe('Metadata - address labeling', () => {
     beforeEach(() => {
-        cy.viewport(1080, 1440).resetDb();
+        cy.viewport(1440, 2560).resetDb();
     });
 
     it(provider, () => {
@@ -28,12 +28,11 @@ describe('Metadata - address labeling', () => {
         });
 
         cy.passThroughInitialRun();
-
-        cy.getTestElement('@suite/menu/wallet-index').click();
-
         cy.discoveryShouldFinish();
 
+        cy.getTestElement('@account-menu/btc/normal/0').click();
         cy.getTestElement('@wallet/menu/wallet-receive').click();
+        cy.getTestElement('@wallet/receive/used-address/show-more').click();
         cy.getTestElement(`${metadataEl}/add-label-button`).click({ force: true });
         cy.passThroughInitMetadata(provider);
 

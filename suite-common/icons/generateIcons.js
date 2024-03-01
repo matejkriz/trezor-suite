@@ -41,7 +41,6 @@ const svgoConfig = {
                 },
             },
         },
-        'removeXMLNS',
         'prefixIds',
         // it's necessary to remove all dimension tags to allow resizing
         'removeDimensions',
@@ -53,6 +52,7 @@ const svgoConfig = {
 const optimizeSvgAssets = assetsDirname => {
     const assetsDir = path.join(__dirname, assetsDirname);
     const assetFileNames = fs.readdirSync(assetsDir);
+
     return assetFileNames
         .map(fileName => ({
             fileName,
@@ -84,6 +84,7 @@ const generateIconsFileContent = assetTypesArray => {
         export type ${typeName} = keyof typeof ${name};
        `,
     );
+
     return `
     /* eslint-disable global-require */
 

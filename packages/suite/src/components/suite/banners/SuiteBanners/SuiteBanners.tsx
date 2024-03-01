@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
 
-import styled from 'styled-components';
-
 import { isDesktop } from '@trezor/env-utils';
 import { selectBannerMessage } from '@suite-common/message-system';
 import { selectDevice } from '@suite-common/wallet-core';
@@ -18,9 +16,12 @@ import { FailedBackup } from './FailedBackupBanner';
 import { SafetyChecksBanner } from './SafetyChecksBanner';
 import { TranslationMode } from './TranslationModeBanner';
 import { FirmwareHashMismatch } from './FirmwareHashMismatchBanner';
+import styled from 'styled-components';
 
-const Wrapper = styled.div`
-    background: ${({ theme }) => theme.BG_WHITE};
+const Container = styled.div<{ isVisible?: boolean }>`
+    background: ${({ theme }) => theme.backgroundSurfaceElevationNegative};
+    border-bottom: ${({ isVisible, theme }) =>
+        isVisible ? `solid 1px ${theme.borderOnElevation0}` : 'none'};
 `;
 
 export const SuiteBanners = () => {
@@ -44,10 +45,11 @@ export const SuiteBanners = () => {
         ) {
             return false;
         }
+
         return transport?.outdated;
     };
 
-    let banner;
+    let banner = null;
     let priority = 0;
     if (device?.id && firmwareHashInvalid.includes(device.id)) {
         banner = <FirmwareHashMismatch />;
@@ -88,12 +90,12 @@ export const SuiteBanners = () => {
     const useMessageSystemBanner = bannerMessage && bannerMessage.priority >= priority;
 
     return (
-        <Wrapper>
+        <Container isVisible={banner !== null}>
             {useMessageSystemBanner && <MessageSystemBanner message={bannerMessage} />}
             {isTranslationMode() && <TranslationMode />}
             <OnlineStatus isOnline={online} />
             {!useMessageSystemBanner && banner}
             {/* TODO: add Pin not set */}
-        </Wrapper>
+        </Container>
     );
 };

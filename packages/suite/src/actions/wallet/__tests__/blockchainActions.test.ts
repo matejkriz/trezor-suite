@@ -85,6 +85,7 @@ const initStore = (state: State) => {
         };
         store.getState().notifications = notificationsReducer(state.notifications, action);
     });
+
     return store;
 };
 
@@ -98,7 +99,7 @@ describe('Blockchain Actions', () => {
             const store = initStore(getInitialState(f.initialState as Args));
             await store.dispatch(initBlockchainThunk());
             expect(filterThunkActionTypes(store.getActions())).toMatchObject(f.actions);
-            expect(TrezorConnect.blockchainSetCustomBackend).toBeCalledTimes(
+            expect(TrezorConnect.blockchainSetCustomBackend).toHaveBeenCalledTimes(
                 f.blockchainSetCustomBackend,
             );
         });
@@ -110,8 +111,10 @@ describe('Blockchain Actions', () => {
             const store = initStore(getInitialState(f.initialState as Args));
             await store.dispatch(onBlockchainConnectThunk(f.symbol));
             expect(filterThunkActionTypes(store.getActions())).toMatchObject(f.actions);
-            expect(TrezorConnect.blockchainEstimateFee).toBeCalledTimes(f.blockchainEstimateFee);
-            expect(TrezorConnect.blockchainSubscribe).toBeCalledTimes(f.blockchainSubscribe);
+            expect(TrezorConnect.blockchainEstimateFee).toHaveBeenCalledTimes(
+                f.blockchainEstimateFee,
+            );
+            expect(TrezorConnect.blockchainSubscribe).toHaveBeenCalledTimes(f.blockchainSubscribe);
         });
     });
 
@@ -131,7 +134,7 @@ describe('Blockchain Actions', () => {
                 const timeout = actions[0].payload.time - new Date().getTime() + 500;
                 jest.setTimeout(10000);
                 await new Promise(resolve => setTimeout(resolve, timeout));
-                expect(TrezorConnect.blockchainUnsubscribeFiatRates).toBeCalledTimes(1);
+                expect(TrezorConnect.blockchainUnsubscribeFiatRates).toHaveBeenCalledTimes(1);
             }
         });
     });
@@ -142,7 +145,7 @@ describe('Blockchain Actions', () => {
             const store = initStore(getInitialState(f.initialState as Args));
             await store.dispatch(onBlockchainNotificationThunk(f.params as any));
             expect(filterThunkActionTypes(store.getActions())).toMatchObject(f.actions);
-            expect(TrezorConnect.getAccountInfo).toBeCalledTimes(f.getAccountInfo);
+            expect(TrezorConnect.getAccountInfo).toHaveBeenCalledTimes(f.getAccountInfo);
         });
     });
 
@@ -190,7 +193,7 @@ describe('Blockchain Actions', () => {
         it(`customBackend: ${f.description}`, async () => {
             const store = initStore(getInitialState(f.initialState as any));
             await store.dispatch(setCustomBackendThunk(f.symbol));
-            expect(TrezorConnect.blockchainSetCustomBackend).toBeCalledTimes(
+            expect(TrezorConnect.blockchainSetCustomBackend).toHaveBeenCalledTimes(
                 f.blockchainSetCustomBackend,
             );
         });
@@ -213,7 +216,7 @@ describe('Blockchain Actions', () => {
         await store.dispatch(updateFeeInfoThunk('btc-invalid'));
         // will not trigger update because of blockHeight's
         await store.dispatch(updateFeeInfoThunk('btc'));
-        expect(TrezorConnect.blockchainEstimateFee).toBeCalledTimes(0);
+        expect(TrezorConnect.blockchainEstimateFee).toHaveBeenCalledTimes(0);
 
         // preload fee info failed in connect
         testMocks.setTrezorConnectFixtures({ success: false });

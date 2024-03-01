@@ -37,6 +37,7 @@ const onLoaded = (method: AppState['method'], html: string) => ({
 
 const onError = (method: AppState['method']) => {
     const url = `${GITHUB}${method?.docs}`;
+
     return {
         type: DOCS_LOADED,
         docs: {
@@ -62,6 +63,7 @@ export const loadDocs = () => async (dispatch: Dispatch, getState: GetState) => 
         const markdown = new Markdown({
             replaceLink: (link: any, _env: any) => `${GITHUB}${link}`,
         });
+        // @ts-expect-error
         markdown.use(MarkdownReplaceLink);
         markdown.use(MarkdownReplaceLinkAttrs, {
             attrs: {

@@ -3,7 +3,7 @@
 
 describe('Suite initial run', () => {
     beforeEach(() => {
-        cy.viewport(1080, 1440).resetDb();
+        cy.viewport(1440, 2560).resetDb();
         cy.task('startEmu', { wipe: true });
         cy.task('setupEmu');
         cy.task('startBridge');
@@ -12,11 +12,11 @@ describe('Suite initial run', () => {
     it('Until user passed through initial run, it will be there after reload', () => {
         cy.prefixedVisit('/');
         cy.getTestElement('@analytics/toggle-switch').should('be.visible');
-        cy.reload();
+        cy.safeReload();
         // analytics screen is there until user confirms his choice
         cy.getTestElement('@analytics/toggle-switch').should('be.visible');
         cy.getTestElement('@analytics/continue-button').click();
-        cy.reload();
+        cy.safeReload();
         cy.getTestElement('@analytics/toggle-switch').should('not.exist');
         cy.getTestElement('@onboarding/exit-app-button').should('be.visible');
     });
@@ -26,7 +26,7 @@ describe('Suite initial run', () => {
         cy.getTestElement('@analytics/continue-button').click();
         cy.getTestElement('@onboarding/exit-app-button').click();
         cy.discoveryShouldFinish();
-        cy.reload();
+        cy.safeReload();
         cy.discoveryShouldFinish();
     });
 });

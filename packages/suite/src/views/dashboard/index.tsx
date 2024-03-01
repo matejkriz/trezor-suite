@@ -1,43 +1,36 @@
 import styled from 'styled-components';
-import { variables } from '@trezor/components';
+import { breakpointMediaQueries } from '@trezor/styles';
 import { useLayout } from 'src/hooks/suite';
-import AssetsCard from './components/AssetsCard';
+import { AssetsView } from './components/AssetsView';
 import PortfolioCard from './components/PortfolioCard';
 import SecurityFeatures from './components/SecurityFeatures';
 import { PromoBanner } from './components/PromoBanner';
 import { T2B1PromoBanner } from './components/T2B1PromoBanner';
+import { PageHeader } from 'src/components/suite/layouts/SuiteLayout';
+import { StakeEthCard } from './components/StakeEthCard/StakeEthCard';
 
 const Wrapper = styled.div`
-    width: 100%;
-    margin-top: 40px; /* 40px + 24px (default padding in suite layout) = 64px (as designed) */
-    margin-bottom: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 64px;
 
-    @media (max-width: ${variables.SCREEN_SIZE.SM}) {
-        margin-top: 10px;
-        margin-bottom: 0;
+    ${breakpointMediaQueries.below_sm} {
+        /* for the promo banner */
+        margin-bottom: 52px;
     }
 `;
 
-const Divider = styled.div`
-    display: flex;
-    margin-bottom: 64px;
-`;
-
-const Dashboard = () => {
-    useLayout();
+export const Dashboard = () => {
+    useLayout('Home', PageHeader);
 
     return (
         <Wrapper data-test="@dashboard/index">
             <PortfolioCard />
             <T2B1PromoBanner />
-            <Divider />
-            <AssetsCard />
-            <Divider />
+            <AssetsView />
             <SecurityFeatures />
-            <Divider />
+            <StakeEthCard />
             <PromoBanner />
         </Wrapper>
     );
 };
-
-export default Dashboard;

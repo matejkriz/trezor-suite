@@ -1,6 +1,24 @@
 // TODO: button hover color could be derived from its based color by applying something like opacity/darkening
 // same goes for gradients
 
+import { boxShadows, colorVariants } from '@trezor/theme';
+
+type LightThemeProps = typeof THEME.light;
+type DarkThemeProps = typeof THEME.dark;
+
+// extracts values for common props (eg. NEUE_BG_GREEN: "#00854D" | "#e3ede0")
+type CommonThemeProps = {
+    [K in keyof LightThemeProps & keyof DarkThemeProps]: LightThemeProps[K] | DarkThemeProps[K];
+};
+
+type PropsOnlyInLightTheme = Omit<LightThemeProps, keyof DarkThemeProps>;
+type PropsOnlyInDarkTheme = Omit<DarkThemeProps, keyof LightThemeProps>;
+
+// all common theme props and their values are nicely listed, props that are specific to given theme are marked optional
+export type SuiteThemeColors = CommonThemeProps &
+    Partial<PropsOnlyInDarkTheme> &
+    Partial<PropsOnlyInLightTheme>;
+
 export const THEME = {
     light: {
         THEME: 'light',
@@ -61,7 +79,6 @@ export const THEME = {
         BOX_SHADOW_BLACK_20: 'rgba(0, 0, 0, 0.2)',
         BOX_SHADOW_MODAL: 'rgba(77, 77, 77, 0.2)',
         BOX_SHADOW_OPTION_CARD: 'rgba(77, 77, 77, 0.12)',
-        BOX_SHADOW_RANGE: 'rgba(0, 0, 0, 0.3)',
 
         HOVER_PRIMER_COLOR: '#000',
         HOVER_TRANSPARENTIZE_FILTER: 0.96,
@@ -129,7 +146,6 @@ export const THEME = {
         BOX_SHADOW_BLACK_20: 'rgba(0, 0, 0, 0.2)', // shadow around dropdown
         BOX_SHADOW_MODAL: 'rgba(0, 0, 0, 0.5)', // shadow around modal
         BOX_SHADOW_OPTION_CARD: 'rgba(0, 0, 0, 0.2)', // shadow around Options card in onboarding,
-        BOX_SHADOW_RANGE: 'rgba(255, 255, 255, 0.3)',
         IMAGE_FILTER: 'brightness(0.8) contrast(1.2) saturate(1.2)',
 
         HOVER_PRIMER_COLOR: '#fff',
@@ -198,7 +214,6 @@ export const THEME = {
         BOX_SHADOW_BLACK_20: 'rgba(255, 255, 255, 0.1)', // shadow around dropdown
         BOX_SHADOW_MODAL: 'rgba(0, 0, 0, 0.5)', // shadow around modal
         BOX_SHADOW_OPTION_CARD: 'rgba(0, 0, 0, 0.2)', // shadow around Options card in onboarding,
-        BOX_SHADOW_RANGE: 'rgba(255, 255, 255, 0.3)',
         IMAGE_FILTER: 'brightness(0.8) contrast(1.2) saturate(1.2)',
 
         HOVER_PRIMER_COLOR: '#fff',
@@ -219,3 +234,8 @@ const oldColors = {
 } as const;
 
 export const colors = { ...oldColors, ...THEME.light } as const;
+
+export const intermediaryTheme = {
+    light: { ...THEME.light, ...colorVariants.standard, ...boxShadows.standard },
+    dark: { ...THEME.dark, ...colorVariants.dark, ...boxShadows.dark },
+};

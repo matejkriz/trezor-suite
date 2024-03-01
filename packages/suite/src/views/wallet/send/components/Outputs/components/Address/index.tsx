@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
-import styled from 'styled-components';
 import { checkAddressChecksum, toChecksumAddress } from 'web3-utils';
+import styled from 'styled-components';
 import { capitalizeFirstLetter } from '@trezor/utils';
-import { Input, useTheme, Icon, Button, Tooltip } from '@trezor/components';
+import { Input, Button, IconButton } from '@trezor/components';
 import { AddressLabeling, Translation, MetadataLabeling } from 'src/components/suite';
 import { scanQrRequest } from 'src/actions/wallet/sendFormActions';
 import { useDevice, useDispatch, useTranslation } from 'src/hooks/suite';
@@ -22,6 +22,14 @@ import { notificationsActions } from '@suite-common/toast-notifications';
 import type { Output } from 'src/types/wallet/sendForm';
 import { InputError } from 'src/components/wallet';
 
+const Container = styled.div`
+    position: relative;
+`;
+
+const Heading = styled.p`
+    position: absolute;
+`;
+
 const Text = styled.span`
     display: flex;
     align-items: center;
@@ -31,13 +39,11 @@ const Text = styled.span`
     }
 `;
 
-const StyledIcon = styled(Icon)`
-    display: flex;
-`;
-
 const MetadataLabelingWrapper = styled.div`
     max-width: 200px;
 `;
+
+type AddressDeprecatedUrl = 'LTC_ADDRESS_INFO_URL' | 'HELP_CENTER_CASHADDR_URL';
 
 interface AddressProps {
     outputId: number;
@@ -46,9 +52,10 @@ interface AddressProps {
 }
 
 export const Address = ({ output, outputId, outputsCount }: AddressProps) => {
-    const [addressDeprecatedUrl, setAddressDeprecatedUrl] = useState<string | undefined>(undefined);
+    const [addressDeprecatedUrl, setAddressDeprecatedUrl] = useState<
+        AddressDeprecatedUrl | undefined
+    >(undefined);
     const dispatch = useDispatch();
-    const theme = useTheme();
     const { device } = useDevice();
     const {
         account,
@@ -78,7 +85,7 @@ export const Address = ({ output, outputId, outputsCount }: AddressProps) => {
     const address = watch(inputName);
     const options = getDefaultValue('options', []);
     const broadcastEnabled = options.includes('broadcast');
-    const inputState = getInputState(addressError, addressValue);
+    const inputState = getInputState(addressError);
 
     const handleQrClick = useCallback(async () => {
         const uri = await dispatch(scanQrRequest());
@@ -125,7 +132,10 @@ export const Address = ({ output, outputId, outputsCount }: AddressProps) => {
         }
     }, [amountInputName, composeTransaction, dispatch, inputName, setValue, symbol]);
 
-    const getValidationButtonProps = () => {
+    const getValidationButtonProps = ():
+        | { url: AddressDeprecatedUrl }
+        | { onClick: () => void; text: string }
+        | undefined => {
         switch (addressError?.type) {
             case 'deprecated':
                 if (addressDeprecatedUrl) {
@@ -164,6 +174,7 @@ export const Address = ({ output, outputId, outputsCount }: AddressProps) => {
                 const url = isAddressDeprecated(value, symbol);
                 if (url) {
                     setAddressDeprecatedUrl(url);
+
                     return translationString('TR_UNSUPPORTED_ADDRESS_FORMAT', {
                         url,
                     });
@@ -204,81 +215,90 @@ export const Address = ({ output, outputId, outputsCount }: AddressProps) => {
         },
     });
 
+    // required for the correct functionality of bottom text in the input
+    const addressLabelComponent = <AddressLabeling address={addressValue} knownOnly />;
+    const isAddressWithLabel = !!addressLabelComponent.type({
+        address: addressValue,
+        knownOnly: true,
+    });
+    const addressBottomText = isAddressWithLabel ? addressLabelComponent : null;
+
     return (
-        <Input
-            inputState={inputState}
-            isMonospace
-            innerAddon={
-                metadataEnabled && broadcastEnabled ? (
-                    <MetadataLabelingWrapper>
-                        <MetadataLabeling
-                            defaultVisibleValue=""
-                            payload={{
-                                type: 'outputLabel',
-                                entityKey: account.key,
-                                // txid is not known at this moment. metadata is only saved
-                                // along with other sendForm data and processed in sendFormActions
-                                txid: 'will-be-replaced',
-                                outputIndex: outputId,
-                                defaultValue: `${outputId}`,
-                                value: label,
+        <Container>
+            <Heading>
+                <Translation
+                    id={outputsCount > 1 ? 'TR_SEND_RECIPIENT_ADDRESS' : 'TR_SEND_ADDRESS_SECTION'}
+                    values={{ index: recipientId }}
+                />
+            </Heading>
+
+            <Input
+                inputState={inputState}
+                innerAddon={
+                    metadataEnabled && broadcastEnabled ? (
+                        <MetadataLabelingWrapper>
+                            <MetadataLabeling
+                                defaultVisibleValue=""
+                                payload={{
+                                    type: 'outputLabel',
+                                    entityKey: account.key,
+                                    // txid is not known at this moment. metadata is only saved
+                                    // along with other sendForm data and processed in sendFormActions
+                                    txid: 'will-be-replaced',
+                                    outputIndex: outputId,
+                                    defaultValue: `${outputId}`,
+                                    value: label,
+                                }}
+                                onSubmit={(value: string | undefined) => {
+                                    setValue(`outputs.${outputId}.label`, value || '');
+                                    setDraftSaveRequest(true);
+                                }}
+                                visible
+                            />
+                        </MetadataLabelingWrapper>
+                    ) : undefined
+                }
+                label={
+                    <Text>
+                        <Translation id="RECIPIENT_ADDRESS" />
+                    </Text>
+                }
+                labelHoverAddon={
+                    <Button variant="tertiary" size="tiny" icon="QR" onClick={handleQrClick}>
+                        <Translation id="RECIPIENT_SCAN" />
+                    </Button>
+                }
+                labelRight={
+                    outputsCount > 1 ? (
+                        <IconButton
+                            icon="CROSS"
+                            size="tiny"
+                            variant="tertiary"
+                            data-test={`outputs.${outputId}.remove`}
+                            onClick={() => {
+                                removeOutput(outputId);
+                                // compose by first Output
+                                composeTransaction();
                             }}
-                            onSubmit={(value: string | undefined) => {
-                                setValue(`outputs.${outputId}.label`, value || '');
-                                setDraftSaveRequest(true);
-                            }}
-                            visible
                         />
-                    </MetadataLabelingWrapper>
-                ) : undefined
-            }
-            label={
-                <Text>
-                    {outputsCount > 1 && `${recipientId}.`} &nbsp;
-                    <Translation id="RECIPIENT_ADDRESS" />
-                    {inputState === 'success' && (
-                        <Tooltip content={<Translation id="TR_ADDRESS_FORMAT" />}>
-                            <Icon icon="CHECK" size={18} color={theme.TYPE_GREEN} />
-                        </Tooltip>
-                    )}
-                </Text>
-            }
-            labelAddon={
-                <Button variant="tertiary" icon="QR" onClick={handleQrClick}>
-                    <Translation id="RECIPIENT_SCAN" />
-                </Button>
-            }
-            labelRight={
-                outputsCount > 1 ? (
-                    <StyledIcon
-                        size={16}
-                        color={theme.TYPE_LIGHT_GREY}
-                        icon="CROSS"
-                        useCursorPointer
-                        data-test={`outputs.${outputId}.remove`}
-                        onClick={() => {
-                            removeOutput(outputId);
-                            // compose by first Output
-                            composeTransaction();
-                        }}
-                    />
-                ) : undefined
-            }
-            bottomText={
-                addressError ? (
-                    <InputError
-                        message={addressError.message}
-                        button={getValidationButtonProps()}
-                    />
-                ) : (
-                    <AddressLabeling address={addressValue} knownOnly />
-                )
-            }
-            data-test={inputName}
-            defaultValue={addressValue}
-            maxLength={formInputsMaxLength.address}
-            innerRef={inputRef}
-            {...inputField}
-        />
+                    ) : undefined
+                }
+                bottomText={
+                    addressError ? (
+                        <InputError
+                            message={addressError.message}
+                            button={getValidationButtonProps()}
+                        />
+                    ) : (
+                        addressBottomText
+                    )
+                }
+                data-test={inputName}
+                defaultValue={addressValue}
+                maxLength={formInputsMaxLength.address}
+                innerRef={inputRef}
+                {...inputField}
+            />
+        </Container>
     );
 };

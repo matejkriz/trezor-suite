@@ -16,6 +16,7 @@ export const en = {
             eject: 'Eject',
         },
         unknownError: 'Something went wrong',
+        default: 'Default',
     },
     messageSystem: {
         killswitch: {
@@ -100,6 +101,18 @@ export const en = {
             discoveryProgress: { loading: 'Loading...', stillWorking: 'Retrieving balances' },
         },
     },
+    biometrics: {
+        ios: {
+            faceId: 'Use FaceID',
+            touchId: 'Use TouchID',
+        },
+        android: {
+            fingerprint: 'Use fingerprint',
+            facial: 'Use facial recognition',
+            combined: 'Use biometrics',
+        },
+        unknown: 'Use biometrics',
+    },
     moduleAccountImport: {
         title: 'Sync my coins',
         error: { unsupportedNetworkType: 'Unsupported account network type.' },
@@ -109,6 +122,103 @@ export const en = {
                 alreadySynced: 'Coin already synced',
             },
             subtitle: "Here's what you have in your account.",
+        },
+        xpubScanScreen: {
+            alert: {
+                address: {
+                    title: 'This is your receive address',
+                    description: 'To check the balance of your coin, scan your public key (XPUB).',
+                    hintButton: 'Where to find it?',
+                },
+                xpub: {
+                    title: 'Incompatible XPUB detected',
+                    description: "Provided XPUB doesn't correspond with selected network.",
+                },
+            },
+            input: {
+                label: {
+                    xpub: 'Enter public key (XPUB) manually',
+                    address: 'Enter address manually',
+                },
+                error: {
+                    address: 'Address is not valid',
+                },
+            },
+            hintBottomSheet: {
+                title: {
+                    xpub: 'Where is my public key (XPUB)?',
+                    address: 'Where is my receive address?',
+                },
+                text: {
+                    xpub: ' To view the public key (XPUB) of your account, open the Trezor Suite app, plug in your Trezor device, then select <emphasized>Details</emphasized>, then choose <emphasized>Show public key</emphasized>.',
+                    address:
+                        'To view the receive address of your account, open the Trezor Suite desktop app, plugin your Trezor device, select <emphasized>Accounts</emphasized>, choose <emphasized>Receive</emphasized>, and click on <emphasized>Show full address</emphasized>.',
+                },
+            },
+            confirmButton: 'Got it',
+        },
+    },
+    moduleAddAccounts: {
+        addCoinAccountScreen: {
+            title: 'Add new',
+        },
+        alerts: {
+            tooManyAccounts: {
+                title: 'You have reached maximum number of accounts',
+                description: 'You can create up to 10 accounts of a type for each coin.',
+                actionPrimary: 'Close',
+            },
+            anotherEmptyAccount: {
+                title: 'Can’t create another fresh account',
+                description: 'The last account you created for this coin has no transactions yet.',
+                actionPrimary: 'Close',
+                actionSecondary: 'Learn more',
+                actionSecondaryUrl: 'https://trezor.io/learn/a/multiple-accounts-in-trezor-suite',
+            },
+            generalError: {
+                title: 'We couldn’t add your account.',
+                description: 'There’s been an unknown technical issue on our end.',
+                actionPrimary: 'Close',
+            },
+        },
+        accountTypeDecisionBootomSheet: {
+            title: 'Add <coin></coin> account',
+            description:
+                '<type></type> is the default address type. <moreLink>Learn more</moreLink>',
+            buttons: {
+                select: 'Change account type',
+                confirm: 'Continue with <type></type>',
+            },
+        },
+        selectAccountTypeScreen: {
+            title: 'Select <symbol></symbol> account type',
+            accountTypes: {
+                normal: {
+                    title: 'SegWit',
+                    subtitle: 'BIP84, P2WPKH, Bech32',
+                    desc: '<li>Reduces transaction size, boosts capacity, and enhances scalability</li><li>Enables lower transaction fees</li><li>May not work with some older services.</li>',
+                },
+                taproot: {
+                    title: 'Taproot',
+                    subtitle: 'BIP86, P2TR, Bech32m',
+                    desc: '<li>Enhances privacy and network efficiency</li><li>Allows more complex spending conditions privately on the blockchain</li><li>May not be supported by all services</li>',
+                },
+                segwit: {
+                    title: 'Legacy SegWit ',
+                    subtitle: 'BIP49, P2SH-P2WPKH, Base58',
+                    desc: '<li>Enhances privacy and network efficiency</li><li>Allows more complex spending conditions privately on the blockchain</li><li>May not be supported by all services</li>',
+                },
+                legacy: {
+                    title: 'Legacy',
+                    subtitle: 'BIP44, P2PKH, Base58',
+                    desc: '<li>Uses simpler transaction formats</li><li>May result in higher transaction fees</li><li>Lacks the efficiency and features found in newer address types</li>',
+                },
+            },
+            aboutTypesLabel: 'Curious about different address types?',
+            buttons: {
+                more: 'Learn more',
+                confirm: 'Continue with <type></type>',
+            },
         },
     },
     moduleConnectDevice: {
@@ -122,6 +232,7 @@ export const en = {
                 digits: 'digits',
                 keypadInfo: 'Follow the keypad layout on your Trezor',
                 enterPin: 'Enter pin',
+                submitting: 'Verifying your PIN',
             },
             wrongPinAlert: {
                 title: 'Incorrect PIN',
@@ -395,6 +506,23 @@ export const en = {
             learnMore: '<securityLink>More</securityLink> about privacy',
         },
     },
+    moduleAccountManagement: {
+        accountSettingsScreen: {
+            xpubBottomSheet: {
+                xpub: {
+                    title: 'Public key (XPUB)',
+                    showButton: 'Show public key (XPUB)',
+                    copyMessage: 'XPUB copied',
+                },
+                address: {
+                    title: 'Receive address',
+                    showButton: 'Show receive address',
+                    copyMessage: 'Public address copied',
+                },
+                copyButton: 'Copy',
+            },
+        },
+    },
     moduleAccounts: {
         accountDetail: {
             accountLabelBadge: 'Run on {accountLabel}',
@@ -407,10 +535,17 @@ export const en = {
         },
     },
     transactions: {
+        title: 'Transactions',
+        receive: 'Receive',
         phishing: {
             badge: 'Caution!',
             warning:
                 "Caution! This transaction may be a scam. If you’re unsure, don't engage. <blogLink>Read more</blogLink>",
+        },
+        emptyState: {
+            title: 'No transactions',
+            subtitle: 'Get started by receiving coins',
+            button: 'Receive',
         },
     },
     deviceManager: {

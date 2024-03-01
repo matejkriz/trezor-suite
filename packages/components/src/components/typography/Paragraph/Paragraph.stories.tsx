@@ -1,43 +1,28 @@
-import { P } from '../../../index';
-import { storiesOf } from '@storybook/react';
-import { select, text } from '@storybook/addon-knobs';
+import { Meta, StoryObj } from '@storybook/react';
+import { Paragraph as P, ParagraphProps } from '../../../index';
 
-storiesOf('Typography/Paragraph', module).add('Paragraph', () => {
-    const value = text('Value', 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.');
-    const textAlign: any = select(
-        'Align',
-        {
-            Left: 'left',
-            Right: 'right',
-            Center: 'center',
-        },
-        'left',
-    );
-    const size: any = select(
-        'Size',
-        {
-            Normal: 'normal',
-            Small: 'small',
-            Tiny: 'tiny',
-        },
-        'normal',
-    );
-    const weight: any = select(
-        'Weight',
-        {
-            Normal: 'normal',
-            Bold: 'bold',
-        },
-        'normal',
-    );
+export default {
+    title: 'Typography/Paragraph',
+    component: P,
+} as Meta;
 
-    return (
-        <P
-            {...(textAlign !== 'left' ? { textAlign } : {})}
-            {...(size !== 'normal' ? { size } : {})}
-            {...(weight !== 'normal' ? { weight } : {})}
-        >
-            {value}
-        </P>
-    );
-});
+export const Paragraph: StoryObj<ParagraphProps> = {
+    args: {
+        children: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
+    },
+    argTypes: {
+        type: {
+            control: 'radio',
+            options: [
+                'titleLarge',
+                'titleMedium',
+                'titleSmall',
+                'highlight',
+                'body',
+                'callout',
+                'hint',
+                'label',
+            ],
+        },
+    },
+};

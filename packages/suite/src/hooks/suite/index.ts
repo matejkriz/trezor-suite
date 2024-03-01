@@ -1,5 +1,6 @@
 export { useDevice } from './useDevice';
 export { useDiscovery } from './useDiscovery';
+export { useRediscoveryNeeded } from './useRediscoveryNeeded';
 export { useActions } from './useActions';
 export { useLayout } from './useLayout';
 export { useLayoutSize } from './useLayoutSize';
@@ -19,6 +20,9 @@ export { useAnonymityStatus } from './useAnonymityStatus';
 export { useCountdownTimer } from './useCountdownTimer';
 export { useDispatch } from './useDispatch';
 export { usePasswords } from './usePasswords';
+export { useDebugLanguageShortcut } from './useDebugLanguageShortcut';
+export { useValidatorsQueue } from './useValidatorsQueue';
+export { useEverstakePoolStats } from './useEverstakePoolStats';
 
 // replaced in suite-native
 export { useLocales } from 'src/hooks/suite/useLocales';

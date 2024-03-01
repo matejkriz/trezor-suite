@@ -6,12 +6,16 @@ import BigNumber from 'bignumber.js';
 import { trezorLogo } from '@suite-common/suite-constants';
 import { TransactionTarget } from '@trezor/connect';
 import { Network } from '@suite-common/wallet-config';
-import { ExportFileType, WalletAccountTransaction } from '@suite-common/wallet-types';
-import { getIsZeroValuePhishing } from '@suite-common/suite-utils';
+import {
+    ExportFileType,
+    TokenDefinitions,
+    WalletAccountTransaction,
+} from '@suite-common/wallet-types';
 
 import { formatNetworkAmount, formatAmount } from './accountUtils';
 import { getNftTokenId, isNftTokenTransfer } from './transactionUtils';
 import { localizeNumber } from './localizeNumberUtils';
+import { getIsPhishingTransaction } from './antiFraud';
 
 type AccountTransactionForExports = Omit<WalletAccountTransaction, 'targets'> & {
     targets: (TransactionTarget & { metadataLabel?: string })[];
@@ -98,7 +102,7 @@ const formatAmounts =
         ethereumSpecific: tx.ethereumSpecific
             ? {
                   ...tx.ethereumSpecific,
-                  gasPrice: fromWei(tx.ethereumSpecific.gasPrice, 'gwei'),
+                  gasPrice: fromWei(tx.ethereumSpecific?.gasPrice ?? '0', 'gwei'),
               }
             : undefined,
         cardanoSpecific: tx.cardanoSpecific
@@ -118,6 +122,7 @@ const loadPdfMake = async () => {
     if (fonts?.pdfMake?.vfs) {
         pdfMake.vfs = fonts.pdfMake.vfs;
     }
+
     return pdfMake;
 };
 
@@ -131,12 +136,13 @@ const makePdf = (
         });
     });
 
-const prepareContent = (data: Data): Fields[] => {
+const prepareContent = (data: Data, tokenDefinitions: TokenDefinitions): Fields[] => {
     const { transactions, coin } = data;
+
     return transactions
         .map(formatAmounts(coin))
         .flatMap(t => {
-            if (getIsZeroValuePhishing(t)) {
+            if (getIsPhishingTransaction(t, tokenDefinitions)) {
                 return null;
             }
 
@@ -209,6 +215,7 @@ const prepareContent = (data: Data): Fields[] => {
                         other: '',
                     };
                     hasFeeBeenAlreadyUsed = true;
+
                     return tokenData;
                 });
             }
@@ -237,6 +244,7 @@ const prepareContent = (data: Data): Fields[] => {
                         other: '',
                     };
                     hasFeeBeenAlreadyUsed = true;
+
                     return internalTransferData;
                 });
             }
@@ -250,10 +258,11 @@ const sanitizeCsvValue = (value: string) => {
     if (value.indexOf(CSV_SEPARATOR) !== -1) {
         return `"${value.replace(/"/g, '""')}"`;
     }
+
     return value;
 };
 
-const prepareCsv = (data: Data) => {
+const prepareCsv = (data: Data, tokenDefinitions: TokenDefinitions) => {
     const csvFields: Fields = {
         timestamp: 'Timestamp',
         date: 'Date',
@@ -270,7 +279,7 @@ const prepareCsv = (data: Data) => {
         other: 'Other',
     };
 
-    const content = prepareContent(data);
+    const content = prepareContent(data, tokenDefinitions);
 
     const lines: string[] = [];
 
@@ -299,7 +308,7 @@ const prepareCsv = (data: Data) => {
     return lines.join(CSV_NEWLINE);
 };
 
-const preparePdf = (data: Data): TDocumentDefinitions => {
+const preparePdf = (data: Data, tokenDefinitions: TokenDefinitions): TDocumentDefinitions => {
     const pdfFields = {
         dateTime: 'Date & Time',
         type: 'Type',
@@ -312,7 +321,7 @@ const preparePdf = (data: Data): TDocumentDefinitions => {
     const fieldKeys = Object.keys(pdfFields);
     const fieldValues = Object.values(pdfFields);
 
-    const content = prepareContent(data);
+    const content = prepareContent(data, tokenDefinitions);
 
     const lines: any[] = [];
     content.forEach(item => {
@@ -390,18 +399,20 @@ const preparePdf = (data: Data): TDocumentDefinitions => {
     };
 };
 
-export const formatData = async (data: Data) => {
+export const formatData = async (data: Data, tokenDefinitions: TokenDefinitions) => {
     const { coin, type, transactions } = data;
 
     switch (type) {
         case 'csv': {
-            const csv = prepareCsv(data);
+            const csv = prepareCsv(data, tokenDefinitions);
+
             return new Blob([csv], { type: 'text/csv;charset=utf-8' });
         }
         case 'pdf': {
-            const pdfLayout = preparePdf(data);
+            const pdfLayout = preparePdf(data, tokenDefinitions);
             const pdfMake = await loadPdfMake();
             const pdf = await makePdf(pdfLayout, pdfMake);
+
             return pdf;
         }
         case 'json': {
@@ -413,6 +424,7 @@ export const formatData = async (data: Data) => {
                 null,
                 2,
             );
+
             return new Blob([json], { type: 'text/json;charset=utf-8' });
         }
         // no default

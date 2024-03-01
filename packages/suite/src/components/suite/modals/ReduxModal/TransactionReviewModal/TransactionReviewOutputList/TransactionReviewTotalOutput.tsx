@@ -31,7 +31,7 @@ const StepIndicator = ({ signedTx, outputs, buttonRequestsCount }: StepIndicator
 
 type TransactionReviewTotalOutputProps = Omit<
     TransactionReviewOutputListProps,
-    'precomposedForm' | 'decision' | 'detailsOpen' | 'isRbfAction'
+    'precomposedForm' | 'decision' | 'detailsOpen' | 'isRbfAction' | 'actionText'
 >;
 
 const getLines = (
@@ -95,6 +95,7 @@ const getLines = (
             },
         ];
     }
+
     return [
         {
             id: 'total',

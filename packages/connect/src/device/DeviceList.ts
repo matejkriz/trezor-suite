@@ -1,8 +1,6 @@
 // original file https://github.com/trezor/connect/blob/develop/src/js/device/DeviceList.js
 
-/* eslint-disable no-restricted-syntax */
-
-import { TypedEmitter } from '@trezor/utils/lib/typedEventEmitter';
+import { TypedEmitter } from '@trezor/utils';
 import {
     BridgeTransport,
     WebUsbTransport,
@@ -165,6 +163,7 @@ export class DeviceList extends TypedEmitter<DeviceListEvents> {
 
             if (lastError) {
                 this.emit(TRANSPORT.ERROR, lastError);
+
                 return;
             }
 
@@ -249,8 +248,8 @@ export class DeviceList extends TypedEmitter<DeviceListEvents> {
                     d.forEach(descriptor => {
                         const path = descriptor.path.toString();
                         const device = this.devices[path];
-                        _log.debug('Event', e, device.toMessageObject());
                         if (device) {
+                            _log.debug('Event', e, device.toMessageObject());
                             this.emit(e, device.toMessageObject());
                         }
                     });
@@ -289,6 +288,7 @@ export class DeviceList extends TypedEmitter<DeviceListEvents> {
 
             if (!enumerateResult.success) {
                 this.emit(TRANSPORT.ERROR, enumerateResult.error);
+
                 return;
             }
 
@@ -348,11 +348,13 @@ export class DeviceList extends TypedEmitter<DeviceListEvents> {
             // emit connect event once device becomes acquired
             this.emit(DEVICE.CONNECT, device.toMessageObject());
         });
+
         return device;
     }
 
     private _createUnreadableDevice(descriptor: Descriptor, unreadableError: string) {
         _log.debug('Creating Unreadable Device', descriptor, unreadableError);
+
         return Device.createUnacquired(this.transport, descriptor, unreadableError);
     }
 
@@ -437,6 +439,7 @@ export class DeviceList extends TypedEmitter<DeviceListEvents> {
 
     private getAuthPenalty() {
         const { penalizedDevices } = this;
+
         return Object.keys(penalizedDevices).reduce(
             (penalty, key) => Math.max(penalty, penalizedDevices[key]),
             0,

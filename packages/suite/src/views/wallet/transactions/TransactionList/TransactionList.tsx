@@ -10,7 +10,7 @@ import {
     getAccountNetwork,
 } from '@suite-common/wallet-utils';
 import { CoinjoinBatchItem } from 'src/components/wallet/TransactionItem/CoinjoinBatchItem';
-import { SkeletonStack, Translation } from 'src/components/suite';
+import { Translation } from 'src/components/suite';
 import { DashboardSection } from 'src/components/dashboard';
 import { useDispatch, useSelector } from 'src/hooks/suite';
 import { WalletAccountTransaction, Account } from 'src/types/wallet';
@@ -24,6 +24,8 @@ import { findAnchorTransactionPage } from 'src/utils/suite/anchor';
 import { TransactionCandidates } from './TransactionCandidates';
 import { selectLabelingDataForAccount } from 'src/reducers/suite/metadataReducer';
 import { getTxsPerPage } from '@suite-common/suite-utils';
+import { SkeletonStack } from '@trezor/components';
+import { selectLocalCurrency } from 'src/reducers/wallet/settingsReducer';
 
 const StyledSection = styled(DashboardSection)`
     margin-bottom: 20px;
@@ -38,6 +40,8 @@ interface TransactionListProps {
     symbol: WalletAccountTransaction['symbol'];
     isLoading?: boolean;
     account: Account;
+    customTotalItems?: number;
+    isExportable?: boolean;
 }
 
 export const TransactionList = ({
@@ -45,8 +49,10 @@ export const TransactionList = ({
     isLoading,
     account,
     symbol,
+    customTotalItems,
+    isExportable = true,
 }: TransactionListProps) => {
-    const localCurrency = useSelector(state => state.wallet.settings.localCurrency);
+    const localCurrency = useSelector(selectLocalCurrency);
     const anchor = useSelector(state => state.router.anchor);
     const dispatch = useDispatch();
     const accountMetadata = useSelector(state => selectLabelingDataForAccount(state, account.key));
@@ -94,7 +100,8 @@ export const TransactionList = ({
     }, [account.descriptor, account.symbol, startPage]);
 
     const isSearching = searchQuery.trim() !== '';
-    const totalItems = isSearching ? searchedTransactions.length : account.history.total;
+    const defaultTotalItems = customTotalItems ?? account.history.total;
+    const totalItems = isSearching ? searchedTransactions.length : defaultTotalItems;
 
     const onPageSelected = (page: number) => {
         setSelectedPage(page);
@@ -180,6 +187,7 @@ export const TransactionList = ({
                     setSearch={setSearchQuery}
                     setSelectedPage={setSelectedPage}
                     accountMetadata={accountMetadata}
+                    isExportable={isExportable}
                 />
             }
             data-test="@wallet/accounts/transaction-list"

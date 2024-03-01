@@ -4,8 +4,7 @@ import { GraphScaleDropdownItem, Translation } from 'src/components/suite';
 
 export const TransactionSummaryDropdown = () => (
     <Dropdown
-        alignMenu="right"
-        offset={16}
+        alignMenu="bottom-right"
         items={[
             {
                 key: 'group1',
@@ -13,9 +12,8 @@ export const TransactionSummaryDropdown = () => (
                 options: [
                     {
                         key: 'graphView',
-                        noHover: true,
                         label: <GraphScaleDropdownItem />,
-                        callback: () => false,
+                        shouldCloseOnClick: false,
                     },
                 ],
             },

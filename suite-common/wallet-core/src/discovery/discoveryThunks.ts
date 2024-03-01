@@ -79,6 +79,7 @@ const calculateProgress =
         discovery.failed.forEach(f => {
             total -= LIMIT - f.index;
         });
+
         return {
             deviceState: discovery.deviceState,
             loaded,
@@ -175,7 +176,7 @@ export const stopDiscoveryThunk = createThunk(
     },
 );
 
-const getBundleThunk = createThunk(
+export const getBundleThunk = createThunk(
     `${DISCOVERY_MODULE_PREFIX}/getBundle`,
     ({ discovery, device }: { discovery: Discovery; device: TrezorDevice }, { getState }) => {
         const bundle: DiscoveryItem[] = [];
@@ -236,6 +237,7 @@ const getBundleThunk = createThunk(
                 });
             }
         });
+
         return bundle;
     },
 );
@@ -298,6 +300,7 @@ export const getAvailableCardanoDerivationsThunk = createThunk(
                     errorCode: code,
                 }),
             );
+
             return;
         }
 
@@ -338,6 +341,7 @@ export const startDiscoveryThunk = createThunk(
                     error: 'Device not found',
                 }),
             );
+
             return;
         }
 
@@ -348,6 +352,7 @@ export const startDiscoveryThunk = createThunk(
                     error: 'Device auth confirmation needed',
                 }),
             );
+
             return;
         }
 
@@ -358,6 +363,7 @@ export const startDiscoveryThunk = createThunk(
                     error: 'Discovery not found',
                 }),
             );
+
             return;
         }
 
@@ -443,6 +449,7 @@ export const startDiscoveryThunk = createThunk(
                     status: DiscoveryStatus.COMPLETED,
                 }),
             );
+
             return;
         }
 
@@ -557,6 +564,7 @@ export const startDiscoveryThunk = createThunk(
                     );
 
                     await dispatch(startDiscoveryThunk()); // restart process, exclude failed coins
+
                     return;
                 } catch (error) {
                     // do nothing. error will be handled in lower block

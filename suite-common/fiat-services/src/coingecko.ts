@@ -18,8 +18,10 @@ const fetchCoinGecko = async (url: string) => {
         const res = await rateLimiter.limit(signal => fetchUrl(url, { signal }));
         if (!res.ok) {
             console.warn(`Coingecko: Fiat rates failed to fetch: ${res.status}`);
+
             return;
         }
+
         return res.json();
     } catch (error) {
         // Do not report to Sentry to save the issues count limit.
@@ -40,41 +42,13 @@ const buildCoinUrl = (ticker: TickerId) => {
     const config = getTickerConfig(ticker);
     if (!config) {
         console.error('buildCoinUrl: cannot find ticker config for ', ticker);
+
         return null;
     }
 
     const baseUrl = `${COINGECKO_API_BASE_URL}/coins/${config.coingeckoId}`;
+
     return ticker.tokenAddress ? `${baseUrl}/contract/${ticker.tokenAddress}` : baseUrl;
-};
-
-/**
- * Returns the current rate for a given token fetched from CoinGecko API.
- * Returns null if main network for the token is not ethereum.
- * Supports only tokens on ethereum.
- *
- * @param {TickerId} ticker
- * @returns
- */
-export const fetchCurrentTokenFiatRates = async (ticker: TickerId) => {
-    if (!ticker.tokenAddress) return null;
-
-    const networkTickerConfig = getTickerConfig(ticker);
-    if (!networkTickerConfig || networkTickerConfig?.coingeckoId !== 'ethereum') {
-        console.warn('fetchCurrentTokenFiatRates: This API supports only ethereum', ticker);
-        return null;
-    }
-
-    const url = `${COINGECKO_API_BASE_URL}/simple/token_price/${
-        networkTickerConfig.coingeckoId
-    }?contract_addresses=${ticker.tokenAddress}&vs_currencies=${FIAT_CONFIG.currencies.join(',')}`;
-
-    const rates = await fetchCoinGecko(url);
-    if (!rates) return null;
-
-    return {
-        ts: new Date().getTime() / 1000,
-        rates: rates[ticker.tokenAddress.toLowerCase()],
-    };
 };
 
 /**

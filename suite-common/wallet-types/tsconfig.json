@@ -1,5 +1,5 @@
 {
-    "extends": "../../tsconfig.json",
+    "extends": "../../tsconfig.base.json",
     "compilerOptions": { "outDir": "libDev" },
     "references": [
         { "path": "../intl-types" },
@@ -7,6 +7,9 @@
         { "path": "../suite-config" },
         { "path": "../wallet-config" },
         { "path": "../wallet-constants" },
+        {
+            "path": "../../packages/blockchain-link-types"
+        },
         { "path": "../../packages/connect" },
         { "path": "../../packages/type-utils" },
         { "path": "../../packages/utils" }

@@ -39,9 +39,9 @@ export const Ready = ({ hideWindow, isCancelable }: ReadyProps) => {
             heading={<Translation id="TR_UPDATE_MODAL_UPDATE_DOWNLOADED" />}
             isCancelable={isCancelable}
             onCancel={installOnQuit}
-            bottomBar={
+            bottomBarComponents={
                 <>
-                    <Button onClick={installOnQuit} variant="secondary">
+                    <Button onClick={installOnQuit} variant="tertiary">
                         <Translation id="TR_UPDATE_MODAL_UPDATE_ON_QUIT" />
                     </Button>
                     <Button onClick={install} variant="primary">

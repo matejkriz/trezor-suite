@@ -7,7 +7,6 @@ import { Button } from './buttons/Button/Button';
 import { CollapsibleBox } from './CollapsibleBox/CollapsibleBox';
 import { Card } from './Card/Card';
 import { Switch } from './form/Switch/Switch';
-import { H1 } from './typography/Heading/Heading';
 
 const StyledCard = styled(Card)`
     max-width: 550px;
@@ -42,7 +41,7 @@ const Label = styled.span`
     display: flex;
 `;
 
-const Heading = styled(H1)`
+const Heading = styled.h2`
     font-size: ${variables.FONT_SIZE.SMALL};
     font-weight: ${variables.FONT_WEIGHT.DEMI_BOLD};
     color: ${({ theme }) => theme.TYPE_DARK_GREY};
@@ -56,6 +55,7 @@ const Description = styled.span`
     color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
 
     margin-bottom: 20px;
+
     /* text-align: center; */
 `;
 
@@ -71,7 +71,7 @@ const CategoryItems = styled.div`
 `;
 
 const CategoryName = styled(Description)`
-    margin-bottom: 0px;
+    margin-bottom: 0;
     width: 120px;
 `;
 
@@ -110,6 +110,7 @@ interface DataAnalyticsProps {
     analyticsLink?: (chunks: ReactNode[]) => JSX.Element;
     tosLink?: (chunks: ReactNode[]) => JSX.Element;
     className?: string;
+    isInitialTrackingEnabled?: boolean;
 }
 
 // This component is used in connect-ui, therefore it's located in this library,
@@ -119,8 +120,9 @@ export const DataAnalytics = ({
     analyticsLink,
     tosLink,
     className,
+    isInitialTrackingEnabled = true,
 }: DataAnalyticsProps) => {
-    const [trackingEnabled, setTrackingEnabled] = useState<boolean>(true);
+    const [trackingEnabled, setTrackingEnabled] = useState<boolean>(isInitialTrackingEnabled);
 
     return (
         <StyledCard data-test="@analytics/consent" className={className}>
@@ -153,7 +155,6 @@ export const DataAnalytics = ({
                 >
                     <Category>
                         {collectedData.map((category, i) => (
-                            // eslint-disable-next-line react/no-array-index-key
                             <Fragment key={i}>
                                 <CategoryName>{category.name}</CategoryName>
                                 <CategoryItems>

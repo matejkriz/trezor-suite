@@ -128,6 +128,7 @@ export class CoinjoinMempoolController {
                 ),
             );
             this.lastPurge = new Date().getTime();
+
             return [...this.mempool.values()];
         }
 
@@ -143,9 +144,7 @@ export class CoinjoinMempoolController {
                 .concat(change)
                 .map(({ address }) => getAddressScript(address, this.network));
 
-            // eslint-disable-next-line no-await-in-loop
             await promiseAllSequence(
-                // eslint-disable-next-line no-loop-func
                 filters.map(([txid, matchAny], index) => async () => {
                     if (matchAny(scripts)) await addTx(txid);
                     if (progressCooldown())
@@ -162,6 +161,7 @@ export class CoinjoinMempoolController {
         }
 
         this.lastPurge = new Date().getTime();
+
         return Array.from(set, txid => this.mempool.get(txid)!);
     }
 

@@ -14,20 +14,17 @@ const StyledDropdown = styled(Dropdown)`
     text-align: left;
 `;
 
-const StyledInner = styled.div`
-    display: flex;
-    overflow: hidden;
-`;
-
 type Props = RequiredKey<ExtendedProps, 'dropdownOptions'>;
 
 /**
  * Returns component wrapped into Dropdown.
+ * ONLY for the MetadataLabeling component.
  */
-export const withDropdown = (WrappedComponent: FC<Props>) => (props: Props) => (
+export const withDropdown = (WrappedComponent: FC<ExtendedProps>) => (props: Props) => (
     <StyledDropdown
         isDisabled={props.editActive}
-        alignMenu="left"
+        alignMenu="bottom-left"
+        renderOnClickPosition
         items={[
             {
                 key: 'key',
@@ -37,11 +34,7 @@ export const withDropdown = (WrappedComponent: FC<Props>) => (props: Props) => (
                 })),
             },
         ]}
-        absolutePosition
-        appendTo={document.body}
     >
-        <StyledInner>
-            <WrappedComponent {...props} />
-        </StyledInner>
+        <WrappedComponent {...props} />
     </StyledDropdown>
 );

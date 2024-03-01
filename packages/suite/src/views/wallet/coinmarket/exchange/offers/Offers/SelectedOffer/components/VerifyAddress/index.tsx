@@ -12,6 +12,7 @@ import { useAccountAddressDictionary } from 'src/hooks/wallet/useAccounts';
 import { ReceiveOptions, AccountSelectOption } from './ReceiveOptions';
 import { useTranslation } from 'src/hooks/suite/useTranslation';
 import { ConfirmedOnTrezor } from 'src/views/wallet/coinmarket/common/ConfirmedOnTrezor';
+import { cryptoToCoinSymbol } from 'src/utils/wallet/coinmarket/cryptoSymbolUtils';
 
 const Wrapper = styled.div`
     display: flex;
@@ -71,6 +72,7 @@ const getTranslationIds = (type: AccountSelectOption['type'] | undefined) => {
             addressTooltipTranslationId: 'TR_EXCHANGE_RECEIVE_NON_SUITE_ADDRESS_QUESTION_TOOLTIP',
         } as const;
     }
+
     return {
         accountTooltipTranslationId: 'TR_EXCHANGE_RECEIVE_ACCOUNT_QUESTION_TOOLTIP',
         addressTooltipTranslationId: 'TR_EXCHANGE_RECEIVE_ADDRESS_QUESTION_TOOLTIP',
@@ -144,12 +146,16 @@ const VerifyAddressComponent = () => {
         },
     });
 
+    if (!selectedQuote?.receive) {
+        return null;
+    }
+
     return (
         <Wrapper>
             <Heading>
                 <Translation
                     id="TR_EXCHANGE_RECEIVING_ADDRESS_INFO"
-                    values={{ symbol: selectedQuote?.receive }}
+                    values={{ symbol: cryptoToCoinSymbol(selectedQuote.receive) }}
                 />
             </Heading>
             <CardContent>
@@ -195,10 +201,10 @@ const VerifyAddressComponent = () => {
                                     />
                                 </Label>
                             }
-                            variant="small"
+                            size="small"
                             readOnly={selectedAccountOption?.type !== 'NON_SUITE'}
                             inputState={errors.address ? 'error' : undefined}
-                            bottomText={errors.address?.message}
+                            bottomText={errors.address?.message || null}
                             innerRef={networkRef}
                             {...networkField}
                         />
@@ -211,7 +217,7 @@ const VerifyAddressComponent = () => {
                 {selectedQuote?.extraFieldDescription && (
                     <Row>
                         <Input
-                            variant="small"
+                            size="small"
                             label={
                                 <Label>
                                     <Translation
@@ -229,7 +235,7 @@ const VerifyAddressComponent = () => {
                                 </Label>
                             }
                             inputState={errors.extraField ? 'error' : undefined}
-                            bottomText={errors.extraField?.message}
+                            bottomText={errors.extraField?.message || null}
                             innerRef={descriptionRef}
                             {...descriptionField}
                         />

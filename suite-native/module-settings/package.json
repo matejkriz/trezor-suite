@@ -8,13 +8,13 @@
     "main": "src/index",
     "scripts": {
         "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "type-check": "tsc --build"
+        "type-check": "yarn g:tsc --build"
     },
     "dependencies": {
         "@mobily/ts-belt": "^3.13.1",
         "@react-navigation/core": "^6.4.10",
-        "@react-navigation/native": "^6.1.9",
-        "@react-navigation/native-stack": "^6.9.17",
+        "@react-navigation/native": "6.1.10",
+        "@react-navigation/native-stack": "6.9.18",
         "@reduxjs/toolkit": "1.9.5",
         "@suite-common/analytics": "workspace:*",
         "@suite-common/icons": "workspace:*",
@@ -31,16 +31,14 @@
         "@suite-native/navigation": "workspace:*",
         "@suite-native/storage": "workspace:*",
         "@suite-native/theme": "workspace:*",
+        "@suite-native/toasts": "workspace:*",
         "@trezor/connect": "workspace:*",
         "@trezor/env-utils": "workspace:*",
         "@trezor/styles": "workspace:*",
         "@trezor/theme": "workspace:*",
         "jotai": "1.9.1",
         "react": "18.2.0",
-        "react-native": "0.71.8",
+        "react-native": "0.73.2",
         "react-redux": "8.0.7"
-    },
-    "devDependencies": {
-        "typescript": "5.3.2"
     }
 }

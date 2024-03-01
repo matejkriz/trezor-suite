@@ -8,7 +8,7 @@ const providers = ['google'] as const;
 
 describe('Metadata - Output labeling', () => {
     beforeEach(() => {
-        cy.viewport(1080, 1440).resetDb();
+        cy.viewport(1440, 2560).resetDb();
         cy.task('rmDir', { dir: Cypress.config('downloadsFolder'), recursive: true, force: true });
     });
 
@@ -37,7 +37,7 @@ describe('Metadata - Output labeling', () => {
             cy.passThroughInitialRun();
 
             cy.discoveryShouldFinish();
-            cy.getTestElement('@suite/menu/wallet-index').click();
+            cy.getTestElement('@account-menu/btc/normal/0').click();
 
             cy.getTestElement(targetEl1).click({ force: true });
             cy.passThroughInitMetadata(provider);
