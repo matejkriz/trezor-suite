@@ -2,19 +2,34 @@ name: "[Test] connect"
 
 # run only if there are changes in connect or related libs paths
 on:
+  schedule:
+    # Runs at midnight UTC every day at 01:00 AM CET
+    - cron: "0 0 * * *"
   push:
+    branches: [npm-release/*, release/*]
+  pull_request:
     paths:
-      - "packages/blockchain-link"
-      - "packages/connect/**"
+      - "packages/blockchain-link/**"
       - "packages/connect-common/**"
       - "packages/connect-iframe/**"
       - "packages/connect-web/**"
-      - "packages/transport"
-      - "packages/utxo-lib"
-      - "packages/utils"
-      - "docker"
-      - "submodules/trezor-common"
+      - "packages/connect/**"
+      - "packages/protobuf/**"
+      - "packages/schema-utils/**"
+      - "packages/transport/**"
+      - "packages/utils/**"
+      - "packages/utxo-lib/**"
+      - "docker/**"
+      - "submodules/trezor-common/**"
       - "yarn.lock"
+      - ".github/workflows/connect-test.yml"
+      - ".github/workflows/template-connect-test-params.yml"
+      - "docker/docker-connect-test.sh"
+      - "docker/docker-compose.connect-test.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-$${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   # todo: meaning of 'build' job is questionable. only 'web' tests use part of this jobs output
@@ -30,96 +45,323 @@ jobs:
           node-version-file: ".nvmrc"
           cache: yarn
           cache-dependency-path: "**/yarn.lock"
-      - run: sed -i "/\"node\"/d" package.json
-      - run: yarn install
-      - run: yarn build:libs
+      - run: |
+          echo -e "\nenableScripts: false" >> .yarnrc.yml
+      - run: yarn workspaces focus @trezor/connect-iframe @trezor/connect-web
       - run: yarn workspace @trezor/connect-iframe build
       - run: yarn workspace @trezor/connect-web build
       # upload + download takes longer than doing yarn build:libs
-      - uses: actions/upload-artifact@v4
+      - name: Upload build connect-web
+        uses: actions/upload-artifact@v4
         with:
-          name: build-artifact
+          name: build-artifact-connect-web
           path: packages/connect-web/build
+      - name: Upload build connect-iframe
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifact-connect-iframe
+          path: packages/connect-iframe/build
 
   api:
     needs: [build]
-    uses: ./.github/workflows/connect-test-params.yml
+    uses: ./.github/workflows/template-connect-test-params.yml
     with:
       test-pattern: "init authorizeCoinjoin cancelCoinjoinAuthorization passphrase unlockPath setBusy override checkFirmwareAuthenticity"
 
+  legacy-canary-firmware-api:
+    needs: [build]
+    if: github.event_name == 'schedule'
+    uses: ./.github/workflows/template-connect-test-params.yml
+    with:
+      test-pattern: "init authorizeCoinjoin cancelCoinjoinAuthorization passphrase unlockPath setBusy override checkFirmwareAuthenticity"
+      tests-firmware: ${{ matrix.firmware }}
+
+    strategy:
+      matrix:
+        firmware: ["2.2.0", "2-main"]
+      fail-fast: false
+
   management:
     needs: [build]
-    uses: ./.github/workflows/connect-test-params.yml
+    uses: ./.github/workflows/template-connect-test-params.yml
     with:
       test-pattern: methods
       methods: "applySettings,applyFlags,getFeatures,getFirmwareHash"
 
+  legacy-canary-firmware-management:
+    needs: [build]
+    if: github.event_name == 'schedule'
+    uses: ./.github/workflows/template-connect-test-params.yml
+    with:
+      test-pattern: methods
+      methods: "applySettings,applyFlags,getFeatures,getFirmwareHash"
+      tests-firmware: ${{ matrix.firmware }}
+
+    strategy:
+      matrix:
+        firmware: ["2.2.0", "2-main"]
+      fail-fast: false
+
   btc-sign:
     needs: [build]
-    uses: ./.github/workflows/connect-test-params.yml
+    uses: ./.github/workflows/template-connect-test-params.yml
     with:
       test-pattern: methods
       methods: "signTransaction"
 
+  legacy-canary-firmware-btc-sign:
+    needs: [build]
+    if: github.event_name == 'schedule'
+    uses: ./.github/workflows/template-connect-test-params.yml
+    with:
+      test-pattern: methods
+      methods: "signTransaction"
+      tests-firmware: ${{ matrix.firmware }}
+
+    strategy:
+      matrix:
+        firmware: ["2.2.0", "2-main"]
+      fail-fast: false
+
   btc-others:
     needs: [build]
-    uses: ./.github/workflows/connect-test-params.yml
+    uses: ./.github/workflows/template-connect-test-params.yml
     with:
       test-pattern: methods
       methods: "getAccountInfo,getAccountDescriptor,getAddress,getPublicKey,signMessage,verifyMessage,composeTransaction,getOwnershipId,getOwnershipProof"
 
+  legacy-canary-firmware-btc-others:
+    needs: [build]
+    if: github.event_name == 'schedule'
+    uses: ./.github/workflows/template-connect-test-params.yml
+    with:
+      test-pattern: methods
+      methods: "getAccountInfo,getAccountDescriptor,getAddress,getPublicKey,signMessage,verifyMessage,composeTransaction,getOwnershipId,getOwnershipProof"
+      tests-firmware: ${{ matrix.firmware }}
+
+    strategy:
+      matrix:
+        firmware: ["2.2.0", "2-main"]
+      fail-fast: false
+
   stellar:
     needs: [build]
-    uses: ./.github/workflows/connect-test-params.yml
+    uses: ./.github/workflows/template-connect-test-params.yml
     with:
       test-pattern: methods
       methods: "stellarGetAddress,stellarSignTransaction"
 
+  legacy-canary-firmware-stellar:
+    needs: [build]
+    if: github.event_name == 'schedule'
+    uses: ./.github/workflows/template-connect-test-params.yml
+    with:
+      test-pattern: methods
+      methods: "stellarGetAddress,stellarSignTransaction"
+      tests-firmware: ${{ matrix.firmware }}
+
+    strategy:
+      matrix:
+        firmware: ["2.2.0", "2-main"]
+      fail-fast: false
+
   cardano:
     needs: [build]
-    uses: ./.github/workflows/connect-test-params.yml
+    uses: ./.github/workflows/template-connect-test-params.yml
     with:
       test-pattern: methods
       methods: "cardanoGetAddress,cardanoGetNativeScriptHash,cardanoGetPublicKey,cardanoSignTransaction"
 
+  legacy-canary-firmware-cardano:
+    needs: [build]
+    if: github.event_name == 'schedule'
+    uses: ./.github/workflows/template-connect-test-params.yml
+    with:
+      test-pattern: methods
+      methods: "cardanoGetAddress,cardanoGetNativeScriptHash,cardanoGetPublicKey,cardanoSignTransaction"
+      tests-firmware: ${{ matrix.firmware }}
+
+    strategy:
+      matrix:
+        firmware: ["2.2.0", "2-main"]
+      fail-fast: false
+
   eos:
     needs: [build]
-    uses: ./.github/workflows/connect-test-params.yml
+    uses: ./.github/workflows/template-connect-test-params.yml
     with:
       test-pattern: methods
       methods: "eosGetPublicKey,eosSignTransaction"
 
+  legacy-canary-firmware-eos:
+    needs: [build]
+    if: github.event_name == 'schedule'
+    uses: ./.github/workflows/template-connect-test-params.yml
+    with:
+      test-pattern: methods
+      methods: "eosGetPublicKey,eosSignTransaction"
+      tests-firmware: ${{ matrix.firmware }}
+
+    strategy:
+      matrix:
+        firmware: ["2.2.0", "2-main"]
+      fail-fast: false
+
   ethereum:
     needs: [build]
-    uses: ./.github/workflows/connect-test-params.yml
+    uses: ./.github/workflows/template-connect-test-params.yml
     with:
       test-pattern: methods
       methods: "ethereumGetAddress,ethereumGetPublicKey,ethereumSignMessage,ethereumSignTransaction,ethereumVerifyMessage,ethereumSignTypedData"
 
+  legacy-canary-firmware-ethereum:
+    needs: [build]
+    if: github.event_name == 'schedule'
+    uses: ./.github/workflows/template-connect-test-params.yml
+    with:
+      test-pattern: methods
+      methods: "ethereumGetAddress,ethereumGetPublicKey,ethereumSignMessage,ethereumSignTransaction,ethereumVerifyMessage,ethereumSignTypedData"
+      tests-firmware: ${{ matrix.firmware }}
+
+    strategy:
+      matrix:
+        firmware: ["2.2.0", "2-main"]
+      fail-fast: false
+
   nem:
     needs: [build]
-    uses: ./.github/workflows/connect-test-params.yml
+    uses: ./.github/workflows/template-connect-test-params.yml
     with:
       test-pattern: methods
       methods: "nemGetAddress,nemSignTransaction"
 
+  legacy-canary-firmware-nem:
+    needs: [build]
+    if: github.event_name == 'schedule'
+    uses: ./.github/workflows/template-connect-test-params.yml
+    with:
+      test-pattern: methods
+      methods: "nemGetAddress,nemSignTransaction"
+      tests-firmware: ${{ matrix.firmware }}
+
+    strategy:
+      matrix:
+        firmware: ["2.2.0", "2-main"]
+      fail-fast: false
+
   ripple:
     needs: [build]
-    uses: ./.github/workflows/connect-test-params.yml
+    uses: ./.github/workflows/template-connect-test-params.yml
     with:
       test-pattern: methods
       methods: "rippleGetAddress,rippleSignTransaction"
 
+  legacy-canary-firmware-ripple:
+    needs: [build]
+    if: github.event_name == 'schedule'
+    uses: ./.github/workflows/template-connect-test-params.yml
+    with:
+      test-pattern: methods
+      methods: "rippleGetAddress,rippleSignTransaction"
+      tests-firmware: ${{ matrix.firmware }}
+
+    strategy:
+      matrix:
+        firmware: ["2.2.0", "2-main"]
+      fail-fast: false
+
   tezos:
     needs: [build]
-    uses: ./.github/workflows/connect-test-params.yml
+    uses: ./.github/workflows/template-connect-test-params.yml
     with:
       test-pattern: methods
       methods: "tezosGetAddress,tezosGetPublicKey,tezosSignTransaction"
 
+  legacy-canary-firmware-tezos:
+    needs: [build]
+    if: github.event_name == 'schedule'
+    uses: ./.github/workflows/template-connect-test-params.yml
+    with:
+      test-pattern: methods
+      methods: "tezosGetAddress,tezosGetPublicKey,tezosSignTransaction"
+      tests-firmware: ${{ matrix.firmware }}
+
+    strategy:
+      matrix:
+        firmware: ["2.2.0", "2-main"]
+      fail-fast: false
+
   binance:
     needs: [build]
-    uses: ./.github/workflows/connect-test-params.yml
+    uses: ./.github/workflows/template-connect-test-params.yml
     with:
       test-pattern: methods
       methods: "binanceGetAddress,binanceGetPublicKey,binanceSignTransaction"
+
+  legacy-canary-firmware-binance:
+    needs: [build]
+    if: github.event_name == 'schedule'
+    uses: ./.github/workflows/template-connect-test-params.yml
+    with:
+      test-pattern: methods
+      methods: "binanceGetAddress,binanceGetPublicKey,binanceSignTransaction"
+      tests-firmware: ${{ matrix.firmware }}
+
+    strategy:
+      matrix:
+        firmware: ["2.2.0", "2-main"]
+      fail-fast: false
+
+  connect-T2B1:
+    needs: [build]
+    if: github.event_name == 'schedule'
+    uses: ./.github/workflows/template-connect-test-params.yml
+    with:
+      test-pattern: ${{ matrix.pattern }}
+      methods: ${{ matrix.pattern }}
+      tests-firmware: "2-latest"
+      test-firmware-model: "R"
+      node-environment: ${{ matrix.node-environment }}
+      web-environment: ${{ matrix.web-environment }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - pattern: "authenticateDevice"
+            methods: ""
+            node-environment: true
+            web-environment: true
+          - pattern: "methods"
+            web-environment: false
+            node-environment: true
+            methods: "applySettings,applyFlags,getFirmwareHash"
+          # "signTransaction", (unsupported chain in fixtures)
+          - pattern: "methods"
+            web-environment: false
+            node-environment: true
+            methods: "getAccountInfo,getAccountDescriptor,getPublicKey,signMessage,verifyMessage,composeTransaction,getOwnershipId,getOwnershipProof"
+          - pattern: "methods"
+            web-environment: false
+            node-environment: true
+            methods: "stellarGetAddress,stellarSignTransaction"
+          - pattern: "methods"
+            web-environment: false
+            node-environment: true
+            methods: "cardanoGetAddress,cardanoGetNativeScriptHash,cardanoGetPublicKey,cardanoSignTransaction"
+          # eos not supported
+          - pattern: "methods"
+            web-environment: false
+            node-environment: true
+            methods: "ethereumGetAddress,ethereumGetPublicKey,ethereumSignMessage,ethereumSignTransaction,ethereumVerifyMessage,ethereumSignTypedData"
+          - pattern: "methods"
+            web-environment: false
+            node-environment: true
+            methods: "rippleGetAddress,rippleSignTransaction"
+          - pattern: "methods"
+            web-environment: false
+            node-environment: true
+            methods: "tezosGetAddress,tezosGetPublicKey,tezosSignTransaction"
+          - pattern: "methods"
+            web-environment: false
+            node-environment: true
+            methods: "binanceGetAddress,binanceGetPublicKey,binanceSignTransaction"

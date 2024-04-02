@@ -14,11 +14,10 @@ import { useSelector } from 'src/hooks/suite';
 import { FiatHeader } from 'src/views/dashboard/components/FiatHeader';
 import { selectLocalCurrency } from 'src/reducers/wallet/settingsReducer';
 import { useFiatFromCryptoValue } from 'src/hooks/suite/useFiatFromCryptoValue';
-import { globalPaddingEraserStyle } from 'src/components/suite/layouts/SuiteLayout/utils';
 import { STAKE_SYMBOLS } from 'src/constants/suite/ethStaking';
-import { selectIsDebugModeActive } from 'src/reducers/suite/suiteReducer';
 import { selectSelectedAccountAutocompoundBalance } from 'src/reducers/wallet/selectedAccountReducer';
 import { mapTestnetSymbol } from 'src/utils/wallet/coinmarket/coinmarketUtils';
+import { selectAccountStakeTransactions } from '@suite-common/wallet-core';
 
 export const ACCOUNT_INFO_HEIGHT = 80;
 
@@ -26,10 +25,11 @@ const Container = styled.div`
     display: flex;
     flex-direction: column;
     gap: ${spacingsPx.xxs};
-    width: fit-content;
     min-height: ${ACCOUNT_INFO_HEIGHT}px;
-
-    ${globalPaddingEraserStyle}
+    width: 100%;
+    padding-left: ${spacingsPx.md};
+    padding-right: ${spacingsPx.md};
+    margin-top: ${spacingsPx.lg};
 `;
 
 const AccountCryptoBalance = styled.div`
@@ -66,7 +66,11 @@ export const AccountTopPanel = forwardRef<HTMLDivElement>((_, ref) => {
     const { account, loader, status } = useSelector(state => state.wallet.selectedAccount);
     const localCurrency = useSelector(selectLocalCurrency);
     const autocompoundBalance = useSelector(selectSelectedAccountAutocompoundBalance);
-    const isDebug = useSelector(selectIsDebugModeActive);
+    const stakeTxs = useSelector(state =>
+        selectAccountStakeTransactions(state, account?.key || ''),
+    );
+
+    const hasStaked = stakeTxs.length > 0;
 
     // TODO: move this to FiatHeader
     const { fiatAmount } = useFiatFromCryptoValue({
@@ -90,8 +94,8 @@ export const AccountTopPanel = forwardRef<HTMLDivElement>((_, ref) => {
     }
 
     const { symbol, formattedBalance } = account;
-    // TODO: remove isDebug for staking release
-    const isStakeShown = STAKE_SYMBOLS.includes(symbol) && isDebug;
+
+    const isStakeShown = STAKE_SYMBOLS.includes(symbol) && hasStaked;
 
     return (
         <Container ref={ref}>

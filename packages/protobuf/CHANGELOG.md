@@ -1,3 +1,16 @@
+# 1.0.11
+
+-   chore(connect-explorer-nextra): code cleanup, yarn resolutions (a0e511f1fd)
+-   feat(connect-explorer-nextra): params table for viewing schemas (2ed3a5b366)
+-   chore: TS project references for build:libs + buildless utxo-lib (#11526) (4d857722fe)
+-   chore(repo): mostly buildless monorepo (#11464) (637ad88dcf)
+
+# 1.0.10
+
+-   fix(protobuf): undefined in messageToJSON (5fa61491e)
+-   chore(connect): format json after re-generation (350daea70)
+-   feat(connect): update protobuf (450acf915)
+
 # 1.0.9
 
 -   fix: from g:tsx to local tsx in prepublish script (d21d698b2)

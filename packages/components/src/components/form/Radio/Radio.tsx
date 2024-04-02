@@ -42,7 +42,7 @@ const RadioIcon = styled(CheckContainer)`
     position: relative;
     border-radius: ${borders.radii.full};
 
-    ::after {
+    &::after {
         content: '';
         position: absolute;
         top: 3px;
@@ -50,42 +50,43 @@ const RadioIcon = styled(CheckContainer)`
         width: 14px;
         height: 14px;
         border-radius: 50%;
-        background: ${({ theme, variant }) => theme[variantStyles[variant].background]};
+        background: ${({ theme, $variant }) => theme[variantStyles[$variant].background]};
         transition: background 0.1s;
     }
 
     input:checked + && {
         background: ${({ theme }) => theme.backgroundSurfaceElevation0};
-        border-color: ${({ theme, variant }) => theme[radioVariantStyles[variant].borderChecked]};
+        border-color: ${({ theme, $variant }) => theme[radioVariantStyles[$variant].borderChecked]};
 
-        ::after {
-            background: ${({ theme, variant }) => theme[variantStyles[variant].backgroundChecked]};
+        &::after {
+            background: ${({ theme, $variant }) =>
+                theme[variantStyles[$variant].backgroundChecked]};
         }
     }
 
     input:disabled:not(:checked) + && {
         background: ${({ theme }) => theme.backgroundSurfaceElevation0};
-        border-color: ${({ theme, variant }) => theme[variantStyles[variant].borderDisabled]};
+        border-color: ${({ theme, $variant }) => theme[variantStyles[$variant].borderDisabled]};
 
-        ::after {
+        &::after {
             background: transparent;
         }
     }
 
     input:disabled:checked + && {
         background: transparent;
-        border-color: ${({ theme, variant }) =>
-            theme[radioVariantStyles[variant].borderDisabledChecked]};
+        border-color: ${({ theme, $variant }) =>
+            theme[radioVariantStyles[$variant].borderDisabledChecked]};
 
-        ::after {
-            background: ${({ theme, variant }) =>
-                theme[radioVariantStyles[variant].dotDisabledChecked]};
+        &::after {
+            background: ${({ theme, $variant }) =>
+                theme[radioVariantStyles[$variant].dotDisabledChecked]};
         }
     }
 
     ${/* sc-selector */ Container}:hover input:not(:disabled):not(:checked) + && {
-        ::after {
-            background: ${({ theme, variant }) => theme[variantStyles[variant].backgroundHover]};
+        &::after {
+            background: ${({ theme, $variant }) => theme[variantStyles[$variant].backgroundHover]};
         }
     }
 
@@ -123,8 +124,8 @@ export const Radio = ({
         <Container
             onClick={onClick}
             onKeyUp={handleKeyUp}
-            isDisabled={isDisabled}
-            labelAlignment={labelAlignment}
+            $isDisabled={isDisabled}
+            $labelAlignment={labelAlignment}
             data-checked={isChecked}
             data-test={dataTest}
         >
@@ -136,9 +137,9 @@ export const Radio = ({
                 tabIndex={-1}
             />
 
-            <RadioIcon variant={variant} tabIndex={0} />
+            <RadioIcon $variant={variant} tabIndex={0} />
 
-            {children && <Label isRed={variant === 'destructive'}>{children}</Label>}
+            {children && <Label $isRed={variant === 'destructive'}>{children}</Label>}
         </Container>
     );
 };

@@ -39,30 +39,6 @@ const InstanceType = styled.div`
     max-width: 300px;
 `;
 
-const Wrapper = styled(Box)`
-    display: flex;
-    width: 100%;
-    align-items: center;
-    background: ${({ theme }) => theme.backgroundSurfaceElevation1};
-
-    & + & {
-        margin-top: 10px;
-    }
-
-    :hover,
-    :focus-within {
-        background: ${({ theme }) => theme.backgroundSurfaceElevation0};
-
-        ${InstanceType} > span {
-            text-decoration: underline;
-        }
-
-        ${InstanceType} div > span {
-            text-decoration: underline;
-        }
-    }
-`;
-
 const InstanceTitle = styled.div`
     font-weight: 500;
     line-height: 1.57;
@@ -71,13 +47,13 @@ const InstanceTitle = styled.div`
     font-variant-numeric: tabular-nums;
 `;
 
-const Col = styled.div<{ grow?: number; centerItems?: boolean }>`
+const Col = styled.div<{ $grow?: number; $centerItems?: boolean }>`
     display: flex;
-    flex-grow: ${({ grow }) => grow || 0};
+    flex-grow: ${({ $grow }) => $grow || 0};
     flex-direction: column;
-    align-items: ${({ centerItems }) => (centerItems ? 'center' : 'flex-start')};
+    align-items: ${({ $centerItems }) => ($centerItems ? 'center' : 'flex-start')};
 
-    :first-child {
+    &:first-child {
         cursor: pointer;
     }
 `;
@@ -144,13 +120,14 @@ export const WalletInstance = ({
     const defaultWalletLabel = defaultAccountLabelString({ device: instance });
 
     return (
-        <Wrapper
+        <Box
+            forceElevation={0} // @TODO delete when Checkbox has different background in dark mode
             data-test={dataTestBase}
             key={`${instance.label}${instance.instance}${instance.state}`}
             variant={isSelected ? 'primary' : undefined}
             {...rest}
         >
-            <Col grow={1} onClick={() => !editing && selectDeviceInstance(instance)} tabIndex={0}>
+            <Col $grow={1} onClick={() => !editing && selectDeviceInstance(instance)} tabIndex={0}>
                 {discoveryProcess && (
                     <InstanceType>
                         {!instance.useEmptyPassphrase && (
@@ -213,7 +190,7 @@ export const WalletInstance = ({
                         />
                     </SwitchCol>
 
-                    <ColEject centerItems>
+                    <ColEject $centerItems>
                         <Icon
                             data-test={`${dataTestBase}/eject-button`}
                             icon="EJECT"
@@ -225,6 +202,6 @@ export const WalletInstance = ({
                     </ColEject>
                 </>
             )}
-        </Wrapper>
+        </Box>
     );
 };

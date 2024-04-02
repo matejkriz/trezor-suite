@@ -186,6 +186,7 @@ export type PublicKey = {
     node: HDNodeType;
     xpub: string;
     root_fingerprint?: number;
+    descriptor?: string;
 };
 
 // GetAddress
@@ -595,8 +596,8 @@ export type FirmwareUpload = {
     hash?: string;
 };
 
-// SelfTest
-export type SelfTest = {
+// ProdTestT1
+export type ProdTestT1 = {
     payload?: string;
 };
 
@@ -1548,6 +1549,7 @@ export enum Enum_Capability {
     Capability_ShamirGroups = 16,
     Capability_PassphraseEntry = 17,
     Capability_Solana = 18,
+    Capability_Translations = 19,
 }
 
 export type Capability = keyof typeof Enum_Capability;
@@ -1601,6 +1603,7 @@ export type Features = {
     homescreen_width?: number;
     homescreen_height?: number;
     bootloader_locked?: boolean;
+    language_version_matches?: boolean;
 };
 
 // LockDevice
@@ -2451,7 +2454,7 @@ export type MessageType = {
     FirmwareErase: FirmwareErase;
     FirmwareRequest: FirmwareRequest;
     FirmwareUpload: FirmwareUpload;
-    SelfTest: SelfTest;
+    ProdTestT1: ProdTestT1;
     CardanoBlockchainPointerType: CardanoBlockchainPointerType;
     CardanoNativeScript: CardanoNativeScript;
     CardanoGetNativeScriptHash: CardanoGetNativeScriptHash;

@@ -7,7 +7,8 @@ import {
     AccountsRootState,
     selectAccountsByNetworkAndDeviceState,
     PORTFOLIO_TRACKER_DEVICE_STATE,
-    selectKnownNetworkTokens,
+    selectFilterKnownTokens,
+    FiatRatesRootState,
 } from '@suite-common/wallet-core';
 import { Box, Button, Divider, VStack } from '@suite-native/atoms';
 import { useAccountLabelForm, AccountFormValues } from '@suite-native/accounts';
@@ -25,7 +26,6 @@ import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
 import { analytics, EventType } from '@suite-native/analytics';
 import { TokenAddress, TokenInfoBranded, TokenSymbol } from '@suite-common/wallet-types';
 import { selectAnyOfTokensHasFiatRates } from '@suite-native/ethereum-tokens';
-import { FiatRatesRootState } from '@suite-native/fiat-rates';
 import { SettingsSliceRootState } from '@suite-native/module-settings';
 import { TokenDefinitionsRootState } from '@suite-common/wallet-core/src/token-definitions/tokenDefinitionsTypes';
 
@@ -63,7 +63,7 @@ export const AccountImportSummaryForm = ({
     );
 
     const knownTokens = useSelector((state: TokenDefinitionsRootState) =>
-        selectKnownNetworkTokens(state, networkSymbol),
+        selectFilterKnownTokens(state, networkSymbol, accountInfo.tokens ?? []),
     );
 
     const deviceNetworkAccounts = useSelector((state: AccountsRootState) =>
@@ -90,16 +90,12 @@ export const AccountImportSummaryForm = ({
                 }),
             ).unwrap();
 
-            // Report  to analytics only those tokens that are known.
-            const validTokens =
-                accountInfo.tokens?.filter(({ contract }) => knownTokens.includes(contract)) ?? [];
-
             analytics.report({
                 type: EventType.AssetsSync,
                 payload: {
                     assetSymbol: networkSymbol,
-                    tokenSymbols: validTokens.map(token => token.symbol as TokenSymbol),
-                    tokenAddresses: validTokens.map(token => token.contract as TokenAddress),
+                    tokenSymbols: knownTokens.map(token => token.symbol as TokenSymbol),
+                    tokenAddresses: knownTokens.map(token => token.contract as TokenAddress),
                 },
             });
 

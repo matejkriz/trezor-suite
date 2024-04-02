@@ -2,6 +2,15 @@ import { A } from '@mobily/ts-belt';
 
 import { isTestnet } from '@suite-common/wallet-utils';
 import { Network, NetworkSymbol, getMainnets, getTestnets } from '@suite-common/wallet-config';
+import { AccountType } from '@suite-common/wallet-types';
+
+export const orderedAccountTypes: AccountType[] = [
+    'normal',
+    'taproot',
+    'segwit',
+    'legacy',
+    'ledger',
+];
 
 const discoveryBlacklist: NetworkSymbol[] = ['sol', 'dsol', 'matic'];
 
@@ -23,7 +32,7 @@ export const networkSymbolsWhitelistMap = {
         'vtc',
         'zec',
     ] as NetworkSymbol[],
-    testnet: ['test', 'regtest', 'tsep', 'tgor', 'thol', 'tada', 'txrp'] as NetworkSymbol[],
+    testnet: ['test', 'regtest', 'tsep', 'thol', 'tada', 'txrp'] as NetworkSymbol[],
 } as const satisfies Record<string, NetworkSymbol[]>;
 
 // Blacklisting coins that are allowed inside `networkSymbolsWhitelistMap` so that we don't have to configs and just filter these out

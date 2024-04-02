@@ -1,13 +1,13 @@
 import { createContext, useContext, useCallback, useState, useEffect, useRef } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
-import { useDispatch, useSelector } from 'src/hooks/suite';
+import { useSelector, useDispatch } from 'src/hooks/suite';
 import { useDidUpdate } from '@trezor/react-utils';
 import {
-    getDraft,
-    removeDraft,
-    saveDraft,
-    signTransaction,
-} from 'src/actions/wallet/sendFormActions';
+    getSendFormDraftThunk,
+    removeSendFormDraftThunk,
+    saveSendFormDraftThunk,
+    signSendFormTransactionThunk,
+} from 'src/actions/wallet/send/sendFormThunks';
 import {
     getLastUsedFeeLevel,
     setLastUsedFeeLevel,
@@ -108,10 +108,11 @@ export const useSendForm = (props: UseSendFormProps): SendContextValues => {
 
     const values = getValues();
     const token = values?.outputs?.[0]?.token;
+    const fiatCurrency = values?.outputs?.[0]?.currency;
 
     const fiatRateKey = getFiatRateKey(
         props.selectedAccount.account.symbol,
-        localCurrencyOption.value as FiatCurrencyCode,
+        fiatCurrency?.value as FiatCurrencyCode,
         token as TokenAddress,
     );
     const fiatRate = useSelector(state => selectFiatRatesByFiatRateKey(state, fiatRateKey));
@@ -223,7 +224,7 @@ export const useSendForm = (props: UseSendFormProps): SendContextValues => {
 
     const resetContext = useCallback(() => {
         setComposedLevels(undefined);
-        dispatch(removeDraft()); // reset draft
+        dispatch(removeSendFormDraftThunk()); // reset draft;
         dispatch(setLastUsedFeeLevel()); // reset last known FeeLevel
         setState(getStateFromProps(props)); // resetting state will trigger "loadDraft" useEffect block, which will reset FormState to default
     }, [dispatch, props, setComposedLevels]);
@@ -260,9 +261,12 @@ export const useSendForm = (props: UseSendFormProps): SendContextValues => {
             : undefined;
         if (composedTx && composedTx.type === 'final') {
             // sign workflow in Actions:
-            // signTransaction > sign[COIN]Transaction > requestPushTransaction (modal with promise decision)
+            // signSendFormTransactionThunk > sign[COIN]SendFormTransactionThunk > sendFormActions.storeSignedTransaction (modal with promise decision)
             setLoading(true);
-            const result = await dispatch(signTransaction(values, composedTx));
+            const result = await dispatch(
+                signSendFormTransactionThunk({ formValues: values, transactionInfo: composedTx }),
+            ).unwrap();
+
             setLoading(false);
             if (result?.success) {
                 resetContext();
@@ -320,15 +324,20 @@ export const useSendForm = (props: UseSendFormProps): SendContextValues => {
 
     // load draft from reducer
     useEffect(() => {
-        const storedState = dispatch(getDraft());
-        const values = getLoadedValues(storedState);
-        // keepDefaultValues will set `isDirty` flag to true
-        reset(values, { keepDefaultValues: !!storedState });
+        const loadDraftValues = async () => {
+            const storedState = await dispatch(getSendFormDraftThunk()).unwrap();
+            const values = getLoadedValues(storedState);
 
-        if (storedState) {
-            draft.current = storedState;
-        }
-    }, [dispatch, getLoadedValues, reset]);
+            // keepDefaultValues will set `isDirty` flag to true
+            reset(values, { keepDefaultValues: !!storedState });
+
+            if (storedState) {
+                draft.current = storedState;
+                composeDraft(storedState);
+            }
+        };
+        loadDraftValues();
+    }, [dispatch, getLoadedValues, reset, composeDraft]);
 
     // register custom form fields (without HTMLElement)
     useEffect(() => {
@@ -347,7 +356,7 @@ export const useSendForm = (props: UseSendFormProps): SendContextValues => {
     useEffect(() => {
         if (!draftSaveRequest) return;
         if (Object.keys(formState.errors).length === 0) {
-            dispatch(saveDraft(getValues()));
+            dispatch(saveSendFormDraftThunk({ formState: getValues() }));
         }
         setDraftSaveRequest(false);
     }, [dispatch, draftSaveRequest, setDraftSaveRequest, getValues, formState.errors]);

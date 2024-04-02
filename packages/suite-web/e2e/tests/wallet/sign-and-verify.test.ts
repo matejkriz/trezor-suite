@@ -1,4 +1,4 @@
-// @group:wallet
+// @group_wallet
 // @retry=2
 
 const SEED = 'all all all all all all all all all all all all';
@@ -23,8 +23,9 @@ describe('Sign and verify', () => {
         cy.discoveryShouldFinish();
         cy.getTestElement('@account-menu/btc/normal/0').click();
 
+        cy.wait(300); // wait until is the dropdown loaded
         cy.getTestElement('@wallet/menu/extra-dropdown').click();
-        cy.getTestElement('@wallet/menu/wallet-sign-verify').click();
+        cy.getTestElement('@wallet/menu/wallet-sign-verify').should('be.visible').click();
     });
 
     /* Test case

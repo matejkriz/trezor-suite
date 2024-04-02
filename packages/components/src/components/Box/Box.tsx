@@ -1,4 +1,4 @@
-import { ReactNode, HTMLAttributes } from 'react';
+import { ReactNode } from 'react';
 import styled, { DefaultTheme } from 'styled-components';
 import {
     CSSColor,
@@ -9,9 +9,9 @@ import {
     mapElevationToBorder,
     spacingsPx,
 } from '@trezor/theme';
-import { useElevation } from '../ElevationContext/ElevationContext';
-import { ElevationContext } from '../ElevationContext/ElevationContext';
+import { ElevationContext, useElevation } from '../ElevationContext/ElevationContext';
 import { UIVariant } from '../../config/types';
+import { ComponentFrame, FrameProps } from '../common/ComponentFrame';
 
 type BoxVariant = Extract<UIVariant, 'primary' | 'warning' | 'destructive' | 'info'>;
 
@@ -31,31 +31,35 @@ const mapVariantToBackgroundColor = ({ variant, theme }: MapArgs): CSSColor => {
     return theme[colorMap[variant]];
 };
 
-export interface BoxProps extends HTMLAttributes<HTMLDivElement> {
+export type BoxProps = FrameProps & {
     variant?: BoxVariant;
     children: ReactNode;
-}
+    forceElevation?: Elevation;
+};
 
-const Wrapper = styled.div<{ variant?: BoxVariant; elevation: Elevation }>`
+const Wrapper = styled.div<{ $variant?: BoxVariant; $elevation: Elevation }>`
     display: flex;
+    align-items: center;
     flex: 1;
     border-radius: ${borders.radii.sm};
     padding: ${spacingsPx.md};
     background: ${mapElevationToBackground};
     border: solid 1px ${mapElevationToBorder};
 
-    ${({ variant, theme }) =>
-        variant === undefined
+    ${({ $variant, theme }) =>
+        $variant === undefined
             ? `padding-left: ${spacingsPx.lg};`
-            : `border-left: 6px solid ${mapVariantToBackgroundColor({ variant, theme })};`}
+            : `border-left: 6px solid ${mapVariantToBackgroundColor({ variant: $variant, theme })};`}
 `;
 
-export const Box = ({ variant, children, ...rest }: BoxProps) => {
-    const { elevation } = useElevation();
+export const Box = ({ variant, children, margin, forceElevation, ...rest }: BoxProps) => {
+    const { elevation } = useElevation(forceElevation);
 
     return (
-        <Wrapper variant={variant} elevation={elevation} {...rest}>
-            <ElevationContext baseElevation={elevation}>{children}</ElevationContext>
-        </Wrapper>
+        <ComponentFrame margin={margin}>
+            <Wrapper $variant={variant} $elevation={elevation} {...rest}>
+                <ElevationContext baseElevation={elevation}>{children}</ElevationContext>
+            </Wrapper>
+        </ComponentFrame>
     );
 };

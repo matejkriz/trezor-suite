@@ -384,6 +384,10 @@
                 "root_fingerprint": {
                     "type": "uint32",
                     "id": 3
+                },
+                "descriptor": {
+                    "type": "string",
+                    "id": 4
                 }
             }
         },
@@ -1590,7 +1594,7 @@
                 }
             }
         },
-        "SelfTest": {
+        "ProdTestT1": {
             "fields": {
                 "payload": {
                     "type": "bytes",
@@ -4523,6 +4527,13 @@
                 "bootloader_locked": {
                     "type": "bool",
                     "id": 49
+                },
+                "language_version_matches": {
+                    "type": "bool",
+                    "id": 50,
+                    "options": {
+                        "default": true
+                    }
                 }
             },
             "nested": {
@@ -4548,6 +4559,9 @@
                         },
                         "Capability_PassphraseEntry": {
                             "(bitcoin_only)": true
+                        },
+                        "Capability_Translations": {
+                            "(bitcoin_only)": true
                         }
                     },
                     "values": {
@@ -4568,7 +4582,8 @@
                         "Capability_Shamir": 15,
                         "Capability_ShamirGroups": 16,
                         "Capability_PassphraseEntry": 17,
-                        "Capability_Solana": 18
+                        "Capability_Solana": 18,
+                        "Capability_Translations": 19
                     }
                 }
             }
@@ -8020,7 +8035,7 @@
                     "(wire_out)": true,
                     "(wire_bootloader)": true
                 },
-                "MessageType_SelfTest": {
+                "MessageType_ProdTestT1": {
                     "(bitcoin_only)": true,
                     "(wire_in)": true,
                     "(wire_bootloader)": true
@@ -8682,7 +8697,7 @@
                 "MessageType_FirmwareErase": 6,
                 "MessageType_FirmwareUpload": 7,
                 "MessageType_FirmwareRequest": 8,
-                "MessageType_SelfTest": 32,
+                "MessageType_ProdTestT1": 32,
                 "MessageType_GetPublicKey": 11,
                 "MessageType_PublicKey": 12,
                 "MessageType_SignTx": 15,

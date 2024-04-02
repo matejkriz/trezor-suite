@@ -16,13 +16,13 @@ import { useEnabledBackends } from '../utils';
 
 const Container = styled.div`
     display: flex;
-    border-top: 1px solid ${({ theme }) => theme.borderOnElevation0};
+    border-top: 1px solid ${({ theme }) => theme.borderElevation1};
 `;
 
 const DescreetContainer = styled(NavigationItemBase)`
     width: 100%;
 
-    :hover {
+    &:hover {
         background: ${({ theme }) => theme.backgroundTertiaryPressedOnElevation0};
     }
 `;
@@ -57,8 +57,8 @@ const TorToggleContainer = styled.div`
     position: relative;
     width: 100%;
 
-    :hover,
-    :focus-within {
+    &:hover,
+    &:focus-within {
         ${StyledCheckIcon} {
             background-color: ${({ theme }) => theme.backgroundTertiaryPressedOnElevation0};
         }

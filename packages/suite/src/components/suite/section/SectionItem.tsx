@@ -6,11 +6,11 @@ import { variables } from '@trezor/components';
 import { anchorOutlineStyles } from 'src/utils/suite/anchor';
 import { SUBPAGE_NAV_HEIGHT } from 'src/constants/suite/layout';
 
-const Content = styled.div<{ shouldHighlight?: boolean }>`
+const Content = styled.div<{ $shouldHighlight?: boolean }>`
     display: flex;
     padding: ${spacingsPx.md};
     margin: -${spacingsPx.md};
-    border-radius: ${({ shouldHighlight }) => shouldHighlight && borders.radii.xs};
+    border-radius: ${({ $shouldHighlight }) => $shouldHighlight && borders.radii.xs};
 
     ${anchorOutlineStyles}
 
@@ -23,15 +23,15 @@ const Wrapper = styled.div`
     display: flex;
     flex-direction: column;
 
-    :not(:last-child) {
-        ::after {
+    &:not(:last-child) {
+        &::after {
             content: '';
             position: relative;
             top: ${spacingsPx.md};
             display: block;
             width: 100%;
             height: 1px;
-            border-bottom: 1px solid ${({ theme }) => theme.borderOnElevation1};
+            border-bottom: 1px solid ${({ theme }) => theme.borderElevation2};
         }
     }
 
@@ -46,7 +46,7 @@ interface SectionItemProps extends HTMLAttributes<HTMLDivElement> {
 export const SectionItem = forwardRef<HTMLDivElement, SectionItemProps>(
     ({ children, shouldHighlight, ...rest }, ref) => (
         <Wrapper ref={ref} {...rest}>
-            <Content shouldHighlight={shouldHighlight}>{children}</Content>
+            <Content $shouldHighlight={shouldHighlight}>{children}</Content>
         </Wrapper>
     ),
 );

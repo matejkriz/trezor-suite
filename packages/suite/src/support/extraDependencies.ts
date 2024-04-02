@@ -81,7 +81,6 @@ export const extraDependencies: ExtraDependencies = {
     },
     actionTypes: {
         storageLoad: STORAGE.LOAD,
-        addButtonRequest: deviceActions.addButtonRequest.type,
         setDeviceMetadata: METADATA.SET_DEVICE_METADATA,
     },
     reducers: {
@@ -138,6 +137,11 @@ export const extraDependencies: ExtraDependencies = {
         },
         storageLoadDevices: (state, { payload }: StorageLoadAction) => {
             state.devices = payload.devices;
+        },
+        storageLoadFormDrafts: (state, { payload }: StorageLoadAction) => {
+            payload.sendFormDrafts.forEach(d => {
+                state.drafts[d.key] = d.value;
+            });
         },
     },
     utils: {

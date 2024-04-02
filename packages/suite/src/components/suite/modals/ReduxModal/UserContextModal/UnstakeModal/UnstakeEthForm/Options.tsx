@@ -21,7 +21,7 @@ const RadioWrapper = styled.div`
         & > div:nth-of-type(2) {
             padding: 14px 0;
             margin-left: ${spacingsPx.xxs};
-            border-bottom: 1px solid ${({ theme }) => theme.borderOnElevation1};
+            border-bottom: 1px solid ${({ theme }) => theme.borderElevation2};
             flex: 1 0 auto;
         }
     }
@@ -53,11 +53,11 @@ const GreenTxt = styled.span`
     color: ${({ theme }) => theme.textPrimaryDefault};
 `;
 
-const InputsWrapper = styled.div<{ isShown: boolean }>`
+const InputsWrapper = styled.div<{ $isShown: boolean }>`
     max-width: 442px;
     margin-left: auto;
     margin-bottom: ${spacingsPx.sm};
-    display: ${({ isShown }) => (isShown ? 'block' : 'none')};
+    display: ${({ $isShown }) => ($isShown ? 'block' : 'none')};
 `;
 
 type UnstakeOptions = 'all' | 'rewards' | 'other';
@@ -185,7 +185,7 @@ export const Options = ({ symbol }: OptionsProps) => {
             </RadioWrapper>
 
             {/* CSS display property is used, as conditional rendering resets form state */}
-            <InputsWrapper isShown={isOtherAmountSelected}>
+            <InputsWrapper $isShown={isOtherAmountSelected}>
                 <Inputs />
             </InputsWrapper>
         </div>

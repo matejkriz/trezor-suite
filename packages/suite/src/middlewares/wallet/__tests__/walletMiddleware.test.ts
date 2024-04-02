@@ -8,7 +8,7 @@ import { configureStore } from 'src/support/tests/configureStore';
 import selectedAccountReducer, {
     State as SelectedAccountState,
 } from 'src/reducers/wallet/selectedAccountReducer';
-import sendFormReducer, { SendState } from 'src/reducers/wallet/sendFormReducer';
+import { prepareSendFormReducer, SendState } from 'src/reducers/wallet/sendFormReducer';
 import formDraftReducer from 'src/reducers/wallet/formDraftReducer';
 import { RouterState } from 'src/reducers/suite/routerReducer';
 import { Action } from 'src/types/suite';
@@ -17,6 +17,8 @@ import { extraDependencies } from 'src/support/extraDependencies';
 import * as fixtures from '../__fixtures__/walletMiddleware';
 
 const { getWalletAccount } = testMocks;
+
+const sendFormReducer = prepareSendFormReducer(extraDependencies);
 
 const TrezorConnect = testMocks.getTrezorConnectMock();
 
@@ -139,7 +141,13 @@ describe('walletMiddleware', () => {
 
                 store.dispatch(action);
 
-                expect(store.getActions()).toEqual(expectedActions);
+                // Omit irrelevant `metadata` property so it does not have to be included in the fixtures.
+                const capturedActions = store.getActions().map(action => ({
+                    type: action.type,
+                    payload: action.payload,
+                }));
+
+                expect(capturedActions).toEqual(expectedActions);
                 expect(store.getState().wallet.send?.drafts).toEqual(expectedDrafts);
             },
         );

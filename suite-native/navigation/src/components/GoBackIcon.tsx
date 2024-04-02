@@ -2,16 +2,24 @@ import { useNavigation } from '@react-navigation/native';
 
 import { IconButton } from '@suite-native/atoms';
 
-export const GoBackIcon = () => {
+import { CloseActionType } from '../navigators';
+
+type GoBackIconProps = {
+    closeActionType?: CloseActionType;
+};
+
+export const GoBackIcon = ({ closeActionType = 'back' }: GoBackIconProps) => {
     const navigation = useNavigation();
 
     const handleGoBack = () => {
-        navigation.goBack();
+        if (navigation.canGoBack()) {
+            navigation.goBack();
+        }
     };
 
     return (
         <IconButton
-            iconName="chevronLeft"
+            iconName={closeActionType === 'back' ? 'chevronLeft' : 'close'}
             size="medium"
             colorScheme="tertiaryElevation0"
             onPress={handleGoBack}

@@ -13,12 +13,12 @@ const TestContainer = styled.div`
     margin: 10px 0;
 `;
 
-export default {
+const meta: Meta = {
     title: 'Misc/GradientOverlay',
     component: GradientOverlayComponent,
     decorators: [
         (Story: React.FC) => (
-            <ElevationContext baseElevation={0}>
+            <ElevationContext baseElevation={-1}>
                 <Card>
                     <TestContainer>
                         OpenStreetMap (OSM) is a free, open geographic database updated and
@@ -41,6 +41,7 @@ export default {
         ),
     ],
 } as Meta;
+export default meta;
 
 export const GradientOverlay: StoryObj<GradientOverlayProps> = {
     args: {

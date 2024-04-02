@@ -3,10 +3,11 @@ import { SkeletonStack as SkeletonStackComponent, SkeletonStackProps } from './S
 import { SkeletonCircle } from './SkeletonCircle';
 import { ElevationContext } from '../ElevationContext/ElevationContext';
 
-export default {
+const meta: Meta = {
     title: 'Skeletons/SkeletonStack',
     component: SkeletonStackComponent,
 } as Meta;
+export default meta;
 
 export const SkeletonStack: StoryObj<SkeletonStackProps> = {
     render: args => (
@@ -19,10 +20,10 @@ export const SkeletonStack: StoryObj<SkeletonStackProps> = {
         </SkeletonStackComponent>
     ),
     args: {
-        col: true,
-        grow: true,
-        margin: '20px',
-        childMargin: '20px',
-        alignItems: 'center',
+        $col: true,
+        $grow: true,
+        $margin: '20px',
+        $childMargin: '20px',
+        $alignItems: 'center',
     },
 };

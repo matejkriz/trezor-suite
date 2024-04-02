@@ -2,9 +2,10 @@ import styled, { useTheme } from 'styled-components';
 import { Button, Icon, IconType, Paragraph } from '@trezor/components';
 import { Modal, Translation } from 'src/components/suite';
 import { TranslationKey } from '@suite-common/intl-types';
-import { useDispatch } from 'src/hooks/suite';
+import { useDispatch, useSelector } from 'src/hooks/suite';
 import { openModal } from 'src/actions/suite/modalActions';
 import { spacingsPx } from '@trezor/theme';
+import { selectSelectedAccount } from 'src/reducers/wallet/selectedAccountReducer';
 
 const StyledModal = styled(Modal)`
     width: 380px;
@@ -62,11 +63,12 @@ interface StakeEthInANutshellModalProps {
 
 export const StakeEthInANutshellModal = ({ onCancel }: StakeEthInANutshellModalProps) => {
     const theme = useTheme();
+    const account = useSelector(selectSelectedAccount);
 
     const dispatch = useDispatch();
-    const proceedToStaking = () => {
+    const proceedToEverstakeModal = () => {
         onCancel();
-        dispatch(openModal({ type: 'stake' }));
+        dispatch(openModal({ type: 'everstake' }));
     };
 
     return (
@@ -85,12 +87,15 @@ export const StakeEthInANutshellModal = ({ onCancel }: StakeEthInANutshellModalP
                         <Icon icon={icon} color={theme.iconPrimaryDefault} />
 
                         <GreyP>
-                            <Translation id={translationId} />
+                            <Translation
+                                id={translationId}
+                                values={{ symbol: account?.symbol.toUpperCase() }}
+                            />
                         </GreyP>
                     </Flex>
                 ))}
             </VStack>
-            <Button isFullWidth onClick={proceedToStaking}>
+            <Button isFullWidth onClick={proceedToEverstakeModal}>
                 <Translation id="TR_GOT_IT" />
             </Button>
         </StyledModal>

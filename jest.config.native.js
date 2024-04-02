@@ -3,6 +3,7 @@ const {
     testMatch,
     testPathIgnorePatterns,
     watchPathIgnorePatterns,
+    moduleNameMapper,
 } = require('./jest.config.base');
 
 const babelConfig = {
@@ -25,6 +26,7 @@ module.exports = {
     testMatch,
     testPathIgnorePatterns,
     watchPathIgnorePatterns,
+    moduleNameMapper,
     testEnvironment: 'jsdom',
     preset: 'jest-expo',
 
@@ -40,4 +42,5 @@ module.exports = {
         '<rootDir>/../../suite-native/test-utils/src/setupReactReanimatedMock.js',
         '<rootDir>/../../suite-native/test-utils/src/atomsMock.js',
     ],
+    moduleNameMapper: { '^uuid$': require.resolve('uuid') },
 };

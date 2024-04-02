@@ -3,11 +3,11 @@ import styled from 'styled-components';
 import { DeviceDisplayText } from './DeviceDisplayText';
 import { splitStringEveryNCharacters } from '@trezor/utils';
 
-const Row = styled.div<{ isAlignedRight?: boolean }>`
+const Row = styled.div<{ $isAlignedRight?: boolean }>`
     display: flex;
     align-items: center;
     gap: 8px;
-    justify-content: ${({ isAlignedRight }) => (isAlignedRight ? 'flex-end' : 'flex-start')};
+    justify-content: ${({ $isAlignedRight }) => ($isAlignedRight ? 'flex-end' : 'flex-start')};
 `;
 
 const ChunksContainer = styled.div`
@@ -18,7 +18,6 @@ const ChunksContainer = styled.div`
 
 type DisplayChunksProps = {
     isPixelType: boolean;
-    'data-test'?: string;
     address: string;
 };
 
@@ -35,16 +34,16 @@ const groupByN = <T,>(arr: T[], n: number): T[][] =>
         return result;
     }, [] as T[][]);
 
-export const DisplayChunks = ({
-    isPixelType,
-    'data-test': dataTest,
-    address,
-}: DisplayChunksProps) => {
+export const DisplayChunks = ({ isPixelType, address }: DisplayChunksProps) => {
     const showChunksInRows = (chunks: string[][] | undefined, isNextAddress?: boolean) =>
         chunks?.map((row, rowIndex) => (
-            <Row key={rowIndex} isAlignedRight={rowIndex === 0 && isNextAddress}>
+            <Row key={rowIndex} $isAlignedRight={rowIndex === 0 && isNextAddress}>
                 {row.map((chunk, chunkIndex) => (
-                    <DeviceDisplayText isPixelType={isPixelType} key={chunkIndex} data-test="chunk">
+                    <DeviceDisplayText
+                        $isPixelType={isPixelType}
+                        key={chunkIndex}
+                        data-test="chunk"
+                    >
                         {chunk}
                     </DeviceDisplayText>
                 ))}
@@ -65,7 +64,7 @@ export const DisplayChunks = ({
     };
 
     return (
-        <ChunksContainer onCopy={handleOnCopy} data-test={dataTest}>
+        <ChunksContainer onCopy={handleOnCopy} data-test="@device-display/chunked-text">
             {showChunksInRows(groupedChunks)}
         </ChunksContainer>
     );

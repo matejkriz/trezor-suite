@@ -33,8 +33,8 @@ export const en = {
         emptyState: {
             device: {
                 title: 'Your wallet is empty',
-                subtitle:
-                    'You need to get some coins first in Trezor Suite Desktop or Web version.',
+                subtitle: 'Start by receiving some assets.',
+                button: 'Receive assets',
             },
             portfolioTracker: {
                 title: 'Get started',
@@ -45,9 +45,9 @@ export const en = {
             },
             connectOrImportCrossroads: {
                 gotMyTrezor: {
-                    title: 'Connect my Trezor',
+                    title: 'Connect & unlock my Trezor',
                     description: 'Manage your coins with your Trezor connected.',
-                    connectButton: 'Connect Trezor',
+                    connectButton: 'Connect & unlock',
                 },
                 syncCoins: {
                     title: 'Track my coins',
@@ -226,18 +226,20 @@ export const en = {
             title: 'Connect & unlock\nyour Trezor',
         },
         pinScreen: {
+            title: 'Enter PIN\non your Trezor',
             form: {
                 title: 'Enter PIN',
                 entered: 'Entered',
                 digits: 'digits',
                 keypadInfo: 'Follow the keypad layout on your Trezor',
-                enterPin: 'Enter pin',
+                enterPin: 'Unlock',
                 submitting: 'Verifying your PIN',
             },
             wrongPinAlert: {
                 title: 'Incorrect PIN',
-                description: 'Enter up to 50 digits.',
-                button: { tryAgain: 'Try again', help: 'Enter PIN Help' },
+                description:
+                    'You have 16 PIN entry attemps.\nFailing all of them will result in your device being erased.',
+                button: { tryAgain: 'Try again', help: 'Enter PIN help' },
             },
         },
         connectingDeviceScreen: {
@@ -260,6 +262,11 @@ export const en = {
                 content:
                     'Follow the keypad layout on your Trezor device to enter your PIN on your mobile display. Your PIN will be hidden on your mobile display for your security. <link>Learn more here</link>.',
             },
+        },
+        pinCanceledDuringDiscovery: {
+            title: 'Some of your balances have not been loaded.',
+            subtitle: 'You need to unlock your device in order to finish loading your balances',
+            button: 'Enter PIN again',
         },
     },
     moduleDevice: {
@@ -315,6 +322,7 @@ export const en = {
     moduleReceive: {
         screenTitle: '{coinSymbol} Receive address',
         accountNotFound: 'Account {accountKey} not found.',
+        deviceCancelError: 'Address confirmation canceled.',
         receiveAddressCard: {
             alert: {
                 success: 'Receive address has been confirmed on your Trezor.',
@@ -599,6 +607,8 @@ export const en = {
     },
     graph: {
         retrievingData: 'Retrieving data...',
+        errorMessage: 'There are some troubles with loading graph: ',
+        tryAgain: 'Try again',
         retrievengTakesLongerThanExpected:
             'Retrieving balances takes longer than usual. \n It may be caused by unstable internet connection.',
     },

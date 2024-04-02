@@ -29,18 +29,18 @@ const ViewText = styled.div`
     transition: transform 0.15s ease-in-out;
 `;
 
-const Container = styled.div<{ isClickable: boolean }>`
+const Container = styled.div<{ $isClickable: boolean }>`
     display: flex;
     align-items: center;
     height: 28px;
     padding: 0 ${SPACING}px;
     background: ${({ theme }) => theme.backgroundSurfaceElevationNegative};
-    border-bottom: 1px solid ${({ theme }) => theme.borderOnElevation0};
+    border-bottom: 1px solid ${({ theme }) => theme.borderElevation1};
     font-size: ${variables.FONT_SIZE.TINY};
     font-weight: ${variables.FONT_WEIGHT.MEDIUM};
     transition: background 0.15s;
-    ${({ isClickable, theme }) =>
-        isClickable &&
+    ${({ $isClickable, theme }) =>
+        $isClickable &&
         css`
             cursor: pointer;
 
@@ -144,7 +144,7 @@ export const CoinjoinStatusBar = ({ accountKey, session, isSingle }: CoinjoinSta
     return (
         <Container
             onClick={isStatusBarClickable ? handleViewAccount : undefined}
-            isClickable={isStatusBarClickable}
+            $isClickable={isStatusBarClickable}
         >
             <StyledProgressPie valueInPercents={sessionProgress} />
 

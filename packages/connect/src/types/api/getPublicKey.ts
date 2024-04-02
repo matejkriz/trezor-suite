@@ -6,7 +6,13 @@ export type GetPublicKey = Static<typeof GetPublicKey>;
 export const GetPublicKey = Type.Intersect([
     GetPublicKeyShared,
     Type.Object({
-        coin: Type.Optional(Type.String()),
+        coin: Type.Optional(
+            Type.String({
+                description:
+                    'determines network definition specified in coins.json file. Coin shortcut, name or label can be used. If coin is not set API will try to get network definition from path.',
+                default: 'btc',
+            }),
+        ),
         crossChain: Type.Optional(Type.Boolean()),
         scriptType: Type.Optional(PROTO.InternalInputScriptType),
         ignoreXpubMagic: Type.Optional(Type.Boolean()),
@@ -23,6 +29,7 @@ export const HDNodeResponse = Type.Object({
     childNum: Type.Number(),
     xpub: Type.String(),
     xpubSegwit: Type.Optional(Type.String()),
+    descriptorChecksum: Type.Optional(Type.String()),
     chainCode: Type.String(),
     publicKey: Type.String(),
     fingerprint: Type.Number(),

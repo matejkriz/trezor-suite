@@ -2,13 +2,13 @@ import { useEffect } from 'react';
 import styled from 'styled-components';
 import { Button, Paragraph, Warning } from '@trezor/components';
 import { Translation, FiatValue, FormattedCryptoAmount } from 'src/components/suite';
-import { FeesInfo } from 'src/components/wallet/FeesInfo';
 import { mapTestnetSymbol } from 'src/utils/wallet/coinmarket/coinmarketUtils';
-import { useSelector } from 'src/hooks/suite';
+import { useDevice, useSelector } from 'src/hooks/suite';
 import { useClaimEthFormContext } from 'src/hooks/wallet/useClaimEthForm';
 import { selectSelectedAccountEverstakeStakingPool } from 'src/reducers/wallet/selectedAccountReducer';
 import { CRYPTO_INPUT } from 'src/types/wallet/stakeForms';
 import { spacingsPx } from '@trezor/theme';
+import ClaimFees from './Fees';
 
 const AmountInfo = styled.div`
     display: flex;
@@ -27,7 +27,7 @@ const GreenTxt = styled.span`
 `;
 
 const StyledWarning = styled(Warning)`
-    margin-top: ${spacingsPx.sm};
+    margin: ${spacingsPx.sm} 0 ${spacingsPx.sm} 0;
     justify-content: flex-start;
 `;
 
@@ -36,7 +36,7 @@ const ClaimingPeriodWrapper = styled.div`
     justify-content: space-between;
     padding: ${spacingsPx.lg} 0 ${spacingsPx.md};
     margin-top: ${spacingsPx.xl};
-    border-top: 1px solid ${({ theme }) => theme.borderOnElevation1};
+    border-top: 1px solid ${({ theme }) => theme.borderElevation2};
 `;
 
 const GreyP = styled(Paragraph)`
@@ -44,11 +44,10 @@ const GreyP = styled(Paragraph)`
 `;
 
 export const ClaimEthForm = () => {
+    const { device, isLocked } = useDevice();
     const {
         account: { symbol },
         formState: { errors, isSubmitting },
-        composedLevels,
-        selectedFee,
         watch,
         isComposing,
         handleSubmit,
@@ -59,8 +58,9 @@ export const ClaimEthForm = () => {
     const hasValues = Boolean(watch(CRYPTO_INPUT));
     // used instead of formState.isValid, which is sometimes returning false even if there are no errors
     const formIsValid = Object.keys(errors).length === 0;
-    const transactionInfo = composedLevels?.[selectedFee];
     const { claimableAmount = '0' } = useSelector(selectSelectedAccountEverstakeStakingPool) ?? {};
+    const isDisabled =
+        !(formIsValid && hasValues) || isSubmitting || isLocked() || !device?.available;
 
     useEffect(() => {
         onClaimChange(claimableAmount);
@@ -83,15 +83,11 @@ export const ClaimEthForm = () => {
                 </TxtRight>
             </AmountInfo>
 
-            <FeesInfo
-                transactionInfo={transactionInfo}
-                symbol={symbol}
-                helperText={<Translation id="TR_STAKE_PAID_FROM_BALANCE" />}
-            />
-
             {errors[CRYPTO_INPUT] && (
                 <StyledWarning variant="destructive">{errors[CRYPTO_INPUT]?.message}</StyledWarning>
             )}
+
+            <ClaimFees />
 
             <ClaimingPeriodWrapper>
                 <GreyP>
@@ -104,7 +100,7 @@ export const ClaimEthForm = () => {
             <Button
                 type="submit"
                 isFullWidth
-                isDisabled={!(formIsValid && hasValues) || isSubmitting}
+                isDisabled={isDisabled}
                 isLoading={isComposing || isSubmitting}
                 onClick={handleSubmit(signTx)}
             >

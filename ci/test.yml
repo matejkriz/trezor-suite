@@ -104,7 +104,7 @@ suite web migrations:
     CYPRESS_USE_TREZOR_USER_ENV_BRIDGE: 1
   parallel:
     matrix:
-      - TEST_GROUP: "@group:migrations"
+      - TEST_GROUP: "@group_migrations"
         CONTAINERS: "trezor-user-env-unix"
 
 suite web:
@@ -303,9 +303,23 @@ connect-popup legacy npm package manual:
 
 connect-popup legacy npm package:
   extends: .connect-popup legacy npm package base
+  needs:
+    - install
+    - connect-web build
+  only:
+    <<: *run_everything_rules
+  except:
+    refs:
+      - /^release\/connect\//
+
+connect-popup legacy npm package production:
+  extends: .connect-popup legacy npm package base
+  needs:
+    - install
+    - connect-web build production
   only:
     refs:
-      - schedules
+      - /^release\/connect\//
 
 .e2e connect-explorer-webextension:
   stage: integration testing
@@ -427,9 +441,11 @@ connect-explorer-webextension manual:
 
 connect legacy fws:
   extends: .connect legacy fws base
+  dependencies:
+    - install
+    - connect-web build
   only:
-    refs:
-      - schedules
+    <<: *run_everything_rules
 
 connect legacy fws manual:
   extends: .connect legacy fws base
@@ -456,36 +472,6 @@ connect canary fws manual:
     refs:
       - schedules
   when: manual
-
-connect T2B1:
-  extends: .connect
-  only:
-    refs:
-      - schedules
-  parallel:
-    matrix:
-      - TESTS_ENVIRONMENT: ["node", "web"]
-        TESTS_PATTERN: "authenticateDevice"
-        TESTS_FIRMWARE: ["2-latest"]
-        TESTS_FIRMWARE_MODEL: "R"
-      - TESTS_ENVIRONMENT: ["node"]
-        TESTS_PATTERN: "methods"
-        TESTS_FIRMWARE: ["2-latest"]
-        TESTS_FIRMWARE_MODEL: "R"
-        TESTS_INCLUDED_METHODS: [
-            "applySettings,applyFlags,getFirmwareHash", # getFeatures (capabilies)
-            # "signTransaction", (unsupported chain in fixtures)
-            "getAccountInfo,getAccountDescriptor,getPublicKey,signMessage,verifyMessage,composeTransaction,getOwnershipId,getOwnershipProof", # getAddress (unsuppported chain in fixtures)
-            "stellarGetAddress,stellarSignTransaction",
-            "cardanoGetAddress,cardanoGetNativeScriptHash,cardanoGetPublicKey,cardanoSignTransaction",
-            # eos not supported
-            "ethereumGetAddress,ethereumGetPublicKey,ethereumSignMessage,ethereumSignTransaction,ethereumVerifyMessage,ethereumSignTypedData",
-            # nem not supported
-            "rippleGetAddress,rippleSignTransaction",
-            "tezosGetAddress,tezosGetPublicKey,tezosSignTransaction",
-            "binanceGetAddress,binanceGetPublicKey,binanceSignTransaction",
-          ]
-        TESTS_MOCK_BACKENDS: "false"
 
 .e2e connect-web:
   stage: integration testing

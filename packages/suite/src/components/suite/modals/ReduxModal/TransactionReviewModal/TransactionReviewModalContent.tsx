@@ -5,8 +5,7 @@ import { Deferred } from '@trezor/utils';
 import { selectDevice, StakeState } from '@suite-common/wallet-core';
 import { isCardanoTx } from '@suite-common/wallet-utils';
 import { SendState } from 'src/reducers/wallet/sendFormReducer';
-import { Dispatch, GetState } from 'src/types/suite';
-import { useDispatch, useSelector } from 'src/hooks/suite';
+import { useSelector } from 'src/hooks/suite';
 import { selectIsActionAbortable } from 'src/reducers/suite/suiteReducer';
 import { constructOutputs } from 'src/utils/wallet/reviewTransactionUtils';
 import { getTransactionReviewModalActionText } from 'src/utils/suite/transactionReview';
@@ -31,7 +30,7 @@ const StyledModal = styled(Modal)`
 interface TransactionReviewModalContentProps {
     decision: Deferred<boolean, string | number | undefined> | undefined;
     txInfoState: SendState | StakeState;
-    cancelSignTx: () => (dispatch: Dispatch, getState: GetState) => void;
+    cancelSignTx: () => void;
 }
 
 export const TransactionReviewModalContent = ({
@@ -43,8 +42,8 @@ export const TransactionReviewModalContent = ({
     const fees = useSelector(state => state.wallet.fees);
     const device = useSelector(selectDevice);
     const isActionAbortable = useSelector(selectIsActionAbortable);
-    const dispatch = useDispatch();
     const [detailsOpen, setDetailsOpen] = useState(false);
+    const [isSending, setIsSending] = useState(false);
 
     const deviceModelInternal = device?.features?.internal_model;
 
@@ -73,10 +72,6 @@ export const TransactionReviewModalContent = ({
 
     const ethereumStakeType =
         'ethereumStakeType' in precomposedForm ? precomposedForm.ethereumStakeType : null;
-    const actionText = getTransactionReviewModalActionText({
-        ethereumStakeType,
-        isRbfAction,
-    });
 
     // omit other button requests (like passphrase)
     const buttonRequests = device.buttonRequests.filter(
@@ -99,13 +94,13 @@ export const TransactionReviewModalContent = ({
 
     // get estimate mining time
     let estimateTime;
-    const selected = fees[selectedAccount.account.symbol];
-    const matchedFeeLevel = selected.levels.find(
+    const symbolFees = fees[selectedAccount.account.symbol];
+    const matchedFeeLevel = symbolFees.levels.find(
         item => item.feePerUnit === precomposedTx.feePerByte,
     );
 
     if (networkType === 'bitcoin' && matchedFeeLevel) {
-        estimateTime = selected.blockTime * matchedFeeLevel.blocks * 60;
+        estimateTime = symbolFees.blockTime * matchedFeeLevel.blocks * 60;
     }
 
     const buttonRequestsCount = isCardano ? buttonRequests.length - 1 : buttonRequests.length;
@@ -113,7 +108,7 @@ export const TransactionReviewModalContent = ({
     const onCancel =
         isActionAbortable || signedTx
             ? () => {
-                  dispatch(cancelSignTx());
+                  cancelSignTx();
                   decision?.resolve(false);
               }
             : undefined;
@@ -140,7 +135,10 @@ export const TransactionReviewModalContent = ({
                 broadcast={precomposedForm.options.includes('broadcast')}
                 detailsOpen={detailsOpen}
                 onDetailsClick={() => setDetailsOpen(!detailsOpen)}
-                actionText={actionText}
+                actionText={getTransactionReviewModalActionText({
+                    ethereumStakeType,
+                    isRbfAction,
+                })}
             />
             <TransactionReviewOutputList
                 account={selectedAccount.account}
@@ -152,7 +150,14 @@ export const TransactionReviewModalContent = ({
                 outputs={outputs}
                 buttonRequestsCount={buttonRequestsCount}
                 isRbfAction={isRbfAction}
-                actionText={actionText}
+                actionText={getTransactionReviewModalActionText({
+                    ethereumStakeType,
+                    isRbfAction,
+                    isSending,
+                })}
+                isSending={isSending}
+                setIsSending={() => setIsSending(true)}
+                ethereumStakeType={ethereumStakeType || undefined}
             />
             <TransactionReviewEvmExplanation account={selectedAccount.account} />
         </StyledModal>

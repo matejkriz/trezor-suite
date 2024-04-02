@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref }}
+  group: ${{ github.workflow }}-$${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -20,6 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      EXPO_PUBLIC_ENVIRONMENT: develop
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

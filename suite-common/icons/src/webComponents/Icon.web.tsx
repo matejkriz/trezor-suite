@@ -29,14 +29,14 @@ const SVG = styled(ReactSVG)`
         css`
             cursor: pointer;
 
-            :focus-visible {
+            &:focus-visible {
                 svg {
                     transition: opacity 0.2s;
                     opacity: 0.5;
                 }
             }
         `}
-`;
+` as typeof ReactSVG;
 
 type WebIconProps = Omit<IconProps, 'color'> & {
     color?: CSSColor | Color;

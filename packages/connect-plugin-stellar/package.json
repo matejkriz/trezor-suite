@@ -1,6 +1,6 @@
 {
     "name": "@trezor/connect-plugin-stellar",
-    "version": "9.0.2",
+    "version": "9.0.3",
     "author": "Trezor <info@trezor.io>",
     "homepage": "https://github.com/trezor/trezor-suite/tree/develop/packages/connect-plugin-stellar",
     "description": "@trezor/connect plugin for Stellar",
@@ -40,6 +40,6 @@
         "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
         "test:unit": "jest -c ../../jest.config.base.js",
         "type-check": "yarn g:tsc --build tsconfig.json",
-        "build:lib": "yarn g:rimraf ./lib && yarn g:tsc --build tsconfig.lib.json"
+        "build:lib": "yarn g:rimraf ./lib && yarn g:tsc --build tsconfig.lib.json && ../../scripts/replace-imports.sh ./lib"
     }
 }

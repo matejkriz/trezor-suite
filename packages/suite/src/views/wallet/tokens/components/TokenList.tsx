@@ -9,7 +9,7 @@ import {
 } from 'src/components/suite';
 import { Account } from 'src/types/wallet';
 import { useSelector } from 'src/hooks/suite';
-import { selectTokenDefinitions } from '@suite-common/wallet-core';
+import { selectCoinDefinitions, selectFiatRates } from '@suite-common/wallet-core';
 import { NoRatesTooltip } from 'src/components/suite/Ticker/NoRatesTooltip';
 import { TokenInfo } from '@trezor/blockchain-link-types';
 import { spacingsPx } from '@trezor/theme';
@@ -17,11 +17,13 @@ import { NetworkSymbol, getNetworkFeatures } from '@suite-common/wallet-config';
 import { enhanceTokensWithRates, sortTokensWithRates } from 'src/utils/wallet/tokenUtils';
 import { Rate } from '@suite-common/wallet-types';
 import { selectLocalCurrency } from 'src/reducers/wallet/settingsReducer';
+import { isTokenDefinitionKnown } from '@suite-common/token-definitions';
 
-const Wrapper = styled(Card)<{ isTestnet?: boolean }>`
+const Wrapper = styled(Card)<{ $isTestnet?: boolean }>`
     display: grid;
     padding: 12px 16px;
-    grid-template-columns: ${props => (props.isTestnet ? 'auto auto 44px' : 'auto auto auto 44px')};
+    grid-template-columns: ${props =>
+        props.$isTestnet ? 'auto auto 44px' : 'auto auto auto 44px'};
     word-break: break-all;
 `;
 
@@ -33,8 +35,8 @@ const TokenSymbol = styled.span`
 `;
 
 interface ColProps {
-    justify?: 'left' | 'right';
-    isTestnet?: boolean;
+    $justify?: 'left' | 'right';
+    $isTestnet?: boolean;
 }
 
 const Col = styled.div<ColProps>`
@@ -43,16 +45,16 @@ const Col = styled.div<ColProps>`
     font-size: ${variables.FONT_SIZE.SMALL};
     border-top: 1px solid ${({ theme }) => theme.STROKE_GREY};
 
-    &:nth-child(${({ isTestnet }) => (isTestnet ? '-n + 3' : '-n + 4')}) {
+    &:nth-child(${({ $isTestnet }) => ($isTestnet ? '-n + 3' : '-n + 4')}) {
         /* first row */
         border-top: none;
     }
 
-    ${({ justify }) =>
-        justify &&
+    ${({ $justify }) =>
+        $justify &&
         css`
-            justify-content: ${justify === 'right' ? 'flex-end' : 'flex-start'};
-            text-align: ${justify === 'right' ? 'right' : 'left'};
+            justify-content: ${$justify === 'right' ? 'flex-end' : 'flex-start'};
+            text-align: ${$justify === 'right' ? 'right' : 'left'};
         `}
 `;
 
@@ -78,9 +80,9 @@ const StyledNoRatesTooltip = styled(NoRatesTooltip)`
     justify-content: flex-end;
 `;
 
-const StyledQuestionTooltip = styled(QuestionTooltip)<{ addMarginTop: boolean }>`
-    ${({ addMarginTop }) =>
-        addMarginTop &&
+const StyledQuestionTooltip = styled(QuestionTooltip)<{ $addMarginTop: boolean }>`
+    ${({ $addMarginTop }) =>
+        $addMarginTop &&
         css`
             margin-top: ${spacingsPx.xxl};
         `}
@@ -107,25 +109,34 @@ export const TokenList = ({
     networkSymbol,
 }: TokenListProps) => {
     const theme = useTheme();
-    const tokenDefinitions = useSelector(state => selectTokenDefinitions(state, networkSymbol));
+    const coinDefinitions = useSelector(state => selectCoinDefinitions(state, networkSymbol));
+    const fiatRates = useSelector(selectFiatRates);
     const localCurrency = useSelector(selectLocalCurrency);
     const { account } = useSelector(state => state.wallet.selectedAccount);
 
     if (!account) return null;
 
-    const tokensWithRates = enhanceTokensWithRates(tokens, localCurrency, account.symbol);
+    const tokensWithRates = enhanceTokensWithRates(
+        tokens,
+        localCurrency,
+        account.symbol,
+        fiatRates,
+    );
 
     const sortedTokens = tokensWithRates.sort(sortTokensWithRates);
 
     if (!tokens || tokens.length === 0) return null;
 
-    const hasNetworkFeatures = getNetworkFeatures(networkSymbol).includes('token-definitions');
+    const hasCoinDefinitions = getNetworkFeatures(networkSymbol).includes('coin-definitions');
     const { knownTokens, unknownTokens } = sortedTokens.reduce<{
         knownTokens: EnhancedTokenInfo[];
         unknownTokens: EnhancedTokenInfo[];
     }>(
         (acc, token) => {
-            if (tokenDefinitions[token.contract]?.isTokenKnown || !hasNetworkFeatures) {
+            if (
+                !hasCoinDefinitions ||
+                isTokenDefinitionKnown(coinDefinitions?.data, account.symbol, token.contract)
+            ) {
                 acc.knownTokens.push(token);
             } else {
                 acc.unknownTokens.push(token);
@@ -145,10 +156,10 @@ export const TokenList = ({
                             <StyledQuestionTooltip
                                 label="TR_TOKEN_UNRECOGNIZED_BY_TREZOR"
                                 tooltip="TR_TOKEN_UNRECOGNIZED_BY_TREZOR_TOOLTIP"
-                                addMarginTop={!!knownTokens.length}
+                                $addMarginTop={!!knownTokens.length}
                             />
                         )}
-                        <Wrapper isTestnet={isTestnet} paddingType="none">
+                        <Wrapper $isTestnet={isTestnet} paddingType="none">
                             {tokens.map(t => {
                                 const symbolMatchesName =
                                     networkType === 'cardano' &&
@@ -157,14 +168,14 @@ export const TokenList = ({
 
                                 return (
                                     <Fragment key={t.contract}>
-                                        <Col isTestnet={isTestnet}>
+                                        <Col $isTestnet={isTestnet}>
                                             {!noSymbol && <TokenSymbol>{t.symbol}</TokenSymbol>}
                                             <TokenName>
                                                 {!noSymbol && ` - `}
                                                 {t.name}
                                             </TokenName>
                                         </Col>
-                                        <Col isTestnet={isTestnet} justify="right">
+                                        <Col $isTestnet={isTestnet} $justify="right">
                                             {t.balance && (
                                                 <CryptoAmount
                                                     value={t.balance}
@@ -177,7 +188,7 @@ export const TokenList = ({
                                             )}
                                         </Col>
                                         {!isTestnet && (
-                                            <Col isTestnet={isTestnet} justify="right">
+                                            <Col $isTestnet={isTestnet} $justify="right">
                                                 {t.balance && t.symbol && t.fiatRate?.rate ? (
                                                     <FiatWrapper>
                                                         <FiatValue
@@ -187,11 +198,11 @@ export const TokenList = ({
                                                         />
                                                     </FiatWrapper>
                                                 ) : (
-                                                    <StyledNoRatesTooltip />
+                                                    <StyledNoRatesTooltip iconOnly={true} />
                                                 )}
                                             </Col>
                                         )}
-                                        <Col isTestnet={isTestnet} justify="right">
+                                        <Col $isTestnet={isTestnet} $justify="right">
                                             <TrezorLink
                                                 href={`${explorerUrl}${t.contract}${explorerUrlQueryString}`}
                                             >

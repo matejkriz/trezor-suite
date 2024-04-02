@@ -5,7 +5,7 @@ import { roundToNearestMinutes, subHours } from 'date-fns';
 import { A } from '@mobily/ts-belt';
 
 import { FiatCurrencyCode } from '@suite-common/suite-config';
-import { selectIsDeviceDiscoveryActive } from '@suite-common/wallet-core';
+import { selectIsDeviceDiscoveryActive, selectIsDeviceAuthorized } from '@suite-common/wallet-core';
 
 import { getMultipleAccountBalanceHistoryWithFiat } from './graphDataFetching';
 import {
@@ -26,6 +26,7 @@ type useGraphForAccountsParams<TIsPortfolioGraph extends boolean = boolean> =
         endOfTimeFrameDate: Date;
         startOfTimeFrameDate: StartOfTimeFrameDate;
         isPortfolioGraph: TIsPortfolioGraph;
+        isElectrumBackend: boolean;
     };
 
 type CommonUseGraphReturnType = {
@@ -76,8 +77,14 @@ export function useGraphForAccounts(params: useGraphForAccountsParams<true>): {
 export function useGraphForAccounts(params: useGraphForAccountsParams): {
     graphPoints: FiatGraphPoint[] | FiatGraphPointWithCryptoBalance[];
 } & CommonUseGraphReturnType {
-    const { accounts, fiatCurrency, endOfTimeFrameDate, startOfTimeFrameDate, isPortfolioGraph } =
-        params;
+    const {
+        accounts,
+        fiatCurrency,
+        endOfTimeFrameDate,
+        startOfTimeFrameDate,
+        isPortfolioGraph,
+        isElectrumBackend,
+    } = params;
     const [graphPoints, setGraphPoints] = useState<
         FiatGraphPoint[] | FiatGraphPointWithCryptoBalance[]
     >([]);
@@ -85,6 +92,8 @@ export function useGraphForAccounts(params: useGraphForAccountsParams): {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const isDiscoveryActive = useSelector(selectIsDeviceDiscoveryActive);
+    const isDeviceAuthorized = useSelector(selectIsDeviceAuthorized);
+
     const lastFetchTimestamp = useRef<number | null>(null);
 
     const fetchGraphValues = useCallback(
@@ -108,6 +117,7 @@ export function useGraphForAccounts(params: useGraphForAccountsParams): {
                         startOfTimeFrameDate,
                         endOfTimeFrameDate,
                         forceRefetch,
+                        isElectrumBackend,
                     });
 
                     let events;
@@ -148,14 +158,17 @@ export function useGraphForAccounts(params: useGraphForAccountsParams): {
             startOfTimeFrameDate,
             isPortfolioGraph,
             isDiscoveryActive,
+            isElectrumBackend,
         ],
     );
 
     const refetch = useCallback(() => fetchGraphValues({ forceRefetch: true }), [fetchGraphValues]);
 
     useEffect(() => {
-        fetchGraphValues();
-    }, [fetchGraphValues]);
+        if (isDeviceAuthorized) {
+            fetchGraphValues();
+        }
+    }, [fetchGraphValues, isDeviceAuthorized]);
 
     return { graphPoints, graphEvents, isLoading, error, refetch };
 }

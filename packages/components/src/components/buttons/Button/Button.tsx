@@ -16,22 +16,22 @@ import { focusStyleTransition, getFocusShadowStyle } from '../../../utils/utils'
 import { useElevation } from '../../ElevationContext/ElevationContext';
 
 interface ButtonContainerProps {
-    variant: ButtonVariant;
-    size: ButtonSize;
-    iconAlignment?: IconAlignment;
-    hasIcon?: boolean;
-    isFullWidth?: boolean;
-    elevation: Elevation;
+    $variant: ButtonVariant;
+    $size: ButtonSize;
+    $iconAlignment?: IconAlignment;
+    $hasIcon?: boolean;
+    $isFullWidth?: boolean;
+    $elevation: Elevation;
 }
 
 export const ButtonContainer = styled.button<ButtonContainerProps>`
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-direction: ${({ iconAlignment }) => iconAlignment === 'right' && 'row-reverse'};
-    gap: ${({ hasIcon }) => hasIcon && spacingsPx.xs};
-    padding: ${({ size }) => getPadding(size, true)};
-    width: ${({ isFullWidth }) => isFullWidth && '100%'};
+    flex-direction: ${({ $iconAlignment }) => $iconAlignment === 'right' && 'row-reverse'};
+    gap: ${({ $hasIcon }) => $hasIcon && spacingsPx.xs};
+    padding: ${({ $size }) => getPadding($size, true)};
+    width: ${({ $isFullWidth }) => $isFullWidth && '100%'};
     border-radius: ${borders.radii.full};
     transition:
         ${focusStyleTransition},
@@ -41,9 +41,9 @@ export const ButtonContainer = styled.button<ButtonContainerProps>`
     border: 1px solid transparent;
 
     ${getFocusShadowStyle()}
-    ${({ variant, elevation }) => getVariantStyle(variant, elevation)}
+    ${({ $variant, $elevation }) => getVariantStyle($variant, $elevation)}
 
-    :disabled {
+    &:disabled {
         background: ${({ theme }) => theme.BG_GREY};
         color: ${({ theme }) => theme.textDisabled};
         pointer-events: none;
@@ -52,9 +52,10 @@ export const ButtonContainer = styled.button<ButtonContainerProps>`
 `;
 
 interface ContentProps {
-    size: ButtonSize;
-    disabled: boolean;
+    $size: ButtonSize;
+    $disabled: boolean;
 }
+
 const getTypography = (size: ButtonSize) => {
     const map: Record<ButtonSize, string> = {
         large: typography.body,
@@ -71,7 +72,7 @@ const Content = styled.div<ContentProps>`
     overflow: hidden;
     text-overflow: ellipsis;
 
-    ${({ size }) => getTypography(size)};
+    ${({ $size }) => getTypography($size)};
 `;
 
 type SelectedHTMLButtonProps = Pick<
@@ -122,21 +123,21 @@ export const Button = ({
 
     return (
         <ButtonContainer
-            variant={variant}
-            size={size}
-            iconAlignment={iconAlignment}
+            $variant={variant}
+            $size={size}
+            $iconAlignment={iconAlignment}
             disabled={isDisabled || isLoading}
-            isFullWidth={isFullWidth}
+            $isFullWidth={isFullWidth}
             type={type}
-            hasIcon={!!icon || isLoading}
-            elevation={elevation}
+            $hasIcon={!!icon || isLoading}
+            $elevation={elevation}
             {...rest}
         >
             {!isLoading && icon && IconComponent}
             {isLoading && Loader}
 
             {children && (
-                <Content size={size} disabled={isDisabled || isLoading}>
+                <Content $size={size} $disabled={isDisabled || isLoading}>
                     {children}
                 </Content>
             )}

@@ -8,12 +8,6 @@ const Wrapper = styled.div`
     flex-direction: column;
 `;
 
-const StyledCard = styled(Card)`
-    align-items: stretch;
-    flex: 1;
-    position: relative;
-`;
-
 const Header = styled.div`
     display: flex;
     margin-bottom: ${spacingsPx.xl};
@@ -44,7 +38,7 @@ const Action = styled.div`
     height: 40px;
 `;
 
-const CheckIconContainer = styled.div<{ isDone: boolean }>`
+const CheckIconContainer = styled.div<{ $isDone: boolean }>`
     position: absolute;
     border-radius: 50%;
     width: 24px;
@@ -53,8 +47,8 @@ const CheckIconContainer = styled.div<{ isDone: boolean }>`
     right: ${spacingsPx.xs};
     overflow: hidden;
     border: 1px solid
-        ${({ theme, isDone }) =>
-            isDone ? theme.backgroundPrimarySubtleOnElevation1 : theme.borderOnElevation1};
+        ${({ theme, $isDone }) =>
+            $isDone ? theme.backgroundPrimarySubtleOnElevation1 : theme.borderElevation2};
 `;
 
 const CheckIconBackground = styled.div`
@@ -71,7 +65,7 @@ const Line = styled.div`
     width: 100%;
     height: 1px;
     margin: ${spacingsPx.md} 0;
-    background: ${({ theme }) => theme.borderOnElevation1};
+    background: ${({ theme }) => theme.borderElevation2};
 `;
 
 export interface SecurityCardProps extends CardProps {
@@ -101,10 +95,10 @@ export const SecurityCard = ({
 
     return (
         <Wrapper {...rest}>
-            <StyledCard>
+            <Card>
                 <Header>
                     <Icon icon={icon} size={32} color={theme.iconDefault} />
-                    <CheckIconContainer isDone={isDone}>
+                    <CheckIconContainer $isDone={isDone}>
                         {isDone && (
                             <CheckIconBackground>
                                 <Icon icon="CHECK" color={theme.iconPrimaryDefault} size={16} />
@@ -160,7 +154,7 @@ export const SecurityCard = ({
                         </>
                     )}
                 </Footer>
-            </StyledCard>
+            </Card>
         </Wrapper>
     );
 };

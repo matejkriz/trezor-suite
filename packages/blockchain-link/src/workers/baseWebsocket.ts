@@ -3,7 +3,7 @@ import { createDeferred } from '@trezor/utils';
 import { createDeferredManager } from '@trezor/utils';
 import { TypedEmitter } from '@trezor/utils';
 
-import { CustomError } from '@trezor/blockchain-link-types/lib/constants/errors';
+import { CustomError } from '@trezor/blockchain-link-types/src/constants/errors';
 
 interface Subscription<T> {
     id: string;
@@ -225,9 +225,8 @@ export abstract class BaseWebsocket<T extends EventMap> extends TypedEmitter<T &
             clearTimeout(this.pingTimeout);
         }
 
-        if (this.isConnected()) {
-            this.disconnect();
-        }
+        this.disconnect();
+
         this.ws?.removeAllListeners();
         this.messages.rejectAll(
             new CustomError('websocket_runtime_error', 'Websocket closed unexpectedly'),

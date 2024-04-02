@@ -1,4 +1,4 @@
-// @group:passphrase
+// @group_passphrase
 // @retry=2
 
 // todo: this test is skipped because it does not work and it can't be debugged on MacArm
@@ -53,7 +53,7 @@ describe.skip('Passphrase - legacy flow', () => {
         cy.getTestElement('@switch-device/wallet-on-index/2').click();
         cy.getTestElement('@dashboard/receive-button').click();
         cy.getTestElement('@wallet/receive/reveal-address-button').click();
-        cy.getTestElement('@modal/confirm-address/address-field');
+        cy.getTestElement('@device-display/chunked-text');
     });
 });
 

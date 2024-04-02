@@ -187,6 +187,10 @@ export default defineMessages({
         id: 'TR_ADDRESSES_USED',
         defaultMessage: 'Used addresses',
     },
+    TR_ADDRESSES_CHANGE: {
+        id: 'TR_ADDRESSES_CHANGE',
+        defaultMessage: 'Change addresses',
+    },
     TR_TRADE_REDIRECTING: {
         defaultMessage: 'Redirecting ...',
         id: 'TR_TRADE_REDIRECTING',
@@ -1783,17 +1787,9 @@ export default defineMessages({
         defaultMessage: 'Buy',
         id: 'TR_BUY_BUY',
     },
-    TR_BUY_FEES: {
-        defaultMessage: 'Fees',
-        id: 'TR_BUY_FEES',
-    },
     TR_BUY_PAID_BY: {
         defaultMessage: 'Payment method',
         id: 'TR_BUY_PAID_BY',
-    },
-    TR_BUY_ALL_FEES_INCLUDED: {
-        defaultMessage: 'Includes all fees',
-        id: 'TR_BUY_ALL_FEES_INCLUDED',
     },
     TR_BUY_PROVIDER: {
         defaultMessage: 'Provider',
@@ -2198,7 +2194,7 @@ export default defineMessages({
         id: 'TR_CONFIRMED_TX',
     },
     TR_CONNECT_YOUR_DEVICE: {
-        defaultMessage: 'Connect your Trezor',
+        defaultMessage: 'Connect & unlock your Trezor',
         description: 'Prompt to user to connect his device.',
         id: 'TR_CONNECT_YOUR_DEVICE',
     },
@@ -2537,6 +2533,11 @@ export default defineMessages({
         defaultMessage: 'Enter PIN',
         description: 'Text for Header and Button when submitting PIN',
         id: 'TR_ENTER_PIN',
+    },
+    TR_ENTER_WIPECODE: {
+        defaultMessage: 'Enter Wipe Code',
+        description: 'Text for Header and Button when submitting wipe code',
+        id: 'TR_ENTER_WIPECODE',
     },
     TR_ENTER_SEED_WORDS_INSTRUCTION: {
         defaultMessage:
@@ -2957,13 +2958,9 @@ export default defineMessages({
         defaultMessage: 'Ethereum',
         id: 'TR_NETWORK_ETHEREUM',
     },
-    TR_NETWORK_ETHEREUM_LABEL: {
-        defaultMessage: 'Incl. ERC-20 tokens',
-        id: 'TR_NETWORK_ETHEREUM_LABEL',
-    },
-    TR_NETWORK_ETHEREUM_TOOLTIP: {
-        defaultMessage: 'Supported tokens',
-        id: 'TR_NETWORK_ETHEREUM_TOOLTIP',
+    TR_INCLUDING_TOKENS: {
+        defaultMessage: 'Including tokens',
+        id: 'TR_INCLUDING_TOKENS',
     },
     TR_NETWORK_ETHEREUM_CLASSIC: {
         defaultMessage: 'Ethereum Classic',
@@ -2972,10 +2969,6 @@ export default defineMessages({
     TR_NETWORK_ETHEREUM_SEPOLIA: {
         defaultMessage: 'Ethereum Sepolia',
         id: 'TR_NETWORK_ETHEREUM_SEPOLIA',
-    },
-    TR_NETWORK_ETHEREUM_GOERLI: {
-        defaultMessage: 'Ethereum Goerli',
-        id: 'TR_NETWORK_ETHEREUM_GOERLI',
     },
     TR_NETWORK_ETHEREUM_HOLESKY: {
         defaultMessage: 'Ethereum Holesky',
@@ -2996,10 +2989,6 @@ export default defineMessages({
     TR_NETWORK_POLYGON: {
         defaultMessage: 'Polygon PoS',
         id: 'TR_NETWORK_POLYGON',
-    },
-    TR_NETWORK_POLYGON_LABEL: {
-        defaultMessage: 'Incl. MRC20 tokens',
-        id: 'TR_NETWORK_POLYGON_LABEL',
     },
     TR_NETWORK_STELLAR: {
         defaultMessage: 'Stellar',
@@ -5442,7 +5431,7 @@ export default defineMessages({
     TR_ADD_TOKEN_DESCRIPTION: {
         id: 'TR_ADD_TOKEN_DESCRIPTION',
         defaultMessage:
-            "Enter a contract address of a token you wish to add to your wallet. This is typically a 42-character alphanumeric string starting with '0x'.",
+            'Enter a contract address of a token to add to your wallet. This is typically a 42-character alphanumeric string starting with "0x".',
     },
     TR_ADD_TOKEN_LABEL: {
         id: 'TR_ADD_TOKEN_LABEL',
@@ -5958,8 +5947,7 @@ export default defineMessages({
         id: 'METADATA_MODAL_HEADING',
     },
     METADATA_MODAL_DESCRIPTION: {
-        defaultMessage:
-            'Select a cloud storage provider to sync your labels or save them locally. Your data is encrypted by Trezor.',
+        defaultMessage: 'Select how to sync your labels. Your data is encrypted by Trezor.',
         id: 'METADATA_MODAL_DESCRIPTION',
     },
     TR_DISABLED_SWITCH_TOOLTIP: {
@@ -5969,6 +5957,14 @@ export default defineMessages({
     TR_UPDATE_FIRMWARE_HOMESCREEN_TOOLTIP: {
         id: 'TR_UPDATE_FIRMWARE_HOMESCREEN_TOOLTIP',
         defaultMessage: 'Update your firmware to change your homescreen',
+    },
+    TR_FIRMWARE_LANGUAGE_CHANGED: {
+        id: 'TR_FIRMWARE_LANGUAGE_CHANGED',
+        defaultMessage: 'Device language successfully changed',
+    },
+    TR_FIRMWARE_LANGUAGE_FETCH_ERROR: {
+        id: 'TR_FIRMWARE_LANGUAGE_FETCH_ERROR',
+        defaultMessage: 'Translation download failed',
     },
     TR_UPDATE_FIRMWARE_HOMESCREEN_LATER_TOOLTIP: {
         id: 'TR_UPDATE_FIRMWARE_HOMESCREEN_LATER_TOOLTIP',
@@ -6146,7 +6142,7 @@ export default defineMessages({
     TR_GRAPH_MISSING_DATA: {
         id: 'TR_GRAPH_MISSING_DATA',
         defaultMessage:
-            "XRP, SOL, and other token transactions are included in portfolio balance, but aren't currently supported in graph view.",
+            "XRP, SOL, and all token amounts are in the portfolio balance but aren't currently supported in graph view.",
     },
     METADATA_PROVIDER_NOT_FOUND_ERROR: {
         id: 'METADATA_PROVIDER_NOT_FOUND_ERROR',
@@ -6491,6 +6487,10 @@ export default defineMessages({
     TR_REPLACE_TX: {
         id: 'TR_REPLACE_TX',
         defaultMessage: 'Replace transaction',
+    },
+    TR_CONFIRMING_TX: {
+        id: 'TR_CONFIRMING_TX',
+        defaultMessage: 'Confirming transaction',
     },
     TR_FINALIZE_TX: {
         id: 'TR_FINALIZE_TX',
@@ -7109,10 +7109,6 @@ export default defineMessages({
         id: 'TR_ONBOARDING_DOWNLOAD_DESKTOP_APP',
         defaultMessage: 'Download Desktop App',
     },
-    TR_ONBOARDING_WELCOME_HEADING: {
-        id: 'TR_ONBOARDING_WELCOME_HEADING',
-        defaultMessage: 'Welcome!',
-    },
     TR_DATA_ANALYTICS_CATEGORY_1: {
         id: 'TR_DATA_ANALYTICS_CATEGORY_1',
         defaultMessage: 'Platform',
@@ -7319,6 +7315,18 @@ export default defineMessages({
     TR_STAKING_WITHDRAW: {
         id: 'TR_STAKING_WITHDRAW',
         defaultMessage: 'Withdraw',
+    },
+    TR_STAKE_ON_EVERSTAKE: {
+        id: 'TR_STAKE_ON_EVERSTAKE',
+        defaultMessage: 'Stake {symbol} on Everstake?',
+    },
+    TR_CLAIM_FROM_EVERSTAKE: {
+        id: 'TR_CLAIM_FROM_EVERSTAKE',
+        defaultMessage: 'Claim {symbol} from Everstake?',
+    },
+    TR_UNSTAKE_FROM_EVERSTAKE: {
+        id: 'TR_UNSTAKE_FROM_EVERSTAKE',
+        defaultMessage: 'Unstake {symbol} from Everstake?',
     },
     TR_TX_WITHDRAWAL: {
         id: 'TR_TX_WITHDRAWAL',
@@ -8052,7 +8060,7 @@ export default defineMessages({
         id: 'TR_LOADING_FACT_21',
         description: '140 symbols max',
         defaultMessage:
-            "Bitcoin transactions are grouped together in 'blocks'. These blocks are organized in a chronological sequence comprising the blockchain",
+            'Bitcoin transactions are grouped together in blocks. These blocks are organized in a chronological sequence on the blockchain.',
     },
     TR_LOADING_FACT_22: {
         id: 'TR_LOADING_FACT_22',
@@ -8454,14 +8462,10 @@ export default defineMessages({
         defaultMessage:
             'This receive address is only for {network} coins and tokens. If someone sends you crypto from outside the {network} network, you may not receive them.',
     },
-    TR_EVM_EXPLANATION_SEND_TITLE: {
-        id: 'TR_EVM_EXPLANATION_SEND_TITLE',
-        defaultMessage: 'Send through the {network} network',
-    },
     TR_EVM_EXPLANATION_SEND_DESCRIPTION: {
         id: 'TR_EVM_EXPLANATION_SEND_DESCRIPTION',
         defaultMessage:
-            'Send only through the {network} network. The address must be on the {network} network for the crypto to be received.',
+            'Send only through the {network} network. The address must be on the {network} network for the sent crypto to be received.',
     },
     TR_EVM_EXPLANATION_EXCHANGE_TITLE: {
         id: 'TR_EVM_EXPLANATION_EXCHANGE_TITLE',
@@ -8495,7 +8499,7 @@ export default defineMessages({
     },
     TR_STAKE_ETH_CARD_TITLE: {
         id: 'TR_STAKE_ETH_CARD_TITLE',
-        defaultMessage: 'The easiest way to earn ETH.',
+        defaultMessage: 'The easiest way to earn {symbol}.',
     },
     TR_STAKE_ETH_EARN_REPEAT: {
         id: 'TR_STAKE_ETH_EARN_REPEAT',
@@ -8503,7 +8507,7 @@ export default defineMessages({
     },
     TR_STAKE_ETH_SEE_MONEY_DANCE: {
         id: 'TR_STAKE_ETH_SEE_MONEY_DANCE',
-        defaultMessage: 'See your money dance',
+        defaultMessage: 'Watch your money dance',
     },
     TR_STAKE_ETH_SEE_MONEY_DANCE_DESC: {
         id: 'TR_STAKE_ETH_SEE_MONEY_DANCE_DESC',
@@ -8548,12 +8552,12 @@ export default defineMessages({
     TR_STAKE_STAKING_IS: {
         id: 'TR_STAKE_STAKING_IS',
         defaultMessage:
-            "Staking is like a friendly gesture where you temporarily lock your Ethereum assets to support the blockchain's operation. As a sweet reward, you'll actually earn more ETH in return!",
+            "Staking is like a friendly gesture where you temporarily lock your Ethereum assets to support the blockchain's operation. As a sweet reward, you'll actually earn more {symbol} in return!",
     },
     TR_STAKE_ANY_AMOUNT_ETH: {
         id: 'TR_STAKE_ANY_AMOUNT_ETH',
         defaultMessage:
-            'Stake any amount and watch that sweet ETH roll in. With our current APY rate of {apyPercent}%, your rewards earn too!',
+            'Stake any amount and watch that sweet {symbol} roll in. With our current APY rate of {apyPercent}%, your rewards earn too!',
     },
     TR_STAKE_LEARN_MORE: {
         id: 'TR_STAKE_LEARN_MORE',
@@ -8565,7 +8569,7 @@ export default defineMessages({
     },
     TR_STAKE_STAKED_ETH_AMOUNT_LOCKED: {
         id: 'TR_STAKE_STAKED_ETH_AMOUNT_LOCKED',
-        defaultMessage: 'The staked amount of ETH is locked and can’t be traded or sent.',
+        defaultMessage: 'The staked amount of {symbol} is locked and can’t be traded or sent.',
     },
     TR_STAKE_UNSTAKING_TAKES: {
         id: 'TR_STAKE_UNSTAKING_TAKES',
@@ -8574,7 +8578,8 @@ export default defineMessages({
     },
     TR_STAKE_ETH_REWARDS_EARN: {
         id: 'TR_STAKE_ETH_REWARDS_EARN',
-        defaultMessage: 'Your rewards also earn. Keep them staked and watch your ETH rewards soar.',
+        defaultMessage:
+            'Your rewards also earn. Keep them staked and watch your {symbol} rewards soar.',
     },
     TR_STAKE_AVAILABLE: {
         id: 'TR_STAKE_AVAILABLE',
@@ -8591,13 +8596,12 @@ export default defineMessages({
     },
     TR_STAKE_LEFT_AMOUNT_FOR_WITHDRAWAL: {
         id: 'TR_STAKE_LEFT_AMOUNT_FOR_WITHDRAWAL',
-        defaultMessage:
-            'We’ve left {amount} ETH out so you will be able to pay for withdrawal fees',
+        defaultMessage: 'We’ve left {amount} {symbol} out so you can pay for withdrawal fees.',
     },
     TR_STAKE_RECOMMENDED_AMOUNT_FOR_WITHDRAWALS: {
         id: 'TR_STAKE_RECOMMENDED_AMOUNT_FOR_WITHDRAWALS',
         defaultMessage:
-            'We recommend you to leave {amount} ETH so you will be able to pay for withdrawal fees',
+            "It's recommended to leave {amount} {symbol} so you can pay for withdrawal fees.",
     },
     TR_STAKE_CONFIRM_ENTRY_PERIOD: {
         id: 'TR_STAKE_CONFIRM_ENTRY_PERIOD',
@@ -8614,7 +8618,7 @@ export default defineMessages({
     TR_STAKE_ETH_WILL_BE_BLOCKED: {
         id: 'TR_STAKE_ETH_WILL_BE_BLOCKED',
         defaultMessage:
-            'Your ETH will be blocked during this period, and you can’t cancel this. <a>Learn more</a>',
+            'Your {symbol} will be blocked during this period, and you can’t cancel this. <a>Learn more</a>',
     },
     TR_STAKE_ACKNOWLEDGE_ENTRY_PERIOD: {
         id: 'TR_STAKE_ACKNOWLEDGE_ENTRY_PERIOD',
@@ -8672,6 +8676,10 @@ export default defineMessages({
     TR_TX_CONFIRMED: {
         id: 'TR_TX_CONFIRMED',
         defaultMessage: 'Transaction confirmed',
+    },
+    TR_TX_CONFIRMING: {
+        id: 'TR_TX_CONFIRMING',
+        defaultMessage: 'Confirming transaction',
     },
     TR_STAKE_ADDING_TO_POOL: {
         id: 'TR_STAKE_ADDING_TO_POOL',
@@ -8733,10 +8741,6 @@ export default defineMessages({
         id: 'TR_STAKE_CLAIMING_PERIOD',
         defaultMessage: 'Claiming period',
     },
-    TR_NOT_ENOUGH_FUNDS_FOR_TX: {
-        id: 'TR_NOT_ENOUGH_FUNDS_FOR_TX',
-        defaultMessage: 'Not enough funds to execute the transaction',
-    },
     TR_STAKE_MIN_AMOUNT_TOOLTIP: {
         id: 'TR_STAKE_MIN_AMOUNT_TOOLTIP',
         defaultMessage: 'Minimum amount to stake is {amount} {symbol}',
@@ -8772,10 +8776,44 @@ export default defineMessages({
     TR_STAKE_CAN_CLAIM_WARNING: {
         id: 'TR_STAKE_CAN_CLAIM_WARNING',
         defaultMessage:
-            'You can already claim {amount} {symbol}. {br}Please claim or wait until new unstake is processed',
+            'You can already claim {amount} {symbol}. {br}Please claim or wait until new unstake is processed.',
     },
     TR_STAKE_CLAIM_IN_NEXT_BLOCK: {
         id: 'TR_STAKE_CLAIM_IN_NEXT_BLOCK',
         defaultMessage: 'in the next block',
+    },
+    TR_STAKE_NOT_ENOUGH_FUNDS: {
+        id: 'TR_STAKE_NOT_ENOUGH_FUNDS',
+        defaultMessage: 'Not enough {symbol} to pay network fees',
+    },
+    TR_STAKE_PROVIDED_BY: {
+        id: 'TR_STAKE_PROVIDED_BY',
+        defaultMessage: 'Provided by',
+    },
+    TR_STAKE_YOUR_FUNDS_MANAGED: {
+        id: 'TR_STAKE_YOUR_FUNDS_MANAGED',
+        defaultMessage: 'Your staked funds are <h>managed by Everstake</h>',
+    },
+    TR_STAKE_POWERED_BY: {
+        id: 'TR_STAKE_POWERED_BY',
+        defaultMessage: 'Powered by',
+    },
+    TR_STAKE_EVERSTAKE_MANAGES: {
+        id: 'TR_STAKE_EVERSTAKE_MANAGES',
+        defaultMessage:
+            'Everstake manages and protects your staked {symbol} <t>with their smart contracts, infrastructure, and technology.</t>',
+    },
+    TR_STAKE_TREZOR_NO_LIABILITY: {
+        id: 'TR_STAKE_TREZOR_NO_LIABILITY',
+        defaultMessage:
+            "Trezor assumes no liability <t>for Everstake's security guarantees. Your Trezor doesn’t manage the security of your staked funds.</t>",
+    },
+    TR_STAKE_CONSENT_TO_STAKING_WITH_EVERSTAKE: {
+        id: 'TR_STAKE_CONSENT_TO_STAKING_WITH_EVERSTAKE',
+        defaultMessage: 'I acknowledge and consent to staking with Everstake',
+    },
+    TR_SOLANA_TX_CONFIRMATION_MAY_TAKE_UP_TO_1_MIN: {
+        id: 'TR_SOLANA_TX_CONFIRMATION_MAY_TAKE_UP_TO_1_MIN',
+        defaultMessage: 'Confirmation of the transaction may take up to <nowrap>1 minute</nowrap>',
     },
 });

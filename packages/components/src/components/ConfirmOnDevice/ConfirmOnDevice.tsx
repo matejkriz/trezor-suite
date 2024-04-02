@@ -3,7 +3,7 @@ import styled, { css, keyframes } from 'styled-components';
 import { DeviceModelInternal } from '@trezor/connect';
 import { borders, spacingsPx } from '@trezor/theme';
 
-import { ElevationContext, useElevation } from '../ElevationContext/ElevationContext';
+import { ElevationUp } from '../ElevationContext/ElevationContext';
 import { ConfirmOnDeviceContent } from './ConfirmOnDeviceContent';
 
 enum AnimationDirection {
@@ -31,7 +31,7 @@ export const SLIDE_DOWN = keyframes`
     }
 `;
 
-const Wrapper = styled.div<{ animation?: AnimationDirection }>`
+const Wrapper = styled.div<{ $animation?: AnimationDirection }>`
     display: flex;
     width: 300px;
     height: 62px;
@@ -41,14 +41,14 @@ const Wrapper = styled.div<{ animation?: AnimationDirection }>`
     box-shadow: ${({ theme }) => theme.boxShadowBase};
     align-items: center;
 
-    ${({ animation }) =>
-        animation === AnimationDirection.Up &&
+    ${({ $animation }) =>
+        $animation === AnimationDirection.Up &&
         css`
             animation: ${SLIDE_UP} 0.6s cubic-bezier(0.16, 1, 0.3, 1);
         `}
 
-    ${({ animation }) =>
-        animation === AnimationDirection.Down &&
+    ${({ $animation }) =>
+        $animation === AnimationDirection.Down &&
         css`
             animation: ${SLIDE_DOWN} 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         `}
@@ -65,17 +65,13 @@ export interface ConfirmOnDeviceProps {
     deviceUnitColor?: number;
 }
 
-export const ConfirmOnDevice = ({ isConfirmed, ...rest }: ConfirmOnDeviceProps) => {
-    const { elevation } = useElevation();
-
-    return (
-        <Wrapper
-            animation={isConfirmed ? AnimationDirection.Down : AnimationDirection.Up}
-            data-test="@prompts/confirm-on-device"
-        >
-            <ElevationContext baseElevation={elevation}>
-                <ConfirmOnDeviceContent {...rest} />
-            </ElevationContext>
-        </Wrapper>
-    );
-};
+export const ConfirmOnDevice = ({ isConfirmed, ...rest }: ConfirmOnDeviceProps) => (
+    <Wrapper
+        $animation={isConfirmed ? AnimationDirection.Down : AnimationDirection.Up}
+        data-test="@prompts/confirm-on-device"
+    >
+        <ElevationUp>
+            <ConfirmOnDeviceContent {...rest} />
+        </ElevationUp>
+    </Wrapper>
+);

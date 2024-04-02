@@ -5,14 +5,14 @@ import { DeviceDisplayText } from './DeviceDisplayText';
 import { DeviceModelInternal } from '@trezor/connect';
 import { DisplayPageSeparator } from './DisplayPageSeparator';
 
-const StyledNextIcon = styled(Icon)<{ isPixelType: boolean }>`
+const StyledNextIcon = styled(Icon)<{ $isPixelType: boolean }>`
     display: inline-block;
-    margin-left: ${({ isPixelType }) => (isPixelType ? '12px' : '24px')};
+    margin-left: ${({ $isPixelType }) => ($isPixelType ? '12px' : '24px')};
 `;
 
-const StyledContinuesIcon = styled(Icon)<{ isPixelType: boolean }>`
+const StyledContinuesIcon = styled(Icon)<{ $isPixelType: boolean }>`
     display: inline-block;
-    margin-right: ${({ isPixelType }) => (isPixelType ? '12px' : '24px')};
+    margin-right: ${({ $isPixelType }) => ($isPixelType ? '12px' : '24px')};
 `;
 
 const Container = styled.div`
@@ -21,7 +21,6 @@ const Container = styled.div`
 
 type DisplayPaginatedTextProps = {
     isPixelType: boolean;
-    'data-test'?: string;
     text: string;
     deviceModel: DeviceModelInternal;
 };
@@ -63,13 +62,13 @@ const Row = ({
             {showPrevPageArrow && (
                 <StyledContinuesIcon
                     {...iconConfig}
-                    isPixelType={isPixelType}
+                    $isPixelType={isPixelType}
                     icon={iconContinuesName}
                 />
             )}
-            <DeviceDisplayText isPixelType={isPixelType}>{row.text}</DeviceDisplayText>
+            <DeviceDisplayText $isPixelType={isPixelType}>{row.text}</DeviceDisplayText>
             {showNextPageArrow && (
-                <StyledNextIcon {...iconConfig} isPixelType={isPixelType} icon={iconNextName} />
+                <StyledNextIcon {...iconConfig} $isPixelType={isPixelType} icon={iconNextName} />
             )}
         </RowContainer>
     );
@@ -77,7 +76,6 @@ const Row = ({
 
 export const DisplayPaginatedText = ({
     isPixelType,
-    'data-test': dataTest,
     text,
     deviceModel,
 }: DisplayPaginatedTextProps) => {
@@ -93,7 +91,10 @@ export const DisplayPaginatedText = ({
                 const isLastPage = pageIndex === pages.length - 1;
 
                 return (
-                    <Page key={`page-${pageIndex}`} data-test={isFirstPage ? dataTest : undefined}>
+                    <Page
+                        key={`page-${pageIndex}`}
+                        data-test={isFirstPage ? '@device-display/paginated-text' : undefined}
+                    >
                         {page.rows.map((row, index) => (
                             <Row
                                 isPrevPageIconOnDevice={isPrevPageIconOnDevice}

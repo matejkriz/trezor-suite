@@ -5,7 +5,8 @@ import { Card, Textarea, Button, Tooltip, H3, IconButton } from '@trezor/compone
 
 import { Translation } from 'src/components/suite';
 import { useDispatch, useTranslation } from 'src/hooks/suite';
-import { pushRawTransaction, sendRaw } from 'src/actions/wallet/sendFormActions';
+import { sendFormActions } from 'src/actions/wallet/sendFormActions';
+import { pushSendFormRawTransactionThunk } from 'src/actions/wallet/send/sendFormThunks';
 import { getInputState, isHexValid } from '@suite-common/wallet-utils';
 import { Network } from 'src/types/wallet';
 import { OpenGuideFromTooltip } from 'src/components/guide';
@@ -26,7 +27,7 @@ const StyledTextarea = styled(Textarea)`
 
     > :first-child {
         background-color: ${({ theme }) => theme.backgroundNeutralSubtleOnElevation1};
-        border-color: ${({ theme }) => theme.borderOnElevation1};
+        border-color: ${({ theme }) => theme.borderElevation2};
     }
 `;
 
@@ -68,10 +69,12 @@ export const Raw = ({ network }: RawProps) => {
         },
     });
 
-    const cancel = () => dispatch(sendRaw(false));
+    const cancel = () => dispatch(sendFormActions.sendRaw(false));
 
     const send = async () => {
-        const result = await dispatch(pushRawTransaction(inputValue, network.symbol));
+        const result = await dispatch(
+            pushSendFormRawTransactionThunk({ tx: inputValue, coin: network.symbol }),
+        ).unwrap();
 
         if (result) {
             setValue(INPUT_NAME, '');
@@ -90,12 +93,9 @@ export const Raw = ({ network }: RawProps) => {
         <StyledCard>
             <H3>
                 <Tooltip
-                    addon={instance => (
-                        <OpenGuideFromTooltip
-                            id="/3_send-and-receive/transactions-in-depth/send-raw.md"
-                            instance={instance}
-                        />
-                    )}
+                    addon={
+                        <OpenGuideFromTooltip id="/3_send-and-receive/transactions-in-depth/send-raw.md" />
+                    }
                     content={<Translation id="SEND_RAW_TRANSACTION_TOOLTIP" />}
                     dashed
                 >

@@ -25,6 +25,7 @@ import { PinProtection } from './PinProtection';
 import { SafetyChecks } from './SafetyChecks';
 import { WipeCode } from './WipeCode';
 import { WipeDevice } from './WipeDevice';
+import { ChangeLanguage } from './ChangeLanguage';
 
 const deviceSettingsUnavailable = (device?: TrezorDevice, transport?: Partial<TransportInfo>) => {
     const noTransportAvailable = transport && !transport.type;
@@ -44,6 +45,7 @@ export const SettingsDevice = () => {
     const isDeviceLocked = isLocked();
     const bootloaderMode = device?.mode === 'bootloader';
     const initializeMode = device?.mode === 'initialize';
+    const isNormalMode = !bootloaderMode && !initializeMode;
     const deviceRemembered = isDeviceRemembered(device) && !device?.connected;
     const deviceModelInternal = device?.features?.internal_model;
     const bitcoinOnlyDevice = isBitcoinOnlyDevice(device);
@@ -103,7 +105,7 @@ export const SettingsDevice = () => {
                 />
             )}
 
-            {!bootloaderMode && !initializeMode && (
+            {isNormalMode && (
                 <SettingsSection title={<Translation id="TR_BACKUP" />} icon="NEWSPAPER">
                     {unfinishedBackup ? (
                         <BackupFailed />
@@ -121,9 +123,10 @@ export const SettingsDevice = () => {
                 {(!bootloaderMode || bitcoinOnlyDevice) && (
                     <FirmwareTypeChange isDeviceLocked={isDeviceLocked} />
                 )}
+                <ChangeLanguage isDeviceLocked={isDeviceLocked} />
             </SettingsSection>
 
-            {!bootloaderMode && !initializeMode && (
+            {isNormalMode && (
                 <>
                     <SettingsSection
                         title={<Translation id="TR_DEVICE_SECURITY" />}
@@ -149,7 +152,7 @@ export const SettingsDevice = () => {
 
             <SettingsSection title={<Translation id="TR_ADVANCED" />} icon="GHOST">
                 <WipeDevice isDeviceLocked={isDeviceLocked} />
-                <WipeCode isDeviceLocked={isDeviceLocked} />
+                {isNormalMode && <WipeCode isDeviceLocked={isDeviceLocked} />}
                 <CustomFirmware />
                 {supportsDeviceAuthentication && <DeviceAuthenticityOptOut />}
             </SettingsSection>

@@ -9,7 +9,7 @@ import {
     spacingsPx,
 } from '@trezor/theme';
 
-const Wrapper = styled.div<{ elevation: Elevation }>`
+const Wrapper = styled.div<{ $elevation: Elevation }>`
     display: flex;
     padding: ${spacingsPx.md} ${spacingsPx.md} ${spacingsPx.md} ${spacingsPx.xl};
     border-radius: ${borders.radii.xs};
@@ -20,7 +20,7 @@ const Wrapper = styled.div<{ elevation: Elevation }>`
     cursor: pointer;
     transition: all 0.3s;
 
-    :hover {
+    &:hover {
         box-shadow: 0 6px 40px 0 ${({ theme }) => theme.BOX_SHADOW_OPTION_CARD};
         border: 1px solid ${({ theme }) => theme.STROKE_GREY_ALT};
     }
@@ -49,7 +49,7 @@ const IconWrapper = styled.div`
     margin-right: 24px;
 `;
 
-export const OptionsWrapper = styled.div<{ fullWidth?: boolean }>`
+export const OptionsWrapper = styled.div<{ $fullWidth?: boolean }>`
     display: flex;
 
     @media all and (max-width: ${variables.SCREEN_SIZE.SM}) {
@@ -57,7 +57,7 @@ export const OptionsWrapper = styled.div<{ fullWidth?: boolean }>`
     }
 
     ${props =>
-        props.fullWidth !== false &&
+        props.$fullWidth !== false &&
         css`
             width: 100%;
         `}
@@ -82,7 +82,7 @@ export const OnboardingOption = ({
     const { elevation } = useElevation();
 
     return (
-        <Wrapper elevation={elevation} {...rest}>
+        <Wrapper $elevation={elevation} {...rest}>
             {icon && (
                 <IconWrapper>
                     <Icon icon={icon} size={48} />

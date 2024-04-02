@@ -2,13 +2,13 @@ import { ReactNode } from 'react';
 import styled, { css } from 'styled-components';
 import { borders } from '@trezor/theme';
 
-const Wrapper = styled.div<{ size?: string; isHoverable?: boolean }>`
+const Wrapper = styled.div<{ $size?: string; $isHoverable?: boolean }>`
     position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
 
-    ::after {
+    &::after {
         content: '';
         position: absolute;
         width: 100%;
@@ -24,12 +24,12 @@ const Wrapper = styled.div<{ size?: string; isHoverable?: boolean }>`
     }
 
     ${props =>
-        props.isHoverable &&
+        props.$isHoverable &&
         css`
-            :hover,
-            :focus,
-            :active {
-                ::after {
+            &:hover,
+            &:focus,
+            &:active {
+                &::after {
                     transform: scale(1);
                     background-color: ${({ theme }) => theme.backgroundTertiaryDefaultOnElevation0};
                 }
@@ -48,7 +48,7 @@ export const HoverAnimation = ({
     className,
     children,
 }: HoverAnimationProps) => (
-    <Wrapper isHoverable={isHoverable} className={className}>
+    <Wrapper $isHoverable={isHoverable} className={className}>
         {children}
     </Wrapper>
 );

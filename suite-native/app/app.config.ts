@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /* eslint-disable import/no-default-export */
 /* eslint-disable import/no-anonymous-default-export */
 import { ExpoConfig, ConfigContext } from 'expo/config';
@@ -31,9 +32,15 @@ const appIconsAndroid = {
 } as const;
 
 const appNames = {
-    debug: 'Trezor Suite Debug',
-    develop: 'Trezor Suite Develop',
-    production: 'Trezor Suite',
+    debug: 'Trezor Suite Lite Debug',
+    develop: 'Trezor Suite Lite Develop',
+    production: 'Trezor Suite Lite',
+} as const satisfies Record<BuildType, string>;
+
+const appSlugs = {
+    debug: 'trezor-suite-debug',
+    develop: 'trezor-suite-develop',
+    production: 'trezor-suite',
 } as const satisfies Record<BuildType, string>;
 
 const projectIds = {
@@ -42,23 +49,29 @@ const projectIds = {
     debug: '',
 } as const satisfies Record<BuildType, string>;
 
+const buildType = (process.env.EXPO_PUBLIC_ENVIRONMENT as BuildType) ?? 'debug';
+const isCI = process.env.CI == 'true' || process.env.CI == '1';
+
+if (isCI) {
+    if (!process.env.EXPO_PUBLIC_ENVIRONMENT) {
+        throw new Error('Missing EXPO_PUBLIC_ENVIRONMENT env variable');
+    }
+    if (!process.env.SENTRY_AUTH_TOKEN && buildType !== 'debug') {
+        throw new Error('Missing SENTRY_AUTH_TOKEN env variable');
+    }
+}
+
 export default ({ config }: ConfigContext): ExpoConfig => {
-    const buildType = (process.env.ENVIRONMENT_EXPO as BuildType) ?? 'debug';
     const name = appNames[buildType];
-    const slug = appNames[buildType].toLowerCase().split(' ').join('-');
     const bundleIdentifier = bundleIdentifiers[buildType];
     const projectId = projectIds[buildType];
     const appIconIos = appIconsIos[buildType];
     const appIconAndroid = appIconsAndroid[buildType];
 
-    if (!process.env.SENTRY_AUTH_TOKEN && buildType !== 'debug') {
-        throw new Error('Missing SENTRY_AUTH_TOKEN env variable');
-    }
-
     return {
         ...config,
         name,
-        slug,
+        slug: appSlugs[buildType],
         owner: 'trezorcompany',
         version: suiteNativeVersion,
         splash: {
@@ -118,7 +131,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
                 '@sentry/react-native/expo',
                 {
                     url: 'https://sentry.io/',
-                    authToken: process.env.SENTRY_AUTH_TOKEN,
                     project: 'suite-native',
                     organization: 'satoshilabs',
                 },

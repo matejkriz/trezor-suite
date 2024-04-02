@@ -3,8 +3,10 @@ import styled, { useTheme } from 'styled-components';
 import { Button, Checkbox, H2, Icon, Divider } from '@trezor/components';
 import { spacingsPx } from '@trezor/theme';
 import { Modal, Translation, TrezorLink } from 'src/components/suite';
-import { useDispatch } from 'src/hooks/suite';
+import { useDispatch, useSelector, useValidatorsQueue } from 'src/hooks/suite';
 import { openModal } from 'src/actions/suite/modalActions';
+import { selectSelectedAccount } from 'src/reducers/wallet/selectedAccountReducer';
+import { useDaysTo } from 'src/hooks/suite/useDaysTo';
 
 const StyledModal = styled(Modal)`
     width: 500px;
@@ -26,7 +28,7 @@ const Flex = styled.div`
 
 const DividerWrapper = styled.div`
     & > div {
-        background: ${({ theme }) => theme.borderOnElevation1};
+        background: ${({ theme }) => theme.borderElevation2};
         margin: ${spacingsPx.lg} 0 ${spacingsPx.md} auto;
         max-width: 428px;
         width: 100%;
@@ -54,14 +56,26 @@ const ButtonsWrapper = styled.div`
 `;
 
 interface ConfirmStakeEthModalProps {
+    isLoading: boolean;
     onConfirm: () => void;
     onCancel: () => void;
 }
 
-export const ConfirmStakeEthModal = ({ onConfirm, onCancel }: ConfirmStakeEthModalProps) => {
+export const ConfirmStakeEthModal = ({
+    isLoading,
+    onConfirm,
+    onCancel,
+}: ConfirmStakeEthModalProps) => {
     const theme = useTheme();
     const dispatch = useDispatch();
     const [hasAgreed, setHasAgreed] = useState(false);
+    const account = useSelector(selectSelectedAccount);
+    const { validatorsQueue } = useValidatorsQueue(account?.symbol);
+    const { daysToAddToPoolInitial } = useDaysTo({
+        selectedAccountKey: account?.descriptor ?? '',
+        validatorsQueue,
+    });
+    const isDisabled = !hasAgreed || isLoading;
 
     const handleOnCancel = () => {
         onCancel();
@@ -81,7 +95,12 @@ export const ConfirmStakeEthModal = ({ onConfirm, onCancel }: ConfirmStakeEthMod
             <VStack>
                 <Flex>
                     <Icon icon="CLOCK" size={24} color={theme.iconAlertYellow} />
-                    <Translation id="TR_STAKE_ENTERING_POOL_MAY_TAKE" values={{ days: 35 }} />
+                    <Translation
+                        id="TR_STAKE_ENTERING_POOL_MAY_TAKE"
+                        values={{
+                            days: isNaN(daysToAddToPoolInitial) ? '30+' : daysToAddToPoolInitial,
+                        }}
+                    />
                 </Flex>
                 <Flex>
                     <Icon icon="HAND" size={24} color={theme.iconAlertYellow} />
@@ -94,6 +113,7 @@ export const ConfirmStakeEthModal = ({ onConfirm, onCancel }: ConfirmStakeEthMod
                                     {chunks}
                                 </TrezorLink>
                             ),
+                            symbol: account?.symbol.toUpperCase(),
                         }}
                     />
                 </Flex>
@@ -111,7 +131,7 @@ export const ConfirmStakeEthModal = ({ onConfirm, onCancel }: ConfirmStakeEthMod
                 <Button variant="tertiary" onClick={handleOnCancel}>
                     <Translation id="TR_CANCEL" />
                 </Button>
-                <Button isDisabled={!hasAgreed} onClick={onClick}>
+                <Button isDisabled={isDisabled} onClick={onClick}>
                     <Translation id="TR_STAKE_CONFIRM_AND_STAKE" />
                 </Button>
             </ButtonsWrapper>

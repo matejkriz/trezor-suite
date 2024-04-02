@@ -6,7 +6,7 @@ import {
     TOKEN_PROGRAM_PUBLIC_KEY,
     ASSOCIATED_TOKEN_PROGRAM_PUBLIC_KEY,
     SYSTEM_PROGRAM_PUBLIC_KEY,
-} from '@trezor/blockchain-link-utils/lib/solana';
+} from '@trezor/blockchain-link-utils/src/solana';
 import BigNumber from 'bignumber.js';
 import type { Transaction } from '@solana/web3.js';
 
@@ -42,19 +42,43 @@ const encodeTokenTransferInstructionData = (instruction: {
     return b.subarray(0, span);
 };
 
+type PriorityFees = { computeUnitPrice: string; computeUnitLimit: string };
+
+export const dummyPriorityFeesForFeeEstimation: PriorityFees = {
+    computeUnitPrice: '100000',
+    computeUnitLimit: '200000',
+};
+
+const addPriorityFees = async (transaction: Transaction, priorityFees: PriorityFees) => {
+    const { ComputeBudgetProgram } = await loadSolanaLib();
+    transaction.add(
+        ComputeBudgetProgram.setComputeUnitLimit({
+            units: parseInt(priorityFees.computeUnitLimit, 10),
+        }),
+        ComputeBudgetProgram.setComputeUnitPrice({
+            microLamports: parseInt(priorityFees.computeUnitPrice, 10),
+        }),
+    );
+};
+
 export const buildTransferTransaction = async (
     fromAddress: string,
     toAddress: string,
     amountInSol: string,
     blockhash: string,
     lastValidBlockHeight: number,
+    priorityFees: PriorityFees,
 ) => {
     const { Transaction, SystemProgram, PublicKey } = await loadSolanaLib();
     const transaction = new Transaction({
         blockhash,
         lastValidBlockHeight,
         feePayer: new PublicKey(fromAddress),
-    }).add(
+    });
+
+    await addPriorityFees(transaction, priorityFees);
+
+    transaction.add(
         SystemProgram.transfer({
             fromPubkey: new PublicKey(fromAddress),
             toPubkey: new PublicKey(toAddress),
@@ -210,6 +234,7 @@ export const buildTokenTransferTransaction = async (
     toTokenAccount: TokenAccount | undefined,
     blockhash: string,
     lastValidBlockHeight: number,
+    priorityFees: PriorityFees,
 ): Promise<TokenTransferTxWithDestinationAddress> => {
     const { Transaction, PublicKey } = await loadSolanaLib();
 
@@ -218,6 +243,8 @@ export const buildTokenTransferTransaction = async (
         lastValidBlockHeight,
         feePayer: new PublicKey(fromAddress),
     });
+
+    await addPriorityFees(transaction, priorityFees);
 
     // Token transaction building logic
 

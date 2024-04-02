@@ -27,13 +27,11 @@
         { "path": "../device" },
         { "path": "../discovery" },
         { "path": "../feature-flags" },
-        { "path": "../fiat-rates" },
         { "path": "../graph" },
         { "path": "../message-system" },
         { "path": "../module-settings" },
         { "path": "../storage" },
         { "path": "../toasts" },
-        { "path": "../token-definitions" },
         { "path": "../../packages/connect" },
         {
             "path": "../../packages/transport-native"

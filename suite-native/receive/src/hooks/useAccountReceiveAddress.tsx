@@ -19,6 +19,8 @@ import { AccountKey } from '@suite-common/wallet-types';
 import { getFirstFreshAddress } from '@suite-common/wallet-utils';
 import { analytics, EventType } from '@suite-native/analytics';
 import { requestPrioritizedDeviceAccess } from '@suite-native/device-mutex';
+import { useToast } from '@suite-native/toasts';
+import { useTranslate } from '@suite-native/intl';
 
 export const useAccountReceiveAddress = (accountKey: AccountKey) => {
     const dispatch = useDispatch();
@@ -26,6 +28,8 @@ export const useAccountReceiveAddress = (accountKey: AccountKey) => {
     const [isUnverifiedAddressRevealed, setIsUnverifiedAddressRevealed] = useState(false);
     const isPortfolioTrackerDevice = useSelector(selectIsPortfolioTrackerDevice);
     const navigation = useNavigation();
+    const { translate } = useTranslate();
+    const { showToast } = useToast();
 
     const { showAlert } = useAlert();
 
@@ -73,15 +77,27 @@ export const useAccountReceiveAddress = (accountKey: AccountKey) => {
                 !response.payload.success &&
                 response.payload.payload.code === 'Failure_ActionCancelled'
             ) {
-                navigation.goBack();
+                showToast({
+                    icon: 'warningCircle',
+                    variant: 'default',
+                    message: translate('moduleReceive.deviceCancelError'),
+                });
+                if (navigation.canGoBack()) {
+                    navigation.goBack();
+                }
 
                 return false;
             }
 
             if (
                 !response.payload.success &&
-                // Method_Interrupted is returned when user cancels actions in connect and we want to ignore it here
-                response.payload.payload.code !== 'Method_Interrupted'
+                // Do not show alert for user cancelled actions
+                ![
+                    'Method_Interrupted',
+                    'Failure_PinInvalid',
+                    'Method_Cancel',
+                    'Failure_PinCancelled',
+                ].includes(response.payload.payload.code ?? '')
             ) {
                 showAlert({
                     title: response.payload.payload.code,
@@ -103,7 +119,7 @@ export const useAccountReceiveAddress = (accountKey: AccountKey) => {
         }
 
         return false;
-    }, [accountKey, freshAddress, dispatch, showAlert, navigation]);
+    }, [accountKey, freshAddress, dispatch, showToast, translate, navigation, showAlert]);
 
     const handleShowAddress = useCallback(async () => {
         if (isPortfolioTrackerDevice) {
@@ -121,6 +137,8 @@ export const useAccountReceiveAddress = (accountKey: AccountKey) => {
             if (wasVerificationSuccessful) {
                 analytics.report({ type: EventType.ConfirmedReceiveAdress });
                 setIsReceiveApproved(true);
+            } else {
+                setIsUnverifiedAddressRevealed(false);
             }
         }
     }, [isPortfolioTrackerDevice, networkSymbol, verifyAddressOnDevice]);

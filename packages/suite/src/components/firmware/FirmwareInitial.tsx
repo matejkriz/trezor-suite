@@ -27,6 +27,7 @@ import {
 } from 'src/components/firmware';
 import { FirmwareButtonsRow } from './Buttons/FirmwareButtonsRow';
 import { FirmwareSwitchWarning } from './FirmwareSwitchWarning';
+import { spacingsPx } from '@trezor/theme';
 
 const Description = styled.div`
     align-items: center;
@@ -44,18 +45,14 @@ const TextButton = styled.button`
     text-decoration: underline;
 `;
 
-const StyledConnectDevicePrompt = styled(ConnectDevicePromptManager)`
-    margin-top: 120px;
-`;
-
 const WarningListWrapper = styled.div`
     display: flex;
     align-items: flex-start;
     flex-direction: column;
-    gap: 16px;
+    gap: ${spacingsPx.md};
     border-bottom: 1px solid ${({ theme }) => theme.STROKE_GREY};
-    margin-bottom: 8px;
-    padding-bottom: 16px;
+    margin: ${spacingsPx.xs} ${spacingsPx.md};
+    padding-bottom: ${spacingsPx.md};
 `;
 
 const Important = styled.div`
@@ -154,6 +151,7 @@ export const FirmwareInitial = ({
     // todo: move to utils device.ts
     const devicesConnected = devices.filter(device => device?.connected);
     const multipleDevicesConnected = [...new Set(devicesConnected.map(d => d.path))].length > 1;
+    const shouldCheckSeed = liveDevice?.mode !== 'initialize';
 
     useEffect(() => {
         // When the user choses to install a new firmware update we will ask him/her to reconnect a device in bootloader mode.
@@ -176,7 +174,7 @@ export const FirmwareInitial = ({
         // Most users won't see this as they should come here with a connected device.
         // This is just for people who want to shoot themselves in the foot and disconnect the device before proceeding with fw update flow
         // Be aware that disconnection after fw installation () is completed is fine and won't be caught by this, because device variable will point to cached device
-        return <StyledConnectDevicePrompt device={device} />;
+        return <ConnectDevicePromptManager device={device} />;
     }
 
     // Bitcoin-only firmware is only available on T2T1 from v2.0.8 - older devices must first upgrade to 2.1.1 which does not have a Bitcoin-only variant
@@ -378,7 +376,7 @@ export const FirmwareInitial = ({
                 <FirmwareButtonsRow withCancelButton={willBeWiped} onClose={onClose}>
                     <FirmwareInstallButton
                         onClick={() => {
-                            setStatus(standaloneFwUpdate ? 'check-seed' : 'waiting-for-bootloader');
+                            setStatus(shouldCheckSeed ? 'check-seed' : 'waiting-for-bootloader');
                             updateAnalytics({ firmware: 'update' });
                         }}
                         multipleDevicesConnected={multipleDevicesConnected}

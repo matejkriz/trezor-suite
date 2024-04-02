@@ -4,6 +4,7 @@ import { showXpub } from 'src/actions/wallet/publicKeyActions';
 import { selectSelectedAccount } from 'src/reducers/wallet/selectedAccountReducer';
 import { selectLabelingDataForSelectedAccount } from 'src/reducers/suite/metadataReducer';
 import { useSelector } from 'src/hooks/suite';
+import { DisplayMode } from 'src/types/suite';
 
 export const ConfirmXpubModal = (
     props: Pick<ConfirmValueModalProps, 'isConfirmed' | 'onCancel'>,
@@ -12,6 +13,11 @@ export const ConfirmXpubModal = (
     const { accountLabel } = useSelector(selectLabelingDataForSelectedAccount);
 
     if (!account) return null;
+
+    const xpub =
+        account.descriptorChecksum !== undefined
+            ? `${account.descriptor}#${account.descriptorChecksum}`
+            : account.descriptor;
 
     return (
         <ConfirmValueModal
@@ -33,8 +39,8 @@ export const ConfirmXpubModal = (
             confirmStepLabel={<Translation id="TR_XPUB_MATCH" />}
             validateOnDevice={showXpub}
             copyButtonText={<Translation id="TR_XPUB_MODAL_CLIPBOARD" />}
-            value={account.descriptor}
-            valueDataTest="@xpub-modal/xpub-field"
+            value={xpub}
+            displayMode={DisplayMode.PAGINATED_TEXT}
             {...props}
         />
     );

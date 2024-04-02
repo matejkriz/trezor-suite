@@ -9,7 +9,7 @@ import {
     ButtonProps,
     useElevation,
     IconType,
-    ElevationContext,
+    ElevationUp,
 } from '@trezor/components';
 import { Elevation, borders, spacingsPx, typography } from '@trezor/theme';
 import { TrezorLink } from './TrezorLink';
@@ -69,17 +69,17 @@ const getMainColor = (variant: NotificationCardVariant, theme: DefaultTheme) => 
     }
 };
 const getBackgroundColor = ({
-    elevation,
-    variant,
+    $elevation,
+    $variant,
     theme,
 }: {
-    elevation: Elevation;
-    variant: NotificationCardVariant;
+    $elevation: Elevation;
+    $variant: NotificationCardVariant;
     theme: DefaultTheme;
 }) => {
-    const elevationPart = elevation === -1 ? 'Negative' : elevation;
+    const elevationPart = $elevation === -1 ? 'Negative' : $elevation;
 
-    switch (variant) {
+    switch ($variant) {
         case 'info':
             return theme[`backgroundAlertBlueSubtleOnElevation${elevationPart}`];
         case 'warning':
@@ -91,7 +91,7 @@ const getBackgroundColor = ({
     }
 };
 
-const Wrapper = styled.div<{ elevation: Elevation; variant: NotificationCardVariant }>`
+const Wrapper = styled.div<{ $elevation: Elevation; $variant: NotificationCardVariant }>`
     display: flex;
     border-radius: ${borders.radii.sm};
     padding: ${spacingsPx.sm} ${spacingsPx.lg};
@@ -145,12 +145,12 @@ export const NotificationCard = ({
 
     return (
         <Wrapper
-            variant={variant}
+            $variant={variant}
             className={className}
-            elevation={elevation}
+            $elevation={elevation}
             data-test={props['data-test']}
         >
-            <ElevationContext baseElevation={elevation}>
+            <ElevationUp>
                 <IconWrapper>
                     {isLoading ? (
                         <Spinner size={22} />
@@ -166,7 +166,7 @@ export const NotificationCard = ({
                 </IconWrapper>
                 <Body>{children}</Body>
                 {buttonProps && <CardButton size="tiny" variant={buttonVariant} {...buttonProps} />}
-            </ElevationContext>
+            </ElevationUp>
         </Wrapper>
     );
 };

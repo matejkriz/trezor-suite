@@ -17,32 +17,39 @@ interface GraphTooltipDashboardProps extends TooltipProps<number, any> {
     extendedDataForInterval?: CommonAggregatedHistory[];
 }
 
-export const GraphTooltipDashboard = (props: GraphTooltipDashboardProps) => {
+export const GraphTooltipDashboard = ({
+    active,
+    localCurrency,
+    payload,
+    receivedValueFn,
+    sentValueFn,
+    ...props
+}: GraphTooltipDashboardProps) => {
     const { FiatAmountFormatter } = useFormatters();
 
-    if (!props.active || !props.payload) {
+    // Note: payload is [] when discovery is paused.
+    if (!active || !payload?.length) {
         return null;
     }
 
-    const receivedAmountString = props.receivedValueFn(props.payload[0].payload);
-    const sentAmountString = props.sentValueFn(props.payload[0].payload);
+    const receivedAmountString = receivedValueFn(payload[0].payload);
+    const sentAmountString = sentValueFn(payload[0].payload);
 
     const receivedAmount = (
-        <FiatAmountFormatter currency={props.localCurrency} value={receivedAmountString ?? '0'} />
+        <FiatAmountFormatter currency={localCurrency} value={receivedAmountString ?? '0'} />
     );
 
     const sentAmount = (
-        <FiatAmountFormatter currency={props.localCurrency} value={sentAmountString ?? '0'} />
+        <FiatAmountFormatter currency={localCurrency} value={sentAmountString ?? '0'} />
     );
 
     return (
         <GraphTooltipBase
             {...props}
-            selectedRange={props.selectedRange}
+            active={active}
+            payload={payload}
             sentAmount={sentAmount}
             receivedAmount={receivedAmount}
-            onShow={props.onShow}
-            extendedDataForInterval={props.extendedDataForInterval}
         />
     );
 };

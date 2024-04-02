@@ -30,6 +30,9 @@
             "path": "suite-common/toast-notifications"
         },
         {
+            "path": "suite-common/token-definitions"
+        },
+        {
             "path": "suite-common/transaction-cache-engine"
         },
         { "path": "suite-common/validators" },
@@ -57,7 +60,6 @@
             "path": "suite-native/ethereum-tokens"
         },
         { "path": "suite-native/feature-flags" },
-        { "path": "suite-native/fiat-rates" },
         { "path": "suite-native/formatters" },
         { "path": "suite-native/forms" },
         { "path": "suite-native/graph" },
@@ -101,9 +103,6 @@
         { "path": "suite-native/test-utils" },
         { "path": "suite-native/theme" },
         { "path": "suite-native/toasts" },
-        {
-            "path": "suite-native/token-definitions"
-        },
         { "path": "suite-native/transactions" },
         { "path": "suite-native/video-assets" },
         { "path": "packages/analytics" },
@@ -121,6 +120,12 @@
         { "path": "packages/connect-analytics" },
         { "path": "packages/connect-common" },
         { "path": "packages/connect-explorer" },
+        {
+            "path": "packages/connect-explorer-nextra"
+        },
+        {
+            "path": "packages/connect-explorer-theme"
+        },
         {
             "path": "packages/connect-explorer-webextension"
         },

@@ -32,7 +32,6 @@
         { "path": "../config" },
         { "path": "../device" },
         { "path": "../feature-flags" },
-        { "path": "../fiat-rates" },
         { "path": "../intl" },
         { "path": "../message-system" },
         { "path": "../module-accounts-import" },
@@ -56,6 +55,7 @@
         { "path": "../toasts" },
         { "path": "../transactions" },
         { "path": "../../packages/connect" },
+        { "path": "../../packages/env-utils" },
         {
             "path": "../../packages/react-native-usb"
         },

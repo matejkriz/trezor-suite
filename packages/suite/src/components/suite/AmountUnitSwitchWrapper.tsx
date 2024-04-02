@@ -17,7 +17,7 @@ const Container = styled.div`
     transition: background 0.1s ease-in;
     cursor: pointer;
     ${mediaQueries.hover} {
-        :hover {
+        &:hover {
             background: ${({ theme }) => theme.BG_GREY};
         }
     }
@@ -53,8 +53,6 @@ export const AmountUnitSwitchWrapper = ({ symbol, children }: AmountUnitSwitchWr
             delayShow={TOOLTIP_DELAY_NORMAL}
             delayHide={TOOLTIP_DELAY_NONE}
             placement="bottom"
-            interactive={false}
-            hideOnClick={false}
             content={<Translation id={areSatsDisplayed ? 'TR_TO_BTC' : 'TR_TO_SATOSHIS'} />}
         >
             <Container

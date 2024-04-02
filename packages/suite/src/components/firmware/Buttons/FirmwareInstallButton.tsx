@@ -24,20 +24,20 @@ interface FirmwareInstallButtonProps extends Omit<ButtonProps, 'children'> {
 export const FirmwareInstallButton = (props: FirmwareInstallButtonProps) => {
     const { translationString } = useTranslation();
 
-    if (props.multipleDevicesConnected) {
+    const { multipleDevicesConnected, ...rest } = props;
+
+    if (multipleDevicesConnected) {
         return (
             <Tooltip
                 cursor="default"
                 maxWidth={200}
                 placement="bottom"
-                interactive={false}
-                hideOnClick={false}
                 content={<div>{translationString('TR_INSTALL_FW_DISABLED_MULTIPLE_DEVICES')}</div>}
             >
-                <InstallButtonCommon {...props} isDisabled />
+                <InstallButtonCommon {...rest} isDisabled />
             </Tooltip>
         );
     }
 
-    return <InstallButtonCommon {...props} />;
+    return <InstallButtonCommon {...rest} />;
 };

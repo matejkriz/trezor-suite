@@ -10,16 +10,21 @@ import styled, { css, CSSObject } from 'styled-components';
 
 import { borders, spacingsPx, typography } from '@trezor/theme';
 
-const track = css<Pick<RangeProps, 'trackStyle' | 'disabled'>>`
+type TrackProps = {
+    $trackStyle?: CSSObject;
+    disabled?: boolean; // intentionally not transient (no $), it is HTML attribute of the <input>
+};
+
+const track = css<TrackProps>`
     height: ${spacingsPx.xxs};
     background: ${({ theme, disabled }) =>
         disabled ? theme.backgroundNeutralDisabled : theme.backgroundPrimaryDefault};
     border-radius: ${borders.radii.full};
 
-    ${({ trackStyle }) => trackStyle}
+    ${({ $trackStyle }) => $trackStyle}
 `;
 
-const thumb = css<Pick<RangeProps, 'disabled'>>`
+const thumb = css<{ disabled?: boolean }>`
     appearance: none;
     background: white;
     border-radius: ${borders.radii.full};
@@ -32,7 +37,7 @@ const thumb = css<Pick<RangeProps, 'disabled'>>`
     ${({ disabled }) =>
         !disabled &&
         css`
-            :active {
+            &:active {
                 box-shadow: 0 0 2px 0 rgb(0 0 0 / 50%);
                 cursor: grabbing;
             }
@@ -44,7 +49,7 @@ const focusStyle = css`
     box-shadow: ${({ theme }) => theme.boxShadowFocused};
 `;
 
-const Input = styled.input<Pick<RangeProps, 'disabled' | 'trackStyle'>>`
+const Input = styled.input<{ $trackStyle?: CSSObject; disabled?: boolean }>`
     margin: ${spacingsPx.sm} 0 ${spacingsPx.xs};
     padding: 10px 0;
     width: 100%;
@@ -53,24 +58,24 @@ const Input = styled.input<Pick<RangeProps, 'disabled' | 'trackStyle'>>`
     appearance: none;
     cursor: ${({ disabled }) => !disabled && 'pointer'};
 
-    ::-webkit-slider-runnable-track {
+    &::-webkit-slider-runnable-track {
         ${track};
     }
 
-    ::-webkit-slider-thumb {
+    &::-webkit-slider-thumb {
         ${thumb};
     }
 
-    ::-moz-range-track {
+    &::-moz-range-track {
         ${track}
     }
 
-    ::-moz-range-thumb {
+    &::-moz-range-thumb {
         ${thumb};
     }
 
-    :focus-visible {
-        ::-webkit-slider-thumb {
+    &:focus-visible {
+        &::-webkit-slider-thumb {
             ${focusStyle}
         }
 
@@ -90,15 +95,15 @@ const Label = styled.div<{ disabled?: boolean; $width?: number }>`
     ${typography.label}
     cursor: ${({ disabled }) => (disabled ? 'default' : 'pointer')};
 
-    :first-child {
+    &:first-child {
         text-align: left;
     }
 `;
 
-const LabelsWrapper = styled.div<{ count: number; $width?: number }>`
+const LabelsWrapper = styled.div<{ $count: number; $width?: number }>`
     display: grid;
-    grid-template-columns: ${({ count, $width }) =>
-        `repeat(${count}, ${$width ? `${$width}px` : '1fr'})`};
+    grid-template-columns: ${({ $count, $width }) =>
+        `repeat(${$count}, ${$width ? `${$width}px` : '1fr'})`};
     justify-content: space-between;
 `;
 
@@ -156,9 +161,9 @@ export const Range = ({
 
     return (
         <div className={className}>
-            <Input {...props} type="range" disabled={disabled} trackStyle={trackStyle} />
+            <Input {...props} type="range" disabled={disabled} $trackStyle={trackStyle} />
             {labels?.length && (
-                <LabelsWrapper count={labels.length} $width={labelsElWidth}>
+                <LabelsWrapper $count={labels.length} $width={labelsElWidth}>
                     {labelComponents}
                 </LabelsWrapper>
             )}

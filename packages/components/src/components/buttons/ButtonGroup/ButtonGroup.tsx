@@ -5,7 +5,7 @@ import { Button, ButtonProps } from '../Button/Button';
 import { ButtonSize, ButtonVariant } from '../buttonStyleUtils';
 import { IconButton, IconButtonProps } from '../IconButton/IconButton';
 
-const Container = styled.div<{ variant?: Exclude<ButtonVariant, 'danger'> }>`
+const Container = styled.div<{ $variant?: Exclude<ButtonVariant, 'danger'> }>`
     position: relative;
     display: flex;
     align-items: center;
@@ -25,14 +25,14 @@ const Container = styled.div<{ variant?: Exclude<ButtonVariant, 'danger'> }>`
     > :not(:last-child) {
         position: relative;
 
-        ::after {
+        &::after {
             content: '';
             position: absolute;
             right: -1px;
             width: 1px;
             height: 66%;
-            background: ${({ theme, variant }) =>
-                variant === 'tertiary' ? theme.textOnTertiary : theme.textOnPrimary};
+            background: ${({ theme, $variant }) =>
+                $variant === 'tertiary' ? theme.textOnTertiary : theme.textOnPrimary};
             opacity: 0.1;
         }
     }
@@ -78,7 +78,7 @@ export const ButtonGroup = ({
     );
 
     return (
-        <Container variant={variant} className={className}>
+        <Container $variant={variant} className={className}>
             {childrenWithProps}
         </Container>
     );

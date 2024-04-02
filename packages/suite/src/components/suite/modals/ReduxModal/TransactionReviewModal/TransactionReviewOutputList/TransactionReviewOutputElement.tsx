@@ -9,6 +9,7 @@ import { amountToSatoshi } from '@suite-common/wallet-utils';
 import { TransactionReviewStepIndicatorProps } from './TransactionReviewStepIndicator';
 import { zIndices } from '@trezor/theme';
 import { DeviceDisplay } from '../../../../DeviceDisplay/DeviceDisplay';
+import { DisplayMode } from 'src/types/suite';
 
 const OutputWrapper = styled.div`
     display: flex;
@@ -36,23 +37,23 @@ const OutputValue = styled.div`
     flex-wrap: wrap;
 `;
 
-const OutputLeft = styled.div<{ isCentered: boolean }>`
+const OutputLeft = styled.div<{ $isCentered: boolean }>`
     display: flex;
     width: 30px;
-    justify-content: ${({ isCentered }) => (isCentered ? 'center' : 'flex-start')};
-    padding-top: ${({ isCentered }) => (isCentered ? undefined : '5px')};
+    justify-content: ${({ $isCentered }) => ($isCentered ? 'center' : 'flex-start')};
+    padding-top: ${({ $isCentered }) => ($isCentered ? undefined : '5px')};
     flex-direction: column;
 `;
 
-const MultiIndicatorWrapper = styled.div<{ linesCount: number }>`
+const MultiIndicatorWrapper = styled.div<{ $linesCount: number }>`
     display: flex;
     align-self: flex-start;
-    height: ${({ linesCount }) => linesCount * 80}px;
+    height: ${({ $linesCount }) => $linesCount * 80}px;
     align-items: center;
     position: relative;
     z-index: ${zIndices.base};
 
-    ::after {
+    &::after {
         z-index: -2;
         width: 10px;
         left: 10px;
@@ -65,7 +66,7 @@ const MultiIndicatorWrapper = styled.div<{ linesCount: number }>`
         display: block;
     }
 
-    ::before {
+    &::before {
         z-index: -1;
         width: 20px;
         background: ${({ theme }) => theme.BG_WHITE};
@@ -147,7 +148,7 @@ export type TransactionReviewOutputElementProps = {
     token?: TokenInfo;
     account?: Account;
     state?: TransactionReviewStepIndicatorProps['state'];
-    valueDataTest?: string;
+    displayMode?: DisplayMode;
 };
 
 export const TransactionReviewOutputElement = forwardRef<
@@ -165,7 +166,7 @@ export const TransactionReviewOutputElement = forwardRef<
             fiatVisible = false,
             account,
             state,
-            valueDataTest,
+            displayMode,
         },
         ref,
     ) => {
@@ -176,9 +177,9 @@ export const TransactionReviewOutputElement = forwardRef<
 
         return (
             <OutputWrapper ref={ref}>
-                <OutputLeft isCentered={hasMultipleLines}>
+                <OutputLeft $isCentered={hasMultipleLines}>
                     {hasMultipleLines ? (
-                        <MultiIndicatorWrapper linesCount={lines.length - 1}>
+                        <MultiIndicatorWrapper $linesCount={lines.length - 1}>
                             {indicator}
                         </MultiIndicatorWrapper>
                     ) : (
@@ -199,11 +200,11 @@ export const TransactionReviewOutputElement = forwardRef<
                             <OutputValue>
                                 <TruncateWrapper condition={hasExpansion}>
                                     {isActive &&
+                                    displayMode &&
                                     (line.id === 'address' || line.id === 'regular_legacy') ? (
                                         <DeviceDisplay
-                                            valueDataTest={valueDataTest}
+                                            displayMode={displayMode}
                                             address={line.value}
-                                            network={network}
                                         />
                                     ) : (
                                         <OutputValueWrapper>

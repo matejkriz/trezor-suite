@@ -1,6 +1,6 @@
 // origin: https://github.com/trezor/connect/blob/develop/src/data/config.json
 
-import { TREZOR_USB_DESCRIPTORS } from '@trezor/transport/lib/constants';
+import { TREZOR_USB_DESCRIPTORS } from '@trezor/transport/src/constants';
 
 export const config = {
     webusb: TREZOR_USB_DESCRIPTORS,
@@ -34,6 +34,16 @@ export const config = {
         {
             origin: 'nkbihfbeogaeaoehlefnkodbefgpgknn',
             label: 'MetaMask',
+            icon: '',
+        },
+        {
+            origin: 'bpcdaglidgnlggelgbjfagekoapjmccp',
+            label: 'Rainbow DEV',
+            icon: '',
+        },
+        {
+            origin: 'opfgelmcmbiajamepnmloijbpoleiama',
+            label: 'Rainbow',
             icon: '',
         },
         { origin: 'file://', label: ' ', icon: '' },
@@ -108,7 +118,7 @@ export const config = {
             ],
         },
         {
-            coin: ['eth', 'tsep', 'tgor', 'thol'],
+            coin: ['eth', 'tsep', 'thol'],
             min: { T1B1: '1.8.0', T2T1: '2.1.0' },
             comment: ['There were protobuf backwards incompatible changes.'],
         },
@@ -227,6 +237,10 @@ export const config = {
             comment: [
                 "Since firmware 2.6.3 there is a new protobuf field 'chunkify' in almost all getAddress and signTx methods",
             ],
+        },
+        {
+            methods: ['changeLanguage'],
+            min: { T1B1: '0', T2T1: '2.7.0', T2B1: '2.7.0' },
         },
     ],
 };

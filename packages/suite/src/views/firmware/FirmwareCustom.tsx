@@ -22,16 +22,15 @@ import {
     SelectCustomFirmware,
 } from 'src/components/firmware';
 
-const StyledModal = styled(Modal)<{ isNarrow: boolean }>`
-    width: ${({ isNarrow }) => (isNarrow ? '450px' : '620px')};
+const StyledModal = styled(Modal)<{ $isNarrow: boolean }>`
+    width: ${({ $isNarrow }) => ($isNarrow ? '450px' : '620px')};
 `;
 
-const ModalContent = styled.div<{ isNarrow: boolean }>`
+const ModalContent = styled.div`
     text-align: left;
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: ${({ isNarrow }) => (isNarrow ? '380px' : '550px')};
 `;
 
 export const FirmwareCustom = () => {
@@ -47,14 +46,17 @@ export const FirmwareCustom = () => {
     const onFirmwareSelected = useCallback(
         (fw: ArrayBuffer) => {
             setFirmwareBinary(fw);
-            // if there is no firmware installed, check-seed and waiting-for-bootloader steps could be skipped
+            // If there is no firmware installed, check-seed and waiting-for-bootloader steps could be skipped.
             if (liveDevice?.firmware === 'none') {
                 firmwareCustom(fw);
+                // No need to check seed on a device which is not initialized.
+            } else if (liveDevice?.mode === 'initialize') {
+                setStatus('waiting-for-bootloader');
             } else {
                 setStatus('check-seed');
             }
         },
-        [liveDevice?.firmware, setStatus, firmwareCustom],
+        [liveDevice?.firmware, liveDevice?.mode, setStatus, firmwareCustom],
     );
 
     const onSeedChecked = useCallback(() => {
@@ -165,7 +167,7 @@ export const FirmwareCustom = () => {
 
     return (
         <StyledModal
-            isNarrow={status === 'initial'}
+            $isNarrow={status === 'initial'}
             isCancelable={isCancelable}
             onCancel={onClose}
             heading={<Translation id="TR_DEVICE_SETTINGS_CUSTOM_FIRMWARE_TITLE" />}
@@ -180,7 +182,7 @@ export const FirmwareCustom = () => {
             }
             data-test="@firmware-custom"
         >
-            <ModalContent isNarrow={status === 'initial'}>
+            <ModalContent>
                 <Step />
             </ModalContent>
         </StyledModal>

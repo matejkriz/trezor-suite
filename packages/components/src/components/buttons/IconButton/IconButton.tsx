@@ -4,18 +4,19 @@ import { Icon, IconType } from '../../assets/Icon/Icon';
 import { Spinner } from '../../loaders/Spinner/Spinner';
 import { ButtonContainer, ButtonProps } from '../Button/Button';
 import { ButtonVariant, getIconColor, getIconSize, getPadding } from '../buttonStyleUtils';
-import { TOOLTIP_DELAY_NONE, TOOLTIP_DELAY_SHORT, Tooltip } from '../../Tooltip/Tooltip';
+import { TOOLTIP_DELAY_NONE, TOOLTIP_DELAY_SHORT } from '../../Tooltip/TooltipDelay';
 import { useElevation } from '../../ElevationContext/ElevationContext';
+import { Tooltip } from '../../Tooltip/Tooltip';
 
 const IconButtonContainer = styled(ButtonContainer)`
     position: relative;
-    padding: ${({ size }) => getPadding(size, false)};
+    padding: ${({ $size }) => getPadding($size, false)};
 `;
 
-const Label = styled.span<{ isDisabled: boolean }>`
+const Label = styled.span<{ $isDisabled: boolean }>`
     position: absolute;
     bottom: -22px;
-    color: ${({ theme, isDisabled }) => (isDisabled ? theme.textDisabled : theme.textSubdued)};
+    color: ${({ theme, $isDisabled }) => ($isDisabled ? theme.textDisabled : theme.textSubdued)};
     white-space: nowrap;
 `;
 
@@ -63,16 +64,16 @@ export const IconButton = ({
             cursor="default"
         >
             <IconButtonContainer
-                variant={variant}
-                size={size}
+                $variant={variant}
+                $size={size}
                 disabled={isDisabled || isLoading}
-                elevation={elevation}
+                $elevation={elevation}
                 {...rest}
             >
                 {!isLoading && icon && IconComponent}
                 {isLoading && Loader}
 
-                {bottomLabel && <Label isDisabled={isDisabled}>{bottomLabel}</Label>}
+                {bottomLabel && <Label $isDisabled={isDisabled}>{bottomLabel}</Label>}
             </IconButtonContainer>
         </Tooltip>
     );

@@ -1,4 +1,4 @@
-// @group:wallet
+// @group_wallet
 // @retry=2
 
 import { rerouteMetadataToMockProvider, stubOpen } from '../../stubs/metadata';
@@ -35,6 +35,7 @@ describe('Import a BTC csv file', () => {
         // Test preparation
         //
         cy.getTestElement('@account-menu/btc/normal/0').click();
+        cy.wait(300);
         cy.hoverTestElement("@metadata/accountLabel/m/84'/0'/0'/hover-container");
         cy.getTestElement("@metadata/accountLabel/m/84'/0'/0'/add-label-button")
             .should('be.visible')

@@ -17,8 +17,8 @@ import { withCoinmarket } from '../withCoinmarket';
 import { useEffect } from 'react';
 import { updateFiatRatesThunk } from '@suite-common/wallet-core';
 import { FiatCurrencyCode } from '@suite-common/suite-config';
-import { Timestamp } from '@suite-common/wallet-types';
 import { useDispatch } from 'src/hooks/suite';
+import { Timestamp } from '@suite-common/wallet-types';
 
 const Header = styled.div`
     font-weight: 500;
@@ -70,6 +70,7 @@ const LabelText = styled.div`
     font-size: ${variables.FONT_SIZE.SMALL};
     font-weight: ${variables.FONT_WEIGHT.MEDIUM};
     color: ${({ theme }) => theme.TYPE_DARK_GREY};
+    padding-right: 20px;
 `;
 
 const LinkButton = styled(Button)`
@@ -84,7 +85,7 @@ const LinkButton = styled(Button)`
     align-items: center;
     text-decoration: underline;
 
-    :hover {
+    &:hover {
         opacity: 0.8;
     }
 `;
@@ -131,7 +132,7 @@ const CoinmarketSavingsSetup = (props: WithSelectedAccountLoadedProps) => {
                     },
                     localCurrency: fiatCurrency?.toLowerCase() as FiatCurrencyCode,
                     rateType: 'current',
-                    lastSuccessfulFetchTimestamp: Date.now() as Timestamp,
+                    fetchAttemptTimestamp: Date.now() as Timestamp,
                 }),
             );
         };

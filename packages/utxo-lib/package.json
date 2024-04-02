@@ -1,6 +1,6 @@
 {
     "name": "@trezor/utxo-lib",
-    "version": "2.0.7",
+    "version": "2.0.8",
     "author": "Trezor <info@trezor.io>",
     "homepage": "https://github.com/trezor/trezor-suite/tree/develop/packages/utxo-lib",
     "description": "Client-side Bitcoin-like JavaScript library",
@@ -20,18 +20,21 @@
         "utxo",
         "javascript"
     ],
-    "main": "./lib/index.js",
+    "main": "./src/index.ts",
     "files": [
         "lib/",
         "!**/*.map"
     ],
-    "types": "lib/index.d.ts",
-    "typings": "lib/index.d.ts",
+    "publishConfig": {
+        "main": "./lib/index.js",
+        "types": "lib/index.d.ts",
+        "typings": "lib/index.d.ts"
+    },
     "scripts": {
         "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
         "test:unit": "yarn g:jest --verbose -c jest.config.js",
         "type-check": "yarn g:tsc --build tsconfig.json",
-        "build:lib": "yarn g:rimraf lib && yarn g:tsc --build ./tsconfig.lib.json",
+        "build:lib": "yarn g:rimraf lib && yarn g:tsc --build tsconfig.lib.json && ../../scripts/replace-imports.sh ./lib",
         "prepublishOnly": "yarn tsx ../../scripts/prepublishNPM.js",
         "prepublish": "yarn tsx ../../scripts/prepublish.js"
     },

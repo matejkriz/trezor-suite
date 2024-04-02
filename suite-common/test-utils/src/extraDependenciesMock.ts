@@ -73,6 +73,7 @@ export const extraDependenciesMock: ExtraDependencies = {
             checkFirmwareAuthenticity: false,
             coinjoinAllowNoTor: false,
             showDebugMenu: false,
+            isViewOnlyModeVisible: false,
             transports: [],
         }),
         selectDesktopBinDir: mockSelector('selectDesktopBinDir', '/bin'),
@@ -97,7 +98,6 @@ export const extraDependenciesMock: ExtraDependencies = {
     },
     actionTypes: {
         storageLoad: mockActionType('storageLoad'),
-        addButtonRequest: mockActionType('addButtonRequest'),
         setDeviceMetadata: mockActionType('setDeviceMetadata'),
     },
     reducers: {
@@ -109,6 +109,7 @@ export const extraDependenciesMock: ExtraDependencies = {
         addButtonRequestFirmware: mockReducer('addButtonRequestFirmware'),
         setDeviceMetadataReducer: mockReducer('setDeviceMetadataReducer'),
         storageLoadDevices: mockReducer('storageLoadDevices'),
+        storageLoadFormDrafts: mockReducer('storageLoadFormDrafts'),
     },
     utils: {
         saveAs: (data, fileName) =>

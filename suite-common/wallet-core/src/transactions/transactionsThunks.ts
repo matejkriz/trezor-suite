@@ -22,15 +22,15 @@ import {
 import { AccountLabels } from '@suite-common/metadata-types';
 import TrezorConnect from '@trezor/connect';
 import { blockbookUtils } from '@trezor/blockchain-link-utils';
-import { Transaction } from '@trezor/blockchain-link-types/lib/blockbook';
+import { Transaction } from '@trezor/blockchain-link-types/src/blockbook';
 import { createThunk } from '@suite-common/redux-utils';
 
 import { accountsActions } from '../accounts/accountsActions';
 import { selectTransactions } from './transactionsReducer';
-import { transactionsActionsPrefix, transactionsActions } from './transactionsActions';
+import { TRANSACTIONS_MODULE_PREFIX, transactionsActions } from './transactionsActions';
 import { selectAccountByKey, selectAccounts } from '../accounts/accountsReducer';
 import { selectBlockchainHeightBySymbol } from '../blockchain/blockchainReducer';
-import { selectTokenDefinitions } from '../token-definitions/tokenDefinitionsSelectors';
+import { selectNetworkTokenDefinitions } from '../token-definitions/tokenDefinitionsSelectors';
 
 /**
  * Replace existing transaction in the reducer (RBF)
@@ -44,7 +44,7 @@ interface ReplaceTransactionThunkParams {
 }
 
 export const replaceTransactionThunk = createThunk<ReplaceTransactionThunkParams>(
-    `${transactionsActionsPrefix}/replaceTransactionThunk`,
+    `${TRANSACTIONS_MODULE_PREFIX}/replaceTransactionThunk`,
     ({ precomposedTx, newTxid, signedTransaction }, { getState, dispatch }) => {
         if (!precomposedTx.prevTxid) return; // ignore if it's not a replacement tx
 
@@ -110,7 +110,7 @@ interface AddFakePendingTransactionParams {
 }
 
 export const addFakePendingTxThunk = createThunk<AddFakePendingTransactionParams>(
-    `${transactionsActionsPrefix}/addFakePendingTransaction`,
+    `${TRANSACTIONS_MODULE_PREFIX}/addFakePendingTransaction`,
     ({ transaction, precomposedTx, account }, { dispatch, getState }) => {
         const blockHeight = selectBlockchainHeightBySymbol(getState(), account.symbol);
         const accounts = selectAccounts(getState());
@@ -122,7 +122,7 @@ export const addFakePendingTxThunk = createThunk<AddFakePendingTransactionParams
         }>(
             (result, output) => {
                 if (output.addresses) {
-                    findAccountsByAddress(output.addresses[0], accounts).forEach(
+                    findAccountsByAddress(account.symbol, output.addresses[0], accounts).forEach(
                         affectedAccount => {
                             if (affectedAccount.key === account.key) return accounts;
                             if (!result[affectedAccount.key]) {
@@ -175,7 +175,7 @@ export const addFakePendingTxThunk = createThunk<AddFakePendingTransactionParams
 );
 
 export const addFakePendingCardanoTxThunk = createThunk(
-    `${transactionsActionsPrefix}/addFakePendingTransaction`,
+    `${TRANSACTIONS_MODULE_PREFIX}/addFakePendingTransaction`,
     (
         {
             precomposedTx,
@@ -220,7 +220,7 @@ export const addFakePendingCardanoTxThunk = createThunk(
 );
 
 export const exportTransactionsThunk = createThunk(
-    `${transactionsActionsPrefix}/exportTransactions`,
+    `${TRANSACTIONS_MODULE_PREFIX}/exportTransactions`,
     async (
         {
             account,
@@ -241,7 +241,7 @@ export const exportTransactionsThunk = createThunk(
         // Get state of transactions
         const allTransactions = selectTransactions(getState());
         const localCurrency = selectors.selectLocalCurrency(getState());
-        const tokenDefinitions = selectTokenDefinitions(getState(), account.symbol);
+        const tokenDefinitions = selectNetworkTokenDefinitions(getState(), account.symbol) || {};
 
         // TODO: this is not nice (copy-paste)
         // metadata reducer is still not part of trezor-common and I can not import it
@@ -296,7 +296,7 @@ export const exportTransactionsThunk = createThunk(
 );
 
 export const fetchTransactionsThunk = createThunk(
-    `${transactionsActionsPrefix}/fetchTransactionsThunk`,
+    `${TRANSACTIONS_MODULE_PREFIX}/fetchTransactionsThunk`,
     async (
         {
             accountKey,

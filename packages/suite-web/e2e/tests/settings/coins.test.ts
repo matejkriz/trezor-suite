@@ -1,4 +1,4 @@
-// @group:settings
+// @group_settings
 // @retry=2
 
 import { EventType } from '@trezor/suite-analytics';
@@ -37,7 +37,6 @@ describe('Coin Settings', () => {
             // 'sol', FIXME: disabled till available in trezor-user-env
             'test',
             'tsep',
-            'tgor',
             'thol',
             'txrp',
             'tada',

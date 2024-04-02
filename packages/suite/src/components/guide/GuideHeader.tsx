@@ -7,9 +7,9 @@ import { close } from 'src/actions/suite/guideActions';
 import { useDispatch } from 'src/hooks/suite';
 import { IconButton, variables } from '@trezor/components';
 import { HeaderBreadcrumb, ContentScrolledContext } from 'src/components/guide';
-import { typography } from '@trezor/theme';
+import { typography, zIndices } from '@trezor/theme';
 
-const HeaderWrapper = styled.div<{ noLabel?: boolean; isScrolled: boolean }>`
+const HeaderWrapper = styled.div<{ $noLabel?: boolean; $isScrolled: boolean }>`
     display: flex;
     align-items: center;
     padding: 12px 21px;
@@ -20,16 +20,17 @@ const HeaderWrapper = styled.div<{ noLabel?: boolean; isScrolled: boolean }>`
     border-bottom: 1px solid transparent;
     transition: all 0.5s ease;
     white-space: nowrap;
+    z-index: ${zIndices.base}; /* Prevents search bar from overlapping when scrolling */
 
-    ${({ isScrolled }) =>
-        isScrolled &&
+    ${({ $isScrolled }) =>
+        $isScrolled &&
         css`
             box-shadow: 0 9px 27px 0 ${({ theme }) => transparentize(0.5, theme.STROKE_GREY)};
             border-bottom: 1px solid ${({ theme }) => theme.STROKE_GREY};
         `}
 
-    ${({ noLabel }) =>
-        noLabel &&
+    ${({ $noLabel }) =>
+        $noLabel &&
         css`
             justify-content: space-between;
         `}
@@ -79,7 +80,7 @@ export const GuideHeader = ({ back, label, useBreadcrumb }: GuideHeaderProps) =>
     };
 
     return (
-        <HeaderWrapper noLabel={!label} isScrolled={isScrolled}>
+        <HeaderWrapper $noLabel={!label} $isScrolled={isScrolled}>
             {!useBreadcrumb && back && (
                 <>
                     <IconButton

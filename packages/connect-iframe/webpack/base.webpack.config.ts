@@ -13,24 +13,15 @@ const DIST = path.resolve(__dirname, '../build');
 // Because of Expo EAS, we need to use the commit hash from expo to avoid failing git command inside EAS
 // because we need to call `yarn build:libs during native build`
 const commitHash =
-    process.env.EAS_BUILD_GIT_COMMIT_HASH || execSync('git rev-parse HEAD').toString().trim();
+    process.env.EAS_BUILD_GIT_COMMIT_HASH ||
+    process.env.GITHUB_SHA ||
+    execSync('git rev-parse HEAD').toString().trim();
 
 export const config: webpack.Configuration = {
     target: 'web',
-    mode: 'production',
+    mode: process.env.NODE_ENV === 'production' ? 'production' : 'development',
     module: {
         rules: [
-            {
-                test: /\.(js|ts)$/,
-                exclude: /node_modules/,
-                use: {
-                    loader: 'babel-loader',
-                    options: {
-                        presets: ['@babel/preset-typescript'],
-                    },
-                },
-            },
-
             {
                 test: (input: string) => input.includes('background-sharedworker'),
                 loader: 'worker-loader',
@@ -79,6 +70,16 @@ export const config: webpack.Configuration = {
                 loader: 'worker-loader',
                 options: {
                     filename: './workers/blockfrost-worker.[contenthash].js',
+                },
+            },
+            {
+                test: /\.(js|ts)$/,
+                exclude: /node_modules/,
+                use: {
+                    loader: 'babel-loader',
+                    options: {
+                        presets: ['@babel/preset-typescript'],
+                    },
                 },
             },
         ],
@@ -131,13 +132,8 @@ export const config: webpack.Configuration = {
             ],
         }),
         new webpack.DefinePlugin({
-            process: {
-                env: {
-                    VERSION: JSON.stringify(version),
-                    COMMIT_HASH: JSON.stringify(commitHash),
-                    NODE_ENV: JSON.stringify(process.env.NODE_ENV),
-                },
-            },
+            'process.env.VERSION': JSON.stringify(version),
+            'process.env.COMMIT_HASH': JSON.stringify(commitHash),
         }),
     ],
 

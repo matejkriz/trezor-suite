@@ -3,7 +3,7 @@ import { css } from 'styled-components';
 import { AccountTransactionBaseAnchor, AnchorType } from 'src/constants/suite/anchors';
 
 import type { WalletAccountTransaction } from 'src/types/wallet';
-import { borders } from '@trezor/theme';
+import { borders, zIndices } from '@trezor/theme';
 
 export const getTxIdFromAnchor = (anchor?: string): string => anchor?.split('/').pop() || '';
 
@@ -26,13 +26,14 @@ export const findAnchorTransactionPage = (
     return Math.floor(orderOfTx / transactionsPerPage) + 1;
 };
 
-export const anchorOutlineStyles = css<{ shouldHighlight?: boolean }>`
+export const anchorOutlineStyles = css<{ $shouldHighlight?: boolean }>`
     transition: all 0.3s;
     transition-delay: 0.3s;
     outline: solid ${borders.widths.large} transparent;
+    z-index: ${zIndices.base};
 
-    ${({ shouldHighlight }) =>
-        shouldHighlight &&
+    ${({ $shouldHighlight }) =>
+        $shouldHighlight &&
         css`
             outline: solid ${borders.widths.large} ${({ theme }) => theme.backgroundAlertYellowBold};
             background: ${({ theme }) => theme.backgroundAlertYellowSubtleOnElevation1};

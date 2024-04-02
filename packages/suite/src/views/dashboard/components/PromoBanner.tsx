@@ -78,8 +78,8 @@ const DesktopLinkButton = styled(Button)`
     transition: opacity 0.15s;
     opacity: 0.6;
 
-    :hover,
-    :focus {
+    &:hover,
+    &:focus {
         background: ${({ theme }) => theme.STROKE_GREY};
         opacity: 1;
     }
@@ -103,18 +103,18 @@ const StyledTooltip = styled(Tooltip)`
     }
 `;
 
-const Badge = styled(Image)<{ isHighlighted: boolean }>`
+const Badge = styled(Image)<{ $isHighlighted: boolean }>`
     max-width: unset;
-    opacity: ${({ isHighlighted }) => (isHighlighted ? 1 : 0.6)};
+    opacity: ${({ $isHighlighted }) => ($isHighlighted ? 1 : 0.6)};
     transition: opacity 0.3s;
     cursor: pointer;
 `;
 
-const StoreTitle = styled(Image)<{ isDark: boolean }>`
+const StoreTitle = styled(Image)<{ $isDark: boolean }>`
     display: block;
     margin: 2px auto 6px;
-    ${({ isDark }) =>
-        isDark &&
+    ${({ $isDark }) =>
+        $isDark &&
         `
             filter: invert(1);
     `}
@@ -146,38 +146,49 @@ const StoreBadge = ({
     shownQRState: [showQR, setShowQr],
 }: StoreBadgeProps) => {
     const { isMobileLayout } = useLayoutSize();
+    const [isTooltipOpen, setIsTooltipOpen] = useState(false);
     const currentTheme = useSelector(state => state.suite.settings.theme.variant);
 
     return (
         <StyledTooltip
+            isOpen={isTooltipOpen}
             disabled={isMobileLayout}
             content={
                 <div>
                     <StoreTitle
-                        isDark={currentTheme === 'dark'}
+                        $isDark={currentTheme === 'dark'}
                         image={`${image}_TITLE`}
                         height={26}
                     />
                     <QR value={url} />
                 </div>
             }
-            onShow={() => setShowQr(type)}
-            onHide={() => setShowQr(undefined)}
         >
-            <TrezorLink
-                href={url}
-                variant="nostyle"
-                onClick={() =>
-                    analytics.report({
-                        type: EventType.GetMobileApp,
-                        payload: {
-                            platform: analyticsPayload,
-                        },
-                    })
-                }
+            <span
+                onMouseEnter={() => {
+                    setIsTooltipOpen(true);
+                    setShowQr(type);
+                }}
+                onMouseLeave={() => {
+                    setIsTooltipOpen(false);
+                    setShowQr(undefined);
+                }}
             >
-                <Badge image={`${image}_BADGE`} height={35} isHighlighted={showQR === type} />
-            </TrezorLink>
+                <TrezorLink
+                    href={url}
+                    variant="nostyle"
+                    onClick={() =>
+                        analytics.report({
+                            type: EventType.GetMobileApp,
+                            payload: {
+                                platform: analyticsPayload,
+                            },
+                        })
+                    }
+                >
+                    <Badge image={`${image}_BADGE`} height={35} $isHighlighted={showQR === type} />
+                </TrezorLink>
+            </span>
         </StyledTooltip>
     );
 };

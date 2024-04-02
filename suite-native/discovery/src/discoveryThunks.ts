@@ -106,7 +106,7 @@ const getAccountInfoDetailsLevel = (coin: NetworkSymbol) => {
 };
 
 const getCardanoSupportedAccountTypesThunk = createThunk(
-    `${DISCOVERY_MODULE_PREFIX}/addAccountsByDescriptorThunk`,
+    `${DISCOVERY_MODULE_PREFIX}/getCardanoSupportedAccountTypesThunk`,
     async (
         {
             deviceState,
@@ -222,22 +222,22 @@ export const addAndDiscoverNetworkAccountThunk = createThunk(
     async (
         {
             network,
-            accountType,
             deviceState,
         }: {
             network: Network;
-            accountType: AccountType;
             deviceState: string;
         },
         { dispatch, getState },
     ): Promise<Account | undefined> => {
+        const accountType = network.accountType ?? NORMAL_ACCOUNT_TYPE;
+
         const accounts = selectDeviceAccountsForNetworkSymbolAndAccountType(
             getState(),
             network.symbol,
             accountType,
         );
 
-        const index = accounts.length + 1;
+        const index = accounts.length;
 
         if (index > LIMIT) {
             return undefined;

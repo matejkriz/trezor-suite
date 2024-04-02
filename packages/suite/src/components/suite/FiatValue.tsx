@@ -7,12 +7,16 @@ import {
     useFiatFromCryptoValue,
     useFiatFromCryptoValueParams,
 } from 'src/hooks/suite/useFiatFromCryptoValue';
+import { HiddenPlaceholderProps } from './HiddenPlaceholder';
 
-const StyledHiddenPlaceholder = styled(props => <HiddenPlaceholder {...props} />)`
+const StyledHiddenPlaceholder = styled((props: HiddenPlaceholderProps) => (
+    <HiddenPlaceholder {...props} />
+))`
     font-variant-numeric: tabular-nums;
 `;
 
-const SameWidthNums = styled.span`
+// Do NOT use any prop from <HiddenPlaceholderProps>, its here just to fix types
+const SameWidthNums = styled.span<HiddenPlaceholderProps>`
     font-variant-numeric: tabular-nums;
 `;
 
@@ -93,7 +97,7 @@ export const FiatValue = ({
         return children({
             value: fiatValueComponent,
             rate: fiatRateComponent,
-            timestamp: useCustomSource ? null : currentRate?.lastSuccessfulFetchTimestamp ?? null,
+            timestamp: useCustomSource ? null : currentRate?.lastTickerTimestamp ?? null,
         });
     }
     if (!children) return null;

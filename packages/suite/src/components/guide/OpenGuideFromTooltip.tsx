@@ -19,18 +19,17 @@ const OpenGuideLink = styled.span`
     overflow: visible;
     cursor: pointer;
 
-    :hover {
+    &:hover {
         background: ${({ theme }) => transparentize(0.9, theme.backgroundAlertYellowBold)};
     }
 `;
 
 type OpenGuideFromTooltipProps = {
     id: string;
-    instance: { hide: () => void };
     dataTest?: string;
 };
 
-export const OpenGuideFromTooltip = ({ id, instance, dataTest }: OpenGuideFromTooltipProps) => {
+export const OpenGuideFromTooltip = ({ id, dataTest }: OpenGuideFromTooltipProps) => {
     const { openNodeById } = useGuideOpenNode();
     const theme = useTheme();
 
@@ -39,7 +38,6 @@ export const OpenGuideFromTooltip = ({ id, instance, dataTest }: OpenGuideFromTo
             data-test={dataTest}
             onClick={(e: MouseEvent<any>) => {
                 e.stopPropagation();
-                instance.hide();
                 openNodeById(id);
             }}
         >

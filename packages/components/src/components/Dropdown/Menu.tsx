@@ -26,7 +26,7 @@ const addonAnimation = keyframes`
     }
 `;
 
-const AddonContainer = styled.div<{ isFocused?: boolean }>`
+const AddonContainer = styled.div<{ $isFocused?: boolean }>`
     position: absolute;
     top: 16px;
     right: 16px;
@@ -34,13 +34,13 @@ const AddonContainer = styled.div<{ isFocused?: boolean }>`
     align-items: center;
     gap: ${spacingsPx.xxs};
     padding: ${spacingsPx.xxxs} ${spacingsPx.xs};
-    background: ${({ theme, isFocused }) =>
-        isFocused ? theme.backgroundSurfaceElevation0 : 'none'};
+    background: ${({ theme, $isFocused }) =>
+        $isFocused ? theme.backgroundSurfaceElevation0 : 'none'};
     letter-spacing: 0.4px;
     color: ${({ theme }) => theme.textPrimaryDefault};
     text-transform: uppercase;
     border: 0;
-    opacity: ${({ isFocused }) => isFocused && 0.6} !important;
+    opacity: ${({ $isFocused }) => $isFocused && 0.6} !important;
     cursor: pointer;
     transform: translateX(-10px);
     transition:
@@ -51,15 +51,19 @@ const AddonContainer = styled.div<{ isFocused?: boolean }>`
     ${typography.label};
 `;
 
-const Container = styled.ul<Pick<MenuProps, 'coords' | 'alignMenu'> & { elevation: Elevation }>`
+const Container = styled.ul<{
+    $coords?: Coords;
+    $alignMenu?: MenuAlignment;
+    $elevation: Elevation;
+}>`
     position: fixed;
     ${menuStyle};
 
-    ${({ coords }) =>
-        coords &&
+    ${({ $coords }) =>
+        $coords &&
         css`
-            top: ${coords.y}px;
-            left: ${coords.x}px;
+            top: ${$coords.y}px;
+            left: ${$coords.x}px;
         `}
 `;
 
@@ -74,12 +78,15 @@ const GroupLabel = styled.li`
     }
 `;
 
-type MenuItemsProps = Pick<DropdownMenuItemProps, 'isDisabled' | 'separatorBefore'> & {
-    noHoverEffect: boolean;
-    isFocused: boolean;
+type MenuItemContainerProps = {
+    $separatorBefore?: boolean;
+    $noHoverEffect: boolean;
+    $isFocused: boolean;
+    $isDisabled?: boolean;
+    $elevation: Elevation;
 };
 
-const MenuItemContainer = styled.li<MenuItemsProps & { elevation: Elevation }>`
+const MenuItemContainer = styled.li<MenuItemContainerProps>`
     position: relative;
     display: flex;
     align-items: center;
@@ -87,31 +94,31 @@ const MenuItemContainer = styled.li<MenuItemsProps & { elevation: Elevation }>`
     gap: ${spacingsPx.sm};
     padding: ${spacingsPx.xs} ${spacingsPx.sm};
     border-radius: ${borders.radii.xxs};
-    background: ${({ isFocused, noHoverEffect, theme, elevation }) =>
-        isFocused && !noHoverEffect
-            ? mapElevationToBackground({ theme, elevation: nextElevation[elevation] })
+    background: ${({ $isFocused, $noHoverEffect, theme, $elevation }) =>
+        $isFocused && !$noHoverEffect
+            ? mapElevationToBackground({ theme, $elevation: nextElevation[$elevation] })
             : undefined};
-    color: ${({ isDisabled, theme }) => (!isDisabled ? theme.textDefault : theme.textDisabled)};
+    color: ${({ $isDisabled, theme }) => (!$isDisabled ? theme.textDefault : theme.textDisabled)};
     white-space: nowrap;
     transition: background 0.2s ease;
-    pointer-events: ${({ isDisabled }) => (isDisabled ? 'none' : 'auto')};
-    cursor: ${({ noHoverEffect }) => (noHoverEffect ? 'default' : 'pointer')};
+    pointer-events: ${({ $isDisabled }) => ($isDisabled ? 'none' : 'auto')};
+    cursor: ${({ $noHoverEffect }) => ($noHoverEffect ? 'default' : 'pointer')};
 
     > span {
         margin-right: auto;
     }
 
-    ${({ separatorBefore, theme }) =>
-        separatorBefore &&
+    ${({ $separatorBefore, theme }) =>
+        $separatorBefore &&
         css`
             margin-top: ${spacingsPx.md};
 
-            ::after {
+            &::after {
                 position: absolute;
                 width: 100%;
                 top: -${spacingsPx.xs};
                 left: 0;
-                border-top: 1px solid ${theme.borderOnElevation1};
+                border-top: 1px solid ${theme.borderElevation2};
                 content: '';
             }
         `}
@@ -132,7 +139,7 @@ const Addon = ({ label, icon, onClick, isKeyboardSelected, onMouseOver }: AddonC
     const theme = useTheme();
 
     return (
-        <AddonContainer onClick={onClick} isFocused={isKeyboardSelected} onMouseOver={onMouseOver}>
+        <AddonContainer onClick={onClick} $isFocused={isKeyboardSelected} onMouseOver={onMouseOver}>
             <span>{label}</span>
             <Icon icon={icon} size={spacings.sm} color={theme.iconPrimaryDefault} />
         </AddonContainer>
@@ -168,7 +175,9 @@ const MenuItem = ({
     setToggled,
     isKeyboardSelected,
     onMouseOver,
-    ...rest
+    key,
+    'data-test': dataTest,
+    separatorBefore,
 }: MenuItemComponentProps) => {
     const { elevation } = useElevation();
 
@@ -185,13 +194,15 @@ const MenuItem = ({
 
     return (
         <MenuItemContainer
-            elevation={elevation}
+            $elevation={elevation}
             onClick={onMenuItemClick}
-            isDisabled={isDisabled}
-            noHoverEffect={!onClick}
-            isFocused={isKeyboardSelected}
+            $isDisabled={isDisabled}
+            $noHoverEffect={!onClick}
+            $isFocused={isKeyboardSelected}
             onMouseOver={onMouseOver}
-            {...rest}
+            key={key}
+            $separatorBefore={separatorBefore}
+            data-test={dataTest}
         >
             {icon && <Icon icon={icon} size={spacings.md} />}
             <span>{label}</span>
@@ -417,10 +428,10 @@ export const Menu = forwardRef<HTMLUListElement, MenuProps>(
 
         return (
             <Container
-                elevation={elevation}
+                $elevation={elevation}
                 ref={ref}
-                alignMenu={alignMenu}
-                coords={coords}
+                $alignMenu={alignMenu}
+                $coords={coords}
                 tabIndex={content ? 0 : 1} // do not affect tab order when there is no content
                 onClick={e => e.stopPropagation()} // prevent closing the menu when clicking on the menu itself or within the menu
             >

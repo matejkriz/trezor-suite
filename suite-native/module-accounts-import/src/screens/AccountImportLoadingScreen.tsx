@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
-import { updateFiatRatesThunk } from '@suite-native/fiat-rates';
 import { selectFiatCurrencyCode } from '@suite-native/module-settings';
 import {
     AccountsImportStackParamList,
@@ -11,8 +10,8 @@ import {
     StackToStackCompositeScreenProps,
 } from '@suite-native/navigation';
 import TrezorConnect, { AccountInfo } from '@trezor/connect';
-import { getTokenDefinitionThunk } from '@suite-common/wallet-core';
-import { networks } from '@suite-common/wallet-config';
+import { updateFiatRatesThunk } from '@suite-common/wallet-core';
+import { Timestamp, TokenAddress } from '@suite-common/wallet-types';
 
 import { AccountImportLoader } from '../components/AccountImportLoader';
 import { useShowImportError } from '../useShowImportError';
@@ -79,24 +78,29 @@ export const AccountImportLoadingScreen = ({
                         },
                         rateType: 'current',
                         localCurrency: fiatCurrency,
+                        fetchAttemptTimestamp: Date.now() as Timestamp,
                     }),
                 ),
             ]);
 
             if (!ignore) {
                 if (fetchedAccountInfo?.success) {
-                    if (networkSymbol === 'eth') {
-                        fetchedAccountInfo.payload.tokens?.forEach(token =>
-                            dispatch(
-                                getTokenDefinitionThunk({
-                                    networkSymbol: 'eth',
-                                    chainId: networks.eth.chainId,
-                                    contractAddress: token.contract,
-                                }),
-                            ),
-                        );
-                    }
                     setAccountInfo(fetchedAccountInfo.payload);
+
+                    //fetch fiat rates for all tokens of newly discovered account
+                    fetchedAccountInfo.payload.tokens?.forEach(token =>
+                        dispatch(
+                            updateFiatRatesThunk({
+                                ticker: {
+                                    symbol: networkSymbol,
+                                    tokenAddress: token.contract as TokenAddress,
+                                },
+                                rateType: 'current',
+                                localCurrency: fiatCurrency,
+                                fetchAttemptTimestamp: Date.now() as Timestamp,
+                            }),
+                        ),
+                    );
                 } else {
                     safelyShowImportError(fetchedAccountInfo.payload.error, getAccountInfo);
                 }

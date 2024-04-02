@@ -36,6 +36,7 @@ import { selectFiatRatesByFiatRateKey } from '@suite-common/wallet-core';
 // @ts-expect-error
 import { Ethereum } from '@everstake/wallet-sdk';
 import { selectSelectedAccountAutocompoundBalance } from '../../reducers/wallet/selectedAccountReducer';
+import { useFees } from './form/useFees';
 
 type UnstakeContextValues = UnstakeContextValuesBase & {
     amountLimits: AmountLimitsString;
@@ -49,11 +50,11 @@ export const useUnstakeEthForm = ({
 }: UseStakeFormsProps): UnstakeContextValues => {
     const dispatch = useDispatch();
 
-    const localCurrency = useSelector(selectLocalCurrency);
-    const fees = useSelector(state => state.wallet.fees);
-
     const { account, network } = selectedAccount;
     const { symbol } = account;
+
+    const localCurrency = useSelector(selectLocalCurrency);
+    const symbolFees = useSelector(state => state.wallet.fees[symbol]);
 
     const symbolForFiat = mapTestnetSymbol(symbol);
     const currentRate = useSelector(state =>
@@ -63,8 +64,6 @@ export const useUnstakeEthForm = ({
             'current',
         ),
     );
-    // TODO: Implement fee switcher
-    const selectedFee = 'normal';
 
     const autocompoundBalance = useSelector(selectSelectedAccountAutocompoundBalance);
     const amountLimits: AmountLimitsString = {
@@ -91,9 +90,8 @@ export const useUnstakeEthForm = ({
     const isDraft = !!draft;
 
     const state = useMemo(() => {
-        const coinFees = fees[account.symbol];
-        const levels = getFeeLevels(account.networkType, coinFees);
-        const feeInfo = { ...coinFees, levels };
+        const levels = getFeeLevels(account.networkType, symbolFees);
+        const feeInfo = { ...symbolFees, levels };
 
         return {
             account,
@@ -101,7 +99,7 @@ export const useUnstakeEthForm = ({
             feeInfo,
             formValues: defaultValues,
         };
-    }, [account, defaultValues, fees, network]);
+    }, [account, defaultValues, symbolFees, network]);
 
     const methods = useForm<UnstakeFormState>({
         mode: 'onChange',
@@ -134,10 +132,25 @@ export const useUnstakeEthForm = ({
         isLoading: isComposing,
         composeRequest,
         composedLevels,
+        onFeeLevelChange,
     } = useStakeCompose({
         ...methods,
         state,
     });
+
+    // sub-hook, FeeLevels handler
+    const fees = useSelector(state => state.wallet.fees);
+    const coinFees = fees[account.symbol];
+    const levels = getFeeLevels(account.networkType, coinFees);
+    const feeInfo = { ...coinFees, levels };
+    const { changeFeeLevel, selectedFee: _selectedFee } = useFees({
+        defaultValue: 'normal',
+        feeInfo,
+        onChange: onFeeLevelChange,
+        composeRequest,
+        ...methods,
+    });
+    const selectedFee = _selectedFee ?? 'normal';
 
     useDebounce(
         () => {
@@ -227,7 +240,7 @@ export const useUnstakeEthForm = ({
                 clearForm();
             }
         }
-    }, [getValues, composedLevels, dispatch, clearForm]);
+    }, [getValues, composedLevels, dispatch, clearForm, selectedFee]);
 
     return {
         ...methods,
@@ -247,6 +260,8 @@ export const useUnstakeEthForm = ({
         clearErrors,
         onOptionChange,
         currentRate,
+        feeInfo,
+        changeFeeLevel,
     };
 };
 

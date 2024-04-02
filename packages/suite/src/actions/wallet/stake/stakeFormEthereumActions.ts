@@ -33,12 +33,14 @@ import {
 // @ts-expect-error
 import { Ethereum } from '@everstake/wallet-sdk';
 import { MIN_ETH_FOR_WITHDRAWALS } from 'src/constants/suite/ethStaking';
+import { NetworkSymbol } from '@suite-common/wallet-config';
 
 const calculate = (
     availableBalance: string,
     output: ExternalOutput,
     feeLevel: FeeLevel,
     compareWithAmount = true,
+    symbol: NetworkSymbol,
 ): PrecomposedTransaction => {
     const feeInSatoshi = calculateEthFee(
         toWei(feeLevel.feePerUnit, 'gwei'),
@@ -64,10 +66,14 @@ const calculate = (
         new BigNumber(feeInSatoshi).gt(availableBalance) ||
         (compareWithAmount && totalSpent.isGreaterThan(availableBalance))
     ) {
-        const error = 'AMOUNT_IS_NOT_ENOUGH';
+        const error = 'TR_STAKE_NOT_ENOUGH_FUNDS';
 
         // errorMessage declared later
-        return { type: 'error', error, errorMessage: { id: error } } as const;
+        return {
+            type: 'error',
+            error,
+            errorMessage: { id: error, values: { symbol: symbol.toUpperCase() } },
+        } as const;
     }
 
     const payloadData = {
@@ -152,42 +158,42 @@ export const composeTransaction =
         const wrappedResponse: PrecomposedLevels = {};
         const compareWithAmount = formValues.ethereumStakeType === 'stake';
         const response = predefinedLevels.map(level =>
-            calculate(availableBalance, output, level, compareWithAmount),
+            calculate(availableBalance, output, level, compareWithAmount, account.symbol),
         );
         response.forEach((tx, index) => {
             const feeLabel = predefinedLevels[index].label as FeeLevel['label'];
             wrappedResponse[feeLabel] = tx;
         });
 
-        // TODO: Implement adding custom fees.
-        // const hasAtLeastOneValid = response.find(r => r.type !== 'error');
+        // Implement adding custom fees.
+        const hasAtLeastOneValid = response.find(r => r.type !== 'error');
         // there is no valid tx in predefinedLevels and there is no custom level
-        // if (!hasAtLeastOneValid && !wrappedResponse.custom) {
-        //     const { minFee } = feeInfo;
-        //     const lastKnownFee = predefinedLevels[predefinedLevels.length - 1].feePerUnit;
-        //     let maxFee = new BigNumber(lastKnownFee).minus(1);
-        //     // generate custom levels in range from lastKnownFee - 1 to feeInfo.minFee (coinInfo in @trezor/connect)
-        //     const customLevels: FeeLevel[] = [];
-        //     while (maxFee.gte(minFee)) {
-        //         customLevels.push({
-        //             feePerUnit: maxFee.toString(),
-        //             feeLimit: predefinedLevels[0].feeLimit,
-        //             label: 'custom',
-        //             blocks: -1,
-        //         });
-        //         maxFee = maxFee.minus(1);
-        //     }
-        //
-        //     // check if any custom level is possible
-        //     const customLevelsResponse = customLevels.map(level =>
-        //         calculate(availableBalance, output, level, compareWithAmount),
-        //     );
-        //
-        //     const customValid = customLevelsResponse.findIndex(r => r.type !== 'error');
-        //     if (customValid >= 0) {
-        //         wrappedResponse.custom = customLevelsResponse[customValid];
-        //     }
-        // }
+        if (!hasAtLeastOneValid && !wrappedResponse.custom) {
+            const { minFee } = feeInfo;
+            const lastKnownFee = predefinedLevels[predefinedLevels.length - 1].feePerUnit;
+            let maxFee = new BigNumber(lastKnownFee).minus(1);
+            // generate custom levels in range from lastKnownFee - 1 to feeInfo.minFee (coinInfo in @trezor/connect)
+            const customLevels: FeeLevel[] = [];
+            while (maxFee.gte(minFee)) {
+                customLevels.push({
+                    feePerUnit: maxFee.toString(),
+                    feeLimit: predefinedLevels[0].feeLimit,
+                    label: 'custom',
+                    blocks: -1,
+                });
+                maxFee = maxFee.minus(1);
+            }
+
+            // check if any custom level is possible
+            const customLevelsResponse = customLevels.map(level =>
+                calculate(availableBalance, output, level, compareWithAmount, account.symbol),
+            );
+
+            const customValid = customLevelsResponse.findIndex(r => r.type !== 'error');
+            if (customValid >= 0) {
+                wrappedResponse.custom = customLevelsResponse[customValid];
+            }
+        }
 
         // format max (calculate sends it as satoshi)
         // update errorMessage values (symbol)

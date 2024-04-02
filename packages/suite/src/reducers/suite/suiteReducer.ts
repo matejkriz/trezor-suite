@@ -4,7 +4,6 @@ import { discoveryActions, DeviceRootState, selectDevice } from '@suite-common/w
 import type { InvityServerEnvironment } from '@suite-common/invity';
 import { versionUtils } from '@trezor/utils';
 import { isWeb } from '@trezor/env-utils';
-import { SuiteThemeVariant } from '@trezor/suite-desktop-api';
 import { TRANSPORT, TransportInfo, ConnectSettings } from '@trezor/connect';
 
 import { getIsTorEnabled, getIsTorLoading } from 'src/utils/suite/tor';
@@ -16,6 +15,7 @@ import { Action, Lock, TorBootstrap, TorStatus } from 'src/types/suite';
 import { getExcludedPrerequisites, getPrerequisiteName } from 'src/utils/suite/prerequisites';
 import { RouterRootState, selectRouter } from './routerReducer';
 import { Network } from '@suite-common/wallet-config';
+import { SuiteThemeVariant } from '@trezor/suite-desktop-api';
 
 export interface SuiteRootState {
     suite: SuiteState;
@@ -28,6 +28,7 @@ export interface DebugModeOptions {
     checkFirmwareAuthenticity: boolean;
     transports: Extract<NonNullable<ConnectSettings['transports']>[number], string>[];
     isUnlockedBootloaderAllowed: boolean;
+    isViewOnlyModeVisible: boolean;
 }
 
 export interface AutodetectSettings {
@@ -69,11 +70,12 @@ export interface Flags {
 
 export interface EvmSettings {
     confirmExplanationModalClosed: Partial<Record<Network['symbol'], Record<string, boolean>>>;
+    explanationBannerClosed: Partial<Record<Network['symbol'], boolean>>;
 }
 
 export interface SuiteSettings {
     theme: {
-        variant: Exclude<SuiteThemeVariant, 'system'>;
+        variant: Exclude<SuiteThemeVariant, 'system'> | 'debug';
     };
     language: Locale;
     torOnionLinks: boolean;
@@ -120,6 +122,7 @@ const initialState: SuiteState = {
     },
     evmSettings: {
         confirmExplanationModalClosed: {},
+        explanationBannerClosed: {},
     },
     settings: {
         theme: {
@@ -136,6 +139,7 @@ const initialState: SuiteState = {
             checkFirmwareAuthenticity: false,
             transports: [],
             isUnlockedBootloaderAllowed: false,
+            isViewOnlyModeVisible: false,
         },
         autodetect: {
             language: true,
@@ -210,6 +214,16 @@ const suiteReducer = (state: SuiteState = initialState, action: Action): SuiteSt
                             ...draft.evmSettings.confirmExplanationModalClosed[action.symbol],
                             [action.route]: true,
                         },
+                    },
+                };
+                break;
+
+            case SUITE.EVM_CLOSE_EXPLANATION_BANNER:
+                draft.evmSettings = {
+                    ...draft.evmSettings,
+                    explanationBannerClosed: {
+                        ...draft.evmSettings.explanationBannerClosed,
+                        [action.symbol]: true,
                     },
                 };
                 break;
@@ -346,5 +360,7 @@ export const selectIsSettingsDesktopAppPromoBannerShown = (state: SuiteRootState
 
 export const selectIsLoggedOut = (state: SuiteRootState & DeviceRootState) =>
     state.suite.flags.initialRun || state.device?.selectedDevice?.mode !== 'normal';
+
+export const selectSuiteFlags = (state: SuiteRootState) => state.suite.flags;
 
 export default suiteReducer;

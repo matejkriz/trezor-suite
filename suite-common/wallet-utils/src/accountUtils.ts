@@ -151,8 +151,6 @@ export const getTitleForNetwork = (symbol: NetworkSymbol) => {
             return 'TR_NETWORK_ETHEREUM';
         case 'tsep':
             return 'TR_NETWORK_ETHEREUM_SEPOLIA';
-        case 'tgor':
-            return 'TR_NETWORK_ETHEREUM_GOERLI';
         case 'thol':
             return 'TR_NETWORK_ETHEREUM_HOLESKY';
         case 'etc':
@@ -287,7 +285,7 @@ export const formatAmount = (amount: BigNumber.Value, decimals: number) => {
 
         return bAmount.div(10 ** decimals).toString(10);
     } catch (error) {
-        return '-1';
+        return '-1'; // TODO: this is definitely not correct return value
     }
 };
 
@@ -378,19 +376,25 @@ export const findAccountsByNetwork = (symbol: NetworkSymbol, accounts: Account[]
 export const findAccountsByDescriptor = (descriptor: string, accounts: Account[]) =>
     accounts.filter(a => a.descriptor === descriptor);
 
-export const findAccountsByAddress = (address: string, accounts: Account[]) =>
-    accounts.filter(a => {
-        if (a.addresses) {
-            return (
-                a.addresses.used.find(u => u.address === address) ||
-                a.addresses.unused.find(u => u.address === address) ||
-                a.addresses.change.find(u => u.address === address) ||
-                a.descriptor === address
-            );
-        }
+export const findAccountsByAddress = (
+    networkSymbol: NetworkSymbol,
+    address: string,
+    accounts: Account[],
+) =>
+    accounts
+        .filter(account => account.symbol === networkSymbol)
+        .filter(a => {
+            if (a.addresses) {
+                return (
+                    a.addresses.used.find(u => u.address === address) ||
+                    a.addresses.unused.find(u => u.address === address) ||
+                    a.addresses.change.find(u => u.address === address) ||
+                    a.descriptor === address
+                );
+            }
 
-        return a.descriptor === address;
-    });
+            return a.descriptor === address;
+        });
 
 export const findAccountDevice = (account: Account, devices: TrezorDevice[]) =>
     devices.find(d => d.state === account.deviceState);

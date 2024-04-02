@@ -34,7 +34,7 @@ const Wrapper = styled.div`
     ${blurFix}
 `;
 
-const StyledCollapsibleBox = styled(CollapsibleBox)<{ elevation: Elevation }>`
+const StyledCollapsibleBox = styled(CollapsibleBox)<{ $elevation: Elevation }>`
     background: none;
     box-shadow: none;
     border-radius: 0;
@@ -55,7 +55,7 @@ const StyledCollapsibleBox = styled(CollapsibleBox)<{ elevation: Elevation }>`
         border-radius: ${borders.radii.sm};
         ${blurFix}
 
-        :hover {
+        &:hover {
             background-color: ${mapElevationToBackground};
         }
     }
@@ -81,7 +81,7 @@ const RowGrid = styled(Grid)`
     padding-bottom: ${spacingsPx.xs};
 `;
 
-const GridItem = styled.div<{ isAccountOwned?: boolean }>`
+const GridItem = styled.div<{ $isAccountOwned?: boolean }>`
     ${typography.label}
     color: ${({ theme }) => theme.textSubdued};
     max-width: 290px;
@@ -163,7 +163,7 @@ const IOGridRow = ({
     const { explorerTxUrl, explorerUrlQueryString } = useExplorerTxUrl();
 
     return (
-        <GridItem isAccountOwned={isAccountOwned}>
+        <GridItem $isAccountOwned={isAccountOwned}>
             <IOAddress
                 txAddress={addresses?.length ? addresses[0] : ''}
                 explorerUrl={explorerTxUrl}
@@ -475,7 +475,7 @@ const CollapsibleIOSection = ({
 
     return inputs?.length || outputs?.length ? (
         <StyledCollapsibleBox
-            elevation={elevation}
+            $elevation={elevation}
             heading={heading}
             isOpen={opened}
             variant="large"

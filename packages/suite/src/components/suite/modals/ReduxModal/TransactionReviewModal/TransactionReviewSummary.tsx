@@ -1,6 +1,6 @@
 import styled, { useTheme } from 'styled-components';
 import BigNumber from 'bignumber.js';
-import { getFeeUnits, formatNetworkAmount, formatAmount } from '@suite-common/wallet-utils';
+import { getFeeUnits, formatNetworkAmount, formatAmount, getFee } from '@suite-common/wallet-utils';
 import { Icon, CoinLogo, variables } from '@trezor/components';
 import { formatDuration, isFeatureFlagEnabled } from '@suite-common/suite-utils';
 import { borders, spacingsPx, typography } from '@trezor/theme';
@@ -86,7 +86,7 @@ const AccountWrapper = styled.div`
 `;
 
 const Separator = styled.div`
-    border-top: 1px solid ${({ theme }) => theme.borderOnElevation1};
+    border-top: 1px solid ${({ theme }) => theme.borderElevation2};
     margin: 10px 0 0;
     padding: 0 0 10px;
     width: 100%;
@@ -110,7 +110,7 @@ const RateInfo = styled.div`
     border-radius: 6px;
     color: ${({ theme }) => theme.textAlertBlue};
 
-    ::before {
+    &::before {
         content: '';
         position: absolute;
         top: -6px;
@@ -121,7 +121,7 @@ const RateInfo = styled.div`
     }
 `;
 
-const TxDetailsButton = styled.button<{ detailsOpen: boolean }>`
+const TxDetailsButton = styled.button<{ $detailsOpen: boolean }>`
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -135,10 +135,10 @@ const TxDetailsButton = styled.button<{ detailsOpen: boolean }>`
     transition:
         background 0.15s,
         opacity 0.15s;
-    background: ${({ theme, detailsOpen }) => detailsOpen && theme.backgroundSurfaceElevation3};
+    background: ${({ theme, $detailsOpen }) => $detailsOpen && theme.backgroundSurfaceElevation3};
     cursor: pointer;
 
-    :hover {
+    &:hover {
         opacity: 0.8;
     }
 
@@ -177,14 +177,14 @@ const ReviewRbfLeftDetailsLineLeft = styled.div`
     }
 `;
 
-const ReviewRbfLeftDetailsLineRight = styled.div<{ color: string; uppercase?: boolean }>`
+const ReviewRbfLeftDetailsLineRight = styled.div<{ $color: string; $uppercase?: boolean }>`
     width: 45%;
     text-align: left;
-    color: ${props => props.color};
+    color: ${props => props.$color};
     font-weight: 500;
 
-    ${({ uppercase }) =>
-        uppercase &&
+    ${({ $uppercase }) =>
+        $uppercase &&
         `
         text-transform: uppercase;
   `};
@@ -220,7 +220,7 @@ export const TransactionReviewSummary = ({
     const theme = useTheme();
 
     const { symbol, accountType, index } = account;
-    const { feePerByte } = tx;
+    const fee = getFee(network.networkType, tx);
 
     const spentWithoutFee = !tx.token ? new BigNumber(tx.totalSpent).minus(tx.fee).toString() : '';
     const amount = !tx.token
@@ -229,7 +229,7 @@ export const TransactionReviewSummary = ({
 
     const formFeeRate = drafts[currentAccountKey]?.feePerUnit;
     const isFeeCustom = drafts[currentAccountKey]?.selectedFee === 'custom';
-    const isComposedFeeRateDifferent = isFeeCustom && formFeeRate !== feePerByte;
+    const isComposedFeeRateDifferent = isFeeCustom && formFeeRate !== fee;
 
     return (
         <Wrapper>
@@ -273,19 +273,19 @@ export const TransactionReviewSummary = ({
                             <Translation id="TR_DELIVERY" />
                         </ReviewRbfLeftDetailsLineLeft>
 
-                        <ReviewRbfLeftDetailsLineRight color={theme.textSubdued}>
+                        <ReviewRbfLeftDetailsLineRight $color={theme.textSubdued}>
                             {formatDuration(estimateTime)}
                         </ReviewRbfLeftDetailsLineRight>
                     </LeftDetailsRow>
                 )}
-                {!!tx.feeLimit && (
+                {!!tx.feeLimit && network.networkType !== 'solana' && (
                     <LeftDetailsRow>
                         <ReviewRbfLeftDetailsLineLeft>
                             <Icon size={12} color={theme.iconSubdued} icon="GAS" />
                             <Translation id="TR_GAS_LIMIT" />
                         </ReviewRbfLeftDetailsLineLeft>
 
-                        <ReviewRbfLeftDetailsLineRight color={theme.textSubdued}>
+                        <ReviewRbfLeftDetailsLineRight $color={theme.textSubdued}>
                             {tx.feeLimit}
                         </ReviewRbfLeftDetailsLineRight>
                     </LeftDetailsRow>
@@ -299,8 +299,8 @@ export const TransactionReviewSummary = ({
                         {network.networkType === 'solana' && <Translation id="TR_TX_FEE" />}
                     </ReviewRbfLeftDetailsLineLeft>
 
-                    <ReviewRbfLeftDetailsLineRight color={theme.textSubdued}>
-                        {feePerByte} {getFeeUnits(network.networkType)}
+                    <ReviewRbfLeftDetailsLineRight $color={theme.textSubdued}>
+                        {fee} {getFeeUnits(network.networkType)}
                     </ReviewRbfLeftDetailsLineRight>
                 </LeftDetailsRow>
 
@@ -319,8 +319,8 @@ export const TransactionReviewSummary = ({
                     </ReviewRbfLeftDetailsLineLeft>
 
                     <ReviewRbfLeftDetailsLineRight
-                        color={broadcast ? theme.textPrimaryDefault : theme.textAlertYellow}
-                        uppercase
+                        $color={broadcast ? theme.textPrimaryDefault : theme.textAlertYellow}
+                        $uppercase
                     >
                         <Translation id={broadcast ? 'TR_ON' : 'TR_OFF'} />
                     </ReviewRbfLeftDetailsLineRight>
@@ -333,8 +333,8 @@ export const TransactionReviewSummary = ({
                         </ReviewRbfLeftDetailsLineLeft>
 
                         <ReviewRbfLeftDetailsLineRight
-                            color={tx.rbf ? theme.textPrimaryDefault : theme.textAlertYellow}
-                            uppercase
+                            $color={tx.rbf ? theme.textPrimaryDefault : theme.textAlertYellow}
+                            $uppercase
                         >
                             <Translation id={tx.rbf ? 'TR_ON' : 'TR_OFF'} />
                         </ReviewRbfLeftDetailsLineRight>
@@ -346,7 +346,7 @@ export const TransactionReviewSummary = ({
 
                         <LeftDetailsRow>
                             <TxDetailsButton
-                                detailsOpen={detailsOpen}
+                                $detailsOpen={detailsOpen}
                                 onClick={() => onDetailsClick()}
                             >
                                 <Translation id="TR_TRANSACTION_DETAILS" />

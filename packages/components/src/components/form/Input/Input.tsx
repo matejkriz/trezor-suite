@@ -15,31 +15,31 @@ import { BOTTOM_TEXT_MIN_HEIGHT, BottomText } from '../BottomText';
 import { InputState, InputSize } from '../inputTypes';
 import { TopAddons } from '../TopAddons';
 import { useElevation } from '../../ElevationContext/ElevationContext';
-import { UIHorizontalAlignment } from 'packages/components/src/config/types';
+import { UIHorizontalAlignment } from '../../../config/types';
 
-const Wrapper = styled.div<Pick<InputProps, 'width'> & { hasBottomPadding: boolean }>`
+const Wrapper = styled.div<{ $width?: number; $hasBottomPadding: boolean }>`
     display: inline-flex;
     flex-direction: column;
-    width: ${({ width }) => (width ? `${width}px` : '100%')};
-    padding-bottom: ${({ hasBottomPadding }) =>
-        hasBottomPadding ? `${BOTTOM_TEXT_MIN_HEIGHT}px` : '0'};
+    width: ${({ $width }) => ($width ? `${$width}px` : '100%')};
+    padding-bottom: ${({ $hasBottomPadding }) =>
+        $hasBottomPadding ? `${BOTTOM_TEXT_MIN_HEIGHT}px` : '0'};
 `;
 
 interface StyledInputProps extends BaseInputProps {
     $size: InputSize;
-    leftAddonWidth?: number;
-    rightAddonWidth?: number;
+    $leftAddonWidth?: number;
+    $rightAddonWidth?: number;
 }
 
 const getExtraAddonPadding = (size: InputSize) =>
     (size === 'small' ? spacings.sm : spacings.md) + spacings.xs;
 
-const StyledInput = styled.input<StyledInputProps & { isWithLabel: boolean }>`
+const StyledInput = styled.input<StyledInputProps & { $isWithLabel: boolean }>`
     padding: 0 ${spacingsPx.md};
-    padding-left: ${({ leftAddonWidth, $size }) =>
-        leftAddonWidth ? `${leftAddonWidth + getExtraAddonPadding($size)}px` : undefined};
-    padding-right: ${({ rightAddonWidth, $size }) =>
-        rightAddonWidth ? `${rightAddonWidth + getExtraAddonPadding($size)}px` : undefined};
+    padding-left: ${({ $leftAddonWidth, $size }) =>
+        $leftAddonWidth ? `${$leftAddonWidth + getExtraAddonPadding($size)}px` : undefined};
+    padding-right: ${({ $rightAddonWidth, $size }) =>
+        $rightAddonWidth ? `${$rightAddonWidth + getExtraAddonPadding($size)}px` : undefined};
     height: ${({ $size }) => `${INPUT_HEIGHTS[$size as InputSize]}px`};
     ${baseInputStyle}
     ${({ $size }) => $size === 'small' && typography.hint};
@@ -54,10 +54,10 @@ const InputWrapper = styled.div`
 const getInputAddonPadding = (size: InputSize) =>
     size === 'small' ? spacingsPx.sm : spacingsPx.md;
 
-const InputAddon = styled.div<{ align: innerAddonAlignment; size: InputSize }>`
+const InputAddon = styled.div<{ $align: innerAddonAlignment; $size: InputSize }>`
     position: absolute;
-    inset: 0 ${({ align, size }) => (align === 'right' ? getInputAddonPadding(size) : 'auto')} 0
-        ${({ align, size }) => (align === 'left' ? getInputAddonPadding(size) : 'auto')};
+    inset: 0 ${({ $align, $size }) => ($align === 'right' ? getInputAddonPadding($size) : 'auto')} 0
+        ${({ $align, $size }) => ($align === 'left' ? getInputAddonPadding($size) : 'auto')};
     display: flex;
     align-items: center;
 `;
@@ -66,7 +66,7 @@ const InputLabel = styled(Label)`
     /* move up when input is focused OR has a placeholder OR has value  */
     input:focus ~ &,
     input:not(:placeholder-shown) ~ &,
-    input:not([placeholder='']):placeholder-shown ~ & {
+    input:not([value='']) ~ & {
         transform: ${LABEL_TRANSFORM};
     }
 `;
@@ -135,20 +135,20 @@ const Input = ({
         <Wrapper
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            hasBottomPadding={hasBottomPadding === true && bottomText === null}
+            $hasBottomPadding={hasBottomPadding === true && bottomText === null}
             className={className}
         >
             <TopAddons isHovered={isHovered} hoverAddon={labelHoverAddon} addonRight={labelRight} />
 
             <InputWrapper>
                 {innerAddon && innerAddonAlign === 'left' && (
-                    <InputAddon align="left" ref={measureLeftAddon} size={size}>
+                    <InputAddon $align="left" ref={measureLeftAddon} $size={size}>
                         {innerAddon}
                     </InputAddon>
                 )}
 
                 {((innerAddon && innerAddonAlign === 'right') || hasShowClearButton) && (
-                    <InputAddon align="right" ref={measureRightAddon} size={size}>
+                    <InputAddon $align="right" ref={measureRightAddon} $size={size}>
                         {!hasShowClearButton && innerAddon}
 
                         {hasShowClearButton && (
@@ -164,27 +164,27 @@ const Input = ({
                 )}
 
                 <StyledInput
-                    elevation={elevation}
+                    $elevation={elevation}
                     value={value}
                     autoComplete="off"
                     autoCorrect="off"
                     autoCapitalize="off"
                     spellCheck={false}
-                    inputState={inputState}
+                    $inputState={inputState}
                     disabled={isDisabled}
                     $size={size}
                     ref={innerRef}
                     data-lpignore="true"
-                    leftAddonWidth={leftAddonWidth}
-                    rightAddonWidth={rightAddonWidth}
-                    isWithLabel={!!label}
+                    $leftAddonWidth={leftAddonWidth}
+                    $rightAddonWidth={rightAddonWidth}
+                    $isWithLabel={!!label}
                     placeholder={placeholder || ''} // needed for uncontrolled inputs
                     data-test={dataTest}
                     {...rest}
                 />
 
                 {label && (
-                    <InputLabel $size={size} isDisabled={isDisabled}>
+                    <InputLabel $size={size} $isDisabled={isDisabled}>
                         {label}
                     </InputLabel>
                 )}

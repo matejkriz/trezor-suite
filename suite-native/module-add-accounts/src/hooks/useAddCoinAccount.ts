@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
-import { useNavigation } from '@react-navigation/native';
+import { CommonActions, useNavigation } from '@react-navigation/native';
 import { A, pipe } from '@mobily/ts-belt';
 
-import { AccountType, NetworkSymbol, Network, networks } from '@suite-common/wallet-config';
+import { AccountType, NetworkSymbol, networks } from '@suite-common/wallet-config';
 import {
     AccountsRootState,
     DeviceRootState,
@@ -28,6 +28,7 @@ import {
     StackToStackCompositeNavigationProps,
     RootStackRoutes,
     AddCoinFlowType,
+    AppTabsRoutes,
 } from '@suite-native/navigation';
 
 type NavigationProps = StackToStackCompositeNavigationProps<
@@ -76,8 +77,8 @@ export const useAddCoinAccount = () => {
     const device = useSelector(selectDevice);
     const { showAlert, hideAlert } = useAlert();
     const navigation = useNavigation<NavigationProps>();
-    const [networkWithTypeToBeAdded, setNetworkWithTypeToBeAdded] = useState<
-        [Network, AccountType] | null
+    const [networkSymbolWithTypeToBeAdded, setNetworkSymbolWithTypeToBeAdded] = useState<
+        [NetworkSymbol, AccountType] | null
     >(null);
 
     const supportedNetworkSymbols = pipe(
@@ -105,11 +106,11 @@ export const useAddCoinAccount = () => {
         return availableTypes;
     }, []);
 
-    const getAvailableAccountTypesForNetwork = ({ network }: { network: Network }) =>
-        availableNetworkAccountTypes.get(network.symbol) ?? [NORMAL_ACCOUNT_TYPE as AccountType];
-
-    const getDefaultAccountType = ({ network }: { network: Network }) =>
-        getAvailableAccountTypesForNetwork({ network })[0];
+    const getAvailableAccountTypesForNetworkSymbol = ({
+        networkSymbol,
+    }: {
+        networkSymbol: NetworkSymbol;
+    }) => availableNetworkAccountTypes.get(networkSymbol) ?? [NORMAL_ACCOUNT_TYPE];
 
     const getNetworkToAdd = ({
         networkSymbol,
@@ -118,11 +119,7 @@ export const useAddCoinAccount = () => {
         networkSymbol: NetworkSymbol;
         accountType?: AccountType;
     }) => {
-        const type =
-            accountType ??
-            getDefaultAccountType({
-                network: supportedNetworks.filter(network => network.symbol === networkSymbol)[0],
-            });
+        const type = accountType ?? NORMAL_ACCOUNT_TYPE;
 
         return supportedNetworks.filter(
             network =>
@@ -140,7 +137,7 @@ export const useAddCoinAccount = () => {
             icon: 'warningCircleLight',
             pictogramVariant: 'red',
             primaryButtonTitle: translate('moduleAddAccounts.alerts.tooManyAccounts.actionPrimary'),
-            onPressPrimaryButton: () => hideAlert(),
+            onPressPrimaryButton: hideAlert,
         });
 
     const showAnotherEmptyAccountAlert = () =>
@@ -152,7 +149,7 @@ export const useAddCoinAccount = () => {
             primaryButtonTitle: translate(
                 'moduleAddAccounts.alerts.anotherEmptyAccount.actionPrimary',
             ),
-            onPressPrimaryButton: () => hideAlert(),
+            onPressPrimaryButton: hideAlert,
             secondaryButtonTitle: translate(
                 'moduleAddAccounts.alerts.anotherEmptyAccount.actionSecondary',
             ),
@@ -171,45 +168,45 @@ export const useAddCoinAccount = () => {
             icon: 'warningCircleLight',
             pictogramVariant: 'red',
             primaryButtonTitle: translate('moduleAddAccounts.alerts.generalError.actionPrimary'),
-            onPressPrimaryButton: () => hideAlert(),
+            onPressPrimaryButton: hideAlert,
         });
 
-    const setDefaultAccountToBeAdded = (network: Network) => {
-        const defaultType = getAvailableAccountTypesForNetwork({ network })[0];
-        setNetworkWithTypeToBeAdded([network, defaultType]);
+    const setDefaultAccountToBeAdded = (networkSymbol: NetworkSymbol) => {
+        const defaultType = getAvailableAccountTypesForNetworkSymbol({ networkSymbol })[0];
+        setNetworkSymbolWithTypeToBeAdded([networkSymbol, defaultType]);
     };
 
     const getAccountsForNetworSymbolkWithAccountType = ({
-        network,
+        networkSymbol,
         accountType,
     }: {
-        network: Network;
+        networkSymbol: NetworkSymbol;
         accountType: AccountType;
     }) =>
         accounts.filter(
-            account => account.symbol === network.symbol && account.accountType === accountType,
+            account => account.symbol === networkSymbol && account.accountType === accountType,
         );
 
     const clearNetworkWithTypeToBeAdded = () => {
-        setNetworkWithTypeToBeAdded(null);
+        setNetworkSymbolWithTypeToBeAdded(null);
     };
 
     const checkCanAddAccount = ({
-        network,
+        networkSymbol,
         accountType,
     }: {
-        network: Network;
+        networkSymbol: NetworkSymbol;
         accountType?: AccountType;
     }) => {
-        const selectedType = accountType ?? getDefaultAccountType({ network });
+        const selectedType = accountType ?? NORMAL_ACCOUNT_TYPE;
 
         const currentAccountTypeAccounts = getAccountsForNetworSymbolkWithAccountType({
-            network,
+            networkSymbol,
             accountType: selectedType,
         });
 
         // Do not allow adding more than 10 accounts of the same type
-        if (currentAccountTypeAccounts.length > LIMIT) {
+        if (currentAccountTypeAccounts.length >= LIMIT) {
             showTooManyAccountsAlert();
 
             return false;
@@ -227,11 +224,15 @@ export const useAddCoinAccount = () => {
         return true;
     };
 
-    const navigateToAccountTypeSelectionScreen = (network: Network, flowType: AddCoinFlowType) => {
+    const navigateToAccountTypeSelectionScreen = (
+        networkSymbol: NetworkSymbol,
+        flowType: AddCoinFlowType,
+        accountType?: AccountType,
+    ) => {
         clearNetworkWithTypeToBeAdded();
         navigation.navigate(AddCoinAccountStackRoutes.SelectAccountType, {
-            accountType: network.accountType ?? NORMAL_ACCOUNT_TYPE,
-            network,
+            accountType: accountType ?? NORMAL_ACCOUNT_TYPE,
+            networkSymbol,
             flowType,
         });
     };
@@ -247,27 +248,35 @@ export const useAddCoinAccount = () => {
         accountType: AccountType;
         accountIndex: number;
     }) => {
-        if (flowType === 'receive') {
-            navigation.replace(RootStackRoutes.ReceiveModal, {
-                networkSymbol,
-                accountType,
-                accountIndex,
-            });
-        } else {
-            navigation.replace(RootStackRoutes.AccountDetail, {
-                networkSymbol,
-                accountType,
-                accountIndex,
-            });
+        switch (flowType) {
+            case 'accounts':
+                navigation.replace(RootStackRoutes.AccountDetail, {
+                    networkSymbol,
+                    accountType,
+                    accountIndex,
+                    closeActionType: 'close',
+                });
+                break;
+
+            case 'home':
+            case 'receive':
+                navigation.replace(RootStackRoutes.ReceiveModal, {
+                    networkSymbol,
+                    accountType,
+                    accountIndex,
+                    closeActionType: 'close',
+                });
+
+                break;
         }
     };
 
     const addCoinAccount = async ({
-        network,
+        networkSymbol,
         accountType,
         flowType,
     }: {
-        network: Network;
+        networkSymbol: NetworkSymbol;
         accountType?: AccountType;
         flowType: AddCoinFlowType;
     }) => {
@@ -278,10 +287,10 @@ export const useAddCoinAccount = () => {
             return;
         }
 
-        const selectedType = accountType ?? getDefaultAccountType({ network });
+        const selectedType = accountType ?? NORMAL_ACCOUNT_TYPE;
 
         const canAddAccount = checkCanAddAccount({
-            network,
+            networkSymbol,
             accountType: selectedType,
         });
 
@@ -289,14 +298,16 @@ export const useAddCoinAccount = () => {
             return;
         }
 
+        const network = getNetworkToAdd({ networkSymbol, accountType: selectedType });
+
         const accountsWithTypeLength = getAccountsForNetworSymbolkWithAccountType({
-            network,
+            networkSymbol,
             accountType: selectedType,
         }).length;
 
         navigateToSuccessorScreen({
             flowType,
-            networkSymbol: network.symbol,
+            networkSymbol,
             accountType: selectedType,
             accountIndex: accountsWithTypeLength,
         });
@@ -304,14 +315,32 @@ export const useAddCoinAccount = () => {
         const account = await dispatch(
             addAndDiscoverNetworkAccountThunk({
                 network,
-                accountType: selectedType,
                 deviceState: device.state,
             }),
         ).unwrap();
 
         if (!account) {
-            navigation.goBack();
+            let screen = AppTabsRoutes.HomeStack;
+            if (flowType === 'accounts') {
+                screen = AppTabsRoutes.AccountsStack;
+            } else if (flowType === 'receive') {
+                screen = AppTabsRoutes.ReceiveStack;
+            }
+
             showGeneralErrorAlert();
+            navigation.dispatch(
+                CommonActions.reset({
+                    index: 0,
+                    routes: [
+                        {
+                            name: RootStackRoutes.AppTabs,
+                            params: {
+                                screen,
+                            },
+                        },
+                    ],
+                }),
+            );
         }
     };
 
@@ -322,26 +351,22 @@ export const useAddCoinAccount = () => {
         networkSymbol: NetworkSymbol;
         flowType: AddCoinFlowType;
     }) => {
-        const network = getNetworkToAdd({ networkSymbol });
+        const types = getAvailableAccountTypesForNetworkSymbol({ networkSymbol });
 
-        const types = getAvailableAccountTypesForNetwork({ network });
-
-        if (network) {
-            if (types.length > 1) {
-                setDefaultAccountToBeAdded(network);
-            } else {
-                addCoinAccount({ network, flowType });
-            }
+        if (types.length > 1) {
+            setDefaultAccountToBeAdded(networkSymbol);
+        } else {
+            addCoinAccount({ networkSymbol, flowType });
         }
     };
 
     return {
         supportedNetworkSymbols,
         onSelectedNetworkItem,
-        getAvailableAccountTypesForNetwork,
+        getAvailableAccountTypesForNetworkSymbol,
         addCoinAccount,
         navigateToAccountTypeSelectionScreen,
-        networkWithTypeToBeAdded,
+        networkSymbolWithTypeToBeAdded,
         clearNetworkWithTypeToBeAdded,
     };
 };

@@ -2,7 +2,7 @@ import { useCallback, useState, ReactNode, useEffect } from 'react';
 
 import styled, { css, useTheme } from 'styled-components';
 import { useEvent } from 'react-use';
-import { spacings, spacingsPx, typography } from '@trezor/theme';
+import { borders, spacings, spacingsPx, typography } from '@trezor/theme';
 
 import { Icon, IconType } from '../../assets/Icon/Icon';
 import { Stepper } from '../../loaders/Stepper/Stepper';
@@ -10,6 +10,7 @@ import { IconButton } from '../../buttons/IconButton/IconButton';
 import { H3 } from '../../typography/Heading/Heading';
 import { ButtonSize } from '../../buttons/buttonStyleUtils';
 import { ElevationContext } from '../../ElevationContext/ElevationContext';
+import { useScrollShadow } from '../../../utils/useScrollShadow';
 
 const CLOSE_ICON_SIZE = spacings.xxl;
 const CLOSE_ICON_MARGIN = 16;
@@ -23,7 +24,7 @@ const Container = styled.div`
     display: flex;
     flex-direction: column;
     position: relative;
-    border-radius: 16px;
+    border-radius: ${borders.radii.md};
 
     /* when theme changes from light to dark */
     transition: background 0.3s;
@@ -38,7 +39,7 @@ const Container = styled.div`
 `;
 
 export interface HeaderProps {
-    isBottomBorderShown: boolean;
+    $isBottomBorderShown: boolean;
 }
 
 const Header = styled.header<HeaderProps>`
@@ -48,8 +49,8 @@ const Header = styled.header<HeaderProps>`
     min-height: 52px;
     padding: ${spacingsPx.xs} ${spacingsPx.md};
     border-bottom: 1px solid
-        ${({ isBottomBorderShown, theme }) =>
-            isBottomBorderShown ? theme.borderOnElevation1 : 'transparent'};
+        ${({ $isBottomBorderShown, theme }) =>
+            $isBottomBorderShown ? theme.borderElevation2 : 'transparent'};
 `;
 
 const BACK_ICON_WIDTH = spacingsPx.xxxl;
@@ -61,9 +62,9 @@ const BackIcon = styled(Icon)`
 `;
 
 interface HeadingContainerProps {
-    isHeadingCentered?: boolean;
-    isWithBackButton?: boolean;
-    componentsWidth?: number;
+    $isHeadingCentered?: boolean;
+    $isWithBackButton?: boolean;
+    $componentsWidth?: number;
 }
 
 const HeadingContainer = styled.div<HeadingContainerProps>`
@@ -72,12 +73,12 @@ const HeadingContainer = styled.div<HeadingContainerProps>`
     align-items: start;
     text-align: left;
 
-    ${({ isHeadingCentered, componentsWidth, isWithBackButton }) =>
-        (isHeadingCentered || isWithBackButton) &&
+    ${({ $isHeadingCentered, $componentsWidth, $isWithBackButton }) =>
+        ($isHeadingCentered || $isWithBackButton) &&
         css`
             flex-grow: 1;
-            margin-right: -${componentsWidth}px;
-            margin-left: ${isWithBackButton && `-${BACK_ICON_WIDTH}`};
+            margin-right: -${$componentsWidth}px;
+            margin-left: ${$isWithBackButton && `-${BACK_ICON_WIDTH}`};
             padding: 0 ${spacingsPx.md};
             align-items: center;
             text-align: center;
@@ -91,11 +92,11 @@ const HEADING_SIZES: Record<string, { css: string; buttonSize: ButtonSize }> = {
 
 type HeadingSize = keyof typeof HEADING_SIZES;
 
-type HeadingProps = { isWithIcon?: boolean; $headingSize: HeadingSize };
+type HeadingProps = { $isWithIcon?: boolean; $headingSize: HeadingSize };
 
 const Heading = styled(H3)<HeadingProps>`
-    ${({ isWithIcon }) =>
-        isWithIcon &&
+    ${({ $isWithIcon }) =>
+        $isWithIcon &&
         css`
             padding-right: ${spacingsPx.md};
 
@@ -106,8 +107,8 @@ const Heading = styled(H3)<HeadingProps>`
     ${({ $headingSize }) => HEADING_SIZES[$headingSize].css};
 `;
 
-const Subheading = styled.span<{ isWithMargin: boolean }>`
-    margin-left: ${({ isWithMargin }) => isWithMargin && spacingsPx.xl};
+const Subheading = styled.span<{ $isWithMargin: boolean }>`
+    margin-left: ${({ $isWithMargin }) => $isWithMargin && spacingsPx.xl};
     ${typography.hint}
     color: ${({ theme }) => theme.textSubdued};
 `;
@@ -124,19 +125,22 @@ const HeaderComponentsContainer = styled.div`
     }
 `;
 
-const Body = styled.div<{ isWithoutTopPadding: boolean }>`
+const ScrollContainer = styled.div`
     display: flex;
     flex-direction: column;
     flex: 1;
     height: 100%;
-    margin-bottom: ${spacingsPx.xl};
-    padding: ${spacingsPx.xl} ${spacingsPx.md} 0;
-    padding-top: ${({ isWithoutTopPadding }) => isWithoutTopPadding && 0};
     overflow-y: auto;
 
     ::-webkit-scrollbar {
         display: none;
     }
+`;
+const Body = styled.div<{ $isWithoutTopPadding: boolean }>`
+    padding: ${spacingsPx.xl} ${spacingsPx.md};
+    padding-top: ${({ $isWithoutTopPadding }) => $isWithoutTopPadding && 0};
+    display: flex;
+    flex-direction: column;
 `;
 
 const Description = styled.div`
@@ -160,7 +164,7 @@ const BottomBar = styled.footer`
     flex-wrap: wrap;
     gap: ${spacingsPx.xs};
     padding: ${spacingsPx.md};
-    border-top: 1px solid ${({ theme }) => theme.borderOnElevation1};
+    border-top: 1px solid ${({ theme }) => theme.borderElevation2};
 `;
 
 const BottomBarComponents = styled.div`
@@ -213,7 +217,8 @@ const Modal = ({
 }: ModalProps) => {
     const [componentsWidth, setComponentsWidth] = useState<number>();
     const theme = useTheme();
-
+    const { scrollElementRef, onScroll, ShadowContainer, ShadowTop, ShadowBottom } =
+        useScrollShadow();
     const showHeaderActions = !!headerComponent || isCancelable;
 
     useEffect(() => {
@@ -247,7 +252,7 @@ const Modal = ({
                 className={className}
             >
                 {(!!onBackClick || !!heading || showHeaderActions) && (
-                    <Header isBottomBorderShown={!!heading}>
+                    <Header $isBottomBorderShown={!!heading}>
                         {onBackClick && (
                             <BackIcon
                                 icon="ARROW_LEFT"
@@ -260,17 +265,17 @@ const Modal = ({
 
                         {heading && (
                             <HeadingContainer
-                                componentsWidth={componentsWidth}
-                                isHeadingCentered={isHeadingCentered}
-                                isWithBackButton={!!onBackClick}
+                                $componentsWidth={componentsWidth}
+                                $isHeadingCentered={isHeadingCentered}
+                                $isWithBackButton={!!onBackClick}
                             >
                                 {preheading && (
-                                    <Subheading isWithMargin={!!headerIcon}>
+                                    <Subheading $isWithMargin={!!headerIcon}>
                                         {preheading}
                                     </Subheading>
                                 )}
 
-                                <Heading $headingSize={headingSize} isWithIcon={!!headerIcon}>
+                                <Heading $headingSize={headingSize} $isWithIcon={!!headerIcon}>
                                     {headerIcon && (
                                         <Icon
                                             icon={headerIcon}
@@ -282,7 +287,7 @@ const Modal = ({
                                 </Heading>
 
                                 {subheading && (
-                                    <Subheading isWithMargin={!!headerIcon}>
+                                    <Subheading $isWithMargin={!!headerIcon}>
                                         {subheading}
                                     </Subheading>
                                 )}
@@ -306,12 +311,21 @@ const Modal = ({
                         )}
                     </Header>
                 )}
-
-                <Body isWithoutTopPadding={!heading && !!isCancelable}>
-                    {description && <Description>{description}</Description>}
-                    <Content id="modal-content">{children}</Content>
-                </Body>
-
+                <ShadowContainer>
+                    <ShadowTop />
+                    <ScrollContainer onScroll={onScroll} ref={scrollElementRef}>
+                        <Body $isWithoutTopPadding={!heading && !!isCancelable}>
+                            {description && <Description>{description}</Description>}
+                            <Content id="modal-content">{children}</Content>
+                        </Body>
+                    </ScrollContainer>
+                    <ShadowBottom
+                        style={{
+                            borderBottomLeftRadius: borders.radii.md,
+                            borderBottomRightRadius: borders.radii.md,
+                        }}
+                    />
+                </ShadowContainer>
                 {(bottomBarComponents || areStepsShown) && (
                     <BottomBar>
                         {areStepsShown && (

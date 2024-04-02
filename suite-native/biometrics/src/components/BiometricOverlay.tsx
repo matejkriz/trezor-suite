@@ -5,7 +5,6 @@ import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
 import { Icon } from '@suite-common/icons';
 import { useTranslate, TxKeyPath } from '@suite-native/intl';
 
-import { useIsBiometricsAuthenticationCanceled } from '../biometricsAtoms';
 import { BiometricsIcons } from './BiometricsIcons';
 import { useBiometricsSettings } from '../useBiometricsSettings';
 
@@ -49,29 +48,35 @@ const getBiometricsTranslationKey = ({
     return 'biometrics.unknown';
 };
 
-export const BiometricOverlay = () => {
+type BiometricOverlayProps = {
+    isBiometricsAuthButtonVisible: boolean;
+    onBiometricAuthPress: () => void;
+};
+
+export const BiometricOverlay = ({
+    isBiometricsAuthButtonVisible,
+    onBiometricAuthPress,
+}: BiometricOverlayProps) => {
     const { applyStyle } = useNativeStyles();
     const { translate } = useTranslate();
     const { isFacialEnabled, isFingerprintEnabled } = useBiometricsSettings();
-    const { isBiometricsAuthenticationCanceled, setIsBiometricsAuthenticationCanceled } =
-        useIsBiometricsAuthenticationCanceled();
 
-    const handleReenable = () => {
-        // Setting this to true lets useBiometrics to ask for biometrics in case it was canceled by user before
-        // https://github.com/trezor/trezor-suite/issues/10647
-        setIsBiometricsAuthenticationCanceled(false);
-    };
     const titleTransKey = getBiometricsTranslationKey({ isFacialEnabled, isFingerprintEnabled });
 
     return (
-        <Box style={applyStyle(overlayWrapperStyle)}>
-            <Icon name="trezor" size="extraLarge" color="iconDefault" />
-            {isBiometricsAuthenticationCanceled && (
-                <TouchableOpacity onPress={handleReenable} style={applyStyle(bottomWrapperStyle)}>
+        <>
+            <Box style={applyStyle(overlayWrapperStyle)}>
+                <Icon name="trezor" size="extraLarge" color="iconDefault" />
+            </Box>
+            {isBiometricsAuthButtonVisible && (
+                <TouchableOpacity
+                    onPress={onBiometricAuthPress}
+                    style={applyStyle(bottomWrapperStyle)}
+                >
                     <BiometricsIcons iconSize={32} showShadow />
                     <Text color="textPrimaryDefault">{translate(titleTransKey)}</Text>
                 </TouchableOpacity>
             )}
-        </Box>
+        </>
     );
 };

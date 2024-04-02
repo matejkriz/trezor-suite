@@ -77,7 +77,6 @@ export type ExtraDependencies = {
     // in place where we have all types available to ensure type safety.
     actionTypes: {
         storageLoad: ActionType;
-        addButtonRequest: ActionType;
         setDeviceMetadata: ActionType;
     };
     reducers: {
@@ -89,6 +88,7 @@ export type ExtraDependencies = {
         addButtonRequestFirmware: AddButtonRequestReducer;
         setDeviceMetadataReducer: BaseReducer;
         storageLoadDevices: StorageLoadReducer;
+        storageLoadFormDrafts: StorageLoadReducer;
     };
     utils: {
         saveAs: (data: Blob, fileName: string) => void;

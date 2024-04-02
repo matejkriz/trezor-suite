@@ -8,7 +8,7 @@ import { variables, PassphraseTypeCard } from '@trezor/components';
 
 import { View } from '../components/View';
 
-const Wrapper = styled.div<{ authConfirmation?: boolean }>`
+const Wrapper = styled.div`
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -65,6 +65,8 @@ export const Passphrase = (props: PassphraseProps) => {
         features.capabilities &&
         features.capabilities.includes('Capability_PassphraseEntry');
 
+    const appendTo = document.getElementById('react')!.shadowRoot!.getElementById('reactRenderIn')!;
+
     return (
         <View title="">
             {/* todo: this part could be shared with suite? */}
@@ -116,11 +118,7 @@ export const Passphrase = (props: PassphraseProps) => {
                         type="hidden"
                         offerPassphraseOnDevice={offerPassphraseOnDevice}
                         onSubmit={onPassphraseSubmit}
-                        learnMoreTooltipAppendTo={() =>
-                            document
-                                .getElementById('react')!
-                                .shadowRoot!.getElementById('reactRenderIn')!
-                        }
+                        learnMoreTooltipAppendTo={appendTo}
                     />
                 </WalletsWrapper>
             </Wrapper>

@@ -11,13 +11,13 @@ import { borders, typography } from '@trezor/theme';
 
 const TRANSITION_CONFIG = '0.1s ease';
 
-const StyledIcon = styled(Icon)<{ isActivated: boolean }>`
+const StyledIcon = styled(Icon)<{ $isActivated: boolean }>`
     position: absolute;
     left: 6px;
     width: 15px;
     height: 15px;
     border: 1.5px solid
-        ${({ theme, isActivated }) => (isActivated ? theme.TYPE_GREEN : theme.TYPE_LIGHT_GREY)};
+        ${({ theme, $isActivated }) => ($isActivated ? theme.TYPE_GREEN : theme.TYPE_LIGHT_GREY)};
     border-radius: 50%;
     transition:
         background ${TRANSITION_CONFIG},
@@ -44,8 +44,8 @@ const getHoverStyle = (backgroundColor: string, strokeColor: string, fontColor?:
 `;
 
 const Container = styled.button<{
-    isActivated: boolean;
-    isHovered: boolean;
+    $isActivated: boolean;
+    $isHovered: boolean;
 }>`
     position: relative;
     display: flex;
@@ -66,24 +66,25 @@ const Container = styled.button<{
     cursor: pointer;
     appearance: none;
 
-    :focus-visible {
+    &:focus-visible {
         ${({ theme }) => getHoverStyle(theme.BG_GREY, theme.TYPE_LIGHTER_GREY)}
     }
 
-    ${({ theme, isHovered }) => isHovered && getHoverStyle(theme.BG_GREY, theme.TYPE_LIGHTER_GREY)}
+    ${({ theme, $isHovered }) =>
+        $isHovered && getHoverStyle(theme.BG_GREY, theme.TYPE_LIGHTER_GREY)}
 
-    ${({ theme, isActivated, isHovered }) =>
-        isActivated &&
+    ${({ theme, $isActivated, $isHovered }) =>
+        $isActivated &&
         css`
             border-color: ${theme.BG_LIGHT_GREEN};
             background: ${theme.BG_LIGHT_GREEN};
             color: ${theme.TYPE_GREEN};
 
-            :focus-visible {
+            &:focus-visible {
                 ${getHoverStyle(theme.BG_LIGHT_RED, theme.TYPE_RED, theme.TYPE_RED)}
             }
 
-            ${isHovered && getHoverStyle(theme.BG_LIGHT_RED, theme.TYPE_RED, theme.TYPE_RED)}
+            ${$isHovered && getHoverStyle(theme.BG_LIGHT_RED, theme.TYPE_RED, theme.TYPE_RED)}
         `};
 `;
 
@@ -138,14 +139,14 @@ export const AutoStopButton = ({ relatedAccountKey }: AutoStopButtonProps) => {
 
     return (
         <Container
-            isActivated={!!isActivated}
-            isHovered={isHovered}
+            $isActivated={!!isActivated}
+            $isHovered={isHovered}
             onClick={handleClick}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
             <StyledIcon
-                isActivated={!!isActivated}
+                $isActivated={!!isActivated}
                 icon={icon}
                 size={iconSize}
                 color={isActivated ? theme.iconPrimaryDefault : undefined}

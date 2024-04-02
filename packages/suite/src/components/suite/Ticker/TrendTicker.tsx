@@ -9,21 +9,22 @@ import { NoRatesTooltip } from './NoRatesTooltip';
 import { NetworkSymbol } from '@suite-common/wallet-config';
 import { selectLocalCurrency } from 'src/reducers/wallet/settingsReducer';
 
-const PercentageWrapper = styled.div<{ isRateGoingUp: boolean }>`
+const PercentageWrapper = styled.div<{ $isRateGoingUp: boolean }>`
     ${typography.hint}
     gap: ${spacingsPx.xxs};
     display: flex;
     align-items: center;
-    color: ${({ theme, isRateGoingUp }) =>
-        isRateGoingUp ? theme.textPrimaryDefault : theme.textAlertRed};
+    color: ${({ theme, $isRateGoingUp }) =>
+        $isRateGoingUp ? theme.textPrimaryDefault : theme.textAlertRed};
 `;
 
 const calculatePercentageDifference = (a: number, b: number) => (a - b) / b;
 
 interface TickerProps {
     symbol: NetworkSymbol;
+    compact?: boolean;
 }
-export const TrendTicker = ({ symbol }: TickerProps) => {
+export const TrendTicker = ({ symbol, compact = false }: TickerProps) => {
     const locale = useSelector(state => state.suite.settings.language);
     const localCurrency = useSelector(selectLocalCurrency);
     const fiatRateKey = getFiatRateKey(symbol, localCurrency);
@@ -35,7 +36,7 @@ export const TrendTicker = ({ symbol }: TickerProps) => {
     const theme = useTheme();
 
     const isSuccessfullyFetched =
-        lastWeekRate?.lastSuccessfulFetchTimestamp && currentRate?.lastSuccessfulFetchTimestamp;
+        lastWeekRate?.lastTickerTimestamp && currentRate?.lastTickerTimestamp;
 
     // TODO: create selectIsRateGoingUp selector when wallet.settings is moved to suite-common
     const isRateGoingUp = isSuccessfullyFetched ? currentRate.rate! >= lastWeekRate.rate! : false;
@@ -47,7 +48,7 @@ export const TrendTicker = ({ symbol }: TickerProps) => {
         <FiatValue amount="1" symbol={symbol}>
             {({ rate, timestamp }) =>
                 rate && timestamp && percentageChange ? (
-                    <PercentageWrapper isRateGoingUp={isRateGoingUp}>
+                    <PercentageWrapper $isRateGoingUp={isRateGoingUp}>
                         <Icon
                             icon={isRateGoingUp ? 'TREND_UP' : 'TREND_DOWN'}
                             color={isRateGoingUp ? theme.iconPrimaryDefault : theme.iconAlertRed}
@@ -56,7 +57,7 @@ export const TrendTicker = ({ symbol }: TickerProps) => {
                         {localizePercentage({ valueInFraction: percentageChange, locale })}
                     </PercentageWrapper>
                 ) : (
-                    <NoRatesTooltip />
+                    <NoRatesTooltip iconOnly={compact} />
                 )
             }
         </FiatValue>

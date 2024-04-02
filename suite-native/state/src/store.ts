@@ -1,12 +1,11 @@
 import { configureStore, Middleware } from '@reduxjs/toolkit';
 
-import { prepareFiatRatesMiddleware } from '@suite-native/fiat-rates';
+import { prepareFiatRatesMiddleware } from '@suite-common/wallet-core';
 import { messageSystemMiddleware } from '@suite-native/message-system';
 import { prepareButtonRequestMiddleware, prepareDeviceMiddleware } from '@suite-native/device';
 import { prepareDiscoveryMiddleware } from '@suite-native/discovery';
 import { prepareTransactionCacheMiddleware } from '@suite-native/accounts';
 import { blockchainMiddleware } from '@suite-native/blockchain';
-import { tokenDefinitionsMiddleware } from '@suite-native/token-definitions';
 
 import { extraDependencies } from './extraDependencies';
 import { prepareRootReducers } from './reducers';
@@ -19,7 +18,6 @@ const middlewares: Middleware[] = [
     prepareButtonRequestMiddleware(extraDependencies),
     prepareDiscoveryMiddleware(extraDependencies),
     prepareTransactionCacheMiddleware(extraDependencies),
-    tokenDefinitionsMiddleware,
 ];
 
 if (__DEV__) {

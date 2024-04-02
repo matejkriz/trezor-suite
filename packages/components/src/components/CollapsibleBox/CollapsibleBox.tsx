@@ -1,9 +1,17 @@
 import { useState, useEffect, useCallback, ReactNode, FC } from 'react';
 import { motion } from 'framer-motion';
 import styled, { css } from 'styled-components';
-import { typography, spacingsPx, borders } from '@trezor/theme';
+import {
+    typography,
+    spacingsPx,
+    borders,
+    Elevation,
+    mapElevationToBackground,
+    mapElevationToBorder,
+} from '@trezor/theme';
 import { Icon } from '@suite-common/icons/src/webComponents';
 import { motionEasing } from '../../config/motion';
+import { ElevationUp, useElevation } from './../ElevationContext/ElevationContext';
 
 const animationVariants = {
     closed: {
@@ -16,15 +24,21 @@ const animationVariants = {
     },
 };
 
-const Wrapper = styled.div<Pick<CollapsibleBoxProps, 'variant'>>`
-    background: ${({ theme }) => theme.backgroundSurfaceElevation1};
+type WrapperProps = {
+    $variant: 'small' | 'large'; // TODO: reevaluate variants
+    $elevation: Elevation;
+};
+
+const Wrapper = styled.div<WrapperProps>`
+    background: ${mapElevationToBackground};
     border-radius: ${borders.radii.sm};
+    border: 1px solid ${mapElevationToBorder};
 
     /* when theme changes from light to dark */
     transition: background 0.3s;
 
-    ${({ variant, theme }) =>
-        variant === 'large' &&
+    ${({ $variant, theme }) =>
+        $variant === 'large' &&
         css`
             border-radius: ${borders.radii.md};
             box-shadow: ${theme.boxShadowBase};
@@ -39,18 +53,22 @@ const IconWrapper = styled.div`
     transition: opacity 0.15s;
 `;
 
-const Header = styled.div<Pick<CollapsibleBoxProps, 'variant'>>`
+type HeaderProps = {
+    $variant: 'small' | 'large'; // TODO: reevaluate variants
+};
+
+const Header = styled.div<HeaderProps>`
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: ${spacingsPx.xl};
-    padding: ${({ variant }) =>
-        variant === 'small'
+    padding: ${({ $variant }) =>
+        $variant === 'small'
             ? `${spacingsPx.sm} ${spacingsPx.md}`
             : `${spacingsPx.md} ${spacingsPx.xl}`};
     cursor: pointer;
 
-    :hover {
+    &:hover {
         ${IconWrapper} {
             opacity: 0.5;
         }
@@ -63,7 +81,11 @@ const IconLabel = styled.div`
     ${typography.hint}
 `;
 
-const Heading = styled.span<Pick<CollapsibleBoxProps, 'variant'>>`
+type HeadingProps = {
+    $variant: 'small' | 'large'; // TODO: reevaluate variants
+};
+
+const Heading = styled.span<HeadingProps>`
     display: flex;
     align-items: center;
     ${typography.body}
@@ -80,24 +102,27 @@ const Flex = styled.div`
 
 const easingValues = motionEasing.transition.join(', ');
 const ANIMATION_DURATION = 0.4;
-const StyledIcon = styled(Icon)<{ isCollapsed?: boolean }>`
-    transform: ${({ isCollapsed }) => (isCollapsed ? 'rotate(0deg)' : 'rotate(180deg)')};
+const StyledIcon = styled(Icon)<{ $isCollapsed?: boolean }>`
+    transform: ${({ $isCollapsed }) => ($isCollapsed ? 'rotate(0deg)' : 'rotate(180deg)')};
 
     /* to sync with the expand animation */
     transition: transform ${ANIMATION_DURATION}s cubic-bezier(${easingValues});
     transform-origin: center;
 `;
 
-const Content = styled.div<{
-    variant: CollapsibleBoxProps['variant'];
-}>`
+type ContentProps = {
+    $variant: CollapsibleBoxProps['variant'];
+    $elevation: Elevation;
+};
+
+const Content = styled.div<ContentProps>`
     display: flex;
     flex-direction: column;
-    padding: ${({ variant }) =>
-        variant === 'small'
+    padding: ${({ $variant }) =>
+        $variant === 'small'
             ? `${spacingsPx.lg} ${spacingsPx.md}`
             : `${spacingsPx.xl} ${spacingsPx.md}`};
-    border-top: 1px solid ${({ theme }) => theme.borderOnElevation1};
+    border-top: 1px solid ${mapElevationToBorder};
     overflow: hidden;
 `;
 
@@ -133,6 +158,7 @@ const CollapsibleBox: FC<CollapsibleBoxProps> & CollapsibleBoxSubcomponents = ({
     ...rest
 }: CollapsibleBoxProps) => {
     const [isCollapsed, setIsCollapsed] = useState(!isOpen);
+    const { elevation } = useElevation();
 
     useEffect(() => {
         setIsCollapsed(!isOpen);
@@ -144,11 +170,11 @@ const CollapsibleBox: FC<CollapsibleBoxProps> & CollapsibleBoxSubcomponents = ({
     }, [isCollapsed, onCollapse]);
 
     return (
-        <Wrapper variant={variant} {...rest}>
-            <Header variant={variant} onClick={handleHeaderClick}>
+        <Wrapper $variant={variant} {...rest} $elevation={elevation}>
+            <Header $variant={variant} onClick={handleHeaderClick}>
                 {(heading || subHeading) && (
                     <Flex>
-                        {heading && <Heading variant={variant}>{heading}</Heading>}
+                        {heading && <Heading $variant={variant}>{heading}</Heading>}
                         {subHeading && <SubHeading>{subHeading}</SubHeading>}
                     </Flex>
                 )}
@@ -156,7 +182,7 @@ const CollapsibleBox: FC<CollapsibleBoxProps> & CollapsibleBoxSubcomponents = ({
                 <IconWrapper>
                     {iconLabel && <IconLabel>{iconLabel}</IconLabel>}
                     <StyledIcon
-                        isCollapsed={isCollapsed}
+                        $isCollapsed={isCollapsed}
                         onClick={() => setIsCollapsed(current => !current)}
                         name="caretCircleDown"
                         size="medium"
@@ -177,7 +203,9 @@ const CollapsibleBox: FC<CollapsibleBoxProps> & CollapsibleBoxSubcomponents = ({
                 }}
                 data-test="@collapsible-box/body"
             >
-                <Content variant={variant}>{children}</Content>
+                <Content $elevation={elevation} $variant={variant}>
+                    <ElevationUp>{children}</ElevationUp>
+                </Content>
             </Collapser>
         </Wrapper>
     );
