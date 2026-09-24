@@ -90,6 +90,23 @@ const createMainWindow = ({ winBounds, cspNonce, store }: CreateMainWindowParams
         backgroundColor: colorVariants[darkTheme ? 'dark' : 'standard'].surfaceFillPage,
     });
 
+    const windowSession = mainWindow.webContents.session;
+    const handleSelectLedgerHidDevice = (
+        event: Electron.Event,
+        details: Electron.SelectHidDeviceDetails,
+        callback: (deviceId?: string | null) => void,
+    ) => {
+        if (details.frame !== mainWindow.webContents.mainFrame) return;
+
+        const ledgerDevice = details.deviceList.find(device => device.vendorId === 0x2c97);
+        if (!ledgerDevice) return;
+
+        event.preventDefault();
+        callback(ledgerDevice.deviceId);
+    };
+
+    windowSession.on('select-hid-device', handleSelectLedgerHidDevice);
+
     // Ensure all network requests from the renderer report a custom user-agent identifying Suite and its version.
     mainWindow.webContents.setUserAgent(`Trezor Suite ${app.getVersion()}`);
 
@@ -107,6 +124,7 @@ const createMainWindow = ({ winBounds, cspNonce, store }: CreateMainWindowParams
     mainWindow.on('move', debouncedStoreWinBounds);
 
     mainWindow.on('closed', () => {
+        windowSession.off('select-hid-device', handleSelectLedgerHidDevice);
         debouncedStoreWinBounds.cancel();
         mainWindow.off('resize', debouncedStoreWinBounds);
         mainWindow.off('maximize', debouncedStoreWinBounds);

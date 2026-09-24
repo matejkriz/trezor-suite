@@ -76,6 +76,7 @@
             "path": "../../suite-common/geolocation"
         },
         { "path": "../../suite-common/icons" },
+        { "path": "../../suite-common/ledger" },
         { "path": "../../suite-common/logger" },
         {
             "path": "../../suite-common/message-system"

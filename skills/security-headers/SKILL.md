@@ -36,6 +36,8 @@ yarn suite:build:web:preview
 - `usb=(self)`:
     - `packages/connect/src/index.browser.ts` (`window.navigator.usb.requestDevice(...)`)
     - `packages/transport/src/transports/webusb.browser.ts`
+- `hid=(self)`:
+    - `packages/suite/src/components/connection/LedgerConnectionModal.tsx` (Ledger Device Kit WebHID transport)
 - `camera=(self)`:
     - `packages/suite/src/components/suite/modals/ReduxModal/UserContextModal/QrScannerModal/CameraQRReader.tsx` (`react-zxing` camera scanner used for QR input)
 - `clipboard-write=(self)`:
