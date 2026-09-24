@@ -4,11 +4,7 @@ import { speculosTransportFactory } from '@ledgerhq/device-transport-kit-speculo
 import { type LedgerDevice, createLedgerBitcoinServiceForTransport } from '../src';
 
 const service = createLedgerBitcoinServiceForTransport(
-    speculosTransportFactory(
-        process.env.SPECULOS_URL ?? 'http://127.0.0.1:5000',
-        true,
-        DeviceModelId.NANO_SP,
-    ),
+    speculosTransportFactory('http://127.0.0.1:5000', true, DeviceModelId.NANO_SP),
 );
 
 const discoverDevice = () =>
