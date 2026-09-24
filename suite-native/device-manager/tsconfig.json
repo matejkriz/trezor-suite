@@ -6,6 +6,7 @@
             "path": "../../suite-common/dependency-injection"
         },
         { "path": "../../suite-common/device" },
+        { "path": "../../suite-common/ledger" },
         {
             "path": "../../suite-common/message-system"
         },
@@ -30,6 +31,7 @@
         { "path": "../activity-center" },
         { "path": "../analytics" },
         { "path": "../atoms" },
+        { "path": "../bluetooth" },
         { "path": "../device" },
         { "path": "../formatters" },
         { "path": "../icons" },

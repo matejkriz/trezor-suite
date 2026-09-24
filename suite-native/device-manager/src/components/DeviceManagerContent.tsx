@@ -20,7 +20,7 @@ import { injectDispatch } from '@suite-common/redux-utils';
 import { type TrezorDevice } from '@suite-common/suite-types';
 import { selectHasRunningDiscovery } from '@suite-common/wallet-core';
 import { events, injectNativeAnalytics } from '@suite-native/analytics';
-import { AnimatedVStack, VStack } from '@suite-native/atoms';
+import { AnimatedVStack, Button, VStack } from '@suite-native/atoms';
 import { selectShouldFactoryResetBeVisible } from '@suite-native/device';
 import {
     type AppTabsParamList,
@@ -39,6 +39,7 @@ import { DeviceList } from './DeviceList';
 import { DeviceManagerModal, MANAGER_MODAL_BOTTOM_RADIUS } from './DeviceManagerModal';
 import { DeviceSettingsButton } from './DeviceSettingsButton';
 import { DevicesToggleButton } from './DevicesToggleButton';
+import { LedgerBitcoinBluetoothPanel } from './LedgerBitcoinBluetoothPanel';
 import { WalletList } from './WalletList';
 import { useDeviceManager } from '../hooks/useDeviceManager';
 
@@ -58,6 +59,7 @@ type NavigationProp = TabNavigationProp<AppTabsParamList, AppTabsRoutes.HomeStac
 export const DeviceManagerContent = () => {
     const { applyStyle, utils } = useNativeStyles();
     const [isChangeDeviceRequested, setIsChangeDeviceRequested] = useState(false);
+    const [isLedgerMode, setIsLedgerMode] = useState(false);
     const { analytics, dispatch } = useServices(injectNativeAnalytics, injectDispatch);
     const isPortfolioTrackerDevice = useSelector(selectIsPortfolioTrackerDevice);
     const isPassphraseEnabledOnDevice = useSelector(selectIsDeviceProtectedByPassphrase);
@@ -117,16 +119,47 @@ export const DeviceManagerContent = () => {
 
     return (
         <DeviceManagerModal
-            footer={<ConnectButton onSelectDevice={handleSelectDevice} />}
+            footer={
+                isLedgerMode ? (
+                    <VStack paddingHorizontal="sp16" paddingBottom="sp16">
+                        <Button
+                            intent="neutral"
+                            priority="secondary"
+                            onPress={() => setIsLedgerMode(false)}
+                        >
+                            Back to Trezor devices
+                        </Button>
+                    </VStack>
+                ) : (
+                    <VStack spacing="sp12" paddingBottom="sp16">
+                        <ConnectButton onSelectDevice={handleSelectDevice} />
+                        <VStack paddingHorizontal="sp16">
+                            <Button
+                                intent="neutral"
+                                priority="secondary"
+                                isFullWidth
+                                isDisabled={hasRunningDiscovery}
+                                onPress={() => setIsLedgerMode(true)}
+                            >
+                                Connect Ledger Bitcoin via Bluetooth
+                            </Button>
+                        </VStack>
+                    </VStack>
+                )
+            }
             customSwitchRightView={
-                !isPortfolioTrackerDevice && (
+                !isPortfolioTrackerDevice &&
+                !isLedgerMode && (
                     <DevicesToggleButton
                         isOpened={isChangeDeviceRequested}
                         onDeviceButtonTap={toggleIsChangeDeviceRequested}
                     />
                 )
             }
-            onClose={() => setIsChangeDeviceRequested(false)}
+            onClose={() => {
+                setIsChangeDeviceRequested(false);
+                setIsLedgerMode(false);
+            }}
         >
             <Animated.ScrollView
                 style={applyStyle(scrollViewStyle, { maxHeight: scrollViewMaxHeight })}
@@ -134,25 +167,33 @@ export const DeviceManagerContent = () => {
                 showsVerticalScrollIndicator={false}
                 layout={LinearTransition}
             >
-                <VStack spacing="sp24">
-                    {isDeviceListVisible && <DeviceList onSelectDevice={handleSelectDevice} />}
-                    {!isPortfolioTrackerDevice && !shouldFactoryResetBeVisible && (
-                        <AnimatedVStack
-                            layout={LinearTransition}
-                            marginTop={!isDeviceListVisible ? 'sp12' : undefined}
-                        >
-                            {deviceStaticSessionId && (
-                                <WalletList onSelectDevice={handleSelectDevice} />
-                            )}
-                            <VStack paddingHorizontal="sp16" paddingBottom="sp16" spacing="sp12">
-                                <DeviceSettingsButton />
-                                {isAddHiddenWalletButtonVisible && (
-                                    <AddHiddenWalletButton isDisabled={hasRunningDiscovery} />
+                {isLedgerMode ? (
+                    <LedgerBitcoinBluetoothPanel />
+                ) : (
+                    <VStack spacing="sp24">
+                        {isDeviceListVisible && <DeviceList onSelectDevice={handleSelectDevice} />}
+                        {!isPortfolioTrackerDevice && !shouldFactoryResetBeVisible && (
+                            <AnimatedVStack
+                                layout={LinearTransition}
+                                marginTop={!isDeviceListVisible ? 'sp12' : undefined}
+                            >
+                                {deviceStaticSessionId && (
+                                    <WalletList onSelectDevice={handleSelectDevice} />
                                 )}
-                            </VStack>
-                        </AnimatedVStack>
-                    )}
-                </VStack>
+                                <VStack
+                                    paddingHorizontal="sp16"
+                                    paddingBottom="sp16"
+                                    spacing="sp12"
+                                >
+                                    <DeviceSettingsButton />
+                                    {isAddHiddenWalletButtonVisible && (
+                                        <AddHiddenWalletButton isDisabled={hasRunningDiscovery} />
+                                    )}
+                                </VStack>
+                            </AnimatedVStack>
+                        )}
+                    </VStack>
+                )}
             </Animated.ScrollView>
         </DeviceManagerModal>
     );
