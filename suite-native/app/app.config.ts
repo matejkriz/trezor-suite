@@ -145,6 +145,7 @@ const getPlugins = (): ExpoPlugins => {
                 },
                 ios: {
                     deploymentTarget: '16.4',
+                    enableSceneSupport: true,
                 },
             },
         ],
