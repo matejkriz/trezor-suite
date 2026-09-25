@@ -41,6 +41,7 @@ import {
 } from './deviceConstants';
 import { type DeviceRootState } from './deviceReducer';
 import { isTrezorDeviceWithState } from './deviceUtils';
+import { isLedgerDevice } from './ledgerDevice';
 
 const createMemoizedSelector = createWeakMapSelector.withTypes<DeviceRootState>();
 
@@ -381,10 +382,11 @@ export const selectDeviceModelWithFlagshipFallback = (
 ): DeviceModelInternal => getDeviceModelWithFlagshipFallback(selectSelectedDevice(state));
 
 export const selectIsDeviceAuthenticityCheckSupported = createMemoizedSelector(
-    [selectIsPortfolioTrackerDevice, selectDeviceModel],
-    (isPortfolioTrackerDevice, deviceModel) =>
-        isPortfolioTrackerDevice ||
-        (!!deviceModel && SUPPORTS_DEVICE_AUTHENTICITY_CHECK[deviceModel]),
+    [selectSelectedDevice, selectIsPortfolioTrackerDevice, selectDeviceModel],
+    (device, isPortfolioTrackerDevice, deviceModel) =>
+        !isLedgerDevice(device) &&
+        (isPortfolioTrackerDevice ||
+            (!!deviceModel && SUPPORTS_DEVICE_AUTHENTICITY_CHECK[deviceModel])),
 );
 
 export const selectFirmwareReleaseConfig = createMemoizedSelector(

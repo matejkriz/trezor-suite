@@ -38,11 +38,28 @@ describe(selectIsDeviceAuthenticityCheckSupported.name, () => {
         expect(selectIsDeviceAuthenticityCheckSupported(state)).toBe(true);
     });
 
-    it('returns false for devices without authenticity-check support', () => {
+    it.each([DeviceModelInternal.T2T1, DeviceModelInternal.T1B1])(
+        'returns false for Trezor model %s without authenticity-check support',
+        internalModel => {
+            const state = {
+                device: {
+                    ...deviceReducerInitialState,
+                    selectedDevice: mockSuiteDevice({}, { internal_model: internalModel }),
+                },
+            };
+
+            expect(selectIsDeviceAuthenticityCheckSupported(state)).toBe(false);
+        },
+    );
+
+    it('returns false for a Ledger with the synthetic unknown model', () => {
         const state = {
             device: {
                 ...deviceReducerInitialState,
-                selectedDevice: mockSuiteDevice({}, { internal_model: DeviceModelInternal.T2T1 }),
+                selectedDevice: {
+                    ...mockSuiteDevice({}, { internal_model: DeviceModelInternal.UNKNOWN }),
+                    provider: 'ledger' as const,
+                },
             },
         };
 
