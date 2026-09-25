@@ -5,7 +5,7 @@ import {
     type DiscoveredDevice,
 } from '@ledgerhq/device-management-kit';
 import { type SignerBtc } from '@ledgerhq/device-signer-kit-bitcoin';
-import { of, throwError } from 'rxjs';
+import { EMPTY, Subject, of, throwError } from 'rxjs';
 
 import { createMockDeps } from '@suite-common/dependency-injection';
 
@@ -60,6 +60,35 @@ const createDeps = () => {
 };
 
 describe('createLedgerBitcoinService', () => {
+    it('uses the supplied device stream when transport discovery emits no devices', () => {
+        const deps = createDeps();
+        deps.dmk.startDiscovering.mockReturnValue(EMPTY);
+        deps.listenToAvailableDevices = jest.fn(() => of([device]));
+        const service = createLedgerBitcoinService(deps);
+        const onDevice = jest.fn();
+
+        service.startDiscovery(onDevice, jest.fn());
+
+        expect(onDevice).toHaveBeenCalledWith(device);
+        expect(deps.dmk.startDiscovering).not.toHaveBeenCalled();
+    });
+
+    it('stops listening to available devices when scanning ends', async () => {
+        const deps = createDeps();
+        const availableDevices = new Subject<DiscoveredDevice[]>();
+        deps.listenToAvailableDevices = jest.fn(() => availableDevices);
+        const service = createLedgerBitcoinService(deps);
+        const onDevice = jest.fn();
+
+        service.startDiscovery(onDevice, jest.fn());
+        availableDevices.next([device]);
+        await service.stopDiscovery();
+        availableDevices.next([device]);
+
+        expect(onDevice).toHaveBeenCalledTimes(1);
+        expect(deps.dmk.stopDiscovering).toHaveBeenCalledTimes(1);
+    });
+
     it('discovers, connects and derives a native SegWit account with the Bitcoin signer', async () => {
         const deps = createDeps();
         const service = createLedgerBitcoinService(deps);

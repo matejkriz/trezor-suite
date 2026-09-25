@@ -1,17 +1,34 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 
-import { RNBleTransportFactory } from '@ledgerhq/device-transport-kit-react-native-ble';
+import {
+    BlePermissionsNotGranted,
+    BlePoweredOff,
+    PairingRefusedError,
+    RNBleTransportFactory,
+} from '@ledgerhq/device-transport-kit-react-native-ble';
 
 import { type LedgerDevice, createLedgerBitcoinServiceForTransport } from '@suite-common/ledger';
 import { Button, Text, TitleHeader, VStack } from '@suite-native/atoms';
 import { selectBluetoothPermissionStatus, useBluetoothPermissions } from '@suite-native/bluetooth';
 
-const getErrorMessage = (error: unknown) =>
-    error instanceof Error ? error.message : 'Ledger connection failed';
+const getErrorMessage = (error: unknown) => {
+    if (error instanceof BlePoweredOff) return 'Turn on Bluetooth to connect your Ledger.';
+    if (error instanceof BlePermissionsNotGranted)
+        return 'Allow Bluetooth access for Suite in system settings.';
+    if (error instanceof PairingRefusedError)
+        return 'Pairing was declined. Start a new scan and try again.';
+    if (error instanceof Error) return error.message;
+    if (error && typeof error === 'object' && '_tag' in error && typeof error._tag === 'string')
+        return `Ledger connection failed (${error._tag}).`;
+
+    return 'Ledger connection failed';
+};
 
 export const LedgerBitcoinBluetoothPanel = () => {
-    const [service] = useState(() => createLedgerBitcoinServiceForTransport(RNBleTransportFactory));
+    const [service] = useState(() =>
+        createLedgerBitcoinServiceForTransport(RNBleTransportFactory, 'available'),
+    );
     const [devices, setDevices] = useState<LedgerDevice[]>([]);
     const [isScanning, setIsScanning] = useState(false);
     const [isBusy, setIsBusy] = useState(false);

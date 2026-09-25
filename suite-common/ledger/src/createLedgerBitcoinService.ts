@@ -9,7 +9,7 @@ import {
     type SignPsbtDAOutput,
     type SignerBtc,
 } from '@ledgerhq/device-signer-kit-bitcoin';
-import type { Subscription } from 'rxjs';
+import { type Observable, type Subscription, mergeMap } from 'rxjs';
 
 import { getLedgerBitcoinAccountPath } from './ledgerBitcoinPath';
 import { runLedgerAction } from './runLedgerAction';
@@ -19,6 +19,7 @@ export type LedgerBitcoinServiceDeps = {
         DeviceManagementKit,
         'startDiscovering' | 'stopDiscovering' | 'connect' | 'disconnect' | 'close'
     >;
+    listenToAvailableDevices?: () => Observable<DiscoveredDevice[]>;
     createSigner: (
         sessionId: string,
     ) => Pick<SignerBtc, 'getExtendedPublicKey' | 'getWalletAddress' | 'signPsbt'>;
@@ -97,7 +98,10 @@ export const createLedgerBitcoinService = (
         startDiscovery(onDevice, onError) {
             if (discoverySubscription && !discoverySubscription.closed) return;
 
-            const subscription = deps.dmk.startDiscovering({}).subscribe({
+            const devices$ = deps.listenToAvailableDevices
+                ? deps.listenToAvailableDevices().pipe(mergeMap(devices => devices))
+                : deps.dmk.startDiscovering({});
+            const subscription = devices$.subscribe({
                 next: onDevice,
                 error: error => {
                     discoverySubscription = undefined;
