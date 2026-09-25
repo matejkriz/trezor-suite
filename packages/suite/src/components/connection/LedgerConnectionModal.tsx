@@ -4,6 +4,7 @@ import { useServices } from '@suite-common/dependency-injection';
 import { selectSelectedExternalWallet } from '@suite-common/device';
 import { type LedgerDevice } from '@suite-common/ledger';
 import { injectDispatch } from '@suite-common/redux-utils';
+import { selectAccounts } from '@suite-common/wallet-core';
 import { Button, Column, H3, Modal, Row, Spinner, Text } from '@trezor/components';
 import TrezorConnect from '@trezor/connect';
 
@@ -27,6 +28,7 @@ export const LedgerConnectionModal = ({ onCancel, onBack }: LedgerConnectionModa
         injectDispatch,
     );
     const selectedExternalWallet = useSelector(selectSelectedExternalWallet);
+    const existingAccounts = useSelector(selectAccounts);
     const [devices, setDevices] = useState<LedgerDevice[]>([]);
     const [isScanning, setIsScanning] = useState(false);
     const [isBusy, setIsBusy] = useState(false);
@@ -92,7 +94,7 @@ export const LedgerConnectionModal = ({ onCancel, onBack }: LedgerConnectionModa
                 },
                 device,
             );
-            addDiscoveredLedgerBitcoinWallet(dispatch, discovered);
+            addDiscoveredLedgerBitcoinWallet(dispatch, existingAccounts, discovered);
             onCancel();
             if (selectedExternalWallet?.id !== discovered.wallet.id) {
                 dispatch(redirectAfterWalletSelectedThunk({ forceDeviceDashboard: true }));
