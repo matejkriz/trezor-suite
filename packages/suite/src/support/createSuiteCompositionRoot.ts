@@ -29,8 +29,9 @@ import { delegatedIdentityKeyCompositionRoot } from '@suite-common/delegated-ide
 import { toGetter } from '@suite-common/dependency-injection';
 import {
     deviceActions,
+    isLedgerDevice,
     selectDeviceByStaticSessionId,
-    selectExternalWallets,
+    selectDevices,
 } from '@suite-common/device';
 import { type CommonServices } from '@suite-common/extra-dependencies';
 import { FW_HASH_CHECK_DEFAULT_TIMEOUTS } from '@suite-common/firmware-authenticity';
@@ -111,11 +112,10 @@ export const createSuiteServicesCompositionRoot = (deps: SuiteAppDeps): SuiteSer
         webHidTransportFactory,
         'interactive',
         () => {
-            selectExternalWallets(deps.getState())
-                .filter(wallet => wallet.connected)
-                .forEach(wallet =>
-                    deps.dispatch(deviceActions.disconnectExternalWallet(wallet.id)),
-                );
+            selectDevices(deps.getState())
+                .filter(isLedgerDevice)
+                .filter(device => device.connected)
+                .forEach(device => deps.dispatch(deviceActions.disconnectLedgerDevice(device.id)));
         },
     );
     const bluetooth = createBluetoothCompositionRoot({

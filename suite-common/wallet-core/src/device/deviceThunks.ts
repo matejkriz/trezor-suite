@@ -12,6 +12,7 @@ import {
     PORTFOLIO_TRACKER_DEVICE_ID,
     acquireDeviceThunk,
     deviceActions,
+    isLedgerDevice,
     portfolioTrackerDevice,
     selectDeviceById,
     selectDeviceThunk,
@@ -19,7 +20,6 @@ import {
     selectNewlyConnectedDeviceThunk,
     selectPhysicalDeviceWallets,
     selectSelectedDevice,
-    selectSelectedExternalWallet,
     shouldDeviceBeRemembered,
     sortDevices,
 } from '@suite-common/device';
@@ -277,14 +277,14 @@ export const confirmAddressOnDeviceThunk = createThunk<
         { getState, extra },
     ): Promise<Awaited<ConnectResponse<Address | CardanoAddress>>> => {
         const account = selectAccountByKey(getState(), accountKey);
-        const externalWallet = selectSelectedExternalWallet(getState());
+        const device = selectSelectedDevice(getState());
 
-        if (externalWallet) {
+        if (isLedgerDevice(device)) {
             if (!account) return ledgerAddressError;
 
             if (
-                !externalWallet.connected ||
-                account.deviceState !== externalWallet.staticSessionId ||
+                !device.connected ||
+                account.deviceState !== device.state?.staticSessionId ||
                 account.symbol !== 'btc' ||
                 account.networkType !== 'bitcoin' ||
                 account.accountType !== 'normal' ||
@@ -341,8 +341,6 @@ export const confirmAddressOnDeviceThunk = createThunk<
                 return ledgerAddressError;
             }
         }
-
-        const device = selectSelectedDevice(getState());
 
         if (!device || !account)
             return {
@@ -688,6 +686,8 @@ export const wipeDeviceThunk = createThunk<
 >(`${DEVICE_MODULE_PREFIX}/wipeDevice`, async (_, { dispatch, getState, rejectWithValue }) => {
     const device = selectSelectedDevice(getState());
     if (!device) return;
+    if (isLedgerDevice(device))
+        return rejectWithValue('Ledger does not support device wipe in Suite');
 
     const devices = selectDevices(getState());
     // collect devices with old "device.id" to be removed (see description below)

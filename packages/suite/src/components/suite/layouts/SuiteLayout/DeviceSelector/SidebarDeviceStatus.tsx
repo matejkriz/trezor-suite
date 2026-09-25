@@ -1,12 +1,6 @@
-import {
-    selectDevices,
-    selectSelectedDevice,
-    selectSelectedExternalWallet,
-} from '@suite-common/device';
+import { isLedgerDevice, selectDevices, selectSelectedDevice } from '@suite-common/device';
 import * as deviceUtils from '@suite-common/suite-utils';
 import { getDeviceInternalModel } from '@suite-common/suite-utils';
-import { Icon, Row, Text, Tooltip } from '@trezor/components';
-import { CableUsbCIcon } from '@trezor/icons';
 
 import { useSelector } from 'src/hooks/suite';
 import { useResponsiveContext } from 'src/support/suite/ResponsiveContext';
@@ -29,30 +23,12 @@ const needsRefresh = (device?: TrezorDevice) => {
 
 export const SidebarDeviceStatus = () => {
     const selectedDevice = useSelector(selectSelectedDevice);
-    const selectedExternalWallet = useSelector(selectSelectedExternalWallet);
     const devices = useSelector(selectDevices);
     const { isSidebarCollapsed } = useResponsiveContext();
 
     const deviceNeedsRefresh = needsRefresh(selectedDevice);
 
     const selectedDeviceModelInternal = getDeviceInternalModel(selectedDevice);
-
-    if (selectedExternalWallet) {
-        const content = (
-            <Row gap={12} alignItems="center" overflow="hidden">
-                <Icon as={CableUsbCIcon} size={24} />
-                {!isSidebarCollapsed && (
-                    <Text textWrap="nowrap">{selectedExternalWallet.label}</Text>
-                )}
-            </Row>
-        );
-
-        return isSidebarCollapsed ? (
-            <Tooltip content={selectedExternalWallet.label}>{content}</Tooltip>
-        ) : (
-            content
-        );
-    }
 
     if (!selectedDevice || !selectedDeviceModelInternal) {
         return null;
@@ -61,7 +37,8 @@ export const SidebarDeviceStatus = () => {
     const instancesWithState = instances.filter(i => i.state);
 
     const isConnectionShown =
-        instancesWithState.length === 1 && selectedDevice.useEmptyPassphrase === true;
+        isLedgerDevice(selectedDevice) ||
+        (instancesWithState.length === 1 && selectedDevice.useEmptyPassphrase === true);
 
     return (
         <DeviceStatus

@@ -136,6 +136,20 @@ const fixtures: Fixture[] = [
 ];
 
 describe('Check device authenticity', () => {
+    it('does not send a Ledger to Trezor Connect', async () => {
+        const device = { ...deviceWithLockedBootloader, provider: 'ledger' as const };
+        const store = initStore(device);
+        const connect = testMocks.getTrezorConnectMock();
+        connect.authenticateDevice.mockClear();
+
+        const result = await store.dispatch(
+            checkDeviceAuthenticityThunk({ allowDebugKeys: false }),
+        );
+
+        expect(result.type).toBe(checkDeviceAuthenticityThunk.rejected.type);
+        expect(connect.authenticateDevice).not.toHaveBeenCalled();
+    });
+
     fixtures.forEach(f => {
         it(f.description, async () => {
             const store = initStore(f.device);

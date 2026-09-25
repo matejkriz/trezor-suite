@@ -1,4 +1,5 @@
 import { routerLocationChange } from '@suite/router';
+import { mockSuiteDevice } from '@suite-common/suite-types/mocks';
 import { asNetworkSymbol } from '@suite-common/wallet-config';
 import { type SelectedAccountStatus, type WalletParams } from '@suite-common/wallet-types';
 import { mockWalletAccount } from '@suite-common/wallet-types/mocks';
@@ -49,16 +50,15 @@ const selectedAccountFixtures: SelectedAccountFixture[] = [
         description: 'Selected Ledger wallet loads its Bitcoin account',
         initialState: {
             device: {
-                externalWallets: [
-                    {
+                selectedDevice: {
+                    ...mockSuiteDevice({
                         id: 'ledger-wallet',
-                        provider: 'ledger',
-                        label: 'Ledger Flex',
-                        staticSessionId: DEVICE_STATE,
+                        state: { staticSessionId: DEVICE_STATE },
                         connected: true,
-                    },
-                ],
-                selectedExternalWalletId: 'ledger-wallet',
+                        available: true,
+                    }),
+                    provider: 'ledger' as const,
+                },
             },
             router: { app: 'wallet', params: walletParams },
             wallet: {

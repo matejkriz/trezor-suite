@@ -1,5 +1,5 @@
 import { events } from '@suite-common/analytics';
-import { deviceInitialState } from '@suite-common/device';
+import { type LedgerSuiteDevice, deviceInitialState } from '@suite-common/device';
 import { type TrezorDevice } from '@suite-common/suite-types';
 import { mockSuiteDevice } from '@suite-common/suite-types/mocks';
 import { testMocks } from '@suite-common/test-utils';
@@ -27,6 +27,10 @@ const LEGACY_ACCOUNT = mockWalletAccount({
 const ETHEREUM_ACCOUNT = mockWalletAccount({ symbol: asNetworkSymbol('eth') });
 
 const CONNECTED_DEVICE = mockSuiteDevice({ connected: true, available: true });
+const LEDGER_DEVICE = {
+    ...CONNECTED_DEVICE,
+    provider: 'ledger' as const,
+} as LedgerSuiteDevice;
 
 const createState = (selectedDevice: TrezorDevice | undefined): SignVerifyRootState => ({
     device: { ...deviceInitialState, selectedDevice },
@@ -84,6 +88,28 @@ describe('Sign/Verify actions', () => {
             SIGNATURE,
         )(dispatch, getState, deps);
         expect(res).toStrictEqual('verified');
+    });
+
+    it('never sends Ledger requests through Trezor Connect', async () => {
+        const getLedgerState = () => createState(LEDGER_DEVICE);
+        const connect = testMocks.getTrezorConnectMock();
+        const getAddress = jest.mocked(connect.getAddress);
+        const signMessage = jest.mocked(connect.signMessage);
+        const verifyMessage = jest.mocked(connect.verifyMessage);
+        getAddress.mockClear();
+        signMessage.mockClear();
+        verifyMessage.mockClear();
+
+        expect(await showAddressThunk(ACCOUNT, ADDRESS, PATH)(dispatch, getLedgerState)).toBe(
+            false,
+        );
+        expect(await signThunk(ACCOUNT, PATH, MESSAGE)(dispatch, getLedgerState, deps)).toBe(false);
+        expect(
+            await verifyThunk(ACCOUNT, ADDRESS, MESSAGE, SIGNATURE)(dispatch, getLedgerState, deps),
+        ).toBe('failed');
+        expect(getAddress).not.toHaveBeenCalled();
+        expect(signMessage).not.toHaveBeenCalled();
+        expect(verifyMessage).not.toHaveBeenCalled();
     });
 
     describe('hex format', () => {

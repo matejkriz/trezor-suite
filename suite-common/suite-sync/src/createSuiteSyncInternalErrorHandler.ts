@@ -1,5 +1,5 @@
 import { type EnsureDelegatedIdentityKeyDep } from '@suite-common/delegated-identity-key-types';
-import { DeviceError, isTrezorDeviceWithState } from '@suite-common/device';
+import { DeviceError, isLedgerDevice, isTrezorDeviceWithState } from '@suite-common/device';
 import { type AllocateOwnerQuotaDep } from '@suite-common/suite-sync-quota-manager';
 import {
     type Errors,
@@ -37,7 +37,7 @@ export const createSuiteSyncInternalErrorHandler =
         // Todo: ------ this shall be REFACTORED OUT! [https://github.com/trezor/trezor-suite/issues/27049] ------
         const device = deps.getSelectedDevice();
 
-        if (!device || !isTrezorDeviceWithState(device)) {
+        if (!device || !isTrezorDeviceWithState(device) || isLedgerDevice(device)) {
             // Temporary, no better error
             deps.suiteSyncUncontrolledErrorHandler({
                 error: DeviceError('Device not found during handling SuiteSync internal error'),

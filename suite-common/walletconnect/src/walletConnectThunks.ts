@@ -3,7 +3,7 @@ import { type IWalletKit, type WalletKitTypes } from '@reown/walletkit';
 
 import { type AnalyticsDep, events } from '@suite-common/analytics';
 import * as trezorConnectPopupActions from '@suite-common/connect-popup';
-import { type DeviceRootState } from '@suite-common/device';
+import { type DeviceRootState, selectDevices } from '@suite-common/device';
 import { type NetworksRootState } from '@suite-common/networks';
 import { type WithServices, createThunk } from '@suite-common/redux-utils';
 import { isDevEnv } from '@suite-common/suite-utils';
@@ -25,6 +25,7 @@ import {
     getNamespaces,
     processNamespaces,
 } from './adapters';
+import { getWalletConnectAccounts } from './walletConnectAccountEligibility';
 import { walletConnectActions } from './walletConnectActions';
 import { PROJECT_ID, WALLETCONNECT_METADATA, WALLETCONNECT_MODULE } from './walletConnectConstants';
 import { type WalletConnectStateRootState, selectPendingProposal } from './walletConnectReducer';
@@ -55,7 +56,7 @@ const sessionAuthenticateThunk = createThunk<
     // Support for Sign-In with Ethereum (SIWE) message, enhanced by ReCaps (ReCap Capabilities)
     try {
         const accounts = selectAllSuccessfulAccountsToList(getState());
-        const supportedNamespaces = getNamespaces(accounts);
+        const supportedNamespaces = getNamespaces(accounts, selectDevices(getState()));
         // @ts-expect-error: indexing with noUncheckedIndexedAccess
         const eip155Namespace: (typeof supportedNamespaces)[keyof typeof supportedNamespaces] =
             supportedNamespaces.eip155;
@@ -144,7 +145,10 @@ const sessionProposalThunk = createThunk<
     { state: SessionProposalThunkState; extra: SessionProposalThunkDeps }
 >(`${WALLETCONNECT_MODULE}/sessionProposalThunk`, ({ event }, { dispatch, getState, extra }) => {
     // Check supported networks
-    const accounts = selectAllSuccessfulAccountsToList(getState());
+    const accounts = getWalletConnectAccounts(
+        selectAllSuccessfulAccountsToList(getState()),
+        selectDevices(getState()),
+    );
     const networks: PendingConnectionProposalNetwork[] = [];
     processNamespaces(accounts, networks, event.params.requiredNamespaces, true);
     processNamespaces(accounts, networks, event.params.optionalNamespaces, false);
@@ -229,8 +233,10 @@ export const switchSelectedAccountThunk = createThunk<
 >(
     `${WALLETCONNECT_MODULE}/switchSelectedAccountThunk`,
     async ({ account, sessionTopic }, { getState }) => {
+        if (getWalletConnectAccounts([account], selectDevices(getState())).length === 0) return;
+
         const accounts = selectAllSuccessfulAccountsToList(getState());
-        const updatedNamespaces = getNamespaces([account, ...accounts]);
+        const updatedNamespaces = getNamespaces([account, ...accounts], selectDevices(getState()));
         const network = getNetwork(account.symbol);
         if (!network) {
             return console.warn(`No network found for account symbol ${account.symbol}`);
@@ -318,10 +324,18 @@ export const sessionProposalApproveThunk = createThunk<
             }
 
             const accounts = selectAllSuccessfulAccountsToList(getState());
-            const supportedNamespaces = getNamespaces([
-                ...(selectedDefaultAccount ? [selectedDefaultAccount] : []),
-                ...accounts,
-            ]);
+            if (
+                selectedDefaultAccount &&
+                getWalletConnectAccounts([selectedDefaultAccount], selectDevices(getState()))
+                    .length === 0
+            ) {
+                throw new Error('Ledger accounts are not supported by WalletConnect');
+            }
+
+            const supportedNamespaces = getNamespaces(
+                [...(selectedDefaultAccount ? [selectedDefaultAccount] : []), ...accounts],
+                selectDevices(getState()),
+            );
             const approvedNamespaces = buildApprovedNamespaces({
                 proposal: pendingProposal.params,
                 supportedNamespaces,

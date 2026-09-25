@@ -1,5 +1,11 @@
+import { useEffect } from 'react';
+
 import { selectFullSelectedAccount } from '@suite/account';
+import { gotoThunk } from '@suite/router';
 import { SignVerify } from '@suite/sign-verify';
+import { useServices } from '@suite-common/dependency-injection';
+import { isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
+import { injectDispatch } from '@suite-common/redux-utils';
 
 import { WalletLayout, WalletSubpageHeading } from 'src/components/wallet';
 import { useSelector } from 'src/hooks/suite';
@@ -7,10 +13,22 @@ import { ConnectDeviceGenericPromo } from 'src/views/wallet/receive/components/C
 
 export const SignVerifyPage = () => {
     const selectedAccount = useSelector(selectFullSelectedAccount);
+    const selectedDevice = useSelector(selectSelectedDevice);
+    const { dispatch } = useServices(injectDispatch);
     const { account } = selectedAccount;
+
+    useEffect(() => {
+        if (isLedgerDevice(selectedDevice)) {
+            dispatch(gotoThunk({ routeName: 'wallet-index', preserveParams: true }));
+        }
+    }, [dispatch, selectedDevice]);
 
     if (account === undefined) {
         return null;
+    }
+
+    if (isLedgerDevice(selectedDevice)) {
+        return <WalletLayout title="TR_NAV_SIGN_VERIFY" account={selectedAccount} />;
     }
 
     return (

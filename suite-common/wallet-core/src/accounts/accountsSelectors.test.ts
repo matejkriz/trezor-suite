@@ -141,21 +141,16 @@ const getStateWithSelectedDevice = (
 
 describe('accountsSelectors', () => {
     it('selects Bitcoin accounts owned by the active Ledger wallet', () => {
+        const ledgerDevice = {
+            ...BTC_DEVICE,
+            provider: 'ledger' as const,
+            connected: true,
+        };
         const state: AccountsRootState & DeviceRootState = {
             ...mockState,
             device: {
                 ...mockState.device,
-                selectedDevice: undefined,
-                externalWallets: [
-                    {
-                        id: 'ledger-wallet',
-                        provider: 'ledger',
-                        label: 'Ledger Flex',
-                        staticSessionId: BTC_DEVICE_SSID,
-                        connected: true,
-                    },
-                ],
-                selectedExternalWalletId: 'ledger-wallet',
+                selectedDevice: ledgerDevice,
             },
         };
 

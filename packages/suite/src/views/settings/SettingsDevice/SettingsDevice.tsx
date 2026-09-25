@@ -10,8 +10,9 @@ import { ContextMessage } from '@suite/message-system';
 import { isRecoveryInProgress } from '@suite/recovery';
 import { useServices } from '@suite-common/dependency-injection';
 import {
+    isLedgerDevice,
     selectIsDeviceAuthenticityCheckSupported,
-    selectSelectedExternalWallet,
+    selectSelectedDevice,
 } from '@suite-common/device';
 import { Context } from '@suite-common/message-system';
 import { injectDispatch } from '@suite-common/redux-utils';
@@ -77,7 +78,7 @@ const deviceSettingsUnavailable = (device?: TrezorDevice) => {
     return wrongDeviceType || wrongDeviceMode || firmwareUpdateRequired;
 };
 
-export const SettingsDevice = () => {
+const TrezorSettingsDevice = () => {
     const { dispatch } = useServices(injectDispatch);
     const hasContentBelowTabletWidth = useIsContentBelowBreakpoint(breakpoints.tablet);
     const hasContentBelowLaptopWidth = useIsContentBelowBreakpoint(breakpoints.laptop);
@@ -92,16 +93,6 @@ export const SettingsDevice = () => {
     const bitcoinOnlyDevice = isBitcoinOnlyDevice(device);
     const shouldShowNoDeviceEshopBanner = useSelector(selectShouldShowNoDeviceEshopSettingsBanner);
     const supportsDeviceAuthentication = useSelector(selectIsDeviceAuthenticityCheckSupported);
-    const selectedExternalWallet = useSelector(selectSelectedExternalWallet);
-
-    if (selectedExternalWallet) {
-        return (
-            <SettingsLayout>
-                <Text>Manage Ledger device settings on your Ledger.</Text>
-            </SettingsLayout>
-        );
-    }
-
     if (noTransportAvailable || deviceSettingsUnavailable(device)) {
         return (
             <SettingsLayout>
@@ -285,4 +276,20 @@ export const SettingsDevice = () => {
             </SettingsSection>
         </SettingsLayout>
     );
+};
+
+export const SettingsDevice = () => {
+    const selectedDevice = useSelector(selectSelectedDevice);
+
+    if (isLedgerDevice(selectedDevice)) {
+        return (
+            <SettingsLayout>
+                <Text>
+                    {`Manage ${selectedDevice.features?.label || selectedDevice.name || 'Ledger'} settings on the device.`}
+                </Text>
+            </SettingsLayout>
+        );
+    }
+
+    return <TrezorSettingsDevice />;
 };

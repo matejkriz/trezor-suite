@@ -4,6 +4,7 @@ import { type AnalyticsDep } from '@suite-common/analytics';
 import {
     type DeviceRootState,
     deviceActions,
+    isLedgerDevice,
     selectDeviceByStaticSessionId,
     selectDevices,
     selectSelectedDevice,
@@ -329,6 +330,7 @@ export const runDiscoveryThunk = createThunk<
 >(
     `${DISCOVERY_MODULE_PREFIX}/run`,
     async ({ device: passedDevice, callId }, { dispatch, getState, extra }): Promise<void> => {
+        if (isLedgerDevice(passedDevice)) return;
         try {
             let device: TrezorDevice = passedDevice;
 
@@ -660,6 +662,7 @@ export const startDiscoveryThunk = createThunk<
         { device, isAddingHiddenWallet, isAddingExistingWallet, useScopedCallIds },
         { dispatch, getState },
     ): void => {
+        if (isLedgerDevice(device)) return;
         const currentDiscovery = selectDiscoveryByDevicePath(getState(), device.path);
 
         if (isDiscoveryInProgress(currentDiscovery)) {
@@ -703,6 +706,8 @@ export const runAdditionalDiscoveryThunk = createThunk<
         // an imported wallet + wallet on the physical device. So this should run for all the applicable devices/wallets
 
         const device = selectDeviceByStaticSessionId(getState(), staticSessionId);
+
+        if (isLedgerDevice(device)) return;
 
         assertDeviceIsAuthorized(device);
 
@@ -880,7 +885,7 @@ export const startOrRestartDiscoveryThunk = createThunk<
     { state: StartOrRestartDiscoveryThunkState; extra: StartOrRestartDiscoveryThunkDeps }
 >(`${DISCOVERY_MODULE_PREFIX}/restart`, (_, { dispatch, getState }) => {
     const device = selectSelectedDevice(getState());
-    if (!device) return;
+    if (!device || isLedgerDevice(device)) return;
     const staticSessionId = device.state?.staticSessionId;
     if (staticSessionId) {
         // we already have staticSessionId (=passphrase state), we probably failed during blockchain discovery

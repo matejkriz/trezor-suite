@@ -1,6 +1,8 @@
 # Ledger Bitcoin proof of concept
 
-This package wraps Ledger Device Management Kit and Bitcoin Device Signer Kit. The transport is injected by each application: WebHID for Suite Web and Desktop, and React Native BLE for Suite Native. It derives the first BIP84 Bitcoin address, supports on-device address verification, and exposes PSBT signing to future wallet flows. The UI currently shows an address preview; Suite account discovery, history, and sending are not connected to Ledger sessions.
+This package wraps Ledger Device Management Kit and Bitcoin Device Signer Kit. The transport is injected by each application: WebHID for Suite Web and Desktop, and React Native BLE for Suite Native. It derives BIP84 Bitcoin accounts, supports on-device address verification, and signs Bitcoin transactions through PSBT. Suite Web and Desktop store connected Ledger wallets in the regular device and account state and use the existing account, receive, and send screens.
+
+The proof of concept supports Bitcoin BIP84 accounts. Ledger firmware, backup, passphrase, Suite Sync, Connect popup, and WalletConnect operations remain unavailable in Suite. Transaction signing rejects RBF and OP_RETURN until those paths are implemented and verified.
 
 ## Speculos smoke test
 

@@ -6,7 +6,11 @@ import { type CryptoId } from 'invity-api';
 import { selectFullSelectedAccount } from '@suite/account';
 import { selectIsDebugModeActive } from '@suite/debug';
 import { useServices } from '@suite-common/dependency-injection';
-import { selectActiveWalletStaticSessionId, selectSelectedDevice } from '@suite-common/device';
+import {
+    isLedgerDevice,
+    selectActiveWalletStaticSessionId,
+    selectSelectedDevice,
+} from '@suite-common/device';
 import { injectAddressValidator, selectSupportedNetworkSymbols } from '@suite-common/networks';
 import { injectDispatch } from '@suite-common/redux-utils';
 import {
@@ -113,7 +117,11 @@ export const useTradingReceiveAddress = ({
         [accounts, symbol, activeWalletStaticSessionId, isDebug, supportedNetworks],
     );
 
-    const canAddSuiteAccount = !!(device?.connected && isSupportedNetwork);
+    const canAddSuiteAccount = !!(
+        device?.connected &&
+        isSupportedNetwork &&
+        !isLedgerDevice(device)
+    );
     const canUseNonSuiteAccount = nonSuiteAccount;
     const hasSuiteReceiveAccount = !!suiteReceiveAccounts?.length;
 

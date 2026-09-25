@@ -1,6 +1,7 @@
-import { selectDeviceLabelOrNameById } from '@suite-common/device';
-import { Row, ShortcutBadge, TOOLTIP_DELAY_LONG, Tooltip } from '@trezor/components';
+import { isLedgerDevice, selectDeviceLabelOrNameById } from '@suite-common/device';
+import { Icon, Row, ShortcutBadge, TOOLTIP_DELAY_LONG, Tooltip } from '@trezor/components';
 import { type DeviceModelInternal, getDeviceColorVariant } from '@trezor/device-utils';
+import { CableUsbCIcon } from '@trezor/icons';
 import { RotateDeviceImage } from '@trezor/product-components';
 
 import { useSelector } from 'src/hooks/suite';
@@ -24,10 +25,12 @@ export const DeviceStatus = ({
     isDeviceDetailVisible = true,
 }: DeviceStatusProps) => {
     const deviceLabel = useSelector(state => selectDeviceLabelOrNameById(state, device?.id));
+    const isLedger = isLedgerDevice(device);
 
     const image = (
         <Row justifyContent="center" width={24} opacity={deviceNeedsRefresh ? 0.4 : 1}>
-            {device && (
+            {isLedger && <Icon as={CableUsbCIcon} size={24} />}
+            {device && !isLedger && (
                 <RotateDeviceImage
                     deviceModel={deviceModel}
                     deviceColor={getDeviceColorVariant(device)}

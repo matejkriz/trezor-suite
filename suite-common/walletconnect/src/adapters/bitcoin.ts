@@ -2,7 +2,7 @@ import { type WalletKitTypes } from '@reown/walletkit';
 import type { ProposalTypes } from '@walletconnect/types';
 
 import * as trezorConnectPopupActions from '@suite-common/connect-popup';
-import { selectSelectedDevice } from '@suite-common/device';
+import { isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
 import { createThunk } from '@suite-common/redux-utils';
 import { getNetwork, networksCollection } from '@suite-common/wallet-config';
 import { type AccountsRootState, selectAccounts } from '@suite-common/wallet-core';
@@ -52,6 +52,10 @@ const bitcoinRequestThunk = createThunk<
     { state: BitcoinRequestThunkState; extra: BitcoinRequestThunkDeps }
 >(`${WALLETCONNECT_MODULE}/bitcoinRequest`, async ({ event }, { dispatch, getState }) => {
     const device = selectSelectedDevice(getState());
+    if (isLedgerDevice(device)) {
+        throw new Error('Ledger accounts are not supported by WalletConnect');
+    }
+
     const session = selectSessionByTopic(getState(), event.topic);
     if (!session) {
         throw new Error('WalletConnect Session not found');
@@ -69,7 +73,9 @@ const bitcoinRequestThunk = createThunk<
     switch (event.params.request.method) {
         case 'getAccountAddresses': {
             const { account: firstAddress } = event.params.request.params;
-            const accounts = selectAccounts(getState());
+            const accounts = selectAccounts(getState()).filter(
+                account => account.deviceState === device?.state?.staticSessionId,
+            );
             const account = findAccount(accounts, firstAddress);
             if (!account?.addresses) return;
 
@@ -85,7 +91,9 @@ const bitcoinRequestThunk = createThunk<
         }
         case 'signMessage': {
             const { account: firstAddress, message, address } = event.params.request.params;
-            const accounts = selectAccounts(getState());
+            const accounts = selectAccounts(getState()).filter(
+                account => account.deviceState === device?.state?.staticSessionId,
+            );
             const account = findAccount(accounts, firstAddress);
             if (!account?.addresses) throw new Error('Account not found or addresses not loaded');
             const addressInfo = [
@@ -124,7 +132,9 @@ const bitcoinRequestThunk = createThunk<
                 changeAddress,
                 memo,
             } = event.params.request.params;
-            const accounts = selectAccounts(getState());
+            const accounts = selectAccounts(getState()).filter(
+                account => account.deviceState === device?.state?.staticSessionId,
+            );
             const account = findAccount(accounts, firstAddress);
             if (!account) throw new Error('Account not found');
 

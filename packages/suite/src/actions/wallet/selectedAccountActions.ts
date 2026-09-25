@@ -9,13 +9,7 @@ import {
     selectRouterApp,
     selectRouterParams,
 } from '@suite/router';
-import {
-    type DeviceRootState,
-    deviceActions,
-    selectActiveWalletStaticSessionId,
-    selectSelectedDevice,
-    selectSelectedExternalWallet,
-} from '@suite-common/device';
+import { type DeviceRootState, deviceActions, selectSelectedDevice } from '@suite-common/device';
 import { getNetwork } from '@suite-common/wallet-config';
 import {
     type DiscoveryRootState,
@@ -48,11 +42,10 @@ type SelectedAccountState = DeviceRootState &
 // move to selector!!!!
 export const getAccountState = (state: SelectedAccountState): SelectedAccountStatus => {
     const device = selectSelectedDevice(state);
-    const externalWallet = selectSelectedExternalWallet(state);
-    const activeWalletStaticSessionId = selectActiveWalletStaticSessionId(state);
+    const activeWalletStaticSessionId = device?.state?.staticSessionId;
 
     // waiting for device
-    if (!device && !externalWallet) {
+    if (!device) {
         return {
             status: 'loading',
             loader: 'waiting-for-device',
@@ -188,8 +181,8 @@ export const getAccountState = (state: SelectedAccountState): SelectedAccountSta
 const actions = new Set<UnknownAction['type']>([
     routerLocationChange.type,
     deviceActions.selectDevice.type,
-    deviceActions.connectExternalWallet.type,
-    deviceActions.selectExternalWallet.type,
+    deviceActions.connectLedgerDevice.type,
+    deviceActions.disconnectLedgerDevice.type,
     deviceActions.updateSelectedDevice.type,
     metadataActions.setAccountAdd.type,
     accountsActions.createAccount.type,

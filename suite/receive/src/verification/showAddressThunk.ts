@@ -5,9 +5,9 @@ import { closeModal, preserveModal, removePreserveModal } from '@suite/modal';
 import {
     type DeviceRootState,
     acquireDeviceThunk,
+    isLedgerDevice,
     selectIsDevicePinLocked,
     selectSelectedDevice,
-    selectSelectedExternalWallet,
 } from '@suite-common/device';
 import { type ReceiveRootState, selectCurrentFreshAddress } from '@suite-common/receive';
 import { type Dispatch, type WithServices } from '@suite-common/redux-utils';
@@ -34,10 +34,9 @@ export const showAddressThunk =
         extra: ShowAddressThunkDeps,
     ) => {
         const device = selectSelectedDevice(getState());
-        const externalWallet = selectSelectedExternalWallet(getState());
         const account = selectSelectedAccount(getState());
 
-        if ((!device && !externalWallet) || !account) return;
+        if (!device || !account) return;
 
         const currentFreshAddress = selectCurrentFreshAddress(getState(), account.key);
 
@@ -47,13 +46,13 @@ export const showAddressThunk =
         });
 
         // Verification cannot start without a device, so ask the user to connect one.
-        if (externalWallet && !externalWallet.connected) {
+        if (isLedgerDevice(device) && !device.connected) {
             dispatch(openConnectionModal('ledger'));
 
             return;
         }
 
-        if (device && (!device.connected || !device.available)) {
+        if (!device.connected || !device.available) {
             if (device.descriptor?.apiType === 'bluetooth') {
                 dispatch(setConnectionMode('bluetooth'));
             }
@@ -67,7 +66,7 @@ export const showAddressThunk =
         // makes the device prompt for the PIN. It emits device-change before it resolves, so the
         // status below is already up to date; still locked means the user dismissed the prompt, and
         // acquireDeviceThunk has reported any real failure itself.
-        if (device && selectIsDevicePinLocked(getState())) {
+        if (!isLedgerDevice(device) && selectIsDevicePinLocked(getState())) {
             await dispatch(acquireDeviceThunk({ requestedDevice: device }));
 
             if (selectIsDevicePinLocked(getState())) return;
@@ -98,7 +97,7 @@ export const showAddressThunk =
             // address modal afterwards.
             dispatch(closeModal());
 
-            if (device) {
+            if (!isLedgerDevice(device)) {
                 extra.services.analytics.report({
                     type: events.createReceiveAddressConfirmOnTrezorEvent.name,
                     payload: { assetSymbol: account.symbol },

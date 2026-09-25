@@ -3,7 +3,7 @@ import { openConnectionModal, setConnectionMode, toggleConnectionModal } from '@
 import { Translation } from '@suite/intl';
 import { bluetoothActions, selectAdapterStatus } from '@suite-common/bluetooth';
 import { useServices } from '@suite-common/dependency-injection';
-import { selectDevices, selectExternalWallets } from '@suite-common/device';
+import { selectDevices } from '@suite-common/device';
 import { injectDispatch } from '@suite-common/redux-utils';
 import * as deviceUtils from '@suite-common/suite-utils';
 import { Button, Column } from '@trezor/components';
@@ -13,14 +13,12 @@ import { useSelector } from 'src/hooks/suite';
 import { type ForegroundAppProps } from 'src/types/suite';
 
 import { DeviceItem } from './DeviceItem/DeviceItem';
-import { ExternalWalletItem } from './ExternalWalletItem';
 import { SwitchDeviceModal } from './SwitchDeviceModal';
 
 export const SwitchDeviceContent = ({ cancelable, onCancel }: ForegroundAppProps) => {
     const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
     const bluetoothAdapterStatus = useSelector(selectAdapterStatus);
     const devices = useSelector(selectDevices);
-    const externalWallets = useSelector(selectExternalWallets);
 
     // exclude selectedDevice from list, because other devices could have a higher priority,
     // and we want to have selectedDevice on top
@@ -60,9 +58,6 @@ export const SwitchDeviceContent = ({ cancelable, onCancel }: ForegroundAppProps
                     instances={deviceUtils.getDeviceInstances(device, devices)}
                     onCancel={cancelable ? onCancel : undefined}
                 />
-            ))}
-            {externalWallets.map(wallet => (
-                <ExternalWalletItem key={wallet.id} wallet={wallet} onCancel={onCancel} />
             ))}
             <Button
                 intent="neutral"

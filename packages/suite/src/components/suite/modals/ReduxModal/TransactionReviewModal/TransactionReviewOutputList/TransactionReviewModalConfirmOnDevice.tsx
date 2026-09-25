@@ -1,5 +1,5 @@
 import { Translation } from '@suite/intl';
-import { selectSelectedDevice, selectSelectedExternalWallet } from '@suite-common/device';
+import { isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
 import { type SerializedTx } from '@suite-common/wallet-core';
 import { ConfirmOnDevicePill } from '@trezor/product-components';
 
@@ -38,15 +38,15 @@ export const TransactionReviewModalConfirmOnDevice = ({
     onCancel,
 }: TransactionReviewModalConfirmOnDeviceProps) => {
     const device = useSelector(selectSelectedDevice);
-    const externalWallet = useSelector(selectSelectedExternalWallet);
+    const isLedger = isLedgerDevice(device);
     const deviceModelInternal = device?.features?.internal_model;
     let activeStep = getActiveStep({ totalSteps, serializedTx, reviewStep });
-    if (externalWallet) activeStep = serializedTx ? 2 : 1;
+    if (isLedger) activeStep = serializedTx ? 2 : 1;
 
     return (
         <ConfirmOnDevicePill
-            title={externalWallet ? 'Confirm on Ledger' : <Translation id="TR_CONFIRM_ON_TREZOR" />}
-            steps={externalWallet ? 1 : totalSteps}
+            title={isLedger ? 'Confirm on Ledger' : <Translation id="TR_CONFIRM_ON_TREZOR" />}
+            steps={isLedger ? 1 : totalSteps}
             activeStep={activeStep}
             deviceModelInternal={deviceModelInternal}
             deviceUnitColor={device?.features?.unit_color}

@@ -7,7 +7,7 @@ import { selectIsLegacyLabelingVisible, selectLabelingValueBeingEdited } from '@
 import { SuiteSyncWalletDebug } from '@suite/suite-sync';
 import { useWalletLabel } from '@suite/wallet';
 import { useServices } from '@suite-common/dependency-injection';
-import { selectDeviceThunk } from '@suite-common/device';
+import { isLedgerDevice, selectDeviceThunk } from '@suite-common/device';
 import { injectDispatch, injectGetState } from '@suite-common/redux-utils';
 import {
     getAccountsByDeviceState,
@@ -48,6 +48,54 @@ type WalletInstanceProps = {
     onCancel?: ForegroundAppProps['onCancel'];
 };
 
+type TrezorWalletInstanceLabelProps = {
+    instance: AcquiredDevice;
+};
+
+const TrezorWalletInstanceLabel = ({ instance }: TrezorWalletInstanceLabelProps) => {
+    const { translationString } = useTranslation();
+    const isLegacyLabelingVisible = useSelector(selectIsLegacyLabelingVisible);
+    const { defaultLabel, label } = useWalletLabel({ device: instance });
+
+    const passphraseIcon = instance.useEmptyPassphrase === false && (
+        <Tooltip content={<Translation id="TR_WALLET_PASSPHRASE_WALLET" />}>
+            <Icon as={AsteriskIcon} size={12} />
+        </Tooltip>
+    );
+
+    if (!instance.state?.staticSessionId) {
+        return (
+            <Row gap={4}>
+                {passphraseIcon}
+                <WalletLabeling device={instance} />
+            </Row>
+        );
+    }
+
+    return (
+        <Column>
+            <Labeling
+                placeholder={translationString('TR_LABELING_WALLET_LABEL')}
+                maxWidth={290}
+                deviceStaticSessionId={instance.state.staticSessionId}
+                defaultValue={defaultLabel}
+                payload={{
+                    type: 'walletLabel',
+                    entityKey: instance.state.staticSessionId,
+                    defaultValue: instance.state.staticSessionId,
+                }}
+                leftAddon={passphraseIcon}
+            >
+                {label}
+            </Labeling>
+            <SuiteSyncWalletDebug
+                device={instance}
+                isLegacyLabelingVisible={isLegacyLabelingVisible}
+            />
+        </Column>
+    );
+};
+
 export const WalletInstance = ({
     instance,
     isSelected,
@@ -62,9 +110,7 @@ export const WalletInstance = ({
     const baseCurrencyCode = useSelector(selectBaseCurrency);
     const editing = useSelector(selectLabelingValueBeingEdited);
     const { dispatch, getState } = useServices(injectDispatch, injectGetState);
-    const { translationString } = useTranslation();
-    const isLegacyLabelingVisible = useSelector(selectIsLegacyLabelingVisible);
-    const { defaultLabel, label } = useWalletLabel({ device: instance });
+    const isLedger = isLedgerDevice(instance);
 
     const deviceAccounts = getAllAccounts(instance.state, accounts);
 
@@ -112,12 +158,6 @@ export const WalletInstance = ({
         }
     };
 
-    const passphraseIcon = instance.useEmptyPassphrase === false && (
-        <Tooltip content={<Translation id="TR_WALLET_PASSPHRASE_WALLET" />}>
-            <Icon as={AsteriskIcon} size={12} />
-        </Tooltip>
-    );
-
     return (
         <Card
             key={`${instance.instance}${instance.state}`}
@@ -129,7 +169,7 @@ export const WalletInstance = ({
             {...rest}
         >
             <Box padding={{ vertical: 12, right: 12, left: 16 }}>
-                <Collapsible isOpen={isEjecting}>
+                <Collapsible isOpen={!isLedger && isEjecting}>
                     <Column gap={8} alignItems="flex-start">
                         <Row justifyContent="space-between" width="100%">
                             <Text
@@ -138,65 +178,43 @@ export const WalletInstance = ({
                                 priority={isSelected ? 'primary' : 'secondary'}
                                 typographyStyle={isSelected ? 'body-md-strong' : 'body-md'}
                             >
-                                {instance.state?.staticSessionId ? (
-                                    <Column>
-                                        <Labeling
-                                            placeholder={translationString(
-                                                'TR_LABELING_WALLET_LABEL',
-                                            )}
-                                            maxWidth={290}
-                                            deviceStaticSessionId={instance.state.staticSessionId}
-                                            defaultValue={defaultLabel}
-                                            payload={{
-                                                type: 'walletLabel',
-                                                entityKey: instance.state.staticSessionId,
-                                                defaultValue: instance.state.staticSessionId,
-                                            }}
-                                            leftAddon={passphraseIcon}
-                                        >
-                                            {label}
-                                        </Labeling>
-                                        <SuiteSyncWalletDebug
-                                            device={instance}
-                                            isLegacyLabelingVisible={isLegacyLabelingVisible}
-                                        />
-                                    </Column>
+                                {isLedger ? (
+                                    <Translation id="TR_NO_PASSPHRASE_WALLET" />
                                 ) : (
-                                    <Row gap={4}>
-                                        {passphraseIcon}
-                                        <WalletLabeling device={instance} />
-                                    </Row>
+                                    <TrezorWalletInstanceLabel instance={instance} />
                                 )}
                             </Text>
-                            <Collapsible.Toggle>
-                                <IconButton
-                                    data-testid={
-                                        isEjecting
-                                            ? `@switch-device/cancelEject`
-                                            : `${dataTestBase}/eject-button`
-                                    }
-                                    icon={isEjecting ? XIcon : EjectIcon}
-                                    size="small"
-                                    intent="neutral"
-                                    priority="secondary"
-                                    onClick={e => {
-                                        e.stopPropagation();
-                                        setIsEjecting(prev => !prev);
-                                    }}
-                                    tooltip={{
-                                        delayShow: TOOLTIP_DELAY_LONG,
-                                        content: (
-                                            <Translation
-                                                id={
-                                                    isEjecting
-                                                        ? 'TR_CANCEL'
-                                                        : 'TR_SWITCH_DEVICE_EJECT_TOOLTIP'
-                                                }
-                                            />
-                                        ),
-                                    }}
-                                />
-                            </Collapsible.Toggle>
+                            {!isLedger && (
+                                <Collapsible.Toggle>
+                                    <IconButton
+                                        data-testid={
+                                            isEjecting
+                                                ? `@switch-device/cancelEject`
+                                                : `${dataTestBase}/eject-button`
+                                        }
+                                        icon={isEjecting ? XIcon : EjectIcon}
+                                        size="small"
+                                        intent="neutral"
+                                        priority="secondary"
+                                        onClick={e => {
+                                            e.stopPropagation();
+                                            setIsEjecting(prev => !prev);
+                                        }}
+                                        tooltip={{
+                                            delayShow: TOOLTIP_DELAY_LONG,
+                                            content: (
+                                                <Translation
+                                                    id={
+                                                        isEjecting
+                                                            ? 'TR_CANCEL'
+                                                            : 'TR_SWITCH_DEVICE_EJECT_TOOLTIP'
+                                                    }
+                                                />
+                                            ),
+                                        }}
+                                    />
+                                </Collapsible.Toggle>
+                            )}
                         </Row>
 
                         <FiatHeader
@@ -207,14 +225,16 @@ export const WalletInstance = ({
                         />
                     </Column>
 
-                    <Collapsible.Content>
-                        <Divider margin={{ vertical: 12 }} />
-                        <EjectConfirmation
-                            instance={instance}
-                            onClick={stopPropagation}
-                            onCancel={onEjectCancelClick}
-                        />
-                    </Collapsible.Content>
+                    {!isLedger && (
+                        <Collapsible.Content>
+                            <Divider margin={{ vertical: 12 }} />
+                            <EjectConfirmation
+                                instance={instance}
+                                onClick={stopPropagation}
+                                onCancel={onEjectCancelClick}
+                            />
+                        </Collapsible.Content>
+                    )}
                 </Collapsible>
             </Box>
         </Card>

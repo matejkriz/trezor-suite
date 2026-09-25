@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { useServices } from '@suite-common/dependency-injection';
-import { selectSelectedExternalWallet } from '@suite-common/device';
+import { selectSelectedDevice } from '@suite-common/device';
 import { type LedgerDevice } from '@suite-common/ledger';
 import { injectDispatch } from '@suite-common/redux-utils';
 import { selectAccounts } from '@suite-common/wallet-core';
@@ -27,7 +27,7 @@ export const LedgerConnectionModal = ({ onCancel, onBack }: LedgerConnectionModa
         injectLedgerBitcoinService,
         injectDispatch,
     );
-    const selectedExternalWallet = useSelector(selectSelectedExternalWallet);
+    const selectedDevice = useSelector(selectSelectedDevice);
     const existingAccounts = useSelector(selectAccounts);
     const [devices, setDevices] = useState<LedgerDevice[]>([]);
     const [isScanning, setIsScanning] = useState(false);
@@ -96,7 +96,7 @@ export const LedgerConnectionModal = ({ onCancel, onBack }: LedgerConnectionModa
             );
             addDiscoveredLedgerBitcoinWallet(dispatch, existingAccounts, discovered);
             onCancel();
-            if (selectedExternalWallet?.id !== discovered.wallet.id) {
+            if (selectedDevice?.id !== discovered.wallet.id) {
                 dispatch(redirectAfterWalletSelectedThunk({ forceDeviceDashboard: true }));
             }
         } catch (error) {

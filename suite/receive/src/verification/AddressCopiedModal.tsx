@@ -1,7 +1,7 @@
 import { useSelector } from 'react-redux';
 
 import { Translation, type TranslationKey } from '@suite/intl';
-import { selectSelectedExternalWallet } from '@suite-common/device';
+import { isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
 import { Card, Column, Modal, Row, Text } from '@trezor/components';
 
 const STEPS: TranslationKey[] = [
@@ -22,7 +22,7 @@ export const AddressCopiedModal = ({
     onVerify,
     onDismiss,
 }: AddressCopiedModalProps) => {
-    const externalWallet = useSelector(selectSelectedExternalWallet);
+    const device = useSelector(selectSelectedDevice);
     if (addressPath === undefined) {
         return null;
     }
@@ -45,7 +45,7 @@ export const AddressCopiedModal = ({
                         data-testid="@wallet/receive/address-copied-modal/verify-button"
                         onClick={handleVerify}
                     >
-                        {externalWallet ? (
+                        {isLedgerDevice(device) ? (
                             <>Verify on Ledger</>
                         ) : (
                             <Translation id="RECEIVE_VERIFY_ON_TREZOR" />

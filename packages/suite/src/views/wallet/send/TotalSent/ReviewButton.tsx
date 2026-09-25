@@ -10,7 +10,7 @@ import {
 } from '@suite/device';
 import { Translation } from '@suite/intl';
 import { useServices } from '@suite-common/dependency-injection';
-import { selectSelectedExternalWallet } from '@suite-common/device';
+import { isLedgerDevice } from '@suite-common/device';
 import { injectDispatch } from '@suite-common/redux-utils';
 import { selectAreFeesLoading } from '@suite-common/wallet-core';
 import { isLowAnonymityWarning } from '@suite-common/wallet-utils';
@@ -38,7 +38,6 @@ const Container = styled.div`
 
 export const ReviewButton = () => {
     const { device, isLocked } = useDevice();
-    const externalWallet = useSelector(selectSelectedExternalWallet);
     const { dispatch } = useServices(injectDispatch);
     const {
         account: { networkType, symbol },
@@ -61,8 +60,7 @@ export const ReviewButton = () => {
     const areFeesLoading = useSelector(state => selectAreFeesLoading(state, symbol));
     const isLoading = isSendFormLoading || areFeesLoading;
 
-    const isDeviceConnected =
-        (device?.connected && device?.available) || !!externalWallet?.connected;
+    const isDeviceConnected = !!device?.connected && !!device?.available;
 
     const options = useWatch({
         name: 'options',
@@ -111,7 +109,7 @@ export const ReviewButton = () => {
 
     const handleButtonReviewClick = () => {
         if (!isDeviceConnected) {
-            if (externalWallet) {
+            if (isLedgerDevice(device)) {
                 dispatch(openConnectionModal('ledger'));
 
                 return;

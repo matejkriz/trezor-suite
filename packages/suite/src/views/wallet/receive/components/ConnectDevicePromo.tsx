@@ -1,7 +1,7 @@
 import { type JSX } from 'react';
 
 import { Translation } from '@suite/intl';
-import { selectSelectedDevice, selectSelectedExternalWallet } from '@suite-common/device';
+import { isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
 import { DEFAULT_FLAGSHIP_MODEL } from '@suite-common/suite-constants';
 import { Banner } from '@trezor/components';
 import { CableUsbCIcon } from '@trezor/icons';
@@ -31,9 +31,9 @@ const ConnectDevicePromo = ({ title, description }: ConnectDevicePromoProps) => 
 };
 
 export const ConnectDeviceGenericPromo = () => {
-    const externalWallet = useSelector(selectSelectedExternalWallet);
+    const device = useSelector(selectSelectedDevice);
 
-    return externalWallet ? (
+    return isLedgerDevice(device) ? (
         <Banner
             intent="warning"
             icon={CableUsbCIcon}

@@ -3,6 +3,7 @@ import { type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import styled from 'styled-components';
 
+import { isLedgerDevice } from '@suite-common/device';
 import * as deviceUtils from '@suite-common/suite-utils';
 import { Column, motionAnimation } from '@trezor/components';
 
@@ -37,7 +38,10 @@ export const CardWithDevice = ({
 }: CardWithDeviceProps) => {
     const deviceStatus = deviceUtils.getStatus(device);
 
-    const needsAttention = device.connected && deviceUtils.deviceNeedsAttention(deviceStatus);
+    const needsAttention =
+        !isLedgerDevice(device) &&
+        device.connected &&
+        deviceUtils.deviceNeedsAttention(deviceStatus);
     const isUnknown = device.type !== 'acquired';
 
     return (

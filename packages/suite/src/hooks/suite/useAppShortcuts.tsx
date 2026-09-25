@@ -7,7 +7,7 @@ import { openModal } from '@suite/modal';
 import { SettingsAnchor, closeModalAppThunk, gotoThunk } from '@suite/router';
 import { selectAutodetectTheme, selectTheme, suiteSettingsActions } from '@suite/settings';
 import { useServices } from '@suite-common/dependency-injection';
-import { selectSelectedDevice } from '@suite-common/device';
+import { isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
 import { useDiscreetMode } from '@suite-common/discreet-mode';
 import { injectDispatch } from '@suite-common/redux-utils';
 import { selectAllAccountsToList, startDiscoveryThunk } from '@suite-common/wallet-core';
@@ -80,7 +80,12 @@ export const useAppShortcuts = () => {
         }
 
         // press ALT + P to open a passphrase (hidden) wallet
-        if (altOnly && e.code === KEYBOARD_CODE.KEY_P && selectedDevice?.connected) {
+        if (
+            altOnly &&
+            e.code === KEYBOARD_CODE.KEY_P &&
+            selectedDevice?.connected &&
+            !isLedgerDevice(selectedDevice)
+        ) {
             e.preventDefault();
             dispatch(closeModalAppThunk());
             dispatch(
@@ -111,7 +116,12 @@ export const useAppShortcuts = () => {
         }
 
         // press ALT + A to add a new account
-        if (altOnly && e.code === KEYBOARD_CODE.KEY_A && selectedDevice) {
+        if (
+            altOnly &&
+            e.code === KEYBOARD_CODE.KEY_A &&
+            selectedDevice &&
+            !isLedgerDevice(selectedDevice)
+        ) {
             e.preventDefault();
             dispatch(openModal({ type: 'add-account', device: selectedDevice }));
         }

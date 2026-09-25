@@ -180,12 +180,6 @@ export const extraDependencies: ExtraDependenciesStatic & TokenDefinitionsMiddle
                     return device;
                 }
             });
-            state.externalWallets =
-                payload.suiteSettings?.externalWallets?.map(wallet => ({
-                    ...wallet,
-                    connected: false,
-                })) ?? [];
-            state.selectedExternalWalletId = undefined;
         },
         storageLoadPersistentDeviceData: (
             _state: PersistentDeviceDataState,

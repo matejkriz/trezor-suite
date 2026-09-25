@@ -1,5 +1,5 @@
 import { type EnsureDelegatedIdentityKeyDep } from '@suite-common/delegated-identity-key-types';
-import { isTrezorDeviceWithState } from '@suite-common/device';
+import { isLedgerDevice, isTrezorDeviceWithState } from '@suite-common/device';
 import { type Dispatch } from '@suite-common/redux-utils';
 import {
     type EnsureSuiteSyncKeys,
@@ -36,7 +36,7 @@ export type EnsureSuiteSyncKeysDeps = {
 export const createEnsureSuiteSyncKeys =
     (deps: EnsureSuiteSyncKeysDeps): EnsureSuiteSyncKeys =>
     async ({ device }): ReturnType<EnsureSuiteSyncKeys> => {
-        if (!device || !isTrezorDeviceWithState(device)) {
+        if (!device || !isTrezorDeviceWithState(device) || isLedgerDevice(device)) {
             return err(SuiteSyncUnavailableOnDeviceError());
         }
 

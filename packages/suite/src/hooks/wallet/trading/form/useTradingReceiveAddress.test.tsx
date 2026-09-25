@@ -1,6 +1,7 @@
 import { waitFor } from '@testing-library/react';
 import { type CryptoId } from 'invity-api';
 
+import { mockSuiteDevice } from '@suite-common/suite-types/mocks';
 import { createTestCompositionRoot, renderHookWithStoreProvider } from '@suite-common/test-utils';
 import { asNetworkSymbol, getNetwork } from '@suite-common/wallet-config';
 import { mockWalletAccount } from '@suite-common/wallet-types/mocks';
@@ -31,6 +32,15 @@ const ledgerAccount = mockWalletAccount({
 
 describe(useTradingReceiveAddress.name, () => {
     it('offers a selected Ledger Bitcoin account for Buy receive and hides Trezor add-account', async () => {
+        const ledgerDevice = {
+            ...mockSuiteDevice({
+                id: 'ledgerwallet',
+                state: { staticSessionId },
+                connected: true,
+                available: true,
+            }),
+            provider: 'ledger' as const,
+        };
         const root = createTestCompositionRoot({
             extra: {
                 services: {
@@ -40,17 +50,7 @@ describe(useTradingReceiveAddress.name, () => {
             preloadedState: {
                 debug: { showDebugMenu: false },
                 device: {
-                    selectedDevice: undefined,
-                    selectedExternalWalletId: 'ledgerwallet',
-                    externalWallets: [
-                        {
-                            id: 'ledgerwallet',
-                            provider: 'ledger',
-                            label: 'Ledger',
-                            staticSessionId,
-                            connected: true,
-                        },
-                    ],
+                    selectedDevice: ledgerDevice,
                 },
                 networks: { btc: getNetwork(symbol) },
                 wallet: {

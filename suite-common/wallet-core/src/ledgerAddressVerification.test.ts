@@ -1,4 +1,5 @@
 import { createMockDeps } from '@suite-common/dependency-injection';
+import { mockSuiteDevice } from '@suite-common/suite-types/mocks';
 import { createTestStore } from '@suite-common/test-utils';
 import { asNetworkSymbol } from '@suite-common/wallet-config';
 import { mockWalletAccount } from '@suite-common/wallet-types/mocks';
@@ -38,17 +39,15 @@ const createStore = ({ connected = true, returnedAddress = address, accountIndex
         extra: deps,
         preloadedState: {
             device: {
-                selectedDevice: undefined,
-                selectedExternalWalletId: 'ledgerwallet',
-                externalWallets: [
-                    {
+                selectedDevice: {
+                    ...mockSuiteDevice({
                         id: 'ledgerwallet',
-                        provider: 'ledger',
-                        label: 'Ledger',
-                        staticSessionId,
                         connected,
-                    },
-                ],
+                        available: connected,
+                        state: { staticSessionId },
+                    }),
+                    provider: 'ledger',
+                },
             },
             wallet: { accounts: [{ ...account, index: accountIndex }] },
         },

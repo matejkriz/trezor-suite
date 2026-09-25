@@ -5,6 +5,7 @@ import { openModal } from '@suite/modal';
 import { type SuiteSettingsRootState, selectIsEntropyCheckEnabled } from '@suite/settings';
 import {
     type DeviceRootState,
+    isLedgerDevice,
     selectSelectedDevice,
     selectSimulatedEntropyCheckFail,
 } from '@suite-common/device';
@@ -33,7 +34,7 @@ export const applySettingsThunk =
     (params: Parameters<typeof TrezorConnect.applySettings>[0]) =>
     async (dispatch: Dispatch<UnknownAction>, getState: () => ApplySettingsThunkState) => {
         const device = selectSelectedDevice(getState());
-        if (!device) return;
+        if (!device || isLedgerDevice(device)) return;
         const result = await TrezorConnect.applySettings({
             device: {
                 path: device.path,
@@ -56,7 +57,7 @@ export const changePinThunk =
     async (dispatch: Dispatch<UnknownAction>, getState: () => ChangePinThunkState) => {
         const device = selectSelectedDevice(getState());
 
-        if (!device) return;
+        if (!device || isLedgerDevice(device)) return;
 
         const result = await TrezorConnect.changePin({
             device: {
@@ -91,7 +92,7 @@ export const changeWipeCodeThunk =
     async (dispatch: Dispatch<UnknownAction>, getState: () => ChangeWipeCodeThunkState) => {
         const device = selectSelectedDevice(getState());
 
-        if (!device) return;
+        if (!device || isLedgerDevice(device)) return;
 
         const result = await TrezorConnect.changeWipeCode({
             device: {
@@ -123,6 +124,7 @@ export const resetDeviceThunk =
         getState: () => ResetDeviceThunkState,
     ) => {
         const device = selectSelectedDevice(getState());
+        if (isLedgerDevice(device)) return;
         const isEntropyCheckEnabledInSettings = selectIsEntropyCheckEnabled(getState());
         const isEntropyCheckDisabledByMessageSystem = selectIsFeatureDisabled(
             getState(),
@@ -208,7 +210,7 @@ export const changeLanguageThunk = createThunk<
 >(`${FIRMWARE_MODULE_PREFIX}/update-firmware-language`, async (params, { dispatch, getState }) => {
     const device = selectSelectedDevice(getState());
 
-    if (!device) return;
+    if (!device || isLedgerDevice(device)) return;
 
     const result = await TrezorConnect.changeLanguage({
         device: {

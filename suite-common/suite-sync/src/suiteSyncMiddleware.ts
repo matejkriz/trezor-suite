@@ -1,6 +1,12 @@
 import { type UnknownAction, isAnyOf } from '@reduxjs/toolkit';
 
-import { deviceActions, isTrezorDeviceWithState, selectDeviceThunk } from '@suite-common/device';
+import {
+    deviceActions,
+    isLedgerDevice,
+    isTrezorDeviceWithState,
+    selectDeviceByStaticSessionId,
+    selectDeviceThunk,
+} from '@suite-common/device';
 import { type MessageSystemRootState } from '@suite-common/message-system';
 import { type WithServices, createMiddlewareWithExtraDeps } from '@suite-common/redux-utils';
 import { type SuiteSyncDep } from '@suite-common/suite-sync-types';
@@ -22,7 +28,8 @@ export const prepareSuiteSyncMiddleware = createMiddlewareWithExtraDeps<
     if (
         selectIsSuiteSyncEnabled(getState()) &&
         deviceActions.setDiscovered.match(action) &&
-        action.payload.success
+        action.payload.success &&
+        !isLedgerDevice(selectDeviceByStaticSessionId(getState(), action.payload.staticSessionId))
     ) {
         const suiteSyncErrors = selectHasDeviceSuiteSyncError(
             getState(),
@@ -39,7 +46,11 @@ export const prepareSuiteSyncMiddleware = createMiddlewareWithExtraDeps<
     if (selectIsSuiteSyncEnabled(getState()) && isAnyOf(selectDeviceThunk.fulfilled)(action)) {
         const { payload } = action;
 
-        if (isTrezorDeviceWithState(payload.device) && payload.device.discovered) {
+        if (
+            isTrezorDeviceWithState(payload.device) &&
+            payload.device.discovered &&
+            !isLedgerDevice(payload.device)
+        ) {
             const suiteSyncErrors = selectHasDeviceSuiteSyncError(
                 getState(),
                 payload.device?.state.staticSessionId,

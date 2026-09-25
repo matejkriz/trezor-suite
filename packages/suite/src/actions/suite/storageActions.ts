@@ -19,12 +19,7 @@ import {
     type ConnectPopupStateRootState,
     selectConnectAppPermissions,
 } from '@suite-common/connect-popup';
-import {
-    type DeviceRootState,
-    deviceActions,
-    selectDevices,
-    selectExternalWallets,
-} from '@suite-common/device';
+import { type DeviceRootState, deviceActions, selectDevices } from '@suite-common/device';
 import { type DiscreetModeRootState, selectDiscreetMode } from '@suite-common/discreet-mode';
 import { type FeatureFeedbackRootState, selectFeatureFeedback } from '@suite-common/feedback';
 import { type FirmwareRootState, selectFirmwareChannel } from '@suite-common/firmware';
@@ -748,10 +743,6 @@ export const saveSuiteSettingsThunk =
                 flags,
                 evmSettings,
                 seenDisconnectNotificationForDeviceIds,
-                externalWallets: selectExternalWallets(getState()).map(wallet => ({
-                    ...wallet,
-                    connected: false,
-                })),
             },
             'suite',
             true,

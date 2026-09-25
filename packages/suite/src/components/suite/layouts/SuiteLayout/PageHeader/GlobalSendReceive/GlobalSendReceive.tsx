@@ -3,7 +3,6 @@ import { useSelector } from 'react-redux';
 
 import { useDevice } from '@suite/device';
 import { useServices } from '@suite-common/dependency-injection';
-import { selectSelectedExternalWallet } from '@suite-common/device';
 import { injectDispatch } from '@suite-common/redux-utils';
 import { selectAllAccountsToList } from '@suite-common/wallet-core';
 import { type Account } from '@suite-common/wallet-types';
@@ -21,15 +20,13 @@ import { useGlobalSendReceiveModal } from './hooks/useGlobalSendReceiveModal';
 
 export const GlobalSendReceive = memo(function GlobalSendReceiveInner() {
     const { device } = useDevice();
-    const externalWallet = useSelector(selectSelectedExternalWallet);
     const { activeModal, openModal, closeModal } = useGlobalSendReceiveModal();
     const { sendAnalytics, receiveAnalytics } = useGlobalSendReceiveAnalytics();
     const { dispatch } = useServices(injectDispatch);
     const accounts = useSelector(selectAllAccountsToList);
     const discoveryStatus = useSelector(selectDiscoveryOverallStatus);
 
-    const isDeviceConnected =
-        (!!device?.connected && !!device?.available) || !!externalWallet?.connected;
+    const isDeviceConnected = !!device?.connected && !!device?.available;
     // The dashboard shows the `EmptyWallet` screen (with its own primary Buy/Receive CTAs)
     // when discovery has finished and every account is empty. In that case we demote the
     // header Send/Receive buttons so the EmptyWallet CTAs stand out and we avoid two

@@ -12,7 +12,7 @@ import { type SerializedError } from '@trezor/connect-common/src/constants/error
 import { type Err } from '@trezor/type-utils';
 
 import { DEVICE_MODULE_PREFIX } from './deviceConstants';
-import { type ExternalWallet } from './externalWalletTypes';
+import { type LedgerSuiteDevice } from './ledgerDevice';
 
 export type DeviceConnectActionPayload = {
     device: Device;
@@ -94,13 +94,12 @@ const selectDevice = createAction(
     }),
 );
 
-const connectExternalWallet = createAction<ExternalWallet>(
-    `${DEVICE_MODULE_PREFIX}/connectExternalWallet`,
+const connectLedgerDevice = createAction<LedgerSuiteDevice>(
+    `${DEVICE_MODULE_PREFIX}/connectLedgerDevice`,
 );
-const disconnectExternalWallet = createAction<string>(
-    `${DEVICE_MODULE_PREFIX}/disconnectExternalWallet`,
+const disconnectLedgerDevice = createAction<string>(
+    `${DEVICE_MODULE_PREFIX}/disconnectLedgerDevice`,
 );
-const selectExternalWallet = createAction<string>(`${DEVICE_MODULE_PREFIX}/selectExternalWallet`);
 
 const updateSelectedDevice = createAction(
     `${DEVICE_MODULE_PREFIX}/updateSelectedDevice`,
@@ -148,9 +147,8 @@ export const deviceActions = {
     addButtonRequest,
     requestDeviceReconnect,
     selectDevice,
-    connectExternalWallet,
-    disconnectExternalWallet,
-    selectExternalWallet,
+    connectLedgerDevice,
+    disconnectLedgerDevice,
     updateSelectedDevice,
     removeButtonRequests,
     setDiscovered,

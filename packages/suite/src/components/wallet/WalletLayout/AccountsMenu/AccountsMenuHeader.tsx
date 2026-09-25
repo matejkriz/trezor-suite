@@ -5,7 +5,7 @@ import styled from 'styled-components';
 import { Translation } from '@suite/intl';
 import { selectIsCoinsFilterVisible, suiteSettingsActions } from '@suite/settings';
 import { useServices } from '@suite-common/dependency-injection';
-import { selectSelectedDevice, selectSelectedExternalWallet } from '@suite-common/device';
+import { isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
 import { injectDispatch } from '@suite-common/redux-utils';
 import { selectAllAccountsToList, selectHasRunningDiscovery } from '@suite-common/wallet-core';
 import { Box, Column, Divider, Icon, Row, Skeleton, Tooltip } from '@trezor/components';
@@ -39,7 +39,6 @@ export const AccountsMenuHeader = () => {
     const { coinFilter } = useAccountSearch();
 
     const device = useSelector(selectSelectedDevice);
-    const externalWallet = useSelector(selectSelectedExternalWallet);
     const accounts = useSelector(selectAllAccountsToList);
     const [isHovered, setIsHovered] = useState(false);
 
@@ -102,7 +101,7 @@ export const AccountsMenuHeader = () => {
                                     </Tooltip>
                                 )}
 
-                                {!isEmpty && !externalWallet && (
+                                {!isEmpty && !isLedgerDevice(device) && (
                                     <AddAccountButton device={device} />
                                 )}
                             </>
@@ -112,7 +111,9 @@ export const AccountsMenuHeader = () => {
                 </ExpandedSidebarOnly>
                 <CollapsedSidebarOnly>
                     <Column alignItems="center" margin={{ bottom: 12 }}>
-                        {!isEmpty && !externalWallet && <AddAccountButton device={device} />}
+                        {!isEmpty && !isLedgerDevice(device) && (
+                            <AddAccountButton device={device} />
+                        )}
                     </Column>
                 </CollapsedSidebarOnly>
             </Box>

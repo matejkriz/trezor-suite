@@ -1,5 +1,5 @@
 import { type LocksRootState, selectIsDeviceLocked } from '@suite/locks';
-import { type DeviceRootState, selectSelectedDevice } from '@suite-common/device';
+import { type DeviceRootState, isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
 import { createThunk } from '@suite-common/redux-utils';
 import TrezorConnect from '@trezor/connect';
 
@@ -16,7 +16,7 @@ export const rerunFwAuthenticityChecksThunk = createThunk<
     { state: RerunFwAuthenticityChecksThunkState }
 >(`${DEVICE_MODULE_PREFIX}/rerunFwAuthenticityChecksThunk`, (_, { getState }) => {
     const device = selectSelectedDevice(getState());
-    if (device === undefined) return;
+    if (device === undefined || isLedgerDevice(device)) return;
     if (selectIsDeviceLocked(getState())) return;
     void TrezorConnect.getFeatures({ device: { path: device.path } });
 });

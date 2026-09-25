@@ -19,10 +19,8 @@ describe('addDiscoveredLedgerBitcoinWallet', () => {
         } as AccountInfo;
         const wallet = {
             id: 'ledgerwallet',
-            provider: 'ledger' as const,
             label: 'Ledger Flex',
             staticSessionId: 'ledgerwallet@ledger:0' as const,
-            connected: true,
         };
 
         addDiscoveredLedgerBitcoinWallet(dispatch, [], {
@@ -30,7 +28,16 @@ describe('addDiscoveredLedgerBitcoinWallet', () => {
             accounts: [{ index: 0, path: "m/84'/0'/0'", accountInfo, visible: true }],
         });
 
-        expect(dispatch).toHaveBeenCalledWith(deviceActions.connectExternalWallet(wallet));
+        expect(dispatch.mock.calls[0]?.[0]).toMatchObject({
+            type: deviceActions.connectLedgerDevice.type,
+            payload: {
+                provider: 'ledger',
+                id: wallet.id,
+                name: wallet.label,
+                features: { label: wallet.label },
+                state: { staticSessionId: wallet.staticSessionId },
+            },
+        });
         expect(dispatch.mock.calls[1]?.[0]).toMatchObject({
             type: accountsActions.createAccount.type,
             payload: {
@@ -45,16 +52,15 @@ describe('addDiscoveredLedgerBitcoinWallet', () => {
                 },
             },
         });
+        expect(dispatch).toHaveBeenCalledTimes(2);
     });
 
     it('refreshes an existing account without discarding its custom label or metadata', () => {
         const dispatch = jest.fn();
         const wallet = {
             id: 'ledgerwallet',
-            provider: 'ledger' as const,
             label: 'Ledger Flex',
             staticSessionId: 'ledgerwallet@ledger:0' as const,
-            connected: true,
         };
         const accountInfo = {
             descriptor: 'zpubaccount',

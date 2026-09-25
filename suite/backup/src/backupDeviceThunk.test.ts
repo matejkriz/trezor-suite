@@ -154,4 +154,20 @@ describe('Backup Thunks', () => {
             }),
         );
     });
+
+    it('does not send a Ledger to Trezor Connect', async () => {
+        const ledgerDevice = { ...selectedDevice, provider: 'ledger' as const };
+        const { dispatch, getState, extra } = createThunkDependencies({
+            device: {
+                ...defaultState.device,
+                selectedDevice: ledgerDevice,
+            },
+        });
+        const connect = testMocks.getTrezorConnectMock();
+        connect.backupDevice.mockClear();
+
+        await backupDeviceThunk({ params: {} })(dispatch, getState, extra);
+
+        expect(connect.backupDevice).not.toHaveBeenCalled();
+    });
 });

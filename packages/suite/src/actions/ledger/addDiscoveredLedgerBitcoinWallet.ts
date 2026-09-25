@@ -5,6 +5,8 @@ import { asNetworkSymbol } from '@suite-common/wallet-config';
 import { accountsActions } from '@suite-common/wallet-core';
 import { type Account } from '@suite-common/wallet-types';
 
+import { createLedgerSuiteDevice } from 'src/support/ledger/createLedgerSuiteDevice';
+
 import { type DiscoveredLedgerBitcoinWallet } from './discoverLedgerBitcoinWallet';
 
 const bitcoinSymbol = asNetworkSymbol('btc');
@@ -14,7 +16,8 @@ export const addDiscoveredLedgerBitcoinWallet = (
     existingAccounts: Account[],
     { wallet, accounts }: DiscoveredLedgerBitcoinWallet,
 ) => {
-    dispatch(deviceActions.connectExternalWallet(wallet));
+    const device = createLedgerSuiteDevice(wallet);
+    dispatch(deviceActions.connectLedgerDevice(device));
 
     accounts.forEach(({ index, path, accountInfo, visible }) => {
         const existingAccount = existingAccounts.find(

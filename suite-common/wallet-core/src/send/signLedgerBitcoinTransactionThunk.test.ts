@@ -1,3 +1,4 @@
+import { mockSuiteDevice } from '@suite-common/suite-types/mocks';
 import { createTestStore } from '@suite-common/test-utils';
 import {
     type Account,
@@ -31,16 +32,15 @@ const createStore = () => {
         extra: { services: { ledgerBitcoinService } },
         preloadedState: {
             device: {
-                selectedDevice: undefined,
-                selectedExternalWalletId: 'ledger-id',
-                externalWallets: [
-                    {
+                selectedDevice: {
+                    ...mockSuiteDevice({
                         id: 'ledger-id',
-                        provider: 'ledger',
-                        staticSessionId: 'ledger-id@ledger:0',
                         connected: true,
-                    },
-                ],
+                        available: true,
+                        state: { staticSessionId: 'ledger-id@ledger:0' },
+                    }),
+                    provider: 'ledger',
+                },
             },
         },
     });

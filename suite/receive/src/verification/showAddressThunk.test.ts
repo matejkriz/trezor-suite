@@ -1,21 +1,22 @@
 import { openConnectionModal } from '@suite/device';
+import { mockSuiteDevice } from '@suite-common/suite-types/mocks';
 
 import { showAddressThunk } from './showAddressThunk';
 
 describe(showAddressThunk.name, () => {
     it('asks to reconnect a selected Ledger before verifying an address', async () => {
         const wallet = {
-            id: 'ledgerwallet',
-            provider: 'ledger',
-            label: 'Ledger',
-            staticSessionId: 'ledgerwallet@ledger:0',
-            connected: false,
+            ...mockSuiteDevice({
+                id: 'ledgerwallet',
+                state: { staticSessionId: 'ledgerwallet@ledger:0' },
+                connected: false,
+                available: false,
+            }),
+            provider: 'ledger' as const,
         };
         const state = {
             device: {
-                selectedDevice: undefined,
-                externalWallets: [wallet],
-                selectedExternalWalletId: wallet.id,
+                selectedDevice: wallet,
             },
             wallet: {
                 selectedAccount: { status: 'loaded', account: { key: 'bitcoin-account' } },

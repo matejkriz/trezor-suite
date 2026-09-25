@@ -3,11 +3,7 @@ import { isRejected } from '@reduxjs/toolkit';
 
 import { type AnalyticsDep } from '@suite-common/analytics';
 import { Calldata } from '@suite-common/calldata';
-import {
-    type DeviceRootState,
-    selectSelectedDevice,
-    selectSelectedExternalWallet,
-} from '@suite-common/device';
+import { type DeviceRootState, isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
 import {
     type ActionsFromAsyncThunk,
     type WithServices,
@@ -704,12 +700,12 @@ export const signTransactionThunk = createThunk<
         { formState, precomposedTransaction, selectedAccount, paymentRequests },
         { dispatch, rejectWithValue, getState, extra },
     ) => {
-        const externalWallet = selectSelectedExternalWallet(getState());
+        const device = selectSelectedDevice(getState());
 
-        if (externalWallet) {
+        if (isLedgerDevice(device)) {
             if (
-                !externalWallet.connected ||
-                selectedAccount.deviceState !== externalWallet.staticSessionId ||
+                !device.connected ||
+                selectedAccount.deviceState !== device.state?.staticSessionId ||
                 selectedAccount.symbol !== 'btc' ||
                 precomposedTransaction.type !== 'final' ||
                 isCardanoTx(selectedAccount, precomposedTransaction) ||
@@ -750,8 +746,6 @@ export const signTransactionThunk = createThunk<
                 });
             }
         }
-
-        const device = selectSelectedDevice(getState());
 
         if (!device || precomposedTransaction?.type !== 'final')
             return rejectWithValue({
@@ -863,8 +857,7 @@ export const enhancePrecomposedTransactionThunk = createThunk<
     ) => {
         const device = selectSelectedDevice(getState());
         const selectedAccountNetwork = getNetwork(selectedAccount.symbol);
-        if (!device && !selectSelectedExternalWallet(getState()))
-            return rejectWithValue('Device not found');
+        if (!device) return rejectWithValue('Device not found');
 
         const createRbfEnhancedTransaction = (): GeneralPrecomposedTransactionFinal => {
             if (!isCardanoTx(selectedAccount, precomposedTransaction) && formValues.rbfParams) {

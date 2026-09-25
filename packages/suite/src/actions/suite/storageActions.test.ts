@@ -47,6 +47,7 @@ import {
 } from 'src/reducers/wallet';
 import graphReducer from 'src/reducers/wallet/graphReducer';
 import { type Db } from 'src/storage/createDb';
+import { createLedgerSuiteDevice } from 'src/support/ledger/createLedgerSuiteDevice';
 import { type PreloadStore, createPreloadStore } from 'src/support/suite/createPreloadStore';
 import { type AcquiredDevice, type AppState } from 'src/types/suite';
 
@@ -69,7 +70,6 @@ const deviceReducer = prepareDesktopDeviceReducer({
         setDeviceMetadataReducer: mockReducer(),
         storageLoadDevices: (state, { payload }) => {
             state.devices = payload.devices;
-            state.externalWallets = payload.suiteSettings?.externalWallets;
         },
     },
 });
@@ -302,11 +302,10 @@ describe('Storage actions', () => {
     it('restores remembered Ledger wallets as disconnected with their Bitcoin accounts', async () => {
         const wallet = {
             id: 'ledgerwallet',
-            provider: 'ledger' as const,
             label: 'Ledger Flex',
             staticSessionId: 'ledgerwallet@ledger:0' as const,
-            connected: true,
         };
+        const device = createLedgerSuiteDevice(wallet);
         const account = mockWalletAccount({
             deviceState: wallet.staticSessionId,
             symbol: btcSymbol,
@@ -314,19 +313,63 @@ describe('Storage actions', () => {
         });
         const store = mockStore(db, getInitialState({ wallet: { accounts: [account] } }));
 
-        store.dispatch(deviceActions.connectExternalWallet(wallet));
+        store.dispatch(deviceActions.connectLedgerDevice(device));
         store.dispatch(accountsActions.changeAccountVisibility(account, false));
-        await store.dispatch(storageActions.saveSuiteSettingsThunk());
+        await storageActions.saveDevice({ db }, device);
 
         const restoredStore = mockStore(db, getInitialState());
         restoredStore.dispatch((await preloadStore())!);
 
-        expect(restoredStore.getState().device.externalWallets).toEqual([
-            { ...wallet, connected: false },
+        expect(restoredStore.getState().device.devices).toEqual([
+            expect.objectContaining({
+                id: wallet.id,
+                provider: 'ledger',
+                name: wallet.label,
+                connected: false,
+                state: { staticSessionId: wallet.staticSessionId },
+            }),
         ]);
         expect(restoredStore.getState().wallet.accounts).toContainEqual(
             expect.objectContaining({ deviceState: wallet.staticSessionId, visible: false }),
         );
+    });
+
+    it('persists a legacy external Ledger wallet as a device across later settings saves', async () => {
+        const legacyWallet = {
+            id: 'legacy-ledger-wallet',
+            provider: 'ledger' as const,
+            label: 'Ledger Flex',
+            staticSessionId: 'legacy-ledger-wallet@ledger:0' as const,
+            connected: false,
+        };
+        const initialStore = mockStore(db, getInitialState());
+        await initialStore.dispatch(storageActions.saveSuiteSettingsThunk());
+        const settings = await db.getItemByPK('suiteSettings', 'suite');
+        await db.addItem(
+            'suiteSettings',
+            { ...settings!, externalWallets: [legacyWallet] },
+            'suite',
+            true,
+        );
+
+        const firstRestore = mockStore(db, getInitialState());
+        firstRestore.dispatch((await preloadStore())!);
+        expect(firstRestore.getState().device.devices).toEqual([
+            expect.objectContaining({ id: legacyWallet.id, provider: 'ledger' }),
+        ]);
+        expect((await db.getItemByPK('suiteSettings', 'suite'))?.externalWallets).toBeUndefined();
+
+        await firstRestore.dispatch(storageActions.saveSuiteSettingsThunk());
+        const secondRestore = mockStore(db, getInitialState());
+        secondRestore.dispatch((await preloadStore())!);
+        expect(secondRestore.getState().device.devices).toEqual([
+            expect.objectContaining({ id: legacyWallet.id, provider: 'ledger' }),
+        ]);
+
+        await db.removeItemByPK('devices', legacyWallet.staticSessionId);
+        const afterForget = mockStore(db, getInitialState());
+        afterForget.dispatch((await preloadStore())!);
+        expect(afterForget.getState().device.devices).toEqual([]);
     });
 
     it('should store, override and remove send form', async () => {

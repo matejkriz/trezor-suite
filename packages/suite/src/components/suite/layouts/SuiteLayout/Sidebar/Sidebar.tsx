@@ -6,11 +6,7 @@ import { selectShouldDisplayDeviceCompromised } from '@suite/authenticity-checks
 import { TrafficLightOffset } from '@suite/macos';
 import { suiteSettingsActions } from '@suite/settings';
 import { useServices } from '@suite-common/dependency-injection';
-import {
-    selectIsAnyDeviceSelected,
-    selectSelectedDevice,
-    selectSelectedExternalWallet,
-} from '@suite-common/device';
+import { selectIsAnyDeviceSelected, selectSelectedDevice } from '@suite-common/device';
 import { injectDispatch } from '@suite-common/redux-utils';
 import { Box, Icon, ResizableBox } from '@trezor/components';
 import { isDesktop } from '@trezor/env-utils';
@@ -112,7 +108,6 @@ export const Sidebar = ({ showAccounts = true }: SidebarProps) => {
 
     const shouldDisplayDeviceCompromised = useSelector(selectShouldDisplayDeviceCompromised);
     const selectedDevice = useSelector(selectSelectedDevice);
-    const selectedExternalWallet = useSelector(selectSelectedExternalWallet);
 
     const handleSidebarWidthChanged = (width: number) => {
         setSidebarWidth(width);
@@ -137,9 +132,7 @@ export const Sidebar = ({ showAccounts = true }: SidebarProps) => {
     }, [setAutoCollapseSuppressed]);
 
     const showAccountsAndIsDeviceReady =
-        !shouldDisplayDeviceCompromised &&
-        (selectedDevice?.mode === 'normal' || !!selectedExternalWallet) &&
-        showAccounts;
+        !shouldDisplayDeviceCompromised && selectedDevice?.mode === 'normal' && showAccounts;
 
     useEffect(() => {
         if (contentWidth == null) return;

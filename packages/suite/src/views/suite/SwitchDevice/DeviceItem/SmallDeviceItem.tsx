@@ -1,8 +1,12 @@
 import { Translation } from '@suite/intl';
-import { selectDeviceLabelOrNameById, selectSelectedDevice } from '@suite-common/device';
+import {
+    isLedgerDevice,
+    selectDeviceLabelOrNameById,
+    selectSelectedDevice,
+} from '@suite-common/device';
 import { getDeviceInternalModel } from '@suite-common/suite-utils';
-import { Image, Row } from '@trezor/components';
-import { LinkBreakIcon, LinkIcon } from '@trezor/icons';
+import { Icon, Image, Row } from '@trezor/components';
+import { CableUsbCIcon, LinkBreakIcon, LinkIcon } from '@trezor/icons';
 
 import { useSelector } from 'src/hooks/suite';
 
@@ -19,20 +23,30 @@ export const SmallDeviceItem = ({ forceAlternativeDeviceLabel }: SmallDeviceItem
         selectDeviceLabelOrNameById(state, selectedDevice?.id),
     );
 
-    const isConnected = selectedDevice !== undefined;
+    const isConnected = selectedDevice?.connected ?? false;
 
     const selectedDeviceModelInternal = getDeviceInternalModel(selectedDevice);
 
     return (
         <Row gap={8} padding={{ vertical: 8, horizontal: 8 }} alignItems="center">
-            <Image
-                width={18}
-                objectFit="contain"
-                alt="Trezor"
-                image={`TREZOR_${selectedDeviceModelInternal}`}
-            />
+            {isLedgerDevice(selectedDevice) ? (
+                <Icon as={CableUsbCIcon} size={18} />
+            ) : (
+                <Image
+                    width={18}
+                    objectFit="contain"
+                    alt="Trezor"
+                    image={`TREZOR_${selectedDeviceModelInternal}`}
+                />
+            )}
 
-            <DeviceDetail label={forceAlternativeDeviceLabel || deviceLabel || 'Trezor'}>
+            <DeviceDetail
+                label={
+                    forceAlternativeDeviceLabel ||
+                    deviceLabel ||
+                    (isLedgerDevice(selectedDevice) ? 'Ledger' : 'Trezor')
+                }
+            >
                 <DeviceConnectionText
                     icon={isConnected ? LinkIcon : LinkBreakIcon}
                     intent={isConnected ? 'brand' : 'critical'}

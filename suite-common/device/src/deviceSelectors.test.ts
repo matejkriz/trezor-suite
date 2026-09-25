@@ -11,20 +11,14 @@ import {
 } from './deviceSelectors';
 
 describe(selectIsAnyDeviceSelected.name, () => {
-    it('includes a selected external wallet', () => {
+    it('includes a selected Ledger device', () => {
         const state = {
             device: {
                 ...deviceReducerInitialState,
-                selectedExternalWalletId: 'ledger1',
-                externalWallets: [
-                    {
-                        id: 'ledger1',
-                        provider: 'ledger' as const,
-                        label: 'Ledger',
-                        staticSessionId: 'ledger1@ledger:0' as const,
-                        connected: true,
-                    },
-                ],
+                selectedDevice: {
+                    ...mockSuiteDevice({ id: 'ledger1', name: 'Ledger Flex' }),
+                    provider: 'ledger' as const,
+                },
             },
         };
 

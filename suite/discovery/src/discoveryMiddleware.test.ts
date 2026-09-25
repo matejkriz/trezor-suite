@@ -126,6 +126,8 @@ const selectedDevice = mockSuiteDevice({
     state: { staticSessionId: 'device@selected:1' },
 });
 
+const ledgerDevice = { ...selectedDevice, provider: 'ledger' as const };
+
 if (!isDeviceAcquired(selectedDevice)) {
     throw `${mockSuiteDevice.name}() must return an AcquiredDevice here.`;
 }
@@ -160,6 +162,11 @@ const createObserveSelectedDeviceFulfilledAction = (payload: {
 }) => walletCore.observeSelectedDeviceThunk.fulfilled(payload, 'request-id', undefined);
 
 const fixtures: Fixture[] = [
+    {
+        description: 'does not start Trezor discovery for a selected Ledger',
+        state: { router: { app: 'dashboard' } },
+        steps: [{ action: deviceActions.selectDevice(ledgerDevice), expectedCallCount: 0 }],
+    },
     {
         description: 'starts discovery when device is selected',
         state: {

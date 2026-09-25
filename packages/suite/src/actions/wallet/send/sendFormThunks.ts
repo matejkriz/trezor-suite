@@ -10,11 +10,7 @@ import { type DesktopAnalyticsDep, events } from '@suite/analytics';
 import { processLegacyMetadataIntoSuiteSyncThunk } from '@suite/labeling';
 import { type MetadataRootState, metadataLabelingActions, selectMetadata } from '@suite/metadata';
 import { closeModal, openDeferredModal, preserveModal } from '@suite/modal';
-import {
-    type DeviceRootState,
-    selectSelectedDevice,
-    selectSelectedExternalWallet,
-} from '@suite-common/device';
+import { type DeviceRootState, selectSelectedDevice } from '@suite-common/device';
 import { type MessageSystemRootState } from '@suite-common/message-system';
 import { type MetadataAddPayload } from '@suite-common/metadata-types';
 import { selectIsMevProtectionFeatureEnabled } from '@suite-common/mev';
@@ -277,8 +273,7 @@ export const signAndPushSendFormTransactionThunk = createThunk<
         { dispatch, getState, extra },
     ) => {
         const device = selectSelectedDevice(getState());
-        const externalWallet = selectSelectedExternalWallet(getState());
-        if ((!device && !externalWallet) || !selectedAccount) return;
+        if (!device || !selectedAccount) return;
 
         const enhancedPrecomposedTransaction = await dispatch(
             enhancePrecomposedTransactionThunk({

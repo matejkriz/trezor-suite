@@ -1,6 +1,6 @@
 import { type StaticSessionId } from '@trezor/connect';
 
-export type ExternalWallet = {
+export type LegacyExternalWallet = {
     id: string;
     provider: 'ledger';
     label: string;

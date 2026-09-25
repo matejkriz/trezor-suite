@@ -3,7 +3,7 @@ import { combineReducers } from '@reduxjs/toolkit';
 import { deviceInitialState, selectSelectedDevice } from '@suite-common/device';
 import { createThunk } from '@suite-common/redux-utils';
 import { mockActionType, mockReducer } from '@suite-common/redux-utils/mocks';
-import { mockOpenModal } from '@suite-common/suite-types/mocks';
+import { mockOpenModal, mockSuiteDevice } from '@suite-common/suite-types/mocks';
 import { createTestStore } from '@suite-common/test-utils';
 import {
     confirmAddressOnDeviceThunk,
@@ -84,26 +84,26 @@ describe('verifyAddressThunk', () => {
                 deviceStaticSessionId: staticSessionId,
             }),
         };
+        const ledgerDevice = {
+            ...mockSuiteDevice({
+                id: 'ledgerwallet',
+                connected: true,
+                available: true,
+                state: { staticSessionId },
+            }),
+            provider: 'ledger' as const,
+        };
         const store = createMockStore(
             {
                 ...deviceInitialState,
-                selectedExternalWalletId: 'ledgerwallet',
-                externalWallets: [
-                    {
-                        id: 'ledgerwallet',
-                        provider: 'ledger',
-                        label: 'Ledger',
-                        staticSessionId,
-                        connected: true,
-                    },
-                ],
+                selectedDevice: ledgerDevice,
             },
             [account],
         );
         const firstUnused = account.addresses?.unused[0];
         if (!firstUnused) throw new Error('Missing Bitcoin receive address fixture');
 
-        (selectSelectedDevice as jest.Mock).mockReturnValue(undefined);
+        (selectSelectedDevice as jest.Mock).mockReturnValue(ledgerDevice);
         (confirmAddressOnDeviceThunk as unknown as jest.Mock).mockImplementation(
             createThunk('@suite/device/confirmAddressOnDeviceThunk', () => ({
                 success: true,

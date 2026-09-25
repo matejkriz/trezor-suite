@@ -2,7 +2,7 @@ import { selectFullSelectedAccount } from '@suite/account';
 import { useDevice } from '@suite/device';
 import { Translation } from '@suite/intl';
 import { selectRouterParams } from '@suite/router';
-import { selectSelectedExternalWallet } from '@suite-common/device';
+import { isLedgerDevice } from '@suite-common/device';
 import { Row } from '@trezor/components';
 import { ButtonGroup } from '@trezor/components/src/components/buttons/ButtonGroup/ButtonGroup';
 import { ArrowDownIcon, ArrowUpIcon } from '@trezor/icons';
@@ -21,17 +21,17 @@ export const HeaderActions = () => {
     const selectedAccount = useSelector(selectFullSelectedAccount);
     const routerParams = useSelector(selectRouterParams) as WalletParams;
     const { device } = useDevice();
-    const externalWallet = useSelector(selectSelectedExternalWallet);
 
     const accountType = selectedAccount.account?.accountType || routerParams?.accountType || '';
     const isTradingAvailable = !['coinjoin'].includes(accountType);
     const isAccountLoading = selectedAccount.status === 'loading';
-    const isDeviceConnected =
-        (device?.connected && device?.available) || !!externalWallet?.connected;
+    const isDeviceConnected = !!device?.connected && !!device?.available;
 
     return (
         <Row gap={12} alignItems="center">
-            {!externalWallet && <HeaderDropdown isDisabled={isAccountLoading} showSignAndVerify />}
+            {!isLedgerDevice(device) && (
+                <HeaderDropdown isDisabled={isAccountLoading} showSignAndVerify />
+            )}
 
             {isTradingAvailable && <TradeActions selectedAccount={selectedAccount} />}
 

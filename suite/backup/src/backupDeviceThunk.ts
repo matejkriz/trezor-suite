@@ -1,5 +1,5 @@
 import { type DesktopAnalyticsDep, events } from '@suite/analytics';
-import { type DeviceRootState, selectSelectedDevice } from '@suite-common/device';
+import { type DeviceRootState, isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
 import { type WithServices, createThunk } from '@suite-common/redux-utils';
 import { notificationsActions } from '@suite-common/toast-notifications';
 import TrezorConnect from '@trezor/connect';
@@ -24,7 +24,7 @@ export const backupDeviceThunk = createThunk<
     `${actionPrefix}/backupDeviceThunk`,
     async ({ params = {}, skipSuccessToast }, { dispatch, getState, extra }) => {
         const device = selectSelectedDevice(getState());
-        if (!device) {
+        if (!device || isLedgerDevice(device)) {
             dispatch(
                 notificationsActions.addToast({
                     type: 'error',

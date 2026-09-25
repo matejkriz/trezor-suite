@@ -1,8 +1,4 @@
-import {
-    type DeviceRootState,
-    selectSelectedDevice,
-    selectSelectedExternalWallet,
-} from '@suite-common/device';
+import { type DeviceRootState, selectSelectedDevice } from '@suite-common/device';
 import { type NetworksRootState, selectSupportedNetworkSymbols } from '@suite-common/networks';
 import { createWeakMapSelector, returnStableArrayIfEmpty } from '@suite-common/redux-utils';
 import { type TrezorDevice } from '@suite-common/suite-types';
@@ -63,9 +59,6 @@ export const selectSupportedNetworkByDevice = (
 };
 
 export const selectDeviceSupportedNetworks = createMemoizedSelector(
-    [selectSelectedDevice, selectSelectedExternalWallet, selectSupportedNetworkSymbols],
-    (device, externalWallet, supportedNetworks) =>
-        externalWallet
-            ? supportedNetworks.filter(symbol => symbol === 'btc')
-            : selectSupportedNetworkByDevice(device, supportedNetworks),
+    [selectSelectedDevice, selectSupportedNetworkSymbols],
+    (device, supportedNetworks) => selectSupportedNetworkByDevice(device, supportedNetworks),
 );

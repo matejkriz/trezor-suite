@@ -1,4 +1,3 @@
-import { type ExternalWallet } from '@suite-common/device';
 import {
     type LedgerBitcoinService,
     type LedgerDevice,
@@ -6,6 +5,8 @@ import {
 } from '@suite-common/ledger';
 import { type AccountInfo } from '@trezor/connect';
 import { type Bip43Path } from '@trezor/crypto-utils';
+
+import { type LedgerWalletIdentity } from 'src/support/ledger/createLedgerSuiteDevice';
 
 const MAX_ACCOUNTS = 10;
 
@@ -25,7 +26,7 @@ type DiscoveredLedgerAccount = {
 };
 
 export type DiscoveredLedgerBitcoinWallet = {
-    wallet: ExternalWallet;
+    wallet: LedgerWalletIdentity;
     accounts: DiscoveredLedgerAccount[];
 };
 
@@ -36,7 +37,7 @@ export const discoverLedgerBitcoinWallet = async (
     await deps.ledgerBitcoinService.connect(device);
 
     const accounts: DiscoveredLedgerAccount[] = [];
-    let wallet: ExternalWallet | undefined;
+    let wallet: LedgerWalletIdentity | undefined;
 
     for (let index = 0; index < MAX_ACCOUNTS; index++) {
         const ledgerAccount = await deps.ledgerBitcoinService.getAccount(index);
@@ -56,10 +57,8 @@ export const discoverLedgerBitcoinWallet = async (
             const id = getLedgerWalletIdentity(ledgerAccount.descriptor);
             wallet = {
                 id,
-                provider: 'ledger',
                 label: device.name || 'Ledger',
                 staticSessionId: `${id}@ledger:0`,
-                connected: true,
             };
         }
 

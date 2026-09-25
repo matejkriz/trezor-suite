@@ -1,7 +1,7 @@
 import { events, injectDesktopAnalytics } from '@suite/analytics';
 import { Translation } from '@suite/intl';
 import { useServices } from '@suite-common/dependency-injection';
-import { selectSelectedExternalWallet } from '@suite-common/device';
+import { isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
 import {
     selectTradingSellActiveTrade,
     selectTradingSellInfo,
@@ -25,7 +25,7 @@ export const TradingSelectedOfferSellTransaction = () => {
     const { handleClick, disabled } = useAsyncClickHandler();
     const isDiscoveryRunning = useSelector(selectHasRunningDiscovery);
     const isWalletConnected = useIsTradingWalletConnected();
-    const externalWallet = useSelector(selectSelectedExternalWallet);
+    const device = useSelector(selectSelectedDevice);
     const { account, sendTransaction } = useTradingSellTradeActions();
     const sellInfo = useSelector(selectTradingSellInfo);
     const isLoading = useSelector(selectTradingSellIsLoading);
@@ -157,7 +157,7 @@ export const TradingSelectedOfferSellTransaction = () => {
                 >
                     <Translation
                         id={
-                            externalWallet
+                            isLedgerDevice(device)
                                 ? 'TR_SELL_CONFIRM_SEND_STEP'
                                 : 'TR_SELL_CONFIRM_ON_TREZOR_SEND'
                         }

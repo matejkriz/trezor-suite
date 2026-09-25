@@ -18,7 +18,7 @@ import { type Err } from '@trezor/type-utils';
 
 import { type DeviceStateActionPayload, deviceActions } from './deviceActions';
 import { PORTFOLIO_TRACKER_DEVICE_ID } from './deviceConstants';
-import { type ExternalWallet } from './externalWalletTypes';
+import { isLedgerDevice } from './ledgerDevice';
 
 export type DeviceReducerState = {
     /**
@@ -31,8 +31,6 @@ export type DeviceReducerState = {
     devices: TrezorDevice[];
 
     selectedDevice?: TrezorDevice;
-    externalWallets?: ExternalWallet[];
-    selectedExternalWalletId?: string;
     dismissedSecurityChecks?: {
         firmwareAuthenticity?: string[];
     };
@@ -44,8 +42,6 @@ export type DeviceReducerState = {
 export const deviceInitialState: DeviceReducerState = {
     devices: [],
     selectedDevice: undefined,
-    externalWallets: [],
-    selectedExternalWalletId: undefined,
 };
 
 export const deviceReducerInitialState = deviceInitialState;
@@ -573,30 +569,37 @@ export const prepareDeviceReducer = createReducerWithExtraDeps(
     deviceInitialState,
     (builder, extra: DeviceReducerDeps) => {
         builder
-            .addCase(deviceActions.connectExternalWallet, (state, { payload }) => {
-                state.externalWallets ??= [];
-                state.externalWallets.forEach(wallet => {
-                    wallet.connected = false;
+            .addCase(deviceActions.connectLedgerDevice, (state, { payload }) => {
+                state.devices.forEach(device => {
+                    if (isLedgerDevice(device)) device.connected = false;
                 });
-                const existingIndex = state.externalWallets.findIndex(
-                    wallet => wallet.id === payload.id,
+                const index = state.devices.findIndex(
+                    device => isLedgerDevice(device) && device.id === payload.id,
                 );
-                if (existingIndex >= 0) {
-                    state.externalWallets[existingIndex] = payload;
+                if (index >= 0) {
+                    const previous = state.devices[index];
+                    state.devices[index] = {
+                        ...payload,
+                        firstConnectedTimestamp:
+                            previous?.firstConnectedTimestamp ?? payload.firstConnectedTimestamp,
+                        metadata: previous?.metadata ?? payload.metadata,
+                        passwords: previous?.passwords ?? payload.passwords,
+                    };
                 } else {
-                    state.externalWallets.push(payload);
+                    state.devices.push(payload);
                 }
-                state.selectedExternalWalletId = payload.id;
-                state.selectedDevice = undefined;
+                state.selectedDevice = state.devices.find(
+                    device => isLedgerDevice(device) && device.id === payload.id,
+                );
             })
-            .addCase(deviceActions.disconnectExternalWallet, (state, { payload }) => {
-                const wallet = state.externalWallets?.find(item => item.id === payload);
-                if (wallet) wallet.connected = false;
-            })
-            .addCase(deviceActions.selectExternalWallet, (state, { payload }) => {
-                if (!state.externalWallets?.some(wallet => wallet.id === payload)) return;
-                state.selectedExternalWalletId = payload;
-                state.selectedDevice = undefined;
+            .addCase(deviceActions.disconnectLedgerDevice, (state, { payload }) => {
+                const device = state.devices.find(
+                    item => isLedgerDevice(item) && item.id === payload,
+                );
+                if (device) device.connected = false;
+                if (isLedgerDevice(state.selectedDevice) && state.selectedDevice.id === payload) {
+                    state.selectedDevice.connected = false;
+                }
             })
             .addCase(deviceActions.deviceChanged, (state, { payload }) => {
                 changeDevice(state, payload, { connected: true, available: true });
@@ -631,7 +634,6 @@ export const prepareDeviceReducer = createReducerWithExtraDeps(
             .addCase(deviceActions.selectDevice, (state, { payload }) => {
                 updateTimestamp(state, payload);
                 state.selectedDevice = payload;
-                if (payload) state.selectedExternalWalletId = undefined;
             })
             .addCase(deviceActions.updateSelectedDevice, (state, { payload }) => {
                 state.selectedDevice = payload;

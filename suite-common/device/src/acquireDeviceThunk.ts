@@ -6,6 +6,7 @@ import TrezorConnect from '@trezor/connect';
 import { DEVICE_MODULE_PREFIX } from './deviceConstants';
 import { type DeviceRootState } from './deviceReducer';
 import { selectSelectedDevice } from './deviceSelectors';
+import { isLedgerDevice } from './ledgerDevice';
 
 /**
  * Called from <AcquireDevice /> component
@@ -26,7 +27,7 @@ export const acquireDeviceThunk = createThunk<
     async ({ requestedDevice }, { dispatch, getState, rejectWithValue }) => {
         const device = requestedDevice ?? selectSelectedDevice(getState());
 
-        if (!device) {
+        if (!device || isLedgerDevice(device)) {
             return rejectWithValue({ error: 'Device_NotFound' });
         }
 

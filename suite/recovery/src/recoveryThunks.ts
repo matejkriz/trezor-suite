@@ -1,5 +1,5 @@
 import { type DesktopAnalyticsDep, events } from '@suite/analytics';
-import { type DeviceRootState, selectSelectedDevice } from '@suite-common/device';
+import { type DeviceRootState, isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
 import { type WithServices, createThunk } from '@suite-common/redux-utils';
 import TrezorConnect, { PROTO, type RecoveryDevice } from '@trezor/connect';
 import { DeviceModelInternal } from '@trezor/device-utils';
@@ -36,7 +36,7 @@ export const checkSeedThunk = createThunk<
     const wordsCount = selectWordsCount(getState());
     const device = selectSelectedDevice(getState());
 
-    if (!device?.features) return;
+    if (!device?.features || isLedgerDevice(device)) return;
 
     dispatch(recoveryActions.setError(undefined));
 
@@ -86,7 +86,7 @@ export const recoverDeviceThunk = createThunk<void, void, { state: RecoverDevice
         const wordsCount = selectWordsCount(getState());
         const device = selectSelectedDevice(getState());
 
-        if (!device?.features) {
+        if (!device?.features || isLedgerDevice(device)) {
             return;
         }
         dispatch(recoveryActions.setError(undefined));
@@ -137,7 +137,7 @@ export const recoveryRerunThunk = createThunk<
     { rejectValue: string; state: RecoveryRerunThunkState; extra: RecoveryRerunThunkDeps }
 >(`${actionPrefix}/recoveryRerunThunk`, async (_, { dispatch, getState, rejectWithValue }) => {
     const device = selectSelectedDevice(getState());
-    if (!device?.features) {
+    if (!device?.features || isLedgerDevice(device)) {
         return rejectWithValue('no device features');
     }
 

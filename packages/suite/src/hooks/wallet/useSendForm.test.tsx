@@ -44,6 +44,7 @@ import { type PROTO } from '@trezor/connect';
 import { asProtocol } from '@trezor/network-module-suite-common-types';
 
 import { type ProtocolState } from 'src/reducers/suite/protocolReducer';
+import { createLedgerSuiteDevice } from 'src/support/ledger/createLedgerSuiteDevice';
 import {
     type UserAction,
     actionSequence,
@@ -565,4 +566,32 @@ describe('useSendForm hook', () => {
             TEST_TIMEOUT,
         );
     });
+
+    it(
+        'shows the recipient address field for a selected Ledger without a Trezor device',
+        async () => {
+            const staticSessionId = 'ledgerwallet@ledger:0' as const;
+            const selectedAccount = {
+                ...fixtures.BTC_ACCOUNT,
+                account: { ...fixtures.BTC_ACCOUNT.account, deviceState: staticSessionId },
+            };
+            const params = buildTestCompositionRootParams({ selectedAccount });
+            const device = createLedgerSuiteDevice({
+                id: 'ledgerwallet',
+                label: 'Ledger Flex',
+                staticSessionId,
+            });
+            params.preloadedState.device = {
+                devices: [device],
+                selectedDevice: device,
+            };
+            const root = createTestCompositionRoot(params);
+            const { unmount } = renderWithProviders(root, <SendIndex />);
+
+            await waitFor(() => expect(findByTestId(/^outputs\.[0-9]+\.address$/)).toHaveLength(1));
+
+            unmount();
+        },
+        TEST_TIMEOUT,
+    );
 });

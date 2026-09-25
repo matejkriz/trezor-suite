@@ -6,7 +6,7 @@ import { selectIsDebugModeActive } from '@suite/debug';
 import { Translation } from '@suite/intl';
 import { gotoThunk } from '@suite/router';
 import { useServices } from '@suite-common/dependency-injection';
-import { selectSelectedExternalWallet } from '@suite-common/device';
+import { isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
 import { injectDispatch } from '@suite-common/redux-utils';
 import { Box, Column, motionEasing } from '@trezor/components';
 
@@ -27,7 +27,8 @@ type SettingsLayoutProps = {
 
 const SettingsHeader = () => {
     const isDebugModeActive = useSelector(selectIsDebugModeActive);
-    const selectedExternalWallet = useSelector(selectSelectedExternalWallet);
+    const selectedDevice = useSelector(selectSelectedDevice);
+    const isLedgerSelected = isLedgerDevice(selectedDevice);
 
     const { dispatch } = useServices(injectDispatch);
 
@@ -43,7 +44,7 @@ const SettingsHeader = () => {
             },
             {
                 id: 'settings-device',
-                isHidden: !!selectedExternalWallet,
+                isHidden: isLedgerSelected,
                 title: <Translation id="TR_DEVICE" />,
                 position: 'primary',
                 'data-testid': '@settings/menu/device',
@@ -78,7 +79,7 @@ const SettingsHeader = () => {
                     dispatch(gotoThunk({ routeName: 'settings-debug', preserveParams: true })),
             },
         ],
-        [dispatch, isDebugModeActive, selectedExternalWallet],
+        [dispatch, isDebugModeActive, isLedgerSelected],
     );
 
     return (
