@@ -14,7 +14,7 @@ type GetAccountInfoResult =
     { success: true; payload: AccountInfo } | { success: false; error: { message: string } };
 
 type DiscoverLedgerBitcoinWalletDeps = {
-    ledgerBitcoinService: Pick<LedgerBitcoinService, 'connect' | 'getAccount'>;
+    ledgerBitcoinService: Pick<LedgerBitcoinService, 'connect' | 'getAccount' | 'getDeviceInfo'>;
     getAccountInfo: (descriptor: string) => Promise<GetAccountInfoResult>;
 };
 
@@ -55,10 +55,12 @@ export const discoverLedgerBitcoinWallet = async (
 
         if (!wallet) {
             const id = getLedgerWalletIdentity(ledgerAccount.descriptor);
+            const deviceInfo = deps.ledgerBitcoinService.getDeviceInfo();
             wallet = {
                 id,
-                label: device.name || 'Ledger',
+                label: deviceInfo?.name || device.name || 'Ledger',
                 staticSessionId: `${id}@ledger:0`,
+                deviceInfo,
             };
         }
 

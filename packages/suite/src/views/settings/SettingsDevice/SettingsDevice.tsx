@@ -10,6 +10,7 @@ import { ContextMessage } from '@suite/message-system';
 import { isRecoveryInProgress } from '@suite/recovery';
 import { useServices } from '@suite-common/dependency-injection';
 import {
+    type LedgerSuiteDevice,
     isLedgerDevice,
     selectIsDeviceAuthenticityCheckSupported,
     selectSelectedDevice,
@@ -30,7 +31,7 @@ import {
     ShieldWarningIcon,
     TrezorLogoIcon,
 } from '@trezor/icons';
-import { SettingsSection } from '@trezor/product-components';
+import { ActionColumn, SectionItem, SettingsSection, TextColumn } from '@trezor/product-components';
 import { breakpoints } from '@trezor/theme';
 
 import { DeviceBanner } from 'src/components/settings/DeviceBanner';
@@ -76,6 +77,66 @@ const deviceSettingsUnavailable = (device?: TrezorDevice) => {
     const firmwareUpdateRequired = device?.firmware === 'required';
 
     return wrongDeviceType || wrongDeviceMode || firmwareUpdateRequired;
+};
+
+const LedgerSettingsDevice = ({ device }: { device: LedgerSuiteDevice }) => {
+    const hasContentBelowTabletWidth = useIsContentBelowBreakpoint(breakpoints.tablet);
+    const { ledgerInfo } = device;
+
+    return (
+        <SettingsLayout>
+            <SettingsSection
+                hasVerticalLayout={hasContentBelowTabletWidth}
+                title={<Translation id="TR_DEVICE" />}
+                icon={PuzzlePieceIcon}
+            >
+                <SectionItem data-testid="@settings/device/ledger/name">
+                    <TextColumn title={<Translation id="TR_DEVICE_SETTINGS_DEVICE_LABEL" />} />
+                    <ActionColumn>
+                        <Text>{device.features?.label || device.name || 'Ledger'}</Text>
+                    </ActionColumn>
+                </SectionItem>
+                <SectionItem data-testid="@settings/device/ledger/model">
+                    <TextColumn title="Model" />
+                    <ActionColumn>
+                        <Text>{ledgerInfo?.model || 'Ledger'}</Text>
+                    </ActionColumn>
+                </SectionItem>
+                {device.connected && ledgerInfo?.osVersion && (
+                    <SectionItem data-testid="@settings/device/ledger/os-version">
+                        <TextColumn title="OS version" />
+                        <ActionColumn>
+                            <Text>{ledgerInfo.osVersion}</Text>
+                        </ActionColumn>
+                    </SectionItem>
+                )}
+                {device.connected && ledgerInfo?.bitcoinAppVersion && (
+                    <SectionItem data-testid="@settings/device/ledger/bitcoin-app-version">
+                        <TextColumn title="Bitcoin app version" />
+                        <ActionColumn>
+                            <Text>{ledgerInfo.bitcoinAppVersion}</Text>
+                        </ActionColumn>
+                    </SectionItem>
+                )}
+                {device.connected && ledgerInfo?.batteryLevel !== undefined && (
+                    <SectionItem data-testid="@settings/device/ledger/battery">
+                        <TextColumn title="Battery" />
+                        <ActionColumn>
+                            <Text>{`${ledgerInfo.batteryLevel}%`}</Text>
+                        </ActionColumn>
+                    </SectionItem>
+                )}
+            </SettingsSection>
+
+            <SettingsSection
+                hasVerticalLayout={hasContentBelowTabletWidth}
+                title={<Translation id="TR_DEVICE_CONNECTION" />}
+                icon={PlugsIcon}
+            >
+                <ForgetDevice />
+            </SettingsSection>
+        </SettingsLayout>
+    );
 };
 
 const TrezorSettingsDevice = () => {
@@ -282,13 +343,7 @@ export const SettingsDevice = () => {
     const selectedDevice = useSelector(selectSelectedDevice);
 
     if (isLedgerDevice(selectedDevice)) {
-        return (
-            <SettingsLayout>
-                <Text>
-                    {`Manage ${selectedDevice.features?.label || selectedDevice.name || 'Ledger'} settings on the device.`}
-                </Text>
-            </SettingsLayout>
-        );
+        return <LedgerSettingsDevice device={selectedDevice} />;
     }
 
     return <TrezorSettingsDevice />;

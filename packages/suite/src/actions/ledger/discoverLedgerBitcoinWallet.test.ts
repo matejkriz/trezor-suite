@@ -29,6 +29,12 @@ describe('discoverLedgerBitcoinWallet', () => {
     it('binds Bitcoin accounts to a stable descriptor-based wallet identity', async () => {
         const service = {
             connect: jest.fn().mockResolvedValue(undefined),
+            getDeviceInfo: jest.fn().mockReturnValue({
+                name: 'My Ledger',
+                model: 'Ledger Flex',
+                osVersion: '1.3.0',
+                bitcoinAppVersion: '2.4.0',
+            }),
             getAccount: jest.fn().mockResolvedValue(ledgerAccount(0)),
         };
         const getAccountInfo = jest.fn().mockResolvedValue({
@@ -45,6 +51,8 @@ describe('discoverLedgerBitcoinWallet', () => {
         expect(getAccountInfo).toHaveBeenCalledWith('zpub-0');
         expect(result.wallet.id).not.toContain(device.id);
         expect(result.wallet.staticSessionId).toContain('@ledger:0');
+        expect(result.wallet.label).toBe('My Ledger');
+        expect(result.wallet.deviceInfo).toEqual(service.getDeviceInfo());
         expect(result.accounts).toEqual([
             {
                 index: 0,
@@ -58,6 +66,7 @@ describe('discoverLedgerBitcoinWallet', () => {
     it('discovers used accounts until the first empty account', async () => {
         const service = {
             connect: jest.fn().mockResolvedValue(undefined),
+            getDeviceInfo: jest.fn().mockReturnValue(undefined),
             getAccount: jest.fn(index => Promise.resolve(ledgerAccount(index))),
         };
         const getAccountInfo = jest.fn(descriptor =>
@@ -81,6 +90,7 @@ describe('discoverLedgerBitcoinWallet', () => {
     it('does not expose a wallet when the backend query fails', async () => {
         const service = {
             connect: jest.fn().mockResolvedValue(undefined),
+            getDeviceInfo: jest.fn().mockReturnValue(undefined),
             getAccount: jest.fn().mockResolvedValue(ledgerAccount(0)),
         };
         const getAccountInfo = jest.fn().mockResolvedValue({

@@ -5,9 +5,11 @@ import { BluetoothSlashIcon, LinkBreakIcon, ScrollIcon } from '@trezor/icons';
 const ConfirmationContent = ({
     isBluetoothDevice,
     isBluetoothConnectedDevice,
+    isLedger,
 }: {
     isBluetoothDevice: boolean;
     isBluetoothConnectedDevice: boolean;
+    isLedger?: boolean;
 }) => (
     <Card paddingType="normal" data-testid="@settings/device/forget/confirm-content">
         <List gap={24}>
@@ -17,7 +19,11 @@ const ConfirmationContent = ({
                 }
             >
                 <Paragraph intent="neutral" priority="secondary">
-                    <Translation id="TR_FORGET_DEVICE_MODAL_BULLET_FORGET" />
+                    {isLedger ? (
+                        'Trezor Suite will forget this Ledger.'
+                    ) : (
+                        <Translation id="TR_FORGET_DEVICE_MODAL_BULLET_FORGET" />
+                    )}
                 </Paragraph>
             </List.Item>
             {isBluetoothDevice && (
@@ -58,15 +64,19 @@ export const ConfirmationModal = ({
     onCancel,
     isBluetoothDevice,
     isBluetoothConnectedDevice,
+    isLedger = false,
 }: {
     onConfirm: () => void;
     onCancel: () => void;
     isBluetoothDevice: boolean;
     isBluetoothConnectedDevice: boolean;
+    isLedger?: boolean;
 }) => (
     <Modal
         onCancel={onCancel}
-        heading={<Translation id="TR_FORGET_DEVICE_MODAL_HEADING" />}
+        heading={
+            isLedger ? 'Forget this Ledger?' : <Translation id="TR_FORGET_DEVICE_MODAL_HEADING" />
+        }
         intent="warning"
         width={680}
         bottomContent={
@@ -91,6 +101,7 @@ export const ConfirmationModal = ({
         <ConfirmationContent
             isBluetoothDevice={isBluetoothDevice}
             isBluetoothConnectedDevice={isBluetoothConnectedDevice}
+            isLedger={isLedger}
         />
     </Modal>
 );

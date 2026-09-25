@@ -3,6 +3,7 @@ import {
     DeviceModel,
     DeviceModelId,
     type DeviceSessionState,
+    DeviceSessionStateType,
     DeviceStatus,
     type DiscoveredDevice,
 } from '@ledgerhq/device-management-kit';
@@ -92,6 +93,35 @@ const createDeps = (
 };
 
 describe('createLedgerBitcoinService', () => {
+    it('exposes device details reported by the connected Ledger session', async () => {
+        const deps = createDeps();
+        const sessionState = new Subject<DeviceSessionState>();
+        deps.dmk.getDeviceSessionState.mockReturnValue(sessionState);
+        const service = createLedgerBitcoinService(deps);
+
+        await service.connect(device);
+        sessionState.next({
+            sessionStateType: DeviceSessionStateType.ReadyWithoutSecureChannel,
+            deviceStatus: DeviceStatus.CONNECTED,
+            deviceModelId: DeviceModelId.NANO_SP,
+            deviceName: 'My Ledger',
+            firmwareVersion: { os: '1.2.3', mcu: '1.0', bootloader: '1.0' },
+            currentApp: { name: 'Bitcoin', version: '2.4.0' },
+            batteryStatus: { level: 90 },
+        } as DeviceSessionState);
+
+        expect(service.getDeviceInfo()).toEqual({
+            name: 'My Ledger',
+            model: 'Ledger Nano S Plus',
+            osVersion: '1.2.3',
+            bitcoinAppVersion: '2.4.0',
+            batteryLevel: 90,
+        });
+
+        sessionState.next({ deviceStatus: DeviceStatus.NOT_CONNECTED } as DeviceSessionState);
+        expect(service.getDeviceInfo()).toBeUndefined();
+    });
+
     it('clears the signer and reports a physically disconnected Ledger', async () => {
         const deps = createDeps();
         const sessionState = new Subject<DeviceSessionState>();

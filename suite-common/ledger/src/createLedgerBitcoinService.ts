@@ -70,6 +70,14 @@ export type LedgerBitcoinAccount = {
     address: string;
 };
 
+export type LedgerDeviceInfo = {
+    name: string;
+    model: string;
+    osVersion?: string;
+    bitcoinAppVersion?: string;
+    batteryLevel?: number;
+};
+
 export type LedgerBitcoinService = {
     listenToAvailableDevices: (
         onDevices: (devices: DiscoveredDevice[]) => void,
@@ -81,6 +89,7 @@ export type LedgerBitcoinService = {
     ) => void;
     stopDiscovery: () => Promise<void>;
     connect: (device: DiscoveredDevice) => Promise<void>;
+    getDeviceInfo: () => LedgerDeviceInfo | undefined;
     getMasterFingerprint: () => Promise<string>;
     getAccount: (index: number) => Promise<LedgerBitcoinAccount>;
     verifyAddress: (index: number, addressIndex: number) => Promise<string>;
@@ -97,6 +106,7 @@ export const createLedgerBitcoinService = (
     let availableDevicesSubscription: Subscription | undefined;
     let sessionStateSubscription: Subscription | undefined;
     let sessionId: string | undefined;
+    let deviceInfo: LedgerDeviceInfo | undefined;
     let signer: ReturnType<LedgerBitcoinServiceDeps['createSigner']> | undefined;
     let activeActionCancel: (() => void) | undefined;
 
@@ -127,6 +137,7 @@ export const createLedgerBitcoinService = (
         sessionStateSubscription?.unsubscribe();
         sessionStateSubscription = undefined;
         sessionId = undefined;
+        deviceInfo = undefined;
         signer = undefined;
         deps.onDisconnect?.();
     };
@@ -214,6 +225,7 @@ export const createLedgerBitcoinService = (
             }
 
             sessionId = await deps.dmk.connect({ device });
+            deviceInfo = { name: device.name, model: device.deviceModel.name };
             signer = deps.createSigner(sessionId);
             const connectedSessionId = sessionId;
             const subscription = deps.dmk
@@ -222,7 +234,28 @@ export const createLedgerBitcoinService = (
                 })
                 .subscribe({
                     next: state => {
-                        if (state.deviceStatus === DeviceStatus.NOT_CONNECTED) clearSession();
+                        if (state.deviceStatus === DeviceStatus.NOT_CONNECTED) {
+                            clearSession();
+
+                            return;
+                        }
+
+                        const info = deviceInfo;
+                        if (!info) return;
+
+                        deviceInfo = {
+                            ...info,
+                            name: state.deviceName || info.name,
+                            ...('firmwareVersion' in state && state.firmwareVersion
+                                ? { osVersion: state.firmwareVersion.os }
+                                : {}),
+                            ...('currentApp' in state && state.currentApp.name === 'Bitcoin'
+                                ? { bitcoinAppVersion: state.currentApp.version }
+                                : {}),
+                            ...('batteryStatus' in state && state.batteryStatus
+                                ? { batteryLevel: state.batteryStatus.level }
+                                : {}),
+                        };
                     },
                     error: () => {
                         if (sessionId === connectedSessionId) clearSession();
@@ -233,6 +266,7 @@ export const createLedgerBitcoinService = (
                 });
             sessionStateSubscription = subscription.closed ? undefined : subscription;
         },
+        getDeviceInfo: () => deviceInfo,
         async getAccount(index) {
             const bitcoinSigner = getSigner();
             const path = getLedgerBitcoinAccountPath(index);

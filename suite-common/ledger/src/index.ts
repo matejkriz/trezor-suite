@@ -3,6 +3,7 @@ export {
     type LedgerBitcoinAccount,
     type LedgerBitcoinService,
     type LedgerBitcoinServiceDeps,
+    type LedgerDeviceInfo,
 } from './createLedgerBitcoinService';
 export { createLedgerBitcoinServiceForTransport } from './createLedgerBitcoinServiceForTransport';
 export { getLedgerBitcoinAccountPath } from './ledgerBitcoinPath';

@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 
 import { selectKnownDeviceByDeviceId } from '@suite-common/bluetooth/src/bluetoothSelectors';
-import { selectSelectedDevice } from '@suite-common/device';
+import { isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
 import { selectPersistentDeviceDataById } from '@suite-common/persistent-device-data';
 import { type TrezorDevice } from '@suite-common/suite-types';
 import { getIsDeviceConnectedViaBluetooth, getIsThpDevice } from '@suite-common/suite-utils';
@@ -12,6 +12,7 @@ import { useSelector } from 'src/hooks/suite';
 import {
     ConnectedCableForgetFlow,
     ImmediateForgetFlow,
+    LedgerForgetFlow,
     ThpBtConnectedForgetFlow,
     ThpBtKnownForgetFlow,
     ThpCableConnectedForgetFlow,
@@ -78,6 +79,10 @@ export const ForgetDeviceModal = ({ onCancel }: { onCancel: () => void }) => {
 
     if (!selectedDevice) {
         return null;
+    }
+
+    if (isLedgerDevice(selectedDevice)) {
+        return <LedgerForgetFlow onCancel={onCancel} />;
     }
 
     if (initialDeviceStateRef.current === null) {

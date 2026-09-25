@@ -5,6 +5,12 @@ export type LedgerSuiteDevice = Omit<AcquiredDevice, 'id' | 'state'> & {
     provider: 'ledger';
     id: string;
     state: NonNullable<AcquiredDevice['state']> & { staticSessionId: StaticSessionId };
+    ledgerInfo?: {
+        model: string;
+        osVersion?: string;
+        bitcoinAppVersion?: string;
+        batteryLevel?: number;
+    };
 };
 
 export const isLedgerDevice = (device?: TrezorDevice | null): device is LedgerSuiteDevice =>

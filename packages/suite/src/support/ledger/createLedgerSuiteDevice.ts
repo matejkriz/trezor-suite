@@ -1,4 +1,5 @@
 import { type LedgerSuiteDevice } from '@suite-common/device';
+import { type LedgerDeviceInfo } from '@suite-common/ledger';
 import { getSupportedNetworks } from '@suite-common/wallet-config';
 import { type StaticSessionId, type UnavailableCapabilities } from '@trezor/connect';
 import { asDeviceUniquePath } from '@trezor/connect-common';
@@ -8,6 +9,7 @@ export type LedgerWalletIdentity = {
     id: string;
     label: string;
     staticSessionId: StaticSessionId;
+    deviceInfo?: LedgerDeviceInfo;
 };
 
 const unsupportedCapabilities = [
@@ -50,6 +52,7 @@ export const createLedgerSuiteDevice = ({
     id,
     label,
     staticSessionId,
+    deviceInfo,
 }: LedgerWalletIdentity): LedgerSuiteDevice => {
     const now = Date.now();
 
@@ -59,6 +62,7 @@ export const createLedgerSuiteDevice = ({
         id,
         name: label,
         label,
+        ledgerInfo: deviceInfo,
         path: asDeviceUniquePath(`ledger:${id}`),
         descriptor: { apiType: 'usb', id },
         status: 'available',

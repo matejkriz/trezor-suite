@@ -43,4 +43,22 @@ describe(createLedgerSuiteDevice.name, () => {
         expect(unavailableCapabilities.evolu).toBe('no-support');
         expect(unavailableCapabilities.getFirmwareHash).toBe('no-support');
     });
+
+    it('keeps details read from Ledger for Device settings', () => {
+        const deviceInfo = {
+            name: 'My Ledger',
+            model: 'Ledger Flex',
+            osVersion: '1.3.0',
+            bitcoinAppVersion: '2.4.0',
+            batteryLevel: 80,
+        };
+        const device = createLedgerSuiteDevice({
+            ...wallet,
+            label: deviceInfo.name,
+            deviceInfo,
+        });
+
+        expect(device.ledgerInfo).toEqual(deviceInfo);
+        expect(device.features.label).toBe('My Ledger');
+    });
 });
