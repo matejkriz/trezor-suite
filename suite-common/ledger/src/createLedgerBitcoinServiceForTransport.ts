@@ -6,6 +6,7 @@ import { createLedgerBitcoinService } from './createLedgerBitcoinService';
 export const createLedgerBitcoinServiceForTransport = (
     transportFactory: TransportFactory,
     discoveryMode: 'interactive' | 'available' = 'interactive',
+    onDisconnect?: () => void,
 ) => {
     const dmk = new DeviceManagementKitBuilder().addTransport(transportFactory).build();
 
@@ -14,5 +15,6 @@ export const createLedgerBitcoinServiceForTransport = (
         listenToAvailableDevices:
             discoveryMode === 'available' ? () => dmk.listenToAvailableDevices({}) : undefined,
         createSigner: sessionId => new SignerBtcBuilder({ dmk, sessionId }).build(),
+        onDisconnect,
     });
 };

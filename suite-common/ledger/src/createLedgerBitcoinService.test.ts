@@ -2,10 +2,12 @@ import {
     DeviceActionStatus,
     DeviceModel,
     DeviceModelId,
+    type DeviceSessionState,
+    DeviceStatus,
     type DiscoveredDevice,
 } from '@ledgerhq/device-management-kit';
 import { type SignerBtc } from '@ledgerhq/device-signer-kit-bitcoin';
-import { EMPTY, Subject, of, throwError } from 'rxjs';
+import { EMPTY, NEVER, Subject, of, throwError } from 'rxjs';
 
 import { createMockDeps } from '@suite-common/dependency-injection';
 
@@ -25,19 +27,42 @@ const device: DiscoveredDevice = {
     transport: 'web-hid',
 };
 
-const createDeps = () => {
-    const signer: Pick<SignerBtc, 'getExtendedPublicKey' | 'getWalletAddress' | 'signPsbt'> = {
+const extendedPublicKey =
+    'xpub6DDUPHpUo4pcy43iJeZjbSVWGav1SMMmuWdMHiGtkK8rhKmfbomtkwW6GKs1GGAKehT6QRocrmda3WWxXawpjmwaUHfFRXuKrXSapdckEYF';
+const descriptor =
+    'zpub6rszzdAK6RuafeRwyN8z1cgWcXCuKbLmjjfnrW4fWKtcoXQ8787214pNJjnBG5UATyghuNzjn6Lfp5k5xymrLFJnCy46bMYJPyZsbpFGagT';
+const firstAddress = 'bc1qannfxke2tfd4l7vhepehpvt05y83v3qsf6nfkk';
+
+const createDeps = (
+    address = firstAddress,
+    serializedTransaction: `0x${string}` = '0x02000000',
+) => {
+    const signer: Pick<
+        SignerBtc,
+        | 'getExtendedPublicKey'
+        | 'getMasterFingerprint'
+        | 'getWalletAddress'
+        | 'signPsbt'
+        | 'signTransaction'
+    > = {
         getExtendedPublicKey: jest.fn(() => ({
             observable: of({
                 status: DeviceActionStatus.Completed,
-                output: { extendedPublicKey: 'xpub-ledger' },
+                output: { extendedPublicKey },
+            }),
+            cancel: jest.fn(),
+        })),
+        getMasterFingerprint: jest.fn(() => ({
+            observable: of({
+                status: DeviceActionStatus.Completed,
+                output: { masterFingerprint: Uint8Array.of(0x5c, 0x9e, 0x22, 0x8d) },
             }),
             cancel: jest.fn(),
         })),
         getWalletAddress: jest.fn(() => ({
             observable: of({
                 status: DeviceActionStatus.Completed,
-                output: { address: 'bc1qledger' },
+                output: { address },
             }),
             cancel: jest.fn(),
         })),
@@ -45,21 +70,74 @@ const createDeps = () => {
             observable: of({ status: DeviceActionStatus.Completed, output: [] }),
             cancel: jest.fn(),
         })),
+        signTransaction: jest.fn(() => ({
+            observable: of({ status: DeviceActionStatus.Completed, output: serializedTransaction }),
+            cancel: jest.fn(),
+        })),
     };
 
     return createMockDeps<LedgerBitcoinServiceDeps>({
         dmk: {
             startDiscovering: () => of(device),
+            listenToAvailableDevices: () => of([device]),
             stopDiscovering: () => Promise.resolve(),
             connect: () => Promise.resolve('session-1'),
+            getDeviceSessionState: () => NEVER,
             disconnect: () => Promise.resolve(),
             close: () => undefined,
         },
         createSigner: () => signer,
+        onDisconnect: jest.fn(),
     });
 };
 
 describe('createLedgerBitcoinService', () => {
+    it('clears the signer and reports a physically disconnected Ledger', async () => {
+        const deps = createDeps();
+        const sessionState = new Subject<DeviceSessionState>();
+        deps.dmk.getDeviceSessionState.mockReturnValue(sessionState);
+        const service = createLedgerBitcoinService(deps);
+
+        await service.connect(device);
+        sessionState.next({ deviceStatus: DeviceStatus.NOT_CONNECTED } as DeviceSessionState);
+
+        expect(deps.onDisconnect).toHaveBeenCalledTimes(1);
+        await expect(service.getAccount(0)).rejects.toThrow('Ledger device is not connected');
+    });
+
+    it('lists previously available devices without starting interactive discovery', () => {
+        const deps = createDeps();
+        const availableDevices = new Subject<DiscoveredDevice[]>();
+        deps.dmk.listenToAvailableDevices.mockReturnValue(availableDevices);
+        const service = createLedgerBitcoinService(deps);
+        const onDevices = jest.fn();
+
+        const stopListening = service.listenToAvailableDevices(onDevices, jest.fn());
+        availableDevices.next([device]);
+
+        expect(onDevices).toHaveBeenCalledWith([device]);
+        expect(deps.dmk.listenToAvailableDevices).toHaveBeenCalledWith({});
+        expect(deps.dmk.startDiscovering).not.toHaveBeenCalled();
+
+        stopListening();
+        availableDevices.next([]);
+        expect(onDevices).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops available-device listening when disconnected', async () => {
+        const deps = createDeps();
+        const availableDevices = new Subject<DiscoveredDevice[]>();
+        deps.dmk.listenToAvailableDevices.mockReturnValue(availableDevices);
+        const service = createLedgerBitcoinService(deps);
+        const onDevices = jest.fn();
+
+        service.listenToAvailableDevices(onDevices, jest.fn());
+        await service.disconnect();
+        availableDevices.next([device]);
+
+        expect(onDevices).not.toHaveBeenCalled();
+    });
+
     it('uses the supplied device stream when transport discovery emits no devices', () => {
         const deps = createDeps();
         deps.dmk.startDiscovering.mockReturnValue(EMPTY);
@@ -100,14 +178,36 @@ describe('createLedgerBitcoinService', () => {
         await service.connect(device);
         await expect(service.getAccount(0)).resolves.toEqual({
             path: "84'/0'/0'",
-            extendedPublicKey: 'xpub-ledger',
-            address: 'bc1qledger',
+            extendedPublicKey,
+            descriptor,
+            masterFingerprint: '5c9e228d',
+            address: firstAddress,
         });
         expect(deps.dmk.connect).toHaveBeenCalledWith({ device });
         expect(deps.createSigner).toHaveBeenCalledWith('session-1');
         expect(deps.createSigner.mock.results[0]?.value.getWalletAddress).toHaveBeenCalledWith(
             expect.objectContaining({ derivationPath: "84'/0'/0'" }),
             0,
+        );
+    });
+
+    it('exposes the stable Bitcoin master fingerprint', async () => {
+        const deps = createDeps();
+        const service = createLedgerBitcoinService(deps);
+
+        await service.connect(device);
+
+        await expect(service.getMasterFingerprint()).resolves.toBe('5c9e228d');
+    });
+
+    it('rejects an account when the signer address differs from the descriptor address', async () => {
+        const deps = createDeps('bc1qwrong');
+        const service = createLedgerBitcoinService(deps);
+
+        await service.connect(device);
+
+        await expect(service.getAccount(0)).rejects.toThrow(
+            'Ledger account public key does not match its first address',
         );
     });
 
@@ -153,7 +253,7 @@ describe('createLedgerBitcoinService', () => {
         const service = createLedgerBitcoinService(deps);
 
         await service.connect(device);
-        await expect(service.verifyAddress(0, 0)).resolves.toBe('bc1qledger');
+        await expect(service.verifyAddress(0, 0)).resolves.toBe(firstAddress);
 
         expect(deps.createSigner.mock.results[0]?.value.getWalletAddress).toHaveBeenCalledWith(
             expect.objectContaining({ derivationPath: "84'/0'/0'" }),
@@ -172,6 +272,29 @@ describe('createLedgerBitcoinService', () => {
         expect(deps.createSigner.mock.results[0]?.value.signPsbt).toHaveBeenCalledWith(
             expect.objectContaining({ derivationPath: "84'/0'/0'" }),
             'cHNidA==',
+        );
+    });
+
+    it('returns unprefixed serialized transaction hex from the Bitcoin signer', async () => {
+        const deps = createDeps();
+        const service = createLedgerBitcoinService(deps);
+
+        await service.connect(device);
+        await expect(service.signTransaction(0, 'cHNidA==')).resolves.toBe('02000000');
+
+        expect(deps.createSigner.mock.results[0]?.value.signTransaction).toHaveBeenCalledWith(
+            expect.objectContaining({ derivationPath: "84'/0'/0'" }),
+            'cHNidA==',
+        );
+    });
+
+    it('rejects malformed serialized transaction hex from the Bitcoin signer', async () => {
+        const service = createLedgerBitcoinService(createDeps(firstAddress, '0x1'));
+
+        await service.connect(device);
+
+        await expect(service.signTransaction(0, 'cHNidA==')).rejects.toThrow(
+            'Ledger returned an invalid serialized Bitcoin transaction',
         );
     });
 
