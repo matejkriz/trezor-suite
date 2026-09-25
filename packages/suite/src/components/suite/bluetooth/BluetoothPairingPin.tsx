@@ -1,0 +1,34 @@
+import styled from 'styled-components';
+
+import { type DesktopBluetoothDevice } from '@suite/bluetooth';
+import { Translation } from '@suite/intl';
+import { Card, Modal, Row, Text } from '@trezor/components';
+
+import { BluetoothDeviceComponent } from './BluetoothDeviceComponent';
+
+const Pin = styled.span`
+    letter-spacing: 16px;
+`;
+
+type BluetoothPairingPinProps = {
+    pairingPin?: string;
+    device: DesktopBluetoothDevice;
+    onCancel: () => void;
+};
+
+export const BluetoothPairingPin = ({ pairingPin, device, onCancel }: BluetoothPairingPinProps) => (
+    <Modal
+        onCancel={onCancel}
+        heading={<Translation id="TR_CONFIRM_PAIRING_TREZOR" />}
+        description={<Translation id="TR_CONFIRM_PAIRING_TREZOR_DESCRIPTION" />}
+    >
+        <Card overflow="hidden" paddingType="large">
+            <Row gap={8} justifyContent="space-between" padding={{ horizontal: 8, vertical: 4 }}>
+                <Text typographyStyle="headline-lg">
+                    <Pin>{pairingPin}</Pin>
+                </Text>
+                <BluetoothDeviceComponent device={device} />
+            </Row>
+        </Card>
+    </Modal>
+);

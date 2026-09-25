@@ -1,7 +1,10 @@
-import { restartDiscoveryThunk } from '@suite-common/wallet-core';
+import { useDevice } from '@suite/device';
+import { Translation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { startOrRestartDiscoveryThunk } from '@suite-common/wallet-core';
+import { RepeatIcon, WarningIcon } from '@trezor/icons';
 
-import { useDevice, useDispatch } from 'src/hooks/suite';
-import { Translation } from 'src/components/suite';
 import { AccountExceptionLayout } from 'src/components/wallet';
 
 /**
@@ -11,20 +14,23 @@ import { AccountExceptionLayout } from 'src/components/wallet';
  * - Other @trezor/connect runtime error
  */
 export const AccountNotLoaded = () => {
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
     const { isLocked } = useDevice();
 
-    const handleClick = () => dispatch(restartDiscoveryThunk());
+    const handleClick = () => dispatch(startOrRestartDiscoveryThunk());
 
     return (
         <AccountExceptionLayout
+            data-testid="@accounts/account-not-loaded"
             title={<Translation id="TR_ACCOUNT_EXCEPTION_DISCOVERY_ERROR" />}
             description={<Translation id="TR_ACCOUNT_EXCEPTION_DISCOVERY_DESCRIPTION" />}
-            image="CLOUDY"
+            icon={WarningIcon}
+            iconVariant="warning"
             actions={[
                 {
                     key: '1',
-                    icon: 'REFRESH',
+                    'data-testid': '@accounts/account-not-loaded/retry-button',
+                    iconLeft: RepeatIcon,
                     isLoading: isLocked(),
                     onClick: handleClick,
                     children: <Translation id="TR_RETRY" />,

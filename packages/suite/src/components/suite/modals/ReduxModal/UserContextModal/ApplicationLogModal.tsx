@@ -1,64 +1,73 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
+
 import styled from 'styled-components';
 
-import { selectLogs } from '@suite-common/logger';
-import { Switch, Button, variables } from '@trezor/components';
+import { injectDesktopAnalytics } from '@suite/analytics';
+import { Translation } from '@suite/intl';
+import { events } from '@suite-common/analytics';
+import { useServices } from '@suite-common/dependency-injection';
+import {
+    Card,
+    Column,
+    H4,
+    Modal,
+    Paragraph,
+    Row,
+    Switch,
+    Text,
+    useScrollShadow,
+    variables,
+} from '@trezor/components';
 
-import { ActionColumn, Modal, TextColumn, Translation } from 'src/components/suite';
-import { SectionItem } from 'src/components/suite/section';
-import { useSelector } from 'src/hooks/suite';
-import { getApplicationInfo, getApplicationLog, prettifyLog } from 'src/utils/suite/logsUtils';
-import { spacingsPx } from '@trezor/theme';
+import { useApplicationLogs } from 'src/utils/suite/logsUtils';
 
-const LogWrapper = styled.pre`
-    padding: 20px;
-    height: 380px;
-    width: 100%;
+// The height sits on the scrolling element rather than on the log, so that the log spans the
+// whole scrollable content and the scroll shadow sentinels inside it land on its very edges.
+const ScrollContainer = styled.div`
     overflow: auto;
-    background-color: ${({ theme }) => theme.BG_LIGHT_GREY};
-    color: ${({ theme }) => theme.TYPE_DARK_GREY};
-    font-size: ${variables.FONT_SIZE.TINY};
-    text-align: left;
-    word-break: break-all;
-    box-shadow: inset 0 0 6px -2px ${({ theme }) => theme.BG_GREY};
-    border-radius: 6px;
+    height: 350px;
 
     ${variables.SCREEN_QUERY.BELOW_LAPTOP} {
-        height: 365px;
+        height: 320px;
     }
 
     ${variables.SCREEN_QUERY.BELOW_TABLET} {
-        height: 330px;
+        height: 280px;
     }
 `;
 
-const BalanceInfoSection = styled(SectionItem)`
-    margin-top: ${spacingsPx.md};
-
-    &:not(:first-child) {
-        > div {
-            border-top: 0;
-        }
-    }
+const LogWrapper = styled.pre`
+    position: relative;
+    padding: 16px;
+    width: 100%;
+    text-align: left;
+    word-break: break-all;
 `;
 
 type ApplicationLogModalProps = { onCancel: () => void };
 
 export const ApplicationLogModal = ({ onCancel }: ApplicationLogModalProps) => {
-    const htmlElement = useRef<HTMLPreElement>(null);
+    const { analytics } = useServices(injectDesktopAnalytics);
     const [hideSensitiveInfo, setHideSensitiveInfo] = useState(false);
-    const logs = useSelector(selectLogs);
-
-    const state = useSelector(state => state);
-
-    const actionLog = getApplicationLog(logs, hideSensitiveInfo);
-    const applicationInfo = getApplicationInfo(state, hideSensitiveInfo);
-
-    const log = prettifyLog([applicationInfo, ...actionLog]);
+    const applicationLogs = useApplicationLogs({ hideSensitiveInfo });
+    const { ShadowTop, ShadowBottom, ShadowContainer, ScrollSentinels, scrollElementRef } =
+        useScrollShadow();
 
     const download = () => {
+        if (applicationLogs === null) return;
+
+        analytics.report({
+            type: events.settingsAppLogExportedEvent.name,
+            payload: {
+                isRedacted: hideSensitiveInfo,
+            },
+        });
+
         const element = document.createElement('a');
-        element.setAttribute('href', `data:text/plain;charset=utf-8,${encodeURIComponent(log)}`);
+        element.setAttribute(
+            'href',
+            `data:text/plain;charset=utf-8,${encodeURIComponent(applicationLogs)}`,
+        );
         element.setAttribute('download', 'trezor-suite-log.txt');
 
         element.style.display = 'none';
@@ -69,35 +78,48 @@ export const ApplicationLogModal = ({ onCancel }: ApplicationLogModalProps) => {
         document.body.removeChild(element);
     };
 
+    // usually takes less than 100 ms, so it's ok to delay display without a loader component
+    if (applicationLogs === null) return null;
+
     return (
         <Modal
-            isCancelable
             onCancel={onCancel}
             heading={<Translation id="TR_LOG" />}
             description={<Translation id="LOG_DESCRIPTION" />}
-            data-test="@modal/application-log"
-            bottomBarComponents={
-                <Button variant="secondary" onClick={download} data-test="@log/export-button">
+            data-testid="@modal/application-log"
+            bottomContent={
+                <Modal.Button onClick={download} data-testid="@log/export-button">
                     <Translation id="TR_EXPORT_TO_FILE" />
-                </Button>
+                </Modal.Button>
             }
         >
-            <LogWrapper ref={htmlElement} data-test="@log/content">
-                {log}
-            </LogWrapper>
+            <Card paddingType="none" margin={{ top: 12 }} overflow="hidden">
+                <ShadowContainer>
+                    <ShadowTop />
+                    <ScrollContainer ref={scrollElementRef}>
+                        <LogWrapper data-testid="@log/content">
+                            <ScrollSentinels />
+                            <Text typographyStyle="body-xs">{applicationLogs}</Text>
+                        </LogWrapper>
+                    </ScrollContainer>
+                    <ShadowBottom />
+                </ShadowContainer>
+            </Card>
 
-            <BalanceInfoSection>
-                <TextColumn
-                    title={<Translation id="LOG_INCLUDE_BALANCE_TITLE" />}
-                    description={<Translation id="LOG_INCLUDE_BALANCE_DESCRIPTION" />}
+            <Row margin={{ top: 24 }} gap={48}>
+                <Column gap={4} alignItems="flex-start">
+                    <H4>
+                        <Translation id="LOG_INCLUDE_BALANCE_TITLE" />
+                    </H4>
+                    <Paragraph intent="neutral" priority="secondary" typographyStyle="body-sm">
+                        <Translation id="LOG_INCLUDE_BALANCE_DESCRIPTION" />
+                    </Paragraph>
+                </Column>
+                <Switch
+                    isChecked={!hideSensitiveInfo}
+                    onChange={() => setHideSensitiveInfo(!hideSensitiveInfo)}
                 />
-                <ActionColumn>
-                    <Switch
-                        isChecked={!hideSensitiveInfo}
-                        onChange={() => setHideSensitiveInfo(!hideSensitiveInfo)}
-                    />
-                </ActionColumn>
-            </BalanceInfoSection>
+            </Row>
         </Modal>
     );
 };

@@ -1,20 +1,20 @@
 import { Input as InputComponent } from '@trezor/components';
 
-import { Field } from '../../types';
 import { Row } from './Row';
+import { type FieldBasic } from '../../types';
 
 interface InputProps {
-    onChange: (field: Field<any>, value: string) => void;
-    field: Field<any>;
-    dataTest?: string;
+    onChange: (field: FieldBasic<any>, value: string) => void;
+    field: FieldBasic<any>;
+    'data-testid'?: string;
 }
 
-const Input = ({ dataTest, field, onChange }: InputProps) => (
+const Input = ({ 'data-testid': dataTest, field, onChange }: InputProps) => (
     <Row>
         <InputComponent
-            dataTest={dataTest}
+            data-testid={dataTest}
             label={field.name}
-            value={field.value}
+            value={field.value || ''}
             onChange={event => onChange(field, event.target.value)}
         />
     </Row>

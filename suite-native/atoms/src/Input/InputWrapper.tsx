@@ -1,10 +1,12 @@
-import { ReactNode } from 'react';
+import { type ReactNode } from 'react';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
 
 import { Box } from '../Box';
-import { Text } from '../Text';
 import { Hint } from '../Hint';
+import { VStack } from '../Stack';
+import { Text } from '../Text';
 
 export type InputWrapperProps = {
     children: ReactNode;
@@ -14,22 +16,8 @@ export type InputWrapperProps = {
 };
 
 const labelStyle = prepareNativeStyle(utils => ({
-    marginTop: utils.spacings.small,
-    marginLeft: 11,
-    marginBottom: 18,
+    marginTop: utils.spacings.sp8,
 }));
-
-const hintStyle = prepareNativeStyle(
-    (_, { error, hint }: Pick<InputWrapperProps, 'error' | 'hint'>) => ({
-        marginTop: 0,
-        extend: {
-            condition: !!error || !!hint,
-            style: {
-                marginTop: 3,
-            },
-        },
-    }),
-);
 
 // Temperorary translation of the error messages used in the native app.
 // Should be later replaced by an implementation of a localization module.
@@ -44,17 +32,27 @@ export const InputWrapper = ({ children, label, hint, error }: InputWrapperProps
     const errorMessage = (error && errorToMessageMap[error]) ?? error;
 
     return (
-        <Box>
-            {label && (
-                <Text variant="highlight" color="textSubdued" style={applyStyle(labelStyle)}>
+        <VStack flex={1} spacing="sp6">
+            {!!label && (
+                <Text variant="body-md" color="contentPrimary" style={applyStyle(labelStyle)}>
                     {label}
                 </Text>
             )}
             <Box>{children}</Box>
-            <Box style={applyStyle(hintStyle, { error, hint })}>
-                {!!error && <Hint variant="error">{errorMessage}</Hint>}
-                {!!hint && <Hint>{hint}</Hint>}
-            </Box>
-        </Box>
+            {(!!error || !!hint) && (
+                <Box marginLeft="sp12">
+                    {!!error && (
+                        <Animated.View entering={FadeIn} exiting={FadeOut}>
+                            <Hint variant="error">{errorMessage}</Hint>
+                        </Animated.View>
+                    )}
+                    {!!hint && (
+                        <Animated.View entering={FadeIn} exiting={FadeOut}>
+                            <Hint>{hint}</Hint>
+                        </Animated.View>
+                    )}
+                </Box>
+            )}
+        </VStack>
     );
 };

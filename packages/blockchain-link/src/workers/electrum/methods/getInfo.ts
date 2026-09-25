@@ -1,7 +1,10 @@
+import type { MessageTypes, ResponseTypes } from '@trezor/blockchain-link-types';
 import { throwError } from '@trezor/utils';
-import { Api, blockheaderToBlockhash } from '../utils';
-import type { GetInfo as Req } from '@trezor/blockchain-link-types/src/messages';
-import type { GetInfo as Res } from '@trezor/blockchain-link-types/src/responses';
+
+import { type Api, blockheaderToBlockhash } from '../utils';
+
+type Req = MessageTypes.GetInfo;
+type Res = ResponseTypes.GetInfo;
 
 const getInfo: Api<Req, Res> = client => {
     const {
@@ -18,6 +21,7 @@ const getInfo: Api<Req, Res> = client => {
         blockHash: blockheaderToBlockhash(hex),
         name: 'Bitcoin',
         shortcut: coin,
+        network: coin,
         testnet: coin === 'REGTEST',
         decimals: 8,
     });

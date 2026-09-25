@@ -1,37 +1,22 @@
-import { useEffect, useState, ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { Provider } from 'react-redux';
 
-import { EnhancedStore } from '@reduxjs/toolkit';
-import { Persistor, persistStore } from 'redux-persist';
-
+import { ServicesProvider } from '@suite-common/dependency-injection';
 import { StorageProvider } from '@suite-native/storage';
 
-import { initStore } from './store';
+import { type NativeServices } from './NativeServices';
+import { type NativeReduxStoreDep } from './createReduxStore';
+import { type StorePersistorDep } from './createStorePersistor';
 
 type StoreProviderProps = {
     children: ReactNode;
+    services: NativeServices & NativeReduxStoreDep & StorePersistorDep;
 };
 
-export const StoreProvider = ({ children }: StoreProviderProps) => {
-    const [store, setStore] = useState<EnhancedStore | null>(null);
-    const [storePersistor, setStorePersistor] = useState<Persistor | null>(null);
-
-    useEffect(() => {
-        const initStoreAsync = async () => {
-            const freshStore = await initStore();
-            const freshPersistor = persistStore(freshStore);
-            setStore(freshStore);
-            setStorePersistor(freshPersistor);
-        };
-
-        initStoreAsync();
-    }, []);
-
-    if (store === null || storePersistor === null) return null;
-
-    return (
-        <Provider store={store}>
-            <StorageProvider persistor={storePersistor}>{children}</StorageProvider>
+export const StoreProvider = ({ children, services }: StoreProviderProps) => (
+    <ServicesProvider services={services}>
+        <Provider store={services.store}>
+            <StorageProvider persistor={services.storePersistor}>{children}</StorageProvider>
         </Provider>
-    );
-};
+    </ServicesProvider>
+);

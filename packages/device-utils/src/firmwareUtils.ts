@@ -1,42 +1,66 @@
-import { FirmwareType, Device, VersionArray } from '@trezor/connect';
+import type { MessagesSchema as PROTO } from '@trezor/protobuf';
+import type { VersionArray } from '@trezor/utils/src/versionUtils';
 
 import { isDeviceInBootloaderMode } from './modeUtils';
+import {
+    type FirmwareSource,
+    FirmwareType,
+    type FirmwareVersionString,
+    type PartialDevice,
+} from './types';
 
-export const getFirmwareRevision = (device?: Device) => device?.features?.revision || '';
+export const getFirmwareSource = (device?: PartialDevice): FirmwareSource => {
+    if (device?.mode === 'bootloader') {
+        return 'NA - bootloader';
+    }
+    if (
+        device?.authenticityChecks?.firmwareRevision?.success &&
+        device?.authenticityChecks?.firmwareHash?.success
+    ) {
+        return 'official';
+    }
 
-export const getFirmwareVersionArray = (device?: Device): VersionArray | null => {
+    return 'unknown';
+};
+
+export const getFirmwareRevision = (device?: PartialDevice) => device?.features?.revision || '';
+
+/**
+ * Gets the firmware/bootloader version from device features, depending on the mode (it does not distinguish normal | bootloader).
+ */
+export const getFirmwareOrBootloaderVersionArray = (features: PROTO.Features): VersionArray => [
+    features.major_version,
+    features.minor_version,
+    features.patch_version,
+];
+
+export const getFirmwareVersionArray = (device?: PartialDevice): VersionArray | null => {
     if (!device?.features) {
         return null;
     }
     const { features } = device;
 
+    // `fw_version` is the firmware version when in bootloader mode, in firmware mode it will be [null, null, null]
     if (isDeviceInBootloaderMode(device)) {
         return features.fw_major
             ? ([features.fw_major, features.fw_minor, features.fw_patch] as VersionArray)
             : null;
     }
 
-    return [features.major_version, features.minor_version, features.patch_version];
+    // `version` is bootloader version when in bootloader mode, in firmware mode it is firmware version.
+    return getFirmwareOrBootloaderVersionArray(features);
 };
 
-export const getFirmwareVersion = (device?: Device) => {
-    if (!device?.features) {
-        return '';
-    }
-    const { features } = device;
-    if (isDeviceInBootloaderMode(device)) {
-        return features.fw_major
-            ? `${features.fw_major}.${features.fw_minor}.${features.fw_patch}`
-            : '';
-    }
+export const getFirmwareVersion = (device?: PartialDevice): '' | FirmwareVersionString => {
+    const versionArray = getFirmwareVersionArray(device);
 
-    return `${features.major_version}.${features.minor_version}.${features.patch_version}`;
+    return versionArray === null ? '' : (versionArray.join('.') as FirmwareVersionString);
 };
 
 // This can give a false negative in bootloader mode for T1B1 and T2T1.
-export const hasBitcoinOnlyFirmware = (device?: Device) =>
+export const hasBitcoinOnlyFirmware = (device?: PartialDevice) =>
     device?.firmwareType === FirmwareType.BitcoinOnly;
 
 // Bitcoin-only device with Universal firmware is treated as a regular device.
-export const isBitcoinOnlyDevice = (device?: Device) =>
-    !!device?.features?.unit_btconly && device?.firmwareType !== FirmwareType.Regular;
+export const isBitcoinOnlyDevice = (device?: PartialDevice) =>
+    !!device?.features?.unit_btconly && device?.firmwareType !== FirmwareType.Universal;

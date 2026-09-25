@@ -1,5 +1,5 @@
-import { RoundPhase, EndRoundState } from '../enums';
-import { AFFILIATION_ID } from '../constants';
+import { type AFFILIATION_ID } from '../constants';
+import { type EndRoundState, type RoundPhase } from '../enums';
 
 export type AffiliationId = keyof typeof AFFILIATION_ID;
 
@@ -130,9 +130,7 @@ export interface CoinjoinOutputAddedEvent {
 }
 
 export type CoinjoinStateEvent =
-    | CoinjoinRoundCreatedEvent
-    | CoinjoinInputAddedEvent
-    | CoinjoinOutputAddedEvent;
+    CoinjoinRoundCreatedEvent | CoinjoinInputAddedEvent | CoinjoinOutputAddedEvent;
 
 export interface AllowedRange {
     Min: number;
@@ -166,11 +164,14 @@ export interface Round {
     AffiliateRequest?: string; // conditionally added by ./client/Status
 }
 
-export interface CoinjoinAffiliateRequest {
-    fee_rate: number;
-    no_fee_threshold: number;
-    min_registrable_amount: number;
+interface CoinjoinAffiliateFields {
     mask_public_key: string;
     coinjoin_flags_array: number[];
     signature: string;
+}
+
+export interface CoinjoinAffiliateRequest extends CoinjoinAffiliateFields {
+    fee_rate: number;
+    no_fee_threshold: number;
+    min_registrable_amount: number;
 }

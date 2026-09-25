@@ -1,24 +1,18 @@
-import styled from 'styled-components';
+import { Column } from '@trezor/components';
 
-import { NotificationRenderer } from 'src/components/suite';
-import { NotificationView } from './NotificationView';
+import { NotificationRenderer } from 'src/components/suite/notifications/NotificationRenderer/NotificationRenderer';
 import type { AppState } from 'src/types/suite';
 
-const Wrapper = styled.div`
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    max-width: 100%;
-`;
+import { NotificationView } from './NotificationView';
 
 interface NotificationListProps {
     notifications: AppState['notifications'];
 }
 
 export const NotificationList = ({ notifications }: NotificationListProps) => (
-    <Wrapper>
+    <Column flex="1" hasDivider gap={24}>
         {notifications.map(n => (
             <NotificationRenderer key={n.id} notification={n} render={NotificationView} />
         ))}
-    </Wrapper>
+    </Column>
 );

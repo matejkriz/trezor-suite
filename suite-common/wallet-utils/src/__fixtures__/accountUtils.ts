@@ -1,131 +1,9 @@
-import { testMocks } from '@suite-common/test-utils';
-
-import { ACCOUNTS } from './accounts';
-
-const DISCOVERIES = [
-    {
-        deviceState: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
-        index: 0,
-        status: 4,
-        total: 35,
-        bundleSize: 0,
-        loaded: 39,
-        failed: [],
-        networks: ['btc', 'btc', 'btc', 'test', 'test', 'test', 'eth', 'txrp'],
-    },
-];
-
-export const getDiscoveryProcess = [
-    {
-        testName:
-            'Discovery for 7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f device',
-        discoveries: DISCOVERIES,
-        device: testMocks.getSuiteDevice({
-            state: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
-        }),
-        result: {
-            bundleSize: 0,
-            deviceState: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
-            failed: [],
-            index: 0,
-            loaded: 39,
-            networks: ['btc', 'btc', 'btc', 'test', 'test', 'test', 'eth', 'txrp'],
-            status: 4,
-            total: 35,
-        },
-    },
-    {
-        testName:
-            'Discovery for 1dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f device',
-        discoveries: DISCOVERIES,
-        device: testMocks.getSuiteDevice({
-            state: '1dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
-        }),
-        result: null,
-    },
-];
-
-export const accountTitleFixture = [
-    { symbol: 'btc', title: 'TR_NETWORK_BITCOIN' },
-    { symbol: 'test', title: 'TR_NETWORK_BITCOIN_TESTNET' },
-    { symbol: 'bch', title: 'TR_NETWORK_BITCOIN_CASH' },
-    { symbol: 'btg', title: 'TR_NETWORK_BITCOIN_GOLD' },
-    { symbol: 'dash', title: 'TR_NETWORK_DASH' },
-    { symbol: 'xrp', title: 'TR_NETWORK_XRP' },
-    { symbol: 'txrp', title: 'TR_NETWORK_XRP_TESTNET' },
-    { symbol: 'tsep', title: 'TR_NETWORK_ETHEREUM_SEPOLIA' },
-    { symbol: 'thol', title: 'TR_NETWORK_ETHEREUM_HOLESKY' },
-    { symbol: 'dgb', title: 'TR_NETWORK_DIGIBYTE' },
-    { symbol: 'doge', title: 'TR_NETWORK_DOGECOIN' },
-    { symbol: 'ltc', title: 'TR_NETWORK_LITECOIN' },
-    { symbol: 'nmc', title: 'TR_NETWORK_NAMECOIN' },
-    { symbol: 'vtc', title: 'TR_NETWORK_VERTCOIN' },
-    { symbol: 'zec', title: 'TR_NETWORK_ZCASH' },
-    { symbol: 'eth', title: 'TR_NETWORK_ETHEREUM' },
-    { symbol: 'etc', title: 'TR_NETWORK_ETHEREUM_CLASSIC' },
-    { symbol: 'xem', title: 'TR_NETWORK_NEM' },
-    { symbol: 'xlm', title: 'TR_NETWORK_STELLAR' },
-    { symbol: 'ada', title: 'TR_NETWORK_CARDANO' },
-    { symbol: 'xtz', title: 'TR_NETWORK_TEZOS' },
-    { symbol: 'aaaaaa', title: 'TR_NETWORK_UNKNOWN' },
-    { symbol: 'bbb', title: 'TR_NETWORK_UNKNOWN' },
-    { symbol: 'c', title: 'TR_NETWORK_UNKNOWN' },
-];
-
-export const accountTitleCoinjoinFixture = [
-    { symbol: 'btc', title: 'TR_NETWORK_COINJOIN_BITCOIN' },
-    { symbol: 'test', title: 'TR_NETWORK_COINJOIN_BITCOIN_TESTNET' },
-    { symbol: 'regtest', title: 'TR_NETWORK_COINJOIN_BITCOIN_REGTEST' },
-    { symbol: 'btg', title: 'TR_NETWORK_UNKNOWN' },
-    { symbol: 'aaaaaa', title: 'TR_NETWORK_UNKNOWN' },
-];
-
-export const parseBIP44Path = [
-    {
-        path: `m/84'/0'/0'/1/0`,
-        result: {
-            purpose: "84'",
-            coinType: "0'",
-            account: "0'",
-            change: '1',
-            addrIndex: '0',
-        },
-    },
-    {
-        path: `m/44'/0'/0'/0/2`,
-        result: {
-            purpose: "44'",
-            coinType: "0'",
-            account: "0'",
-            change: '0',
-            addrIndex: '2',
-        },
-    },
-    {
-        path: `m/44'/0'/0'/0/48`,
-        result: {
-            purpose: "44'",
-            coinType: "0'",
-            account: "0'",
-            change: '0',
-            addrIndex: '48',
-        },
-    },
-    {
-        path: `m/44'/133'/0'/0/0`,
-        result: {
-            purpose: "44'",
-            coinType: "133'",
-            account: "0'",
-            change: '0',
-            addrIndex: '0',
-        },
-    },
-    {
-        path: `m/84'/0'/0'/1/`,
-        result: null,
-    },
-];
+import { asNetworkSymbol } from '@suite-common/wallet-config';
+import { CARDANO_EVERSTAKE_DREP } from '@suite-common/wallet-constants';
+import type { AccountWithNetworkType } from '@suite-common/wallet-types';
+import { mockWalletAccount, networkSpecificDefaultCardano } from '@suite-common/wallet-types/mocks';
+import type { AccountInfo } from '@trezor/connect';
+import type { Bip43Path, Bip43PathTemplate } from '@trezor/crypto-utils';
 
 export const sortByCoin = [
     {
@@ -227,6 +105,32 @@ export const getBip43Type = [
     },
 ];
 
+type SubstituteBip43PathFixture = {
+    description: string;
+    pathTemplate: Bip43PathTemplate;
+    index?: number | string;
+    result: Bip43Path;
+};
+export const substituteBip43Path: SubstituteBip43PathFixture[] = [
+    {
+        description: 'numerical index',
+        pathTemplate: "m/84'/0'/i'",
+        index: 7,
+        result: "m/84'/0'/7'",
+    },
+    {
+        description: 'stringified index',
+        pathTemplate: "m/44'/0'/i'/0",
+        index: '14',
+        result: "m/44'/0'/14'/0",
+    },
+    {
+        description: 'default index',
+        pathTemplate: "m/10025'/1'/i'/1'",
+        result: "m/10025'/1'/0'/1'",
+    },
+];
+
 export const getUtxoFromSignedTransaction = [
     {
         description: 'regular tx, 1 new utxo',
@@ -258,6 +162,87 @@ export const getUtxoFromSignedTransaction = [
         result: [
             { txid: 'ABCD', vout: 1, amount: '1', address: 'B-change', path: '/1/1' },
             { txid: '0000', vout: 0, amount: '4' },
+        ],
+    },
+    {
+        description: 'cardano tx, 1 new change utxo',
+        params: {
+            account: {
+                addresses: {
+                    used: [],
+                    unused: [],
+                    change: [
+                        { path: "m/1852'/1815'/0'/1/0", address: 'A-change' },
+                        { path: "m/1852'/1815'/0'/1/1", address: 'B-change' },
+                    ],
+                },
+                utxo: [
+                    { txid: '0000', vout: 0, amount: '4' },
+                    { txid: '0000', vout: 1, amount: '5' },
+                ],
+            },
+            tx: {
+                type: 'final',
+                inputs: [{ prev_hash: '0000', prev_index: 1 }],
+                outputs: [
+                    { address: 'external', amount: '2' },
+                    {
+                        addressParameters: { addressType: 0, path: "m/1852'/1815'/0'/1/1" },
+                        amount: '1',
+                    },
+                ],
+            },
+            txid: 'ABCD',
+        },
+        result: [
+            {
+                txid: 'ABCD',
+                vout: 1,
+                amount: '1',
+                address: 'B-change',
+                path: "m/1852'/1815'/0'/1/1",
+            },
+            { txid: '0000', vout: 0, amount: '4' },
+        ],
+    },
+    {
+        description: 'cardano tx, change utxo with token bundle keeps lovelace amount',
+        params: {
+            account: {
+                addresses: {
+                    used: [],
+                    unused: [],
+                    change: [{ path: "m/1852'/1815'/0'/1/0", address: 'A-change' }],
+                },
+                utxo: [{ txid: '0000', vout: 0, amount: '10' }],
+            },
+            tx: {
+                type: 'final',
+                inputs: [{ prev_hash: '0000', prev_index: 0 }],
+                outputs: [
+                    { address: 'external', amount: '2' },
+                    {
+                        addressParameters: { addressType: 0, path: "m/1852'/1815'/0'/1/0" },
+                        amount: '3',
+                        tokenBundle: [
+                            {
+                                policyId: 'policy',
+                                tokenAmounts: [{ assetNameBytes: '', amount: '7' }],
+                            },
+                        ],
+                    },
+                ],
+            },
+            txid: 'ABCD',
+        },
+        result: [
+            {
+                txid: 'ABCD',
+                vout: 1,
+                amount: '3',
+                address: 'A-change',
+                path: "m/1852'/1815'/0'/1/0",
+            },
         ],
     },
     {
@@ -436,53 +421,76 @@ export const getUtxoFromSignedTransaction = [
     },
 ];
 
-export const getFirstFreshAddress = [
+type CardanoStaking = AccountWithNetworkType<'cardano'>['misc']['staking'];
+type CardanoDrep = NonNullable<CardanoStaking['drep']>;
+
+const drep: CardanoDrep = {
+    drep_id: CARDANO_EVERSTAKE_DREP.bech32,
+    hex: CARDANO_EVERSTAKE_DREP.hex,
+    amount: '1000000000',
+    active: true,
+    active_epoch: 507,
+    has_script: false,
+};
+
+// only `drep_id` is compared, so any other id will do
+const otherDrep = {
+    ...drep,
+    drep_id: 'drep1ygdzk0zdtehhpqvj5w6vt4h8lqy352euf40x7uypj23mf3gs6c9xy',
+};
+
+const staking = (drepOverride: CardanoDrep | null): CardanoStaking => ({
+    ...networkSpecificDefaultCardano.misc.staking,
+    drep: drepOverride,
+});
+
+// equal on both sides, so the tx count checks preceding the staking comparison can't mask its result
+const history = { total: 13, unconfirmed: 0 };
+
+const drepCases: {
+    description: string;
+    stored: CardanoDrep | null;
+    fresh: CardanoDrep | null;
+    result: boolean;
+}[] = [
+    { description: 'identical staking data', stored: drep, fresh: drep, result: false },
     {
-        description: 'Account without verification',
-        params: {
-            account: ACCOUNTS.test,
-            receive: [],
-            pendingAddresses: [],
-            utxoBasedAccount: true,
-        },
-        result: {
-            address: 'tb1qk0qgmxtaw3kc9366eccjjgklef0g8lxv3l8nvk',
-            path: "m/84\\'/1\\'/0\\'/0/1",
-            transfers: 0,
-        },
+        description: "only the DRep's voting power changed",
+        stored: drep,
+        fresh: { ...drep, amount: '2000000000' },
+        result: false,
+    },
+    { description: 'vote changed to another DRep', stored: drep, fresh: otherDrep, result: true },
+    {
+        description: 'first vote delegation, stored DRep is null',
+        stored: null,
+        fresh: drep,
+        result: true,
+    },
+    { description: 'vote delegation dropped', stored: drep, fresh: null, result: true },
+    {
+        description: 'same DRep, retired since last fetch',
+        stored: drep,
+        fresh: { ...drep, active: false },
+        result: true,
     },
     {
-        description: 'Account with verification and receive requested',
-        params: {
-            account: ACCOUNTS.test,
-            receive: [
-                {
-                    path: "m/84'/1'/0'/0/1",
-                    address: 'tb1qk0qgmxtaw3kc9366eccjjgklef0g8lxv3l8nvk',
-                    isVerified: true,
-                },
-            ],
-            pendingAddresses: ['tb1qk0qgmxtaw3kc9366eccjjgklef0g8lxv3l8nvk'],
-            utxoBasedAccount: true,
-        },
-        result: {
-            address: 'tb1q99ml7urce6m77c2hmxeppm3ylvx7lqk6avhgh7',
-            path: "m/84\\'/1\\'/0\\'/0/2",
-            transfers: 0,
-        },
-    },
-    {
-        description: 'Account not utxo based - xrp',
-        params: {
-            account: ACCOUNTS.txrp,
-            receive: [],
-            pendingAddresses: [],
-            utxoBasedAccount: false,
-        },
-        result: {
-            path: ACCOUNTS.txrp.path,
-            address: ACCOUNTS.txrp.descriptor,
-            transfers: ACCOUNTS.txrp.history.total,
-        },
+        description: 'same DRep, re-registered in a later epoch',
+        stored: drep,
+        fresh: { ...drep, active_epoch: 512 },
+        result: true,
     },
 ];
+
+export const isAccountOutdated = drepCases.map(({ description, stored, fresh, result }) => ({
+    description: `cardano: ${description}`,
+    account: {
+        ...mockWalletAccount(
+            { symbol: asNetworkSymbol('ada'), history },
+            networkSpecificDefaultCardano,
+        ),
+        misc: { staking: staking(stored) },
+    } as AccountWithNetworkType<'cardano'>,
+    freshInfo: { history, misc: { staking: staking(fresh) } } as AccountInfo,
+    result,
+}));

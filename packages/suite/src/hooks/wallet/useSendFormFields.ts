@@ -1,90 +1,201 @@
 import { useCallback } from 'react';
-import { FieldPath, UseFormReturn } from 'react-hook-form';
-import { formatNetworkAmount, toFiatCurrency } from '@suite-common/wallet-utils';
-import {
-    FormState,
-    FormOptions,
-    UseSendFormState,
-    SendContextValues,
-} from 'src/types/wallet/sendForm';
-import { isFeatureFlagEnabled } from '@suite-common/suite-utils';
-import { useBitcoinAmountUnit } from './useBitcoinAmountUnit';
-import { Rate } from '@suite-common/wallet-types';
+import { type FieldPath, type UseFormReturn } from 'react-hook-form';
 
-type Props = UseFormReturn<FormState> & {
-    fiatRate?: Rate;
+import { selectCurrentFiatRates } from '@suite-common/wallet-core';
+import {
+    type FormOptions,
+    type FormState,
+    type Output,
+    type TokenAddress,
+} from '@suite-common/wallet-types';
+import {
+    getFiatRateKey,
+    parseBaseCurrencyToFormattedCrypto,
+    parseCryptoToFormattedBaseCurrency,
+} from '@suite-common/wallet-utils';
+import type { BaseCurrencyCode, TokenInfo } from '@trezor/blockchain-link-types';
+import { BigNumber } from '@trezor/utils';
+
+import { useSelector } from 'src/hooks/suite';
+import { type SendContextValues, type UseSendFormState } from 'src/types/wallet/sendForm';
+
+import { useBitcoinAmountUnit } from './useBitcoinAmountUnit';
+export type GetCurrentRateParams = {
+    currencyCode: BaseCurrencyCode;
+    tokenAddress: TokenAddress;
+};
+
+type UseSendFormFieldsParams = UseFormReturn<FormState> & {
     network: UseSendFormState['network'];
 };
 
 // This hook should be used only as a sub-hook of `useSendForm`
-
 export const useSendFormFields = ({
     getValues,
     setValue,
     clearErrors,
-    fiatRate,
     network,
     formState: { errors },
-}: Props) => {
-    const { shouldSendInSats } = useBitcoinAmountUnit(network.symbol);
+}: UseSendFormFieldsParams) => {
+    const { shouldSendInSats, areSatsDisplayed } = useBitcoinAmountUnit(network.symbol);
+    const currentRates = useSelector(selectCurrentFiatRates);
 
-    const calculateFiat = useCallback(
-        (outputIndex: number, amount?: string) => {
-            const outputError = errors.outputs ? errors.outputs[outputIndex] : undefined;
-            const error = outputError ? outputError.amount : undefined;
+    const getCurrentFiatRate = useCallback(
+        ({ currencyCode, tokenAddress }: GetCurrentRateParams) => {
+            const fiatRateKey = getFiatRateKey(network.symbol, currencyCode, tokenAddress);
 
-            if (error) {
-                amount = undefined;
-            }
+            return currentRates?.[fiatRateKey];
+        },
+        [currentRates, network.symbol],
+    );
 
+    type CalculateFiatFromAmountOrViceVersaParams = {
+        outputId: number;
+        target: Extract<keyof Output, 'fiat' | 'amount'>;
+        convertAndFormatTargetValue: (value: string, fiatRate: number) => string | null;
+        value?: string;
+    };
+
+    const calculateFiatFromAmountOrViceVersa = useCallback(
+        ({
+            convertAndFormatTargetValue,
+            outputId,
+            target,
+            value,
+        }: CalculateFiatFromAmountOrViceVersaParams) => {
             const { outputs } = getValues();
-            const output = outputs ? outputs[outputIndex] : undefined;
-            if (!output || output.type !== 'payment') return;
-            const { fiat, currency } = output;
-            if (typeof fiat !== 'string') return; // fiat input not registered (testnet or fiat not available)
-            const inputName = `outputs.${outputIndex}.fiat` as const;
-            if (!amount) {
-                // reset fiat value (Amount field has error)
-                if (fiat.length > 0) {
-                    setValue(inputName, '');
+            const output = outputs[outputId];
+            if (output?.type !== 'payment') {
+                return;
+            }
+            const targetValue = output[target];
+            if (target === 'fiat' && typeof targetValue !== 'string') {
+                return; // fiat input not registered (testnet or fiat not available)
+            }
+            const targetInputName = `outputs.${outputId}.${target}` as const;
+            const outputError = errors.outputs ? errors.outputs[outputId] : undefined;
+            const error = outputError
+                ? outputError[target === 'fiat' ? 'amount' : 'fiat']
+                : undefined;
+            if (error || !value) {
+                if (targetValue.length > 0) {
+                    setValue(targetInputName, '');
+                    clearErrors(targetInputName);
                 }
 
                 return;
             }
-            // calculate Fiat value
-            if (!fiatRate?.rate) return;
 
-            const formattedAmount = shouldSendInSats // toFiatCurrency always works with BTC, not satoshis
-                ? formatNetworkAmount(amount, network.symbol)
-                : amount;
-
-            const fiatValue = toFiatCurrency(formattedAmount, currency.value, fiatRate, 2, false);
-            if (fiatValue) {
-                setValue(inputName, fiatValue, { shouldValidate: true });
+            const fiatRate = getCurrentFiatRate({
+                currencyCode: output.currency.value as BaseCurrencyCode,
+                tokenAddress: output.token as TokenAddress,
+            });
+            if (!fiatRate?.rate) {
+                return;
+            }
+            const formattedTargetValue = convertAndFormatTargetValue(value, fiatRate.rate);
+            if (formattedTargetValue) {
+                setValue(targetInputName, formattedTargetValue, { shouldValidate: true });
             }
         },
-        [getValues, setValue, fiatRate, shouldSendInSats, network.symbol, errors],
+        [clearErrors, getCurrentFiatRate, getValues, setValue, errors],
+    );
+
+    const calculateBaseCurrencyAmountFromCryptoAmount = useCallback(
+        (outputId: number, amount: string) => {
+            const convert = (amount: string, fiatRate: number) => {
+                const { outputs } = getValues();
+                const output = outputs[outputId];
+                const baseCurrencyCode = output?.currency.value;
+
+                if (!baseCurrencyCode) {
+                    return null;
+                }
+
+                return parseCryptoToFormattedBaseCurrency({
+                    baseCurrencyCode,
+                    rate: fiatRate,
+                    value: new BigNumber(amount),
+                    baseCurrencyToSats: shouldSendInSats === true,
+                    areSatsDisplayed,
+                    symbol: network.symbol,
+                });
+            };
+
+            return calculateFiatFromAmountOrViceVersa({
+                convertAndFormatTargetValue: convert,
+                outputId,
+                target: 'fiat',
+                value: amount,
+            });
+        },
+        [
+            calculateFiatFromAmountOrViceVersa,
+            getValues,
+            shouldSendInSats,
+            areSatsDisplayed,
+            network.symbol,
+        ],
+    );
+
+    const calculateCryptoAmountFromBaseCurrencyAmount = useCallback(
+        (outputId: number, fiat: string, token?: TokenInfo) => {
+            const convert = (fiat: string, fiatRate: number) => {
+                const cryptoDecimals = token ? token.decimals : network.decimals;
+
+                const { outputs } = getValues();
+                const output = outputs[outputId];
+
+                const baseCurrencyCode = output?.currency.value;
+
+                if (!baseCurrencyCode) {
+                    return null;
+                }
+
+                return parseBaseCurrencyToFormattedCrypto({
+                    cryptoDecimals,
+                    rate: fiatRate,
+                    isCryptoInSats: shouldSendInSats === true,
+                    areSatsDisplayed: baseCurrencyCode === 'btc' && areSatsDisplayed,
+                    value: new BigNumber(fiat),
+                });
+            };
+
+            return calculateFiatFromAmountOrViceVersa({
+                convertAndFormatTargetValue: convert,
+                outputId,
+                target: 'amount',
+                value: fiat,
+            });
+        },
+        [
+            calculateFiatFromAmountOrViceVersa,
+            network.decimals,
+            getValues,
+            shouldSendInSats,
+            areSatsDisplayed,
+        ],
     );
 
     const setAmount = useCallback(
-        (outputIndex: number, amount: string) => {
-            setValue(`outputs.${outputIndex}.amount`, amount, {
+        (outputId: number, amount: string) => {
+            setValue(`outputs.${outputId}.amount`, amount, {
                 shouldValidate: amount.length > 0,
                 shouldDirty: true,
             });
-            calculateFiat(outputIndex, amount);
+            calculateBaseCurrencyAmountFromCryptoAmount(outputId, amount);
         },
-        [calculateFiat, setValue],
+        [calculateBaseCurrencyAmountFromCryptoAmount, setValue],
     );
 
     const setMax = useCallback(
-        (outputIndex: number, active: boolean) => {
-            clearErrors([`outputs.${outputIndex}.amount`, `outputs.${outputIndex}.fiat`]);
-            if (!active) {
-                setValue(`outputs.${outputIndex}.amount`, '');
-                setValue(`outputs.${outputIndex}.fiat`, '');
+        (outputId: number, active: boolean, clearInput?: boolean) => {
+            clearErrors([`outputs.${outputId}.amount`, `outputs.${outputId}.fiat`]);
+            if (clearInput || !active) {
+                setValue(`outputs.${outputId}.amount`, '');
+                setValue(`outputs.${outputId}.fiat`, '');
             }
-            setValue('setMaxOutputId', active ? undefined : outputIndex);
+            setValue('setMaxOutputId', active ? undefined : outputId);
         },
         [clearErrors, setValue],
     );
@@ -116,28 +227,26 @@ export const useSendFormFields = ({
         return getValues(fieldName);
     };
 
-    const toggleOption = (option: FormOptions) => {
-        if (
-            option === 'bitcoinRBF' &&
-            (!isFeatureFlagEnabled('RBF') || !network.features?.includes('rbf'))
-        ) {
-            // do not use RBF if disabled
-            return;
-        }
-        const enabledOptions = getValues('options') || [];
-        const isEnabled = enabledOptions.includes(option);
-        if (isEnabled) {
-            setValue(
-                'options',
-                enabledOptions.filter(o => o !== option),
-            );
-        } else {
-            setValue('options', [...enabledOptions, option]);
-        }
-    };
+    const toggleOption = useCallback(
+        (option: FormOptions) => {
+            const enabledOptions = getValues('options') || [];
+            const isEnabled = enabledOptions.includes(option);
+            if (isEnabled) {
+                setValue(
+                    'options',
+                    enabledOptions.filter(o => o !== option),
+                );
+            } else {
+                setValue('options', [...enabledOptions, option]);
+            }
+        },
+        [getValues, setValue],
+    );
 
     return {
-        calculateFiat,
+        getCurrentFiatRate,
+        calculateCryptoAmountFromBaseCurrencyAmount,
+        calculateBaseCurrencyAmountFromCryptoAmount,
         setAmount,
         resetDefaultValue,
         setMax,

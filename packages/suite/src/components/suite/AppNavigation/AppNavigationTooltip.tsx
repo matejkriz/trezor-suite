@@ -1,8 +1,10 @@
-import { ReactNode } from 'react';
+import { type ReactNode } from 'react';
 
-import { Translation } from 'src/components/suite';
-import { useSelector } from 'src/hooks/suite';
+import { selectFullSelectedAccount } from '@suite/account';
+import { Translation } from '@suite/intl';
 import { Tooltip } from '@trezor/components';
+
+import { useSelector } from 'src/hooks/suite';
 
 interface AppNavigationTooltipProps {
     children: ReactNode;
@@ -10,7 +12,7 @@ interface AppNavigationTooltipProps {
 }
 
 export const AppNavigationTooltip = ({ children, isActiveTab }: AppNavigationTooltipProps) => {
-    const { selectedAccount } = useSelector(state => state.wallet);
+    const selectedAccount = useSelector(selectFullSelectedAccount);
 
     const isAccountLoading = selectedAccount.status === 'loading';
 

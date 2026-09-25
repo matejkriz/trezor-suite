@@ -1,8 +1,26 @@
-import { memoize, memoizeWithArgs } from 'proxy-memoize';
+import { createSelector } from '@reduxjs/toolkit';
 
-import { Message, Category } from '@suite-common/suite-types';
+import { selectAnalyticsInstanceId } from '@suite-common/analytics-redux';
+import { createWeakMapSelector, returnStableArrayIfEmpty } from '@suite-common/redux-utils';
+import { type Category, type Message } from '@suite-common/suite-types';
 
-import { ContextDomain, FeatureDomain, MessageSystemRootState } from './messageSystemTypes';
+import { getActiveExperimentGroup } from './experimentUtils';
+import { isYieldFeatureApplicableForVault } from './featureFlagUtils';
+import { EXPERIMENT_MAP } from './messageSystemConstants';
+import {
+    type ContextDomain,
+    type ExperimentId,
+    type ExperimentsItemType,
+    type FeatureDomain,
+    type MessageSystemRootState,
+} from './messageSystemTypes';
+import { resolveMessageContent } from './messageSystemUtils';
+
+// Create app-specific selectors with correct types
+export const createMemoizedSelector = createWeakMapSelector.withTypes<MessageSystemRootState>();
+
+// Basic selectors don't need memoization
+export const selectMessageSystem = (state: MessageSystemRootState) => state.messageSystem;
 
 export const selectMessageSystemConfig = (state: MessageSystemRootState) =>
     state.messageSystem.config;
@@ -13,96 +31,164 @@ export const selectMessageSystemTimestamp = (state: MessageSystemRootState) =>
 export const selectMessageSystemCurrentSequence = (state: MessageSystemRootState) =>
     state.messageSystem.currentSequence;
 
+export const selectMessageSystemConfigSource = (state: MessageSystemRootState) =>
+    state.messageSystem.configSource;
+
 const comparePriority = (a: Message, b: Message) => b.priority - a.priority;
 
 const makeSelectActiveMessagesByCategory = (category: Category) =>
-    memoize((state: MessageSystemRootState) => {
-        const { config, validMessages, dismissedMessages } = state.messageSystem;
-        const nonDismissedValidMessages = validMessages[category].filter(
-            id => !dismissedMessages[id]?.[category],
-        );
+    createMemoizedSelector(
+        [
+            state => state.messageSystem.config,
+            state => state.messageSystem.validMessages[category],
+            state => state.messageSystem.dismissedMessages,
+        ],
+        (config, validMessages, dismissedMessages) => {
+            const nonDismissedValidMessages = validMessages.filter(
+                id => !dismissedMessages[id]?.[category],
+            );
 
-        const messages = config?.actions
-            .filter(({ message }) => nonDismissedValidMessages.includes(message.id))
-            .map(action => action.message);
+            const messages = config?.actions
+                .filter(({ message }) => nonDismissedValidMessages.includes(message.id))
+                .map(action => action.message);
 
-        if (!messages?.length) return [];
-
-        return messages.sort(comparePriority);
-    });
+            return returnStableArrayIfEmpty(messages?.sort(comparePriority));
+        },
+    );
 
 export const selectActiveBannerMessages = makeSelectActiveMessagesByCategory('banner');
-export const selectActiveContextMessages = makeSelectActiveMessagesByCategory('context');
-export const selectActiveModalMessages = makeSelectActiveMessagesByCategory('modal');
+const selectActiveContextMessages = makeSelectActiveMessagesByCategory('context');
 export const selectActiveFeatureMessages = makeSelectActiveMessagesByCategory('feature');
 
-export const selectIsAnyBannerMessageActive = (state: MessageSystemRootState) => {
-    const activeBannerMessages = selectActiveBannerMessages(state);
-
-    return activeBannerMessages.length > 0;
-};
-
-export const selectBannerMessage = memoize((state: MessageSystemRootState) => {
-    const activeBannerMessages = selectActiveBannerMessages(state);
-
-    return activeBannerMessages[0];
-});
-
-export const selectContextMessage = memoizeWithArgs(
-    (state: MessageSystemRootState, domain: ContextDomain) => {
-        const activeContextMessages = selectActiveContextMessages(state);
-
-        return activeContextMessages.find(message => message.context?.domain === domain);
-    },
+export const selectIsAnyBannerMessageActive = createMemoizedSelector(
+    [selectActiveBannerMessages],
+    activeBannerMessages => activeBannerMessages.length > 0,
 );
 
-export const selectContextMessageContent = memoizeWithArgs(
-    (state: MessageSystemRootState, domain: ContextDomain, language: string) => {
-        const activeContextMessages = selectActiveContextMessages(state);
-        const message = activeContextMessages.find(
-            activeContextMessage => activeContextMessage.context?.domain === domain,
-        );
-        if (!message) return;
+export const selectBannerMessage = createMemoizedSelector(
+    [selectActiveBannerMessages],
+    activeBannerMessages => activeBannerMessages[0],
+);
+
+export const selectContextMessageContent = createMemoizedSelector(
+    [
+        selectActiveContextMessages,
+        (_state, domain: ContextDomain | readonly ContextDomain[]) => domain,
+        (_state, _domain, language: string) => language,
+    ],
+    (activeContextMessages, domain, language) => {
+        const requestedDomains = [domain].flat();
+        const message = activeContextMessages.find(({ context }) => {
+            const messageDomains = [context?.domain].flat();
+
+            return requestedDomains.some(requestedDomain =>
+                messageDomains.includes(requestedDomain),
+            );
+        });
+        if (!message) return undefined;
 
         return {
             ...message,
-            content: message?.content[language] ?? message?.content.en,
+            content: resolveMessageContent(message.content, language),
             cta: message?.cta
                 ? {
                       ...message.cta,
-                      label: message.cta.label[language] ?? message.cta.label.en,
+                      label: resolveMessageContent(message.cta.label, language),
                   }
                 : undefined,
         };
     },
 );
 
-export const selectFeatureMessage = memoizeWithArgs(
-    (state: MessageSystemRootState, domain: FeatureDomain) => {
-        const activeFeatureMessages = selectActiveFeatureMessages(state);
-
-        return activeFeatureMessages.find(message =>
+export const selectFeatureMessage = createMemoizedSelector(
+    [selectActiveFeatureMessages, (_state, domain: FeatureDomain) => domain],
+    (activeFeatureMessages, domain) =>
+        activeFeatureMessages.find(message =>
             message.feature?.some(feature => feature.domain === domain),
-        );
+        ),
+);
+
+const selectFeatureMessages = createMemoizedSelector(
+    [selectActiveFeatureMessages, (_state, domain: FeatureDomain) => domain],
+    (activeFeatureMessages, domain) =>
+        activeFeatureMessages.filter(message =>
+            message.feature?.some(feature => feature.domain === domain),
+        ),
+);
+
+export const selectFeatureMessageContent = createMemoizedSelector(
+    [
+        selectFeatureMessage,
+        (_state, domain: FeatureDomain) => domain,
+        (_state, _domain, language: string) => language,
+    ],
+    (featureMessages, _domain, language) =>
+        featureMessages ? resolveMessageContent(featureMessages.content, language) : undefined,
+);
+
+export const selectFeatureConfig = createMemoizedSelector(
+    [selectFeatureMessage, (_state, domain: FeatureDomain) => domain],
+    (featureMessages, domain) =>
+        featureMessages?.feature?.find(feature => feature.domain === domain),
+);
+
+export const selectYieldFeatureMessage = createMemoizedSelector(
+    [
+        selectActiveFeatureMessages,
+        (_state, domain: FeatureDomain) => domain,
+        (_state, _domain, vaultContractAddress?: string | null) => vaultContractAddress,
+    ],
+    (activeFeatureMessages, domain, vaultContractAddress) =>
+        activeFeatureMessages.find(message =>
+            message.feature?.some(
+                feature =>
+                    feature.domain === domain &&
+                    isYieldFeatureApplicableForVault({ feature, vaultContractAddress }),
+            ),
+        ),
+);
+
+const selectYieldFeatureConfig = createMemoizedSelector(
+    [
+        selectYieldFeatureMessage,
+        (_state, domain: FeatureDomain) => domain,
+        (_state, _domain, vaultContractAddress?: string | null) => vaultContractAddress,
+    ],
+    (featureMessages, domain, vaultContractAddress) =>
+        featureMessages?.feature?.find(
+            feature =>
+                feature.domain === domain &&
+                isYieldFeatureApplicableForVault({ feature, vaultContractAddress }),
+        ),
+);
+
+export const selectYieldFeatureMessageContent = createMemoizedSelector(
+    [
+        selectYieldFeatureMessage,
+        (_state, domain: FeatureDomain) => domain,
+        (_state, _domain, vaultContractAddress: string | null | undefined) => vaultContractAddress,
+        (_state, _domain, _vaultContractAddress, language: string) => language,
+    ],
+    (featureMessages, _domain, _vaultContractAddress, language) =>
+        featureMessages ? resolveMessageContent(featureMessages.content, language) : undefined,
+);
+
+export const selectIsYieldFeatureDisabled = createMemoizedSelector(
+    [selectYieldFeatureConfig],
+    featureConfig => {
+        const featureFlag = featureConfig?.flag;
+
+        return featureFlag !== undefined ? !featureFlag : false;
     },
 );
 
-export const selectFeatureMessageContent = memoizeWithArgs(
-    (state: MessageSystemRootState, domain: FeatureDomain, language: string) => {
-        const featureMessages = selectFeatureMessage(state, domain);
-
-        return featureMessages?.content[language] ?? featureMessages?.content.en;
-    },
+export const selectFeaturesConfig = createMemoizedSelector(
+    [selectFeatureMessages, (_state, domain: FeatureDomain) => domain],
+    (messages, domain) =>
+        messages.filter(message => message?.feature?.find(feature => feature.domain === domain)),
 );
 
-export const selectFeatureConfig = memoizeWithArgs(
-    (state: MessageSystemRootState, domain: FeatureDomain) => {
-        const featureMessages = selectFeatureMessage(state, domain);
-
-        return featureMessages?.feature?.find(feature => feature.domain === domain);
-    },
-);
-
+// These don't need memoization as they're simple computations
 export const selectIsFeatureEnabled = (
     state: MessageSystemRootState,
     domain: FeatureDomain,
@@ -120,5 +206,106 @@ export const selectIsFeatureDisabled = (
 ) => {
     const featureFlag = selectFeatureConfig(state, domain)?.flag;
 
-    return typeof featureFlag === 'boolean' ? !featureFlag : defaultValue ?? false;
+    return featureFlag !== undefined ? !featureFlag : (defaultValue ?? false);
 };
+
+export const selectActiveKillswitchMessage = createMemoizedSelector(
+    [selectActiveFeatureMessages],
+    messages =>
+        messages.find(m => m.feature?.some(item => item.domain === 'killswitch' && item?.flag)),
+);
+
+export const selectAllManuallyAddedMessageIds = (state: MessageSystemRootState) =>
+    state.messageSystem.manuallyAddedMessageIds;
+
+export const selectAllManuallyAddedExperimentIds = (state: MessageSystemRootState) =>
+    state.messageSystem.manuallyAddedExperimentIds;
+
+const selectValidMessages = (state: MessageSystemRootState) => state.messageSystem.validMessages;
+const selectValidExperiments = (state: MessageSystemRootState) =>
+    state.messageSystem.validExperiments;
+const selectConfig = (state: MessageSystemRootState) => state.messageSystem.config;
+
+export const selectAllValidMessages = createMemoizedSelector(
+    [selectValidMessages, selectConfig],
+    (validMessages, config) => {
+        const allValidMessages = [
+            ...validMessages.banner,
+            ...validMessages.feature,
+            ...validMessages.modal,
+            ...validMessages.context,
+        ];
+
+        return returnStableArrayIfEmpty(
+            config?.actions.map(a => a.message).filter(m => allValidMessages.includes(m.id)),
+        );
+    },
+);
+
+export const selectAllValidExperiments = createMemoizedSelector(
+    [selectConfig, selectValidExperiments],
+    (config, validExperiments) => {
+        if (!config?.experiments) return [];
+
+        const experiments = config.experiments
+            .filter(experiment => validExperiments.includes(experiment.experiment.id))
+            .map(experiment => experiment.experiment);
+
+        if (!experiments?.length) return [];
+
+        return experiments;
+    },
+);
+
+export const selectAllConfigExperiments = createMemoizedSelector([selectConfig], config =>
+    returnStableArrayIfEmpty(config?.experiments),
+);
+
+export const selectAllValidConfigExperiments = createMemoizedSelector(
+    [selectAllConfigExperiments, selectValidExperiments],
+    (experiments, validExperiments) =>
+        returnStableArrayIfEmpty(
+            experiments.filter(({ experiment }) => validExperiments.includes(experiment.id)),
+        ),
+);
+
+export const selectIsExperimentValid = createMemoizedSelector(
+    [selectValidExperiments, (_state, experimentId: string) => experimentId],
+    (validExperiments, experimentId) => validExperiments.includes(experimentId),
+);
+
+export const selectExperimentById = (id: ExperimentId) =>
+    createMemoizedSelector([selectAllValidExperiments], allValidExperiments =>
+        allValidExperiments.find(
+            (experiment): experiment is ExperimentsItemType => experiment.id === id,
+        ),
+    );
+
+export const selectActiveExperimentsWithVariants = createSelector(
+    [selectAnalyticsInstanceId, selectAllValidExperiments],
+    (instanceId, experiments) =>
+        returnStableArrayIfEmpty(
+            experiments.flatMap(experiment => {
+                const id = experiment.id as ExperimentId;
+                const name = EXPERIMENT_MAP[id];
+                const activeGroup = getActiveExperimentGroup({
+                    instanceId,
+                    experiment: {
+                        ...experiment,
+                        id,
+                    },
+                });
+
+                return activeGroup ? [{ name, variant: activeGroup.variant }] : [];
+            }),
+        ),
+);
+
+export const selectAllExperimentInclusionOverrides = (state: MessageSystemRootState) =>
+    state.messageSystem.experimentInclusionOverrides;
+
+export const selectExperimentInclusionOverrideById = (id: ExperimentId) =>
+    createMemoizedSelector(
+        [selectAllExperimentInclusionOverrides],
+        inclusionOverrides => inclusionOverrides?.[id] ?? null,
+    );

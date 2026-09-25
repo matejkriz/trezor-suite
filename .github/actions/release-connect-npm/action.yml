@@ -1,0 +1,50 @@
+name: "NPM Connect Deploy Action"
+description: "Releases to NPM any Connect package or Trezor dependency"
+inputs:
+  deploymentType:
+    description: "Specifies the deployment type for the npm package. Use 'alpha' for early prereleases, 'beta' for prereleases close to production, and 'latest' for stable versions intended for end-users."
+    required: true
+  packageName:
+    description: "The name of the package to be deployed, without the @trezor/ scope (e.g. 'connect-web' or 'network-solana')."
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      with:
+        submodules: recursive
+
+    - name: Extract branch name
+      shell: bash
+      run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
+      id: extract_branch
+
+    - name: Setup Node.js
+      uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+      with:
+        node-version-file: ".nvmrc"
+        cache: yarn
+
+    - name: Install SafeDep PMG
+      uses: safedep/pmg@be0a93f10fbec6a5c94dd78bc722abf1b7fbfc2d # v0.26.0
+      continue-on-error: true
+      with:
+        version: v0.19.1
+        # Our just-published @trezor packages trip the cooldown. Malware scanning still runs.
+        cooldown-enabled: "false"
+
+    - name: Install dependencies
+      shell: bash
+      run: yarn install --immutable
+
+    - name: Check version
+      shell: bash
+      run: node ./scripts/ci/check-version.js ${{ inputs.packageName }} ${{ inputs.deploymentType }}
+
+    - name: Publish to NPM
+      shell: bash
+      run: |
+        cd "$(node ./scripts/ci/trezor-package-path.js "${{ inputs.packageName }}")"
+        yarn build:lib
+        yarn npm publish --tag ${{ inputs.deploymentType }} --access public --provenance

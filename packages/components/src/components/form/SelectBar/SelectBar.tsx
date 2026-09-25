@@ -1,156 +1,118 @@
-import { useState, useEffect, ReactNode, useCallback, KeyboardEvent } from 'react';
+import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useState } from 'react';
+
 import styled, { css } from 'styled-components';
-import { breakpointMediaQueries } from '@trezor/styles';
-import { borders, spacings, spacingsPx, typography } from '@trezor/theme';
-import { focusStyleTransition, getFocusShadowStyle } from '../../../utils/utils';
 
-const Wrapper = styled.div<{ $isFullWidth?: boolean }>`
-    display: flex;
-    align-items: center;
-    gap: ${spacingsPx.sm};
-    width: ${({ $isFullWidth }) => ($isFullWidth ? '100%' : 'auto')};
+import { type SelectBarOrientation, type SelectBarSize } from './types';
+import { mapSizeToPadding, mapSizeToTypographyStyle, mapStateToTextIntent } from './utils';
+import { variables } from '../../../config';
+import { type FrameProps, type FramePropsKeys } from '../../../utils/frameProps';
+import { useMediaQuery } from '../../../utils/useMediaQuery';
+import { commonFocusStyles, focusStyleTransition } from '../../../utils/utils';
+import { Box } from '../../Box/Box';
+import { Column, Flex } from '../../Flex/Flex';
+import { Grid } from '../../Grid/Grid';
+import { Text } from '../../typography/Text/Text';
 
-    ${breakpointMediaQueries.below_sm} {
-        flex-direction: column;
-        align-items: flex-start;
-        width: 100%;
-    }
+export const allowedSelectBarFrameProps = ['margin'] as const satisfies FramePropsKeys[];
+type AllowedFrameProps = Pick<FrameProps, (typeof allowedSelectBarFrameProps)[number]>;
+
+const GAP = 4;
+
+const getTranslateValue = (index: number = 0) => `calc(${index * 100}% + ${index * GAP}px)`;
+
+const getPuckDimension = (optionsCount: number) =>
+    `calc((100% - ${(optionsCount - 1) * GAP}px) / ${optionsCount})`;
+
+const Options = styled.div`
+    background: ${({ theme }) => theme.elementFillNeutralSofter};
+    border: 1px solid ${({ theme }) => theme.elementBorderNeutralSofterAlt};
+    border-radius: 20px;
+    flex: 1;
+    min-width: 0;
 `;
 
-const Label = styled.span`
-    color: ${({ theme }) => theme.textSubdued};
-    text-transform: capitalize;
-`;
-
-const getTranslateValue = (index: number) => {
-    const value = index * 100;
-
-    if (!index) {
-        return;
-    }
-
-    return `calc(${value}% + ${index * spacings.xxs}px)`;
-};
-
-const getPuckWidth = (optionsCount: number) =>
-    `calc((100% - 8px - ${(optionsCount - 1) * spacings.xxs}px) / ${optionsCount})`;
-
-const Options = styled.div<{ $optionsCount: number; $isFullWidth?: boolean }>`
-    position: relative;
-    display: grid;
-    grid-auto-columns: ${({ $optionsCount }) => `minmax(${getPuckWidth($optionsCount)}, 1fr)`};
-    grid-auto-flow: column;
-    gap: ${spacingsPx.xxs};
-    padding: ${spacingsPx.xxs};
-    background: ${({ theme }) => theme.backgroundSurfaceElevation0};
-    border-radius: ${borders.radii.full};
-    width: ${({ $isFullWidth }) => ($isFullWidth ? '100%' : 'auto')};
-
-    ${breakpointMediaQueries.below_sm} {
-        grid-auto-flow: row;
-        width: 100%;
-        border-radius: ${borders.radii.lg};
-    }
-`;
-
-const Puck = styled.div<{ $optionsCount: number; $selectedIndex: number }>`
+const Puck = styled.div<{
+    $optionsCount: number;
+    $selectedIndex: number;
+    $orientation: SelectBarOrientation;
+}>`
     position: absolute;
-    left: 4px;
-    top: 4px;
-    bottom: 4px;
-    width: ${({ $optionsCount }) => getPuckWidth($optionsCount)};
-    padding: ${spacingsPx.xxs} ${spacingsPx.xl};
-    background: ${({ theme }) => theme.backgroundSurfaceElevation1};
-    border-radius: ${borders.radii.full};
-    box-shadow: ${({ theme }) => theme.boxShadowBase};
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: ${({ $optionsCount }) => getPuckDimension($optionsCount)};
+    background: ${({ theme }) => theme.elementFillElevated};
+    border-radius: calc(infinity * 1px);
+    box-shadow: ${({ theme }) => theme.elementShadowElevated};
     transform: ${({ $selectedIndex }) => `translateX(${getTranslateValue($selectedIndex)})`};
     transition:
         transform 0.175s cubic-bezier(1, 0.02, 0.38, 0.74),
         ${focusStyleTransition};
 
-    ${getFocusShadowStyle()}
-
-    ${breakpointMediaQueries.below_sm} {
-        left: 4px;
-        right: 4px;
-        top: 4px;
-        width: auto;
-        height: ${({ $optionsCount }) => getPuckWidth($optionsCount)};
-        transform: ${({ $selectedIndex: selectedIndex }) =>
-            `translateY(${getTranslateValue(selectedIndex)})`};
+    &:focus-visible {
+        ${commonFocusStyles}
     }
-`;
 
-const WidthMock = styled.span`
-    height: 0;
-    visibility: hidden;
-    ${typography.highlight}
+    ${({ $orientation, $selectedIndex, $optionsCount }) =>
+        $orientation === 'vertical' &&
+        css`
+            bottom: auto;
+            right: 0;
+            width: auto;
+            height: ${getPuckDimension($optionsCount)};
+            transform: ${`translateY(${getTranslateValue($selectedIndex)})`};
+        `}
 `;
 
 const Option = styled.div<{ $isSelected: boolean; $isDisabled: boolean }>`
     position: relative;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-direction: column;
-    height: 36px;
-    padding: ${spacingsPx.xxs} ${spacingsPx.xl};
-    color: ${({ theme }) => theme.textSubdued};
-    ${typography.body}
-    text-transform: capitalize;
-    white-space: nowrap;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
     transition: color 0.175s;
-    cursor: pointer;
 
     &:hover {
         color: ${({ theme, $isSelected, $isDisabled }) =>
-            !$isSelected && !$isDisabled && theme.textDefault};
+            !$isSelected && !$isDisabled && theme.contentPrimary};
     }
-
-    ${({ $isSelected }) =>
-        $isSelected &&
-        css`
-            color: ${({ theme }) => theme.textPrimaryDefault};
-            ${typography.highlight}
-        `}
-
-    ${({ $isDisabled }) =>
-        $isDisabled &&
-        css`
-            color: ${({ theme }) => theme.textDisabled};
-            pointer-events: none;
-        `}
 `;
 
 type ValueTypes = number | string | boolean;
 
-interface Option<V extends ValueTypes> {
+type Option<V extends ValueTypes> = {
     label: ReactNode;
     value: V;
-}
+};
 
-export interface SelectBarProps<V extends ValueTypes> {
+export type SelectBarProps<V extends ValueTypes> = {
     label?: ReactNode;
     options: Option<V>[];
     selectedOption?: V;
     onChange?: (value: V) => void;
+    onOptionClick?: (value: V) => void;
     isDisabled?: boolean;
     isFullWidth?: boolean;
-    className?: string;
-}
+    orientation?: SelectBarOrientation;
+    size?: SelectBarSize;
+    'data-testid'?: string;
+} & AllowedFrameProps;
 
 // Generic type V is determined by selectedOption/options values
-export const SelectBar: <V extends ValueTypes>(props: SelectBarProps<V>) => JSX.Element = ({
+export const SelectBar = <V extends ValueTypes>({
     label,
     options,
     selectedOption,
     onChange,
-    isDisabled,
+    onOptionClick,
+    isDisabled = false,
     isFullWidth,
-    className,
-    ...rest
-}) => {
+    orientation = 'auto',
+    size = 'large',
+    'data-testid': dataTest,
+    margin,
+}: SelectBarProps<V>) => {
     const [selectedOptionIn, setSelected] = useState<ValueTypes | undefined>(selectedOption);
+    const isBelowMobile = useMediaQuery(`(max-width: ${variables.SCREEN_SIZE.SM})`);
 
     useEffect(() => {
         if (selectedOption !== undefined) {
@@ -159,16 +121,22 @@ export const SelectBar: <V extends ValueTypes>(props: SelectBarProps<V>) => JSX.
     }, [selectedOption, setSelected]);
 
     const handleOptionClick = useCallback(
-        (option: Option<ValueTypes>) => () => {
+        (option: Option<V>) => () => {
+            if (isDisabled) {
+                return;
+            }
+
+            onOptionClick?.(option.value);
+
             if (option.value === selectedOptionIn) {
                 return;
             }
 
             setSelected(option.value);
 
-            onChange?.(option?.value as any);
+            onChange?.(option?.value);
         },
-        [selectedOptionIn, onChange],
+        [isDisabled, onOptionClick, selectedOptionIn, onChange],
     );
 
     const handleKeyboardNav = (e: KeyboardEvent) => {
@@ -200,36 +168,95 @@ export const SelectBar: <V extends ValueTypes>(props: SelectBarProps<V>) => JSX.
     };
 
     const selectedIndex = options.findIndex(option => option.value === selectedOptionIn);
+    const isVertical = orientation === 'vertical' || (orientation === 'auto' && isBelowMobile);
 
     return (
-        <Wrapper className={className} $isFullWidth={isFullWidth} {...rest}>
-            {label && <Label>{label}</Label>}
+        <Flex
+            data-component="SelectBar"
+            data-testid={dataTest}
+            direction={isVertical ? 'column' : 'row'}
+            margin={margin}
+            width={isFullWidth || isVertical ? '100%' : 'auto'}
+            alignItems={isVertical ? 'stretch' : 'center'}
+            gap={12}
+        >
+            {label && (
+                <Text
+                    case="capitalize"
+                    intent="neutral"
+                    priority="secondary"
+                    typographyStyle={mapSizeToTypographyStyle(size)}
+                >
+                    {label}
+                </Text>
+            )}
 
-            <Options $optionsCount={options.length} $isFullWidth={isFullWidth}>
-                <Puck
-                    $optionsCount={options.length}
-                    $selectedIndex={selectedIndex}
-                    tabIndex={0}
-                    onKeyDown={handleKeyboardNav}
-                />
+            <Options>
+                <Box margin={4} position={{ type: 'relative' }}>
+                    <Puck
+                        $optionsCount={options.length}
+                        $selectedIndex={selectedIndex}
+                        $orientation={isVertical ? 'vertical' : orientation}
+                        tabIndex={0}
+                        onKeyDown={handleKeyboardNav}
+                    />
+                    <Grid columns={isVertical ? 1 : options.length} gap={GAP} forceEqualColumns>
+                        {options.map(option => {
+                            const isSelected =
+                                selectedOptionIn !== undefined
+                                    ? selectedOptionIn === option.value
+                                    : false;
+                            const textIntent = mapStateToTextIntent(isSelected);
 
-                {options.map(option => (
-                    <Option
-                        key={String(option.value)}
-                        onClick={handleOptionClick(option)}
-                        $isDisabled={!!isDisabled}
-                        $isSelected={
-                            selectedOptionIn !== undefined
-                                ? selectedOptionIn === option.value
-                                : false
-                        }
-                        data-test={`select-bar/${String(option.value)}`}
-                    >
-                        <span>{option.label}</span>
-                        <WidthMock>{option.label}</WidthMock>
-                    </Option>
-                ))}
+                            return (
+                                <Text
+                                    key={String(option.value)}
+                                    intent={textIntent.intent}
+                                    priority={textIntent.priority}
+                                    isDisabled={isDisabled}
+                                    typographyStyle={mapSizeToTypographyStyle(size, isSelected)}
+                                    textWrap="nowrap"
+                                    as="div"
+                                    cursor={isDisabled ? 'not-allowed' : 'pointer'}
+                                    minWidth={0}
+                                    overflow="hidden"
+                                >
+                                    <Option
+                                        onClick={handleOptionClick(option)}
+                                        $isDisabled={!!isDisabled}
+                                        $isSelected={isSelected}
+                                        data-isdisabled={!!isDisabled}
+                                        data-testid={`${dataTest ?? 'select-bar'}/${String(option.value)}`}
+                                    >
+                                        <Column
+                                            padding={mapSizeToPadding(size)}
+                                            alignItems="stretch"
+                                            width="100%"
+                                            minWidth={0}
+                                        >
+                                            <Text
+                                                as="div"
+                                                align="center"
+                                                width="100%"
+                                                maxWidth="100%"
+                                                minWidth={0}
+                                                ellipsisLineCount={1}
+                                            >
+                                                {option.label}
+                                            </Text>
+                                            <Box height={0} overflow="hidden" aria-hidden>
+                                                <Text typographyStyle="body-md-strong">
+                                                    {option.label}
+                                                </Text>
+                                            </Box>
+                                        </Column>
+                                    </Option>
+                                </Text>
+                            );
+                        })}
+                    </Grid>
+                </Box>
             </Options>
-        </Wrapper>
+        </Flex>
     );
 };

@@ -1,0 +1,83 @@
+import { useEffect } from 'react';
+import Animated, {
+    Easing,
+    cancelAnimation,
+    useAnimatedStyle,
+    useSharedValue,
+    withRepeat,
+    withTiming,
+} from 'react-native-reanimated';
+
+import { Canvas, Circle, SweepGradient, vec } from '@shopify/react-native-skia';
+
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
+import { type Color } from '@trezor/theme';
+
+import { ENDLESS_ANIMATION_VALUE } from './constants';
+
+export type CircularSpinnerProps = {
+    size: number;
+    color: Color;
+    width: number;
+};
+
+const FULL_CIRCLE_TURN = 360;
+const ROTATION_DURATION = 2500;
+
+const ContainerStyle = prepareNativeStyle(_ => ({
+    position: 'absolute',
+}));
+
+export const CircularSpinner = ({ size, color, width }: CircularSpinnerProps) => {
+    const { applyStyle, utils } = useNativeStyles();
+
+    const rotation = useSharedValue(0);
+    const animatedStyles = useAnimatedStyle(
+        () => ({
+            transform: [
+                {
+                    rotateZ: `${rotation.value}deg`,
+                },
+            ],
+        }),
+        [rotation.value],
+    );
+
+    useEffect(() => {
+        rotation.value = withRepeat(
+            withTiming(FULL_CIRCLE_TURN, {
+                duration: ROTATION_DURATION,
+                easing: Easing.linear,
+            }),
+            ENDLESS_ANIMATION_VALUE,
+        );
+
+        return () => cancelAnimation(rotation);
+    }, [rotation]);
+
+    const radius = size / 2;
+
+    return (
+        <Animated.View
+            style={[animatedStyles, applyStyle(ContainerStyle)]}
+            testID="@circular-spinner"
+        >
+            <Canvas style={{ height: size, width: size }}>
+                <Circle
+                    opacity={0.75}
+                    cx={radius}
+                    cy={radius}
+                    r={radius - width / 2}
+                    style="stroke"
+                    strokeWidth={width}
+                >
+                    <SweepGradient
+                        c={vec(radius, radius)}
+                        colors={[utils.colors.surfaceFillRaised, utils.colors[color]]}
+                        origin={{ x: radius, y: radius }}
+                    />
+                </Circle>
+            </Canvas>
+        </Animated.View>
+    );
+};

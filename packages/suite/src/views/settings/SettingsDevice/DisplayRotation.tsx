@@ -1,58 +1,112 @@
-import { analytics, EventType } from '@trezor/suite-analytics';
+import { type JSX } from 'react';
 
-import { ActionColumn, SectionItem, TextColumn, Translation } from 'src/components/suite';
-import { Button, ButtonGroup } from '@trezor/components';
-import { useDevice, useDispatch } from 'src/hooks/suite';
-import { applySettings } from 'src/actions/settings/deviceSettingsActions';
-import { useAnchor } from 'src/hooks/suite/useAnchor';
-import { SettingsAnchor } from 'src/constants/suite/anchors';
+import { events, injectDesktopAnalytics } from '@suite/analytics';
+import { useDevice } from '@suite/device';
+import { Translation } from '@suite/intl';
+import { Anchor, SettingsAnchor } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { Icon, SelectBar, Tooltip } from '@trezor/components';
+import { type DisplayRotation as DisplayRotationType, PROTO } from '@trezor/connect';
+import { DeviceModelInternal } from '@trezor/device-utils';
+import { ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon } from '@trezor/icons';
+import { ActionColumn, SectionItem, TextColumn } from '@trezor/product-components';
 
-const DISPLAY_ROTATIONS = [
-    { label: <Translation id="TR_NORTH" />, value: 0 },
-    { label: <Translation id="TR_EAST" />, value: 90 },
-    { label: <Translation id="TR_SOUTH" />, value: 180 },
-    { label: <Translation id="TR_WEST" />, value: 270 },
-] as const;
+import { applySettingsThunk } from 'src/actions/settings/deviceSettingsActions';
+
+type Rotation = { label: JSX.Element; value: DisplayRotationType };
+
+const DISPLAY_ROTATIONS: Array<Rotation> = [
+    {
+        label: (
+            <Tooltip content={<Translation id="TR_NORTH" />} cursor="pointer">
+                <Icon as={ArrowUpIcon} />
+            </Tooltip>
+        ),
+        value: 'North',
+    },
+    {
+        label: (
+            <Tooltip content={<Translation id="TR_EAST" />} cursor="pointer">
+                <Icon as={ArrowLeftIcon} />
+            </Tooltip>
+        ),
+        value: 'East',
+    },
+    {
+        label: (
+            <Tooltip content={<Translation id="TR_SOUTH" />} cursor="pointer">
+                <Icon as={ArrowDownIcon} />
+            </Tooltip>
+        ),
+        value: 'South',
+    },
+    {
+        label: (
+            <Tooltip content={<Translation id="TR_WEST" />} cursor="pointer">
+                <Icon as={ArrowRightIcon} />
+            </Tooltip>
+        ),
+        value: 'West',
+    },
+];
+
+// features.display_rotation cannot be used to determine support because can be defined for devices not supporting rotation (e.g. T3B1).
+const DEVICES_SUPPORTING_ROTATION = [DeviceModelInternal.T2T1, DeviceModelInternal.T3T1];
 
 interface DisplayRotationProps {
     isDeviceLocked: boolean;
 }
 
 export const DisplayRotation = ({ isDeviceLocked }: DisplayRotationProps) => {
-    const dispatch = useDispatch();
-    const { anchorRef, shouldHighlight } = useAnchor(SettingsAnchor.DisplayRotation);
     const { device } = useDevice();
+    const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
+    const isSupported =
+        device?.features !== undefined &&
+        DEVICES_SUPPORTING_ROTATION.includes(device.features.internal_model);
+
+    if (!isSupported) {
+        return null;
+    }
+
     const currentRotation = device?.features?.display_rotation;
 
     return (
-        <SectionItem
-            data-test="@settings/device/display-rotation"
-            ref={anchorRef}
-            shouldHighlight={shouldHighlight}
-        >
-            <TextColumn title={<Translation id="TR_DEVICE_SETTINGS_DISPLAY_ROTATION" />} />
-            <ActionColumn>
-                <ButtonGroup size="small" isDisabled={isDeviceLocked}>
-                    {DISPLAY_ROTATIONS.map(variant => (
-                        <Button
-                            key={variant.value}
-                            variant={currentRotation === variant.value ? 'primary' : 'secondary'}
-                            onClick={() => {
-                                dispatch(applySettings({ display_rotation: variant.value }));
-                                analytics.report({
-                                    type: EventType.SettingsDeviceChangeOrientation,
-                                    payload: {
-                                        value: variant.value,
-                                    },
-                                });
-                            }}
-                            data-test={`@settings/device/rotation-button/${variant.value}`}
+        <Anchor anchorId={SettingsAnchor.DisplayRotation}>
+            {({ anchorId, anchorRef, shouldHighlight }) => (
+                <SectionItem
+                    data-testid={anchorId}
+                    ref={anchorRef}
+                    shouldHighlight={shouldHighlight}
+                >
+                    <TextColumn title={<Translation id="TR_DEVICE_SETTINGS_DISPLAY_ROTATION" />} />
+                    <ActionColumn>
+                        <Tooltip
+                            isActive={isDeviceLocked}
+                            content={
+                                <Translation id="TR_SETTINGS_DEVICE_BANNER_TITLE_REMEMBERED" />
+                            }
                         >
-                            {variant.label}
-                        </Button>
-                    ))}
-                </ButtonGroup>
-            </ActionColumn>
-        </SectionItem>
+                            <SelectBar
+                                isDisabled={isDeviceLocked}
+                                data-testid="@settings/device/rotation-button"
+                                selectedOption={currentRotation ?? undefined}
+                                options={DISPLAY_ROTATIONS}
+                                size="small"
+                                onChange={(value: DisplayRotationType) => {
+                                    dispatch(applySettingsThunk({ display_rotation: value }));
+                                    analytics.report({
+                                        type: events.settingsDeviceChangeOrientationEvent.name,
+                                        payload: {
+                                            value: PROTO.Enum_DisplayRotation[value],
+                                        },
+                                    });
+                                }}
+                            />
+                        </Tooltip>
+                    </ActionColumn>
+                </SectionItem>
+            )}
+        </Anchor>
     );
 };

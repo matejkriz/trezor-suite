@@ -1,13 +1,21 @@
 {
-    "name": "@trezor/connect-explorer",
+    "name": "@trezor/connect-webextension",
     "version": "1.0.0",
     "manifest_version": 3,
     "action": {
         "default_popup": "extension-popup.html"
     },
     "background": {
-        "service_worker": "serviceWorker.bundle.js"
+        "service_worker": "serviceWorker.bundle.js",
+        "type": "module"
     },
-    "permissions": ["scripting"],
-    "host_permissions": ["http://*/*", "https://*/*"]
+    "externally_connectable": {
+        "ids": [],
+        "matches": ["https://*.trezor.io/*", "http://localhost/*", "https://*.suite.sldev.cz/*"]
+    },
+    "host_permissions": [
+        "https://*.trezor.io/*",
+        "http://localhost/*",
+        "https://*.suite.sldev.cz/*"
+    ]
 }

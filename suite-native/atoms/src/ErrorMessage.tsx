@@ -1,23 +1,25 @@
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-import { Icon } from '@suite-common/icons';
+import { type ReactNode } from 'react';
+
+import { Icon } from '@suite-native/icons';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
 
 import { Box } from './Box';
 import { Text } from './Text';
 
 type ErrorMessageProps = {
-    errorMessage: string;
+    errorMessage: ReactNode;
 };
 
 const errorMessageStyle = prepareNativeStyle(utils => ({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: utils.colors.backgroundAlertRedSubtleOnElevation0,
-    margin: utils.spacings.small,
-    borderColor: utils.colors.borderAlertRed,
+    backgroundColor: utils.colors.elementFillCriticalSofter,
+    margin: utils.spacings.sp8,
+    borderColor: utils.colors.elementBorderFieldError,
     borderWidth: 1,
-    borderRadius: utils.borders.radii.medium,
-    padding: utils.spacings.large,
+    borderRadius: utils.borders.radii.r16,
+    padding: utils.spacings.sp24,
 }));
 
 export const ErrorMessage = ({ errorMessage }: ErrorMessageProps) => {
@@ -25,10 +27,10 @@ export const ErrorMessage = ({ errorMessage }: ErrorMessageProps) => {
 
     return (
         <Box style={applyStyle(errorMessageStyle)}>
-            <Box marginRight="small">
-                <Icon name="warningCircle" size="large" color="iconAlertRed" />
+            <Box marginRight="sp8">
+                <Icon name="warningCircle" size="large" color="contentCritical" />
             </Box>
-            <Text color="textAlertRed">Error: {errorMessage}</Text>
+            <Text color="contentCritical">Error: {errorMessage}</Text>
         </Box>
     );
 };

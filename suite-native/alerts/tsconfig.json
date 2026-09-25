@@ -2,8 +2,12 @@
     "extends": "../../tsconfig.base.json",
     "compilerOptions": { "outDir": "libDev" },
     "references": [
-        { "path": "../../suite-common/icons" },
         { "path": "../atoms" },
-        { "path": "../../packages/styles" }
+        { "path": "../icons" },
+        { "path": "../../packages/env-utils" },
+        {
+            "path": "../../packages/styles-native"
+        },
+        { "path": "../../packages/theme" }
     ]
 }

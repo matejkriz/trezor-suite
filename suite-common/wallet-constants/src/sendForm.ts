@@ -1,15 +1,18 @@
-export const CUSTOM_FEE = 'custom' as const;
-export const FIRST_OUTPUT_ID = 0;
-export const BTC_LOCKTIME_SEQUENCE = 0xffffffff - 1;
-export const BTC_LOCKTIME_VALUE = 500000000; // if locktime is equal/greater than this then it's a timestamp
+// A popular choice is to use 0xFFFFFFFD for your sequence fields,
+// as this enables both the locktime field (in case you want to use it)
+// and also replace-by-fee (which is generally useful).
 export const BTC_RBF_SEQUENCE = 0xffffffff - 2;
-export const XRP_FLAG = 0x80000000;
-export const U_INT_32 = 0xffffffff;
-export const ETH_DEFAULT_GAS_PRICE = '1';
-export const ETH_DEFAULT_GAS_LIMIT = '21000';
 
+// Locktime enabled, but RBF disabled
+export const BTC_LOCKTIME_SEQUENCE = 0xffffffff - 1;
+
+export const BTC_LOCKTIME_VALUE = 500000000; // if locktime is equal/greater than this then it's a timestamp
+export const U_INT_32 = 0xffffffff;
+
+export const ETH_SPEED_UP_TX_MULTIPLIER = '1.2'; // multiply max fee and max priority fee per gas when speeding up tx
+export const ETH_TRANSFER_BACKUP_GAS_LIMIT = '50000'; // sending ETH to contract needs more gas limit than 21000
+export const ETH_CONTRACT_CALL_BACKUP_GAS_LIMIT = '250000';
 export const ERC20_TRANSFER = 'a9059cbb'; // 4 bytes function signature of solidity erc20 `transfer(address,uint256)`
-export const ERC20_GAS_LIMIT = '200000';
 
 export const DEFAULT_PAYMENT = {
     type: 'payment',
@@ -38,21 +41,20 @@ export const DEFAULT_VALUES = {
     feePerUnit: '',
     feeLimit: '',
     options: ['broadcast'],
-    bitcoinLockTime: '',
+    bitcoinLocktimeBlockHeight: '',
+    bitcoinLocktimeDatetime: '',
     ethereumNonce: '',
-    ethereumDataAscii: '',
-    ethereumDataHex: '',
-    rippleDestinationTag: '',
+    transactionData: '',
+    destinationTag: '',
     outputs: [],
     isCoinControlEnabled: false,
     hasCoinControlBeenOpened: false,
+    utxoSorting: 'newestFirst',
 } as const;
 
 // Time-to-live (TTL) in cardano represents a slot, or deadline by which a transaction must be submitted.
 // By setting offset to 7200s transaction sent from Suite will be valid for 2h.
 // If it is not included in a block until then it will be rejected by the network.
-export const CARDANO_DEFAULT_TTL_OFFSET = 7200;
-
 export const COMPOSE_ERROR_TYPES = {
     COMPOSE: 'compose',
     COIN_CONTROL: 'coinControl',

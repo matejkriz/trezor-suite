@@ -1,0 +1,16 @@
+{
+    "ignore-patterns": ["libDev", "lib", "build", "build-webextension"],
+    "ignores": [
+        "stylelint-config-standard",
+        "rimraf",
+        "webpack-cli",
+        "babel-plugin-styled-components",
+        "typescript-styled-plugin",
+        "nextra-theme-docs",
+        "// yarn depcheck does not support *.mdx files by default. It may solvable by custom-parser. But it is probably not worth the hassle",
+        "remark-gfm",
+        "swr",
+        "@suite-common/icons",
+        "@trezor/device-authenticity"
+    ]
+}

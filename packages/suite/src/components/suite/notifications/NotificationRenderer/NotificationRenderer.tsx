@@ -1,201 +1,573 @@
-import type { ComponentType } from 'react';
+import { type ComponentType, type JSX } from 'react';
 
-import type { NotificationEntry } from '@suite-common/toast-notifications';
-import { deviceActions } from '@suite-common/wallet-core';
+import { type ErrorCode } from 'invity-api';
+
+import {
+    type ExtendedMessageDescriptor,
+    Translation,
+    type TranslationKey,
+    useTranslation,
+} from '@suite/intl';
+import { TRADING_ERROR_MESSAGE } from '@suite/trading';
+import { selectSelectedDeviceLabelOrName } from '@suite-common/device';
+import { AUTH_DEVICE, type NotificationEntry } from '@suite-common/toast-notifications';
+import { getTradingErrorDisplay } from '@suite-common/trading';
+import { getNetworkDisplaySymbol } from '@suite-common/wallet-config';
 import { DEVICE } from '@trezor/connect';
+import {
+    ArrowDownIcon,
+    ArrowUpIcon,
+    CheckIcon,
+    GearIcon,
+    PiggyBankIcon,
+    TorBrowserIcon,
+} from '@trezor/icons';
+import { exhaustive } from '@trezor/type-utils';
 
-import { NotificationViewProps } from 'src/components/suite';
-import type { ExtendedMessageDescriptor } from 'src/types/suite';
+import { useSelector } from 'src/hooks/suite';
+
 import { ActionRenderer } from './ActionRenderer';
-import { TransactionRenderer } from './TransactionRenderer';
+import { AutoEjectRenderer } from './AutoEjectRenderer';
 import { CoinProtocolRenderer } from './CoinProtocolRenderer';
+import { ExchangeInfoRenderer } from './ExchangeInfoRenderer';
+import { TransactionRenderer } from './TransactionRenderer';
+import { WrapInfoRenderer } from './WrapInfoRenderer';
+import { type NotificationViewProps } from '../Notifications/NotificationGroup/NotificationList/NotificationView';
 
-const simple = (
-    View: NotificationRendererProps['render'],
-    notification: NotificationRendererProps['notification'],
-    variant: NotificationViewProps['variant'],
-    messageId: ExtendedMessageDescriptor['id'],
-    values: ExtendedMessageDescriptor['values'],
-    icon?: NotificationViewProps['icon'],
+type LocalizedNotificationEntry = NotificationEntry<TranslationKey>;
+
+export type NotificationRendererProps<
+    T extends LocalizedNotificationEntry['type'] = LocalizedNotificationEntry['type'],
+> = {
+    render: ComponentType<{ onCancel?: () => void } & NotificationViewProps>;
+    notification: Extract<LocalizedNotificationEntry, { type: T }>;
+};
+
+type RenderConfig = {
+    variant: NotificationViewProps['variant'];
+    message: ExtendedMessageDescriptor['id'];
+    values?: ExtendedMessageDescriptor['values'];
+    icon?: NotificationViewProps['icon'];
+};
+
+/**
+ * Renders a notification with the provided configuration.
+ *
+ * Abstracts common notification rendering logic by accepting a View component,
+ * a notification instance, and render configuration (variant, message, icon, etc).
+ * Generic over the notification type to ensure type-safe access to notification properties.
+ *
+ * @param View - React component for displaying the notification (currenty: ToastNotificationView, NotificationView)
+ * @param notification - Notification instance with specific type and data
+ * @param config - Notification configuration (variant, message ID, translation values, icon)
+ * @returns JSX element of the notification
+ */
+const renderNotificationView = <T extends NotificationEntry['type']>(
+    View: NotificationRendererProps<T>['render'],
+    notification: NotificationRendererProps<T>['notification'],
+    { variant, message, values, icon }: RenderConfig,
 ) => (
     <View
         notification={notification}
         variant={variant}
         icon={icon}
-        message={messageId}
+        message={message}
         messageValues={values}
     />
 );
-
-const error = (
-    View: NotificationRendererProps['render'],
-    notification: NotificationRendererProps['notification'],
-    messageId: ExtendedMessageDescriptor['id'],
-    values: ExtendedMessageDescriptor['values'] = {
-        error: notification.error,
-    },
-) => simple(View, notification, 'error', messageId, values);
-
-const success = (
-    View: NotificationRendererProps['render'],
-    notification: NotificationRendererProps['notification'],
-    messageId: ExtendedMessageDescriptor['id'],
-    icon?: NotificationViewProps['icon'],
-    values: ExtendedMessageDescriptor['values'] = {},
-) => simple(View, notification, 'success', messageId, values, icon);
-
-const info = (
-    View: NotificationRendererProps['render'],
-    notification: NotificationRendererProps['notification'],
-    messageId: ExtendedMessageDescriptor['id'],
-    values: ExtendedMessageDescriptor['values'] = {},
-    icon?: NotificationViewProps['icon'],
-) => simple(View, notification, 'info', messageId, values, icon);
-
-export type NotificationRendererProps<
-    T extends NotificationEntry['type'] = NotificationEntry['type'],
-> = {
-    render: ComponentType<{ onCancel?: () => void } & NotificationViewProps>;
-    notification: Extract<NotificationEntry, { type: T }>;
-};
 
 export const NotificationRenderer = ({
     notification,
     render,
 }: NotificationRendererProps): JSX.Element => {
-    switch (notification.type) {
+    const deviceLabel = useSelector(selectSelectedDeviceLabelOrName);
+    const { translationString } = useTranslation();
+
+    const { type } = notification;
+
+    switch (type) {
         case 'acquire-error':
-            return error(render, notification, 'TOAST_ACQUIRE_ERROR');
-        case 'auth-failed':
-            return error(render, notification, 'TOAST_AUTH_FAILED');
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TOAST_ACQUIRE_ERROR',
+                values: { error: notification.error },
+            });
+
         case 'auth-confirm-error':
-            return error(render, notification, 'TOAST_AUTH_CONFIRM_ERROR', {
-                error: notification.error || { id: 'TOAST_AUTH_CONFIRM_ERROR_DEFAULT' },
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TOAST_AUTH_CONFIRM_ERROR',
+                values: {
+                    error: notification.error || (
+                        <Translation id="TOAST_AUTH_CONFIRM_ERROR_DEFAULT" />
+                    ),
+                },
             });
+
         case 'discovery-error':
-            return error(render, notification, 'TOAST_DISCOVERY_ERROR');
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TOAST_DISCOVERY_ERROR',
+                values: { error: notification.error },
+            });
+
+        case 'account-added':
+            return renderNotificationView(render, notification, {
+                variant: 'transparent',
+                message: 'TOAST_ACCOUNT_ADDED',
+                values: { networkName: notification.networkName },
+            });
+
+        case 'accounts-discovered':
+            return renderNotificationView(render, notification, {
+                variant: 'transparent',
+                message: 'TOAST_ACCOUNTS_DISCOVERED',
+                values: {
+                    count: notification.count,
+                    networkName: notification.networkName,
+                },
+            });
+
         case 'backup-failed':
-            return error(render, notification, 'TOAST_BACKUP_FAILED');
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TOAST_BACKUP_FAILED',
+                values: { error: notification.error },
+            });
+
         case 'backup-success':
-            return success(render, notification, 'TOAST_BACKUP_SUCCESS', 'SETTINGS');
+            return renderNotificationView(render, notification, {
+                variant: 'success',
+                message: 'TOAST_BACKUP_SUCCESS',
+                icon: GearIcon,
+            });
+
         case 'settings-applied':
-            return success(render, notification, 'TOAST_SETTINGS_APPLIED', 'SETTINGS');
+            return renderNotificationView(render, notification, {
+                variant: 'success',
+                message: 'TOAST_SETTINGS_APPLIED',
+                icon: GearIcon,
+            });
+
         case 'pin-changed':
-            return success(render, notification, 'TOAST_PIN_CHANGED', 'SETTINGS');
+            return renderNotificationView(render, notification, {
+                variant: 'success',
+                message: 'TOAST_PIN_CHANGED',
+                icon: GearIcon,
+            });
+
         case 'wipe-code-changed':
-            return success(render, notification, 'TOAST_WIPE_CODE_CHANGED', 'SETTINGS');
+            return renderNotificationView(render, notification, {
+                variant: 'success',
+                message: 'TOAST_WIPE_CODE_CHANGED',
+                icon: GearIcon,
+            });
+
         case 'wipe-code-removed':
-            return success(render, notification, 'TOAST_WIPE_CODE_REMOVED', 'SETTINGS');
+            return renderNotificationView(render, notification, {
+                variant: 'success',
+                message: 'TOAST_WIPE_CODE_REMOVED',
+                icon: GearIcon,
+            });
+
         case 'device-wiped':
-            return success(render, notification, 'TOAST_DEVICE_WIPED', 'SETTINGS');
+            return renderNotificationView(render, notification, {
+                variant: 'success',
+                message: 'TOAST_DEVICE_WIPED',
+                icon: GearIcon,
+            });
+
+        case 'device-forgotten':
+            return renderNotificationView(render, notification, {
+                variant: 'success',
+                message: 'TR_DEVICE_HAS_BEEN_FORGOTTEN',
+                icon: CheckIcon,
+            });
+
         case 'copy-to-clipboard':
-            return success(render, notification, 'TOAST_COPY_TO_CLIPBOARD');
+            return renderNotificationView(render, notification, {
+                variant: 'success',
+                message: 'TOAST_COPY_TO_CLIPBOARD',
+            });
+
         case 'raw-tx-sent':
-            return success(render, notification, 'TOAST_RAW_TX_SENT', 'SEND', {
-                txid: notification.txid,
-            });
+            return (
+                <TransactionRenderer
+                    render={render}
+                    notification={notification}
+                    icon={ArrowUpIcon}
+                    variant="warning"
+                    message="TOAST_TX_SENT"
+                    messageValues={{
+                        account: notification.descriptor,
+                    }}
+                />
+            );
+
         case 'cardano-delegate-error':
-            return error(render, notification, 'TR_ERROR_CARDANO_DELEGATE');
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TR_ERROR_CARDANO_DELEGATE',
+                values: { error: notification.error },
+            });
+
         case 'cardano-withdrawal-error':
-            return error(render, notification, 'TR_ERROR_CARDANO_WITHDRAWAL');
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TR_ERROR_CARDANO_WITHDRAWAL',
+                values: { error: notification.error },
+            });
+
         case 'sign-tx-error':
-            return error(render, notification, 'TOAST_SIGN_TX_ERROR');
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TOAST_SIGN_TX_ERROR',
+                values: { error: notification.error },
+            });
+
         case 'verify-address-error':
-            return error(render, notification, 'TOAST_VERIFY_ADDRESS_ERROR');
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TOAST_VERIFY_ADDRESS_ERROR',
+                values: { error: notification.error },
+            });
+
         case 'verify-xpub-error':
-            return error(render, notification, 'TOAST_VERIFY_XPUB_ERROR');
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TOAST_VERIFY_XPUB_ERROR',
+                values: { error: notification.error },
+            });
+
         case 'sign-message-error':
-            return error(render, notification, 'TOAST_SIGN_MESSAGE_ERROR');
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TOAST_SIGN_MESSAGE_ERROR',
+                values: { error: notification.error },
+            });
+
         case 'verify-message-error':
-            return error(render, notification, 'TOAST_VERIFY_MESSAGE_ERROR');
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TOAST_VERIFY_MESSAGE_ERROR',
+                values: { error: notification.error },
+            });
+
         case 'sign-message-success':
-            return success(render, notification, 'TOAST_SIGN_MESSAGE_SUCCESS');
+            return renderNotificationView(render, notification, {
+                variant: 'success',
+                message: 'TOAST_SIGN_MESSAGE_SUCCESS',
+            });
+
         case 'verify-message-success':
-            return success(render, notification, 'TOAST_VERIFY_MESSAGE_SUCCESS');
+            return renderNotificationView(render, notification, {
+                variant: 'success',
+                message: 'TOAST_VERIFY_MESSAGE_SUCCESS',
+            });
+
+        case 'verify-message-cancelled':
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TR_VERIFICATION_CANCELED',
+            });
+
         case 'error':
-            return error(render, notification, 'TOAST_GENERIC_ERROR');
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TOAST_GENERIC_ERROR',
+                values: { error: notification.error },
+            });
+
+        case 'trading-error': {
+            const display = getTradingErrorDisplay(notification);
+            const entry =
+                TRADING_ERROR_MESSAGE[notification.errorCode as ErrorCode] ??
+                TRADING_ERROR_MESSAGE.unknown;
+
+            if (display.kind === 'detailed' && entry.detailed) {
+                return renderNotificationView(render, notification, {
+                    variant: 'error',
+                    message: entry.detailed,
+                    values: display.values,
+                });
+            }
+
+            if (display.kind === 'base' && display.message) {
+                return renderNotificationView(render, notification, {
+                    variant: 'error',
+                    message: 'TR_TRADING_ERROR_WITH_PARTNER_MESSAGE',
+                    values: {
+                        base: translationString(entry.base),
+                        partnerMessage: display.message,
+                    },
+                });
+            }
+
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: entry.base,
+            });
+        }
+
+        case 'cannot-open-bluetooth-settings-error':
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TR_BLUETOOTH_CANNOT_OPEN_BLUETOOTH_SETTINGS_REMOVE_DEVICE',
+                values: { error: notification.error },
+            });
+
         case 'clear-storage':
-            return success(render, notification, 'TR_STORAGE_CLEARED');
-        case 'firmware-check-authenticity-success':
-            return success(render, notification, 'TR_FIRMWARE_CHECK_AUTHENTICITY_SUCCESS');
+            return renderNotificationView(render, notification, {
+                variant: 'success',
+                message: 'TR_STORAGE_CLEARED',
+            });
+
+        case 'firmware-authenticity-check-error':
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: notification.translationKey,
+                values: { error: notification.error },
+            });
+
         case 'device-authenticity-success':
-            return success(render, notification, 'TR_DEVICE_AUTHENTICITY_SUCCESS');
+            return renderNotificationView(render, notification, {
+                variant: 'success',
+                message: 'TR_DEVICE_AUTHENTICITY_SUCCESS',
+            });
+
         case 'device-authenticity-error':
-            return error(render, notification, 'TR_DEVICE_AUTHENTICITY_ERROR');
-        case 'bridge-dev-restart':
-            return info(
-                render,
-                notification,
-                notification.devMode ? 'TR_BRIDGE_DEV_MODE_START' : 'TR_BRIDGE_DEV_MODE_STOP',
-            );
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TR_DEVICE_AUTHENTICITY_ERROR',
+                values: { error: notification.error },
+            });
+
         case 'metadata-not-found-error':
-            return error(render, notification, 'METADATA_PROVIDER_NOT_FOUND_ERROR');
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'METADATA_PROVIDER_NOT_FOUND_ERROR',
+                values: { error: notification.error },
+            });
+
         case 'metadata-auth-error':
-            return error(render, notification, 'METADATA_PROVIDER_AUTH_ERROR');
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'METADATA_PROVIDER_AUTH_ERROR',
+                values: { error: notification.error },
+            });
+
         case 'metadata-unexpected-error':
-            return error(render, notification, 'METADATA_PROVIDER_UNEXPECTED_ERROR');
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'METADATA_PROVIDER_UNEXPECTED_ERROR',
+                values: { error: notification.error },
+            });
+
+        case 'estimated-fee-error':
+            return renderNotificationView(render, notification, {
+                variant: 'info',
+                message: 'TOAST_ESTIMATED_FEE_ERROR',
+            });
+
         case 'auto-updater-error':
-            return error(render, notification, 'TOAST_AUTO_UPDATER_ERROR', {
-                state: notification.state,
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TOAST_AUTO_UPDATER_ERROR',
+                values: { state: notification.state },
             });
+
         case 'auto-updater-no-new':
-            return info(render, notification, 'TOAST_AUTO_UPDATER_NO_NEW');
+            return renderNotificationView(render, notification, {
+                variant: 'transparent',
+                message: 'TOAST_AUTO_UPDATER_NO_NEW',
+            });
+
         case 'auto-updater-new-version-first-run':
-            return info(render, notification, 'TOAST_AUTO_UPDATER_NEW_VERSION_FIRST_RUN', {
-                version: notification.version,
+            return renderNotificationView(render, notification, {
+                variant: 'info',
+                message: 'TOAST_AUTO_UPDATER_NEW_VERSION_FIRST_RUN',
+                values: { version: notification.version },
             });
+
         case 'add-token-success':
-            return success(render, notification, 'TR_ADD_TOKEN_TOAST_SUCCESS');
-        case 'user-feedback-send-success':
-            return success(render, notification, 'TR_GUIDE_FEEDBACK_SENT');
-        case 'user-feedback-send-error':
-            return error(render, notification, 'TR_GUIDE_FEEDBACK_ERROR');
-        case 'qr-incorrect-address':
-            return error(render, notification, 'TOAST_QR_INCORRECT_ADDRESS');
-        case 'qr-incorrect-coin-scheme-protocol':
-            return error(render, notification, 'TOAST_QR_INCORRECT_COIN_SCHEME_PROTOCOL', {
-                coin: notification.coin,
+            return renderNotificationView(render, notification, {
+                variant: 'success',
+                message: 'TR_ADD_TOKEN_TOAST_SUCCESS',
             });
+
+        case 'activate-token-success':
+            return renderNotificationView(render, notification, {
+                variant: 'success',
+                message: 'TR_ACTIVATE_TOKEN_TOAST_SUCCESS',
+            });
+
+        case 'deactivate-token-success':
+            return renderNotificationView(render, notification, {
+                variant: 'success',
+                message: 'TR_DEACTIVATE_TOKEN_TOAST_SUCCESS',
+            });
+
+        case 'auto-eject-settings':
+            return <AutoEjectRenderer render={render} notification={notification} />;
+
+        case 'user-feedback-send-success':
+            return renderNotificationView(render, notification, {
+                variant: 'success',
+                message: 'TR_GUIDE_FEEDBACK_SENT',
+            });
+
+        case 'user-feedback-send-error':
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TR_GUIDE_FEEDBACK_ERROR',
+                values: { error: notification.error },
+            });
+
+        case 'qr-incorrect-address':
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TOAST_QR_INCORRECT_ADDRESS',
+                values: { error: notification.error },
+            });
+
+        case 'qr-incorrect-coin-scheme-protocol':
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TOAST_QR_INCORRECT_COIN_SCHEME_PROTOCOL',
+                values: { coin: notification.coin },
+            });
+
+        case 'qr-unknown-scheme-protocol':
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TOAST_QR_UNKNOWN_SCHEME_PROTOCOL',
+                values: {
+                    scheme: notification.scheme,
+                    error: notification.error,
+                },
+            });
+
         case 'tor-toggle-error':
-            return error(render, notification, notification.error);
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: notification.error,
+                values: { error: notification.error },
+            });
+
         case 'tor-is-slow':
-            return info(
-                render,
-                notification,
-                'TR_TOR_IS_SLOW_MESSAGE',
-                { br: () => <br /> },
-                'TOR',
-            );
+            return renderNotificationView(render, notification, {
+                variant: 'info',
+                message: 'TR_TOR_IS_SLOW_MESSAGE',
+                icon: TorBrowserIcon,
+                values: { br: () => <br /> },
+            });
+
         case 'coin-scheme-protocol':
             return <CoinProtocolRenderer render={render} notification={notification} />;
+
+        case 'suite-sync-keys-error':
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'SUITE_SYNC_KEY_RETRIEVAL_FAILED',
+                values: { error: notification.error },
+            });
+
+        case 'suite-sync-enabled':
+            return renderNotificationView(render, notification, {
+                variant: 'success',
+                message: 'TR_SUITE_SYNC_ENABLED_SUCCESS',
+                icon: CheckIcon,
+            });
+
         case 'tx-received':
             return (
                 <TransactionRenderer
                     render={render}
                     notification={notification}
-                    icon="RECEIVE"
+                    icon={ArrowDownIcon}
                     variant="info"
                     message="TOAST_TX_RECEIVED"
                     messageValues={{
-                        amount: notification.formattedAmount,
                         account: notification.descriptor,
                     }}
                 />
             );
+
+        case 'tx-revoked':
+            return (
+                <TransactionRenderer
+                    render={render}
+                    notification={notification}
+                    icon={ArrowUpIcon}
+                    variant="warning"
+                    message="TOAST_TX_REVOKED"
+                    messageValues={{
+                        tokenSymbol: notification.token.symbol,
+                    }}
+                />
+            );
+
+        case 'tx-approved':
+            return (
+                <TransactionRenderer
+                    render={render}
+                    notification={notification}
+                    icon={ArrowUpIcon}
+                    variant="warning"
+                    message="TOAST_TX_APPROVED"
+                    messageValues={{
+                        tokenSymbol: notification.token.symbol,
+                    }}
+                />
+            );
+
+        case 'tx-exchange':
+            return (
+                <ExchangeInfoRenderer
+                    render={render}
+                    notification={notification}
+                    icon={ArrowUpIcon}
+                    variant="warning"
+                    message="TOAST_TX_EXCHANGE_BROADCASTED"
+                />
+            );
+
+        case 'tx-wrap':
+            return (
+                <WrapInfoRenderer
+                    render={render}
+                    notification={notification}
+                    icon={ArrowUpIcon}
+                    variant="success"
+                    message="TOAST_TX_WRAP_BROADCASTED"
+                />
+            );
+
+        case 'tx-unwrap':
+            return (
+                <WrapInfoRenderer
+                    render={render}
+                    notification={notification}
+                    icon={ArrowUpIcon}
+                    variant="success"
+                    message="TOAST_TX_UNWRAP_BROADCASTED"
+                />
+            );
+
         case 'tx-sent':
             return (
                 <TransactionRenderer
                     render={render}
                     notification={notification}
-                    icon="SEND"
-                    variant="success"
+                    icon={ArrowUpIcon}
+                    variant="warning"
                     message="TOAST_TX_SENT"
                     messageValues={{
-                        amount: notification.formattedAmount,
                         account: notification.descriptor,
                     }}
                 />
             );
+
         case 'tx-confirmed':
             return (
                 <TransactionRenderer
@@ -204,20 +576,25 @@ export const NotificationRenderer = ({
                     variant="info"
                     message="TOAST_TX_CONFIRMED"
                     messageValues={{
-                        amount: notification.formattedAmount,
                         account: notification.descriptor,
                     }}
                 />
             );
-        case 'savings-kyc-failed':
-            return error(render, notification, 'TR_SAVINGS_KYC_FAILED_NOTIFICATION');
-        case 'savings-kyc-success':
-            return success(render, notification, 'TR_SAVINGS_KYC_SUCCESS_NOTIFICATION');
+
         case 'coinjoin-interrupted':
-            return error(render, notification, 'TR_COINJOIN_INTERRUPTED_ERROR');
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TR_COINJOIN_INTERRUPTED_ERROR',
+                values: { error: notification.error },
+            });
+
         // Events:
-        case deviceActions.authDevice.type:
-            return info(render, notification, 'EVENT_WALLET_CREATED');
+        case AUTH_DEVICE:
+            return renderNotificationView(render, notification, {
+                variant: 'info',
+                message: 'EVENT_WALLET_CREATED',
+            });
+
         case DEVICE.CONNECT:
             return (
                 <ActionRenderer
@@ -225,11 +602,10 @@ export const NotificationRenderer = ({
                     notification={notification}
                     variant="info"
                     message="EVENT_DEVICE_CONNECT"
-                    messageValues={{
-                        label: notification.device.label,
-                    }}
+                    messageValues={{ label: deviceLabel }}
                 />
             );
+
         case DEVICE.CONNECT_UNACQUIRED:
             return (
                 <ActionRenderer
@@ -237,60 +613,169 @@ export const NotificationRenderer = ({
                     notification={notification}
                     variant="warning"
                     message="EVENT_DEVICE_CONNECT_UNACQUIRED"
-                    messageValues={{
-                        label: { id: 'TR_UNACQUIRED' },
-                    }}
+                    messageValues={{ label: <Translation id="TR_UNACQUIRED" /> }}
                 />
             );
+
         case 'tx-staked':
             return (
                 <TransactionRenderer
                     render={render}
                     notification={notification}
-                    icon="SEND"
-                    variant="success"
+                    icon={PiggyBankIcon}
+                    variant="warning"
                     message="TOAST_TX_STAKED"
                     messageValues={{
-                        amount: notification.formattedAmount,
                         account: notification.descriptor,
                     }}
                 />
             );
+
         case 'tx-unstaked':
             return (
                 <TransactionRenderer
                     render={render}
                     notification={notification}
-                    icon="SEND"
-                    variant="success"
+                    icon={PiggyBankIcon}
+                    variant="warning"
                     message="TOAST_TX_UNSTAKED"
                     messageValues={{
-                        amount: notification.formattedAmount,
+                        account: notification.descriptor,
                     }}
                 />
             );
+
         case 'tx-claimed':
             return (
                 <TransactionRenderer
                     render={render}
                     notification={notification}
-                    icon="SEND"
-                    variant="success"
+                    icon={PiggyBankIcon}
+                    variant="warning"
                     message="TOAST_TX_CLAIMED"
                     messageValues={{
-                        amount: notification.formattedAmount,
+                        account: notification.descriptor,
                     }}
                 />
             );
-        case 'successful-claim':
-            return success(render, notification, 'TOAST_SUCCESSFUL_CLAIM', 'CHECK', {
-                symbol: notification.symbol,
-            });
-        case 'firmware-language-changed':
-            return success(render, notification, 'TR_FIRMWARE_LANGUAGE_CHANGED');
-        case 'firmware-language-fetch-error':
-            return error(render, notification, 'TR_FIRMWARE_LANGUAGE_FETCH_ERROR');
 
-        // intentionally no default, all cases must be handled.
+        case 'tx-yield-deposit':
+            return (
+                <TransactionRenderer
+                    render={render}
+                    notification={notification}
+                    icon={ArrowUpIcon}
+                    variant="warning"
+                    message="TOAST_TX_YIELD_DEPOSIT"
+                    messageValues={{
+                        account: notification.descriptor,
+                    }}
+                />
+            );
+
+        case 'tx-yield-withdraw':
+            return (
+                <TransactionRenderer
+                    render={render}
+                    notification={notification}
+                    icon={ArrowUpIcon}
+                    variant="warning"
+                    message="TOAST_TX_YIELD_WITHDRAW"
+                    messageValues={{
+                        account: notification.descriptor,
+                    }}
+                />
+            );
+
+        case 'tx-yield-claim':
+            return (
+                <TransactionRenderer
+                    render={render}
+                    notification={notification}
+                    icon={ArrowUpIcon}
+                    variant="warning"
+                    message="TOAST_TX_YIELD_CLAIM"
+                    messageValues={{
+                        account: notification.descriptor,
+                    }}
+                />
+            );
+
+        case 'successful-claim':
+            return renderNotificationView(render, notification, {
+                variant: 'success',
+                message: 'TOAST_SUCCESSFUL_CLAIM',
+                icon: CheckIcon,
+                values: {
+                    networkDisplaySymbol: getNetworkDisplaySymbol(notification.symbol),
+                },
+            });
+
+        case 'firmware-language-changed':
+            return renderNotificationView(render, notification, {
+                variant: 'success',
+                message: 'TR_FIRMWARE_LANGUAGE_CHANGED',
+            });
+
+        case 'firmware-language-fetch-error':
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TR_FIRMWARE_LANGUAGE_FETCH_ERROR',
+                values: { error: notification.error },
+            });
+
+        case 'not-enough-funds-error':
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TR_NOT_ENOUGH_FUNDS',
+                values: { error: notification.error },
+            });
+
+        case 'could-not-parse-csv':
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TR_COULD_NOT_PARSE',
+                values: { error: notification.error },
+            });
+
+        case 'thp-credentials-reset':
+            return renderNotificationView(render, notification, {
+                variant: 'success',
+                message: 'TR_THP_RESET_CREDENTIALS_SUCCESS',
+            });
+
+        case 'sign-transaction-timeout':
+            return renderNotificationView(render, notification, {
+                variant: 'error',
+                message: 'TR_SIGN_TRANSACTION_TIMEOUT',
+                values: { error: notification.error },
+            });
+
+        case 'connect-popup-success':
+            return renderNotificationView(render, notification, {
+                variant: 'success',
+                message: 'TR_CONNECT_POPUP_SUCCESS',
+                icon: CheckIcon,
+                values: { appName: notification.appName },
+            });
+
+        case 'bip-329-labels-imported':
+            return renderNotificationView(render, notification, {
+                variant: 'success',
+                message: 'TR_BIP_329_LABELS_IMPORTED',
+            });
+
+        case 'legacy-labeling-migration-success':
+            return renderNotificationView(render, notification, {
+                variant: 'success',
+                message: 'TR_LABELING_MIGRATION_SUCCESS',
+                values: {
+                    added: notification.added,
+                    skipped: notification.skipped,
+                },
+            });
+
+        default:
+            return exhaustive(type);
     }
 };

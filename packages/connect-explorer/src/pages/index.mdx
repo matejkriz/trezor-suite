@@ -1,0 +1,550 @@
+---
+auto_sections: false
+icon: lightning
+---
+
+import { Card, Cards, Steps, Tabs } from 'nextra/components';
+
+import { Button, CollapsibleBox, Row } from '@trezor/components';
+
+import {
+    ExampleHeading,
+    ExamplesAside,
+    HiddenNextraHeading,
+    SdkContainer,
+    SdkDescription,
+    SdkHeading,
+    SdkName,
+    SdkTag,
+    SectionCard,
+} from '../components/IndexPageComponents';
+import { LinkButton } from '../components/LinkButton';
+import ZoomableIllustration from '../components/ZoomableIllustration';
+import IconExtension from '../components/icons/IconExtension';
+import IconMobile from '../components/icons/IconMobile';
+import IconNode from '../components/icons/IconNode';
+import IconWeb from '../components/icons/IconWeb';
+
+# Integrate Trezor devices with your project
+
+<SectionCard>
+    ### Connect 10 is here
+
+    A new major version. The integration is now built around **Trezor
+    Suite**: Suite hosts the Connect core and runs the device flow, so users get a better
+    experience and you get a cleaner API. Parts of your integration change — the migration
+    checklist covers them.
+
+    Already integrated with v9? It keeps working: v9 stays supported and its docs stay online,
+    so you can move over whenever it suits you.
+
+    <Row gap={12} flexWrap="wrap" margin={{ top: 16 }}>
+        <LinkButton intent="brand" size="small" href="/guides/migrating-to-connect-10">
+            Migration checklist
+        </LinkButton>
+        <Button
+            intent="neutral"
+            priority="secondary"
+            size="small"
+            href="https://connect.trezor.io/9/"
+            target="_blank">
+            Connect 9 docs
+        </Button>
+    </Row>
+
+</SectionCard>
+
+<SectionCard>
+    ### Explore Trezor Connect SDKs
+
+    Trezor Connect is a tool for seamless integration of Trezor hardware wallet with third-party apps and extensions.
+    Built with a developer-friendly interface, it ensures secure interactions for Trezor users within these apps.
+
+    There are couple of options how to integrate Trezor devices with your project. This page walks
+    you through installation and lets you explore SDK API.
+
+</SectionCard>
+
+<SectionCard>
+    ### Quick start
+
+    {/* this syntax is used to hide the headings from TOC */}
+    {<h4>Choose your environment</h4>}
+
+    Depending on your environment you need to chose the right package and follow the particular guide:
+
+    <Cards num={2}>
+        <Card icon={<IconNode />} title="Node.js" href="#nodejs" />
+        <Card icon={<IconWeb />} title="Web" href="#web" />
+        <Card icon={<IconExtension />} title="Web extension" href="#web-extension" />
+        <Card icon={<IconMobile />} title="Mobile" href="#mobile" />
+    </Cards>
+
+    <CollapsibleBox heading="Still unsure?" margin={{ top: 16 }}>
+        |Environment|Package|
+        |---|-------|
+        |node|@trezor/connect|
+        |electron in main layer|@trezor/connect|
+        |Trezor Suite (desktop) electron app|@trezor/connect|
+        |web app|@trezor/connect-web|
+        |web extension mv3 (foreground)|@trezor/connect-web|
+        |web extension mv3 (background)|@trezor/connect-webextension|
+    </CollapsibleBox>
+
+</SectionCard>
+
+<HiddenNextraHeading>
+
+### Node.js
+
+</HiddenNextraHeading>
+<SectionCard>
+    <SdkHeading className='nx-text-slate-900 dark:nx-text-slate-100'>
+        <IconNode />
+        <SdkName>Node.js</SdkName>
+        <SdkTag></SdkTag>
+        <LinkButton
+            intent="neutral"
+            priority="secondary"
+            size="small"
+            iconLeft="bookOpenText"
+            href="/readme/connect">
+            README
+        </LinkButton>
+        <Button
+            intent="neutral"
+            priority="secondary"
+            size="small"
+            iconLeft="githubLogoAlt"
+            href="https://github.com/trezor/trezor-suite/tree/develop/packages/connect"
+            target="_blank">
+            View on Github
+        </Button>
+    </SdkHeading>
+
+    <ZoomableIllustration src="/images/schema-connect.svg" $darkMode alt="connect schema when used in node" />
+
+    <SdkContainer>
+        <SdkDescription>
+            #### About
+
+            In Node.js the core SDK is loaded as a JavaScript module without any specificities. This allows native or CLI applications to directly interact with Trezor devices.
+        </SdkDescription>
+        <ExamplesAside>
+            <ExampleHeading>Examples:</ExampleHeading>
+            - [node](https://github.com/trezor/trezor-suite/tree/develop/packages/connect-examples/node)
+            - [electron in main layer](https://github.com/trezor/trezor-suite/tree/develop/packages/connect-examples/electron-main-process)
+            - [Trezor Suite (desktop) electron app](https://github.com/trezor/trezor-suite/blob/develop/suite/desktop-app/README.md)
+        </ExamplesAside>
+    </SdkContainer>
+
+    <CollapsibleBox heading="Quick start manual" margin={{ top: 16 }}>
+        <Steps>
+            {<h3>Installation of the package</h3>}
+
+            ```bash
+            npm install @trezor/connect
+            # or
+            yarn add @trezor/connect
+            ```
+
+            {<h3>Import from the package</h3>}
+
+            ```javascript
+            import TrezorConnect from '@trezor/connect';
+            ```
+
+            {<h3>Initialization of the project</h3>}
+
+            ```javascript
+                TrezorConnect.init({
+                    manifest: {
+                        email: 'developer@xyz.com',
+                        appName: 'Your Application',
+                        // svg or png icon
+                        appIcon: 'http://your.application.com/icon.svg',
+                        appUrl: 'http://your.application.com',
+                    },
+                });
+            ```
+
+            Trezor Connect Manifest requires that you, as a Trezor Connect integrator, share your email and application URL with us. This provides us with the ability to reach you in case of any required maintenance. This subscription is mandatory.
+
+            If you need more customization, refer to [init method documentation](./methods/other/init)
+
+            {<h3>How to use?</h3>}
+
+            Here is an example of how to get the device's public key:
+
+            ```javascript
+            TrezorConnect.getPublicKey({
+                "path": "m/49'/0'/0'",
+                    "showOnTrezor": true
+            });
+            ```
+
+            More methods with detailed explanation can be found on the left under the 'Coin methods' section. You can also try the Method Testing Tool, where you can try interacting with the device by yourself.
+        </Steps>
+    </CollapsibleBox>
+
+</SectionCard>
+
+<HiddenNextraHeading>
+
+### Web
+
+</HiddenNextraHeading>
+<SectionCard>
+    <SdkHeading className='nx-text-slate-900 dark:nx-text-slate-100'>
+        <IconWeb />
+        <SdkName>Web</SdkName>
+        <SdkTag>DOM required</SdkTag>
+        <LinkButton
+            intent="neutral"
+            priority="secondary"
+            size="small"
+            iconLeft="bookOpenText"
+            href="/readme/connect-web">
+            README
+        </LinkButton>
+        <Button
+            intent="neutral"
+            priority="secondary"
+            size="small"
+            iconLeft="githubLogoAlt"
+            href="https://github.com/trezor/trezor-suite/tree/develop/packages/connect-web"
+            target="_blank">
+            View on Github
+        </Button>
+    </SdkHeading>
+
+    <Tabs items={['Suite desktop popup', 'Suite Web popup']}>
+        <Tabs.Tab>
+            <ZoomableIllustration
+                src="/images/schema-connect-desktop.svg"
+                $darkMode
+                alt="connect schema when used with Suite Desktop popup"
+            />
+        </Tabs.Tab>
+        <Tabs.Tab>
+            <ZoomableIllustration
+                src="/images/schema-connect-web.svg"
+                $darkMode
+                alt="connect schema when used on web"
+            />
+        </Tabs.Tab>
+    </Tabs>
+
+    <SdkContainer>
+        <SdkDescription>
+            #### About
+
+            `@trezor/connect-web` ships a thin API layer that routes requests to one of two runtime modes:
+            **Suite Desktop WebSocket** (preferred when Suite Desktop is running) or **Suite Web popup** hosted on connect.trezor.io.
+            User input (PIN, passphrase, confirmations) is handled inside Suite Desktop or the popup, isolated from your application.
+        </SdkDescription>
+        <ExamplesAside>
+            <ExampleHeading>Examples:</ExampleHeading>
+            -   [web extension mv3 (foreground)](https://github.com/trezor/trezor-suite/tree/develop/packages/connect-examples/webextension-mv3)
+        </ExamplesAside>
+    </SdkContainer>
+    <CollapsibleBox heading="Quick start manual" margin={{ top: 16 }}>
+            <Steps>
+                {<h3>Installation of the package</h3>}
+
+                ```bash
+                npm install @trezor/connect-web
+                # or
+                yarn add @trezor/connect-web
+                ```
+
+                {<h3>Import from the package</h3>}
+
+                ```javascript
+                import TrezorConnect from '@trezor/connect-web';
+                ```
+
+                {<h3>Initialization of the project</h3>}
+
+                ```javascript
+                TrezorConnect.init({
+                    manifest: {
+                        email: 'developer@xyz.com',
+                        appName: 'Your Application',
+                        appUrl: 'http://your.application.com',
+                    },
+                });
+                ```
+
+                Trezor Connect Manifest requires that you, as a Trezor Connect integrator, share your email and application URL with us. This provides us with the ability to reach you in case of any required maintenance. This subscription is mandatory.
+
+                If you need more customization, refer to [init method documentation](./methods/other/init)
+
+                {<h3>How to use?</h3>}
+                Here is an example of how to get the device's public key:
+
+                ```javascript
+                TrezorConnect.getPublicKey({
+                    path: "m/44'/0'/0'/0/0",
+                    showOnTrezor: true,
+                });
+                ```
+
+                More methods with detailed explanation can be found on the left under the 'Coin methods' section. You can also try the Method Testing Tool, where you can try interacting with the device by yourself.
+            </Steps>
+        </CollapsibleBox>
+
+</SectionCard>
+
+<HiddenNextraHeading>
+
+### Web extension
+
+</HiddenNextraHeading>
+<SectionCard>
+    <SdkHeading className='nx-text-slate-900 dark:nx-text-slate-100'>
+        <IconExtension />
+        <SdkName>Web extension</SdkName>
+        <SdkTag>Using service worker</SdkTag>
+        <LinkButton
+            intent="neutral"
+            priority="secondary"
+            size="small"
+            iconLeft="bookOpenText"
+            href="/readme/connect-webextension">
+            README
+        </LinkButton>
+        <Button
+            intent="neutral"
+            priority="secondary"
+            size="small"
+            iconLeft="githubLogoAlt"
+            href="https://github.com/trezor/trezor-suite/tree/develop/packages/connect-webextension"
+            target="_blank">
+            View on Github
+        </Button>
+    </SdkHeading>
+
+    <ZoomableIllustration src="/images/schema-connect-webextension.svg" $darkMode alt="connect schema when used in webextension" />
+
+    <SdkContainer>
+        <SdkDescription>
+            #### About
+            In case of `@trezor/connect-webextension`, TrezorConnect object is created in a service worker.
+            In this env we can't inject iframe so we use a mode similar to popup mode in `@trezor/connect-web`, where we load SDK logic in the popup.
+            This however does not build persistent connection between SDK and 3rd party application meaning that events cannot be used.
+
+            #### Learn step-by-step
+            Learn how to integrate the @trezor/connect-webextension package into a Chrome extension,
+            allowing secure connection to Trezor hardware wallets.
+            By the end, you'll have a fully functional web extension.
+
+            <LinkButton
+                intent="neutral"
+                priority="secondary"
+                className="nx-mt-4 nx-mb-8"
+                size="small"
+                iconLeft="bookOpenText"
+                href="/guides/webextension-implementation-tutorial">
+                Open Tutorial  →
+            </LinkButton>
+        </SdkDescription>
+        <ExamplesAside>
+            <ExampleHeading>Examples:</ExampleHeading>
+            - [Simple example](https://github.com/trezor/trezor-suite/tree/develop/packages/connect-examples/webextension)
+        </ExamplesAside>
+    </SdkContainer>
+
+        <CollapsibleBox heading="Quick start manual" margin={{ top: 16 }}>
+            <Steps>
+                {<h3>Installation of the package</h3>}
+
+                ```bash
+                npm install @trezor/connect-webextension
+                # or
+                yarn add @trezor/connect-webextension
+                ```
+
+                We support two methods for integrating the library into your extension - automatic content script injection and manual content script injection.
+
+                The popup flow no longer uses `connect-script` or inline iframe injection. Instead, the service worker opens
+                the Suite Web popup and the popup communicates back using the `externally_connectable` API. Make sure your
+                extension allows the Suite Web origin you use to send messages back:
+
+                ```json
+                "externally_connectable": {
+                    "matches": [
+                        "https://suite.trezor.io/*"
+                    ]
+                }
+                ```
+
+                {<h3>Import in the service worker</h3>}
+
+                ```javascript
+                import TrezorConnect from '@trezor/connect-webextension';
+                ```
+
+                The library is only available in the service worker context, so to use it in your extension's UI, you need to communicate with the service worker. This mechanism is not provided by the library, this depends on your extension's architecture.
+                Also it should be noted that the service worker may be idle when the extension is not in use, so you should implement a mechanism to keep it alive or wake it up when needed.
+
+                {<h3>Initialization of the extension</h3>}
+
+                ```javascript
+                TrezorConnect.init({
+                    manifest: {
+                        email: 'developer@xyz.com',
+                        appName: 'Your Application',
+                        appUrl: 'http://your.application.com',
+                    },
+                });
+                ```
+
+                Trezor Connect Manifest requires that you, as a Trezor Connect integrator, share your email and application URL with us. This provides us with the ability to reach you in case of any required maintenance. This subscription is mandatory.
+
+                If you need more customization, refer to [init method documentation](./methods/other/init)
+
+                {<h3>How to use?</h3>}
+
+                Here is an example of how to get the device's public key:
+
+                ```javascript
+                TrezorConnect.getPublicKey({
+                    path: "m/44'/0'/0'/0/0",
+                    showOnTrezor: true,
+                });
+                ```
+
+                More methods with detailed explanation can be found on the left under the 'Coin methods' section. You can also try the Method Testing Tool, where you can try interacting with the device by yourself.
+            </Steps>
+        </CollapsibleBox>
+
+</SectionCard>
+
+<HiddenNextraHeading>
+
+### Mobile
+
+</HiddenNextraHeading>
+<SectionCard>
+    <SdkHeading className='nx-text-slate-900 dark:nx-text-slate-100'>
+        <IconMobile />
+        <SdkName>Mobile</SdkName>
+        <SdkTag>Using deep linking</SdkTag>
+        <LinkButton
+            intent="neutral"
+            priority="secondary"
+            size="small"
+            iconLeft="bookOpenText"
+            href="/readme/connect-mobile">
+            README
+        </LinkButton>
+        <Button
+            intent="neutral"
+            priority="secondary"
+            size="small"
+            iconLeft="githubLogoAlt"
+            href="https://github.com/trezor/trezor-suite/tree/develop/packages/connect-mobile"
+            target="_blank">
+            View on Github
+        </Button>
+    </SdkHeading>
+
+    <ZoomableIllustration src="/images/schema-connect-deeplink.svg" $darkMode alt="connect schema when used in deeplink" />
+
+    <SdkContainer>
+        <SdkDescription>
+            #### About
+
+            `@trezor/connect-mobile` is a package that allows you to communicate with Trezor devices from your mobile app.
+            This package is somewhat different from the other SDKs, as it doesn't provide a direct API to the device. Instead, it uses deep linking to open the Trezor Suite app and communicate with the device.
+
+            #### Use deep linking without SDK
+
+            If you are not able to use the SDK, for example on non-supported platforms, you can still use deep linking to open the Trezor Suite app and communicate with the device.
+
+            This can be done by implementing the following specification.
+
+            <LinkButton
+                intent="neutral"
+                priority="secondary"
+                className="nx-mt-4 nx-mb-8"
+                size="small"
+                iconRight="arrowRight"
+                href="/details/deeplinking">
+                Deep linking specification
+            </LinkButton>
+
+        </SdkDescription>
+        <ExamplesAside>
+            <ExampleHeading>Examples:</ExampleHeading>
+            - [Expo App example](https://github.com/trezor/trezor-suite/tree/develop/packages/connect-examples/mobile-expo)
+        </ExamplesAside>
+    </SdkContainer>
+
+        <CollapsibleBox heading="Quick start manual" margin={{ top: 16 }}>
+            <Steps>
+                {<h3>Installation of the package</h3>}
+
+                Simply install the package using your preferred package manager:
+
+                ```bash
+                npm install @trezor/connect-mobile
+                # or
+                yarn add @trezor/connect-mobile
+                ```
+
+                {<h3>Initialization of the API</h3>}
+
+                ```javascript
+                import * as Linking from 'expo-linking';
+
+                TrezorConnect.init({
+                    manifest: {
+                        email: 'developer@xyz.com',
+                        appName: 'Your Application',
+                        appUrl: 'http://your.application.com',
+                    },
+                    deeplinkOpen: url => {
+                        Linking.openURL(url);
+                    },
+                    deeplinkCallbackUrl: Linking.createURL('/connect'),
+                });
+                ```
+
+                Trezor Connect Manifest requires that you, as a Trezor Connect integrator, share your email and application URL with us. This provides us with the ability to reach you in case of any required maintenance. This subscription is mandatory.
+
+                The deeplink SDK needs two extra parameters: `deeplinkOpen` and `deeplinkCallbackUrl`. The `deeplinkOpen` function is used to open the Trezor Suite app, and the `deeplinkCallbackUrl` is the URL that the app will redirect to after the operation is complete.
+
+                In this example, we are using the `Linking` API from Expo to open the Trezor Suite app, however this may be different depending on your mobile app's environment.
+
+                {<h3>Handling callbacks</h3>}
+
+                The app needs to pass results from the callback URL back to the SDK. This can be done by listening to the URL and passing the data to the SDK using the `handleDeeplink` method.
+
+                ```javascript
+                useEffect(() => {
+                    const subscription = Linking.addEventListener('url', event => {
+                        TrezorConnect.handleDeeplink(event.url);
+                    });
+
+                    return () => subscription?.remove();
+                }, []);
+                ```
+
+                {<h3>How to use?</h3>}
+
+                Here is an example of how to get the device's public key:
+
+                ```javascript
+                TrezorConnect.getPublicKey({
+                    path: "m/44'/0'/0'/0/0",
+                    showOnTrezor: true,
+                });
+                ```
+
+                More methods with detailed explanation can be found on the left under the 'Coin methods' section. You can also try the Method Testing Tool, where you can try interacting with the device by yourself.
+            </Steps>
+        </CollapsibleBox>
+
+</SectionCard>

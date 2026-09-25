@@ -1,198 +1,38 @@
-import EventEmitter from 'events';
-
-// NOTE: @trezor/connect part is intentionally not imported from the index so we do include the whole library.
-import {
-    POPUP,
-    IFRAME,
-    ERRORS,
-    UI_EVENT,
-    createErrorMessage,
-    ConnectSettings,
-    Manifest,
-    UiResponseEvent,
-    CallMethod,
-} from '@trezor/connect/src/exports';
-import { factory } from '@trezor/connect/src/factory';
-import { initLog, setLogWriter, LogMessage, LogWriter } from '@trezor/connect/src/utils/debug';
+// note: at the moment, there is something in the root of @trezor/connect-common that pulls entire PROTO runtime, thus
+// these targeted imports
+import { CORE_CALL_CANCEL, POPUP } from '@trezor/connect-common/src/events';
+import { factoryPublic } from '@trezor/connect-common/src/factory';
+import { TrezorConnectDynamic } from '@trezor/connect-common/src/impl/dynamic';
 // Import as src not lib due to webpack issues with inlining content script later
-import { ServiceWorkerWindowChannel } from '@trezor/connect-web/src/channels/serviceworker-window';
-import * as popup from '@trezor/connect-web/src/popup';
+import { ServiceWorkerWindowChannel } from '@trezor/connect-common/src/messageChannel/serviceworker-window';
+import type {
+    ConnectDynamicSettings,
+    TrezorConnectPublicAPI,
+} from '@trezor/connect-common/src/types';
+// eslint-disable-next-line @typescript-eslint/no-restricted-imports -- intra-tier wiring: connect-webextension composes implementations from connect-web (see #27376)
+import { CoreInSuiteDesktop } from '@trezor/connect-web/src/impl/core-in-suite-desktop';
+// eslint-disable-next-line @typescript-eslint/no-restricted-imports -- intra-tier wiring: connect-webextension composes implementations from connect-web (see #27376)
+import { CoreInSuiteWeb } from '@trezor/connect-web/src/impl/core-in-suite-web';
 
-import { parseConnectSettings } from './connectSettings';
-
-const eventEmitter = new EventEmitter();
-let _settings = parseConnectSettings();
-
-/**
- * setup logger.
- * service worker cant communicate directly with sharedworker logger so the communication is as follows:
- * - service worker -> content script -> popup -> sharedworker
- * todo: this could be simplified by injecting additional content script into log.html
- */
-const logger = initLog('@trezor/connect-webextension');
-const popupManagerLogger = initLog('@trezor/connect-webextension/popupManager');
-let _popupManager: popup.PopupManager;
-
-const logWriterFactory = (popupManager: popup.PopupManager): LogWriter => ({
-    add: (message: LogMessage) => {
-        popupManager.channel.postMessage(
-            {
-                event: UI_EVENT,
-                type: IFRAME.LOG,
-                payload: message,
-            },
-            { usePromise: false, useQueue: true },
-        );
+const impl = new TrezorConnectDynamic({
+    implementations: {
+        'core-in-suite-desktop': new CoreInSuiteDesktop(),
+        'core-in-suite-web': new CoreInSuiteWeb(),
     },
 });
 
-const manifest = (data: Manifest) => {
-    _settings = parseConnectSettings({
-        ..._settings,
-        manifest: data,
-    });
-};
-
-const dispose = () => {
-    eventEmitter.removeAllListeners();
-    _settings = parseConnectSettings();
-    if (_popupManager) {
-        _popupManager.close();
-    }
-
-    return Promise.resolve(undefined);
-};
-
-const cancel = (error?: string) => {
-    if (_popupManager) {
-        _popupManager.emit(POPUP.CLOSED, error);
-    }
-};
-
-const init = (settings: Partial<ConnectSettings> = {}): Promise<void> => {
-    const oldSettings = parseConnectSettings({
-        ..._settings,
-    });
-    const newSettings = parseConnectSettings({
-        ..._settings,
-        ...settings,
-    });
-    // defaults for connect-webextension
-    if (!newSettings.transports?.length) {
-        newSettings.transports = ['BridgeTransport', 'WebUsbTransport'];
-    }
-    newSettings.useCoreInPopup = true;
-    const equalSettings = JSON.stringify(oldSettings) === JSON.stringify(newSettings);
-    _settings = newSettings;
-
-    if (!_popupManager || !equalSettings) {
-        if (_popupManager) _popupManager.close();
-        _popupManager = new popup.PopupManager(_settings, { logger: popupManagerLogger });
-        setLogWriter(() => logWriterFactory(_popupManager));
-    }
-
-    logger.enabled = !!settings.debug;
-
-    if (!_settings.manifest) {
-        throw ERRORS.TypedError('Init_ManifestMissing');
-    }
-
-    logger.debug('initiated');
-
-    return Promise.resolve();
-};
-
-/**
- * 1. opens popup
- * 2. sends request to popup where the request is handled by core
- * 3. returns response
- */
-const call: CallMethod = async params => {
-    logger.debug('call', params);
-
-    // request popup window it might be used in the future
-    if (_settings.popup) {
-        await _popupManager.request();
-    }
-
-    await _popupManager.channel.init();
-    _popupManager.channel.postMessage({
-        type: POPUP.INIT,
-        payload: {
-            settings: _settings,
-            useCore: true,
-        },
-    });
-
-    await _popupManager.handshakePromise?.promise;
-
-    // post message to core in popup
-    try {
-        const response = await _popupManager.channel.postMessage({
-            type: IFRAME.CALL,
-            payload: params,
-        });
-
-        logger.debug('call: response: ', response);
-
-        if (response) {
-            if (_popupManager && response.success) {
-                _popupManager.clear();
-            }
-
-            return response;
-        }
-
-        return createErrorMessage(ERRORS.TypedError('Method_NoResponse'));
-    } catch (error) {
-        logger.error('call: error', error);
-        _popupManager.clear(false);
-
-        return createErrorMessage(error);
-    }
-};
-
-const uiResponse = (response: UiResponseEvent) => {
-    const { type, payload } = response;
-    _popupManager.channel.postMessage({ event: UI_EVENT, type, payload });
-};
-
-const renderWebUSBButton = () => {};
-
-const requestLogin = () => {
-    // todo: not supported yet
-    throw ERRORS.TypedError('Method_InvalidPackage');
-};
-
-const disableWebUSB = () => {
-    // todo: not supported yet, probably not needed
-    throw ERRORS.TypedError('Method_InvalidPackage');
-};
-
-const requestWebUSBDevice = () => {
-    // not needed - webusb pairing happens in popup
-    throw ERRORS.TypedError('Method_InvalidPackage');
-};
-
-const TrezorConnect = factory({
-    eventEmitter,
-    manifest,
-    init,
-    call,
-    requestLogin,
-    uiResponse,
-    renderWebUSBButton,
-    disableWebUSB,
-    requestWebUSBDevice,
-    cancel,
-    dispose,
-});
+// Bind all methods due to shadowing `this`
+const TrezorConnect: TrezorConnectPublicAPI<ConnectDynamicSettings> = factoryPublic(impl);
 
 const initProxyChannel = () => {
     const channel = new ServiceWorkerWindowChannel<{
         type: string;
         method: keyof typeof TrezorConnect;
-        settings: { manifest: Manifest } & Partial<ConnectSettings>;
+        settings: ConnectDynamicSettings;
+        reason?: string;
+        // We need `error` field for backward compatibility, for connect10 with older clients.
+        error?: string;
+        callId?: string;
     }>({
         name: 'trezor-connect-proxy',
         channel: {
@@ -203,31 +43,62 @@ const initProxyChannel = () => {
         allowSelfOrigin: true,
     });
 
-    let proxySettings: ConnectSettings = parseConnectSettings();
+    let proxySettings: ConnectDynamicSettings;
 
     channel.init();
     channel.on('message', message => {
         const { id, payload, type } = message;
+
+        // Handle cancel before the payload guard — cancel messages may
+        // carry no meaningful payload.
+        if (type === POPUP.CLOSED) {
+            TrezorConnect.cancel({ reason: payload?.error, callId: payload?.callId });
+
+            return;
+        }
+        if (type === CORE_CALL_CANCEL) {
+            TrezorConnect.cancel({ reason: payload?.reason, callId: payload?.callId });
+
+            return;
+        }
+
         if (!payload) return;
         const { method, settings } = payload;
 
         if (type === POPUP.INIT) {
-            proxySettings = parseConnectSettings({ ..._settings, ...settings });
+            proxySettings = settings;
 
             return;
         }
 
         // Core is loaded in popup and initialized every time, so we send the settings from here.
-        TrezorConnect.init(proxySettings as { manifest: Manifest } & Partial<ConnectSettings>).then(
-            () => {
+        impl.init({ env: 'webextension', ...proxySettings })
+            .then(() =>
                 (TrezorConnect as any)[method](payload).then((response: any) => {
-                    channel.postMessage({
+                    // Response must use usePromise: false so the original
+                    // message `id` from the proxy is preserved.  The default
+                    // (usePromise: true) would overwrite `id` with the SW's
+                    // own counter, which can desynchronize from the proxy's
+                    // counter and leave the proxy's call() promise unresolved.
+                    channel.postMessage(
+                        {
+                            ...response,
+                            id,
+                        },
+                        { usePromise: false },
+                    );
+                }),
+            )
+            .catch((error: any) => {
+                channel.postMessage(
+                    {
+                        success: false,
+                        payload: { error: error?.message ?? String(error) },
                         id,
-                        payload: response.payload,
-                    });
-                });
-            },
-        );
+                    },
+                    { usePromise: false },
+                );
+            });
     });
 };
 
@@ -235,4 +106,6 @@ initProxyChannel();
 
 // eslint-disable-next-line import/no-default-export
 export default TrezorConnect;
-export * from '@trezor/connect/src/exports';
+export * from '@trezor/connect-common/src/constants';
+export * from '@trezor/connect-common/src/events';
+export type * from '@trezor/connect-common/src/types';

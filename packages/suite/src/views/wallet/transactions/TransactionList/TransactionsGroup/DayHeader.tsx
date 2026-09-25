@@ -1,119 +1,94 @@
 import { FormattedDate } from 'react-intl';
-import styled from 'styled-components';
-import BigNumber from 'bignumber.js';
 
-import { variables } from '@trezor/components';
-import { zIndices } from '@trezor/theme';
 import { useFormatters } from '@suite-common/formatters';
-import { parseTransactionDateKey, isTestnet } from '@suite-common/wallet-utils';
+import type { NetworkSymbol } from '@suite-common/wallet-config';
+import { useDisplayBaseCurrency } from '@suite-common/wallet-core';
+import { type BaseCurrencyAmount, asBaseCurrencyAmount } from '@suite-common/wallet-types';
+import { parseTransactionDateKey } from '@suite-common/wallet-utils';
+import { Grid, Text } from '@trezor/components';
+import { type BigNumber } from '@trezor/utils';
 
-import { Translation, HiddenPlaceholder, FormattedCryptoAmount } from 'src/components/suite';
-import { Network } from 'src/types/wallet';
-import { SUBPAGE_NAV_HEIGHT } from 'src/constants/suite/layout';
+import { FormattedCryptoAmount, HiddenPlaceholder, Sign } from 'src/components/suite';
+import { useLayoutSize } from 'src/hooks/suite/useLayoutSize';
 
-const Wrapper = styled.div`
-    display: flex;
-    position: sticky;
-    background: ${({ theme }) => theme.backgroundSurfaceElevation0};
-    top: ${SUBPAGE_NAV_HEIGHT};
-    align-items: center;
-    justify-content: space-between;
-    flex: 1;
-    padding-top: 8px;
-    padding-bottom: 8px;
-    padding-right: 24px;
-    z-index: ${zIndices.secondaryStickyBar};
-`;
-
-const Col = styled(HiddenPlaceholder)`
-    font-size: ${variables.FONT_SIZE.SMALL};
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    font-weight: ${variables.FONT_WEIGHT.DEMI_BOLD};
-`;
-
-const ColDate = styled(Col)`
-    font-variant-numeric: tabular-nums;
-    flex: 1;
-`;
-
-const ColPending = styled(Col)`
-    color: ${({ theme }) => theme.TYPE_ORANGE};
-    font-variant-numeric: tabular-nums;
-`;
-
-const ColAmount = styled(Col)<{ $isVisible?: boolean }>`
-    padding-left: 16px;
-    text-align: right;
-    opacity: ${({ $isVisible }) => ($isVisible ? 1 : 0)};
-    transition: opacity 0.1s;
-`;
-
-const ColFiat = styled(Col)`
-    padding-left: 16px;
-    text-align: right;
-`;
-
-interface DayHeaderProps {
+type DayHeaderProps = {
     dateKey: string;
-    symbol: Network['symbol'];
+    symbol: NetworkSymbol;
     totalAmount: BigNumber;
-    totalFiatAmountPerDay: BigNumber;
+    totalFiatAmountPerDay: BaseCurrencyAmount;
     localCurrency: string;
-    txsCount?: number;
     isMissingFiatRates?: boolean;
-    isHovered?: boolean;
-}
+};
 
-// TODO: Do not show FEE for sent but not mine transactions
+// TODO: Do not show FEE for sent but not mined transactions
 export const DayHeader = ({
     dateKey,
     symbol,
     totalAmount,
     totalFiatAmountPerDay,
     localCurrency,
-    txsCount,
     isMissingFiatRates,
-    isHovered,
 }: DayHeaderProps) => {
-    const { FiatAmountFormatter } = useFormatters();
+    const { BaseCurrencyAmountFormatter } = useFormatters();
+    const { isAboveTablet } = useLayoutSize();
 
     const parsedDate = parseTransactionDateKey(dateKey);
-    const showFiatValue = !isTestnet(symbol);
+    const { shallDisplayBaseCurrency } = useDisplayBaseCurrency(symbol);
+
+    // blockTime can be undefined according to types, although I don't know when that happens.
+    const isDateValid = !isNaN(parsedDate.getTime());
+
+    const absoluteTotalAmount = Math.abs(Number(totalAmount.toFixed()));
+    const absoluteTotalFiatAmount = asBaseCurrencyAmount(totalFiatAmountPerDay.abs());
+
+    const commonTextProps = {
+        typographyStyle: 'body-sm-strong',
+        variant: 'tertiary',
+        as: 'div',
+    } as const;
 
     return (
-        <Wrapper>
-            {dateKey === 'pending' ? (
-                <ColPending data-test="@transaction-group/pending/count">
-                    <Translation id="TR_PENDING_TX_HEADING" values={{ count: txsCount }} /> •{' '}
-                    {txsCount}
-                </ColPending>
-            ) : (
+        <Grid
+            columns="1fr max-content minmax(110px, max-content)"
+            rowGap={6}
+            columnGap={24}
+            flex="1"
+            padding={{ right: 24 }}
+            margin={{ right: 2 }}
+        >
+            <Text {...commonTextProps}>
+                {isDateValid && (
+                    <FormattedDate
+                        value={parsedDate ?? undefined}
+                        day="numeric"
+                        month="long"
+                        year="numeric"
+                    />
+                )}
+            </Text>
+            {isAboveTablet && (
                 <>
-                    <ColDate>
-                        <FormattedDate
-                            value={parsedDate ?? undefined}
-                            day="numeric"
-                            month="long"
-                            year="numeric"
+                    <Text {...commonTextProps} align="end">
+                        <FormattedCryptoAmount
+                            signValue={totalAmount}
+                            signGrayscale
+                            value={absoluteTotalAmount}
+                            symbol={symbol}
                         />
-                    </ColDate>
-                    <ColAmount $isVisible={isHovered}>
-                        {totalAmount.gte(0) && <span>+</span>}
-                        <FormattedCryptoAmount value={totalAmount.toFixed()} symbol={symbol} />
-                    </ColAmount>
-                    {showFiatValue && !isMissingFiatRates && (
-                        <ColFiat>
+                    </Text>
+                    <Text {...commonTextProps} align="end">
+                        {shallDisplayBaseCurrency && !isMissingFiatRates && (
                             <HiddenPlaceholder>
-                                {totalFiatAmountPerDay.gte(0) && <span>+</span>}
-                                <FiatAmountFormatter
+                                <Sign value={totalAmount} grayscale />
+                                <BaseCurrencyAmountFormatter
                                     currency={localCurrency}
-                                    value={totalFiatAmountPerDay.toFixed()}
+                                    value={absoluteTotalFiatAmount}
                                 />
                             </HiddenPlaceholder>
-                        </ColFiat>
-                    )}
+                        )}
+                    </Text>
                 </>
             )}
-        </Wrapper>
+        </Grid>
     );
 };

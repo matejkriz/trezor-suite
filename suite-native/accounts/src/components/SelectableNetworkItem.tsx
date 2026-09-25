@@ -1,70 +1,73 @@
-import { TouchableOpacity } from 'react-native';
-
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-import { networks, NetworkSymbol } from '@suite-common/wallet-config';
 import { useFormatters } from '@suite-common/formatters';
-import { Icon, IconName } from '@suite-common/icons';
-import { Badge, Box, HStack, RoundedIcon, Text } from '@suite-native/atoms';
+import { type NetworkSymbol, getNetwork } from '@suite-common/wallet-config';
+import { Badge, Box, HStack, PressableOpacity, Text } from '@suite-native/atoms';
+import { Icon, type IconName, TokenIcon } from '@suite-native/icons';
+import { Translation } from '@suite-native/intl';
+import { isNetworkWithTokens } from '@suite-native/tokens';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
 
-export type SelectableAssetItemProps = {
+type SelectableAssetItemProps = {
     symbol: NetworkSymbol;
     rightIcon?: IconName;
-    onPress?: (networkSymbol: NetworkSymbol) => void;
+    onPress?: (symbol: NetworkSymbol) => void;
 };
 
-const selectableAssetContentStyle = prepareNativeStyle(utils => ({
+const selectableAssetContentStyle = prepareNativeStyle(_ => ({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     flex: 1,
-    marginLeft: utils.spacings.small + utils.spacings.extraSmall,
 }));
 
-const erc20BadgeStyle = prepareNativeStyle(utils => ({
-    paddingBottom: utils.spacings.extraSmall / 2,
+const tokensBadgeStyle = prepareNativeStyle(utils => ({
+    paddingBottom: utils.spacings.sp2,
 }));
 
 export const SelectableNetworkItem = ({ symbol, onPress, rightIcon }: SelectableAssetItemProps) => {
     const { applyStyle } = useNativeStyles();
-    const { NetworkSymbolFormatter } = useFormatters();
+    const { DisplaySymbolFormatter } = useFormatters();
 
     const handlePress = () => {
         if (!onPress) return;
         onPress(symbol);
     };
 
-    const networkName = networks[symbol].name;
+    const networkName = getNetwork(symbol).name;
 
-    const isEthereumNetwork = symbol === 'eth';
+    const isNetworkSupportingTokens = isNetworkWithTokens(symbol);
 
     return (
-        <TouchableOpacity
+        <PressableOpacity
             disabled={!onPress}
             onPress={handlePress}
-            testID={`@onboarding/select-coin/${networkName}`}
+            testID={`@onboarding/select-coin/${symbol}`}
         >
-            <Box flexDirection="row" alignItems="center">
-                <RoundedIcon name={symbol} />
+            <HStack alignItems="center" spacing="sp16">
+                <TokenIcon tokenSymbol={symbol} networkSymbol={symbol} />
                 <Box style={applyStyle(selectableAssetContentStyle)}>
                     <Box flex={1} justifyContent="space-between" alignItems="flex-start">
-                        <Text variant="body">{networkName}</Text>
+                        <Text variant="body-md">{networkName}</Text>
                         <HStack alignItems="center" justifyContent="center">
-                            <Text variant="hint" color="textSubdued">
-                                <NetworkSymbolFormatter
+                            <Text variant="body-sm" color="contentSecondary">
+                                <DisplaySymbolFormatter
                                     value={symbol}
                                     areAmountUnitsEnabled={false}
                                 />
                             </Text>
-                            {isEthereumNetwork && (
-                                <Box style={applyStyle(erc20BadgeStyle)}>
-                                    <Badge label="+ ERC-20" variant="neutral" size="small" />
+                            {isNetworkSupportingTokens && (
+                                <Box style={applyStyle(tokensBadgeStyle)}>
+                                    <Badge
+                                        label={<Translation id="generic.tokens" />}
+                                        intent="neutral"
+                                        size="small"
+                                    />
                                 </Box>
                             )}
                         </HStack>
                     </Box>
                 </Box>
-                {rightIcon && <Icon name={rightIcon} color="iconDisabled" size="large" />}
-            </Box>
-        </TouchableOpacity>
+                {rightIcon && <Icon name={rightIcon} color="contentDisabled" size="large" />}
+            </HStack>
+        </PressableOpacity>
     );
 };

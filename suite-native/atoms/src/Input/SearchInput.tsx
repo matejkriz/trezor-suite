@@ -1,109 +1,170 @@
-import { useState, useRef } from 'react';
-import { Pressable, TextInput, TouchableOpacity } from 'react-native';
+import {
+    type ComponentType,
+    type RefAttributes,
+    forwardRef,
+    useImperativeHandle,
+    useRef,
+} from 'react';
+import { Platform, Pressable, TextInput, type TextInputProps } from 'react-native';
 
-import { Icon } from '@suite-common/icons';
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
+import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
+
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
 
 import { Box } from '../Box';
-import { SurfaceElevation } from '../types';
+import { SearchInputClearButton } from './SearchInputClearButton';
+import { SearchInputMagnifyingGlass } from './SearchInputMagnifyingGlass';
+import { useSearchInputCallbacks } from './useSearchInputCallbacks';
 
-type InputProps = {
-    onChange: (value: string) => void;
-    placeholder?: string;
-    isDisabled?: boolean;
-    maxLength?: number;
-    elevation?: SurfaceElevation;
+export const SEARCH_INPUT_SIZES = ['medium', 'large'] as const;
+type SearchInputSize = (typeof SEARCH_INPUT_SIZES)[number];
+
+const searchInputHeights: Record<SearchInputSize, number> = {
+    medium: 40,
+    large: 48,
 };
-
-const inputStyle = prepareNativeStyle(utils => ({
-    ...utils.typography.body,
-    flex: 1,
-    color: utils.colors.textOnTertiary,
-    marginLeft: utils.spacings.medium,
-    lineHeight: 0,
-}));
 
 type InputStyleProps = {
     isFocused: boolean;
-    elevation: SurfaceElevation;
+    size: SearchInputSize;
 };
-const inputWrapperStyle = prepareNativeStyle<InputStyleProps>(
-    (utils, { isFocused, elevation }) => ({
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        height: 48,
-        borderWidth: utils.borders.widths.small,
-        borderRadius: utils.borders.radii.small,
-        borderColor: utils.colors.backgroundNeutralSubtleOnElevation0,
-        backgroundColor: utils.colors.backgroundNeutralSubtleOnElevation0,
-        paddingLeft: 14,
-        paddingRight: 14.25,
-        extend: [
-            {
-                condition: isFocused,
-                style: {
-                    borderColor: utils.colors.borderFocus,
-                },
-            },
-            {
-                condition: elevation === '1',
-                style: {
-                    borderColor: utils.colors.backgroundNeutralSubtleOnElevation1,
-                    backgroundColor: utils.colors.backgroundNeutralSubtleOnElevation1,
-                },
-            },
-        ],
-    }),
+
+const inputStyle = prepareNativeStyle(utils => ({
+    ...utils.typography['body-md'],
+    // `letterSpacing` from `typography['body-md']` causes layout jumps on Android; reset it
+    // to the TextInput default.
+    letterSpacing: 0,
+    flex: 1,
+    // Remove the platform default vertical padding so the input collapses to its line height
+    // and stays vertically centered by the wrapper's `alignItems: 'center'` at any height.
+    paddingVertical: 0,
+    textAlignVertical: 'center',
+    color: utils.colors.contentPrimary,
+    marginLeft: utils.spacings.sp16,
+
+    extend: {
+        // on IOS, when is the default lineHeight used, it causes layout jumps between the placeholder and inputed text.
+        // Probably bug in the underlying native library. Value of 20 is empiricaly found closest value to default of 24 that makes it work correctly.
+        condition: Platform.OS === 'ios',
+        style: {
+            lineHeight: 20,
+        },
+    },
+}));
+
+const inputWrapperStyle = prepareNativeStyle<InputStyleProps>((utils, { isFocused, size }) => ({
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    height: searchInputHeights[size],
+    borderWidth: utils.borders.widths.small,
+    borderRadius: utils.borders.radii.r12,
+    borderColor: utils.colors.elementBorderField,
+    backgroundColor: utils.colors.elementFillField,
+    paddingLeft: utils.spacings.sp16,
+    paddingRight: utils.spacings.sp16,
+    extend: {
+        condition: isFocused,
+        style: {
+            borderColor: utils.colors.elementBorderFieldFocused,
+        },
+    },
+}));
+
+export type SearchInputProps = {
+    onChange: (value: string) => void;
+    placeholder?: string;
+    autoFocus?: boolean;
+    isDisabled?: boolean;
+    maxLength?: number;
+    size?: SearchInputSize;
+    value?: string;
+    autoCorrect?: boolean;
+    testId?: string;
+    onFocus?: () => void;
+    onBlur?: () => void;
+    isBottomSheetInput?: boolean;
+    autoCapitalize?: TextInputProps['autoCapitalize'];
+};
+
+export const SearchInput = forwardRef<TextInput, SearchInputProps>(
+    (
+        {
+            onChange,
+            placeholder,
+            maxLength,
+            autoFocus,
+            onFocus,
+            onBlur,
+            isDisabled = false,
+            size = 'medium',
+            value,
+            autoCorrect,
+            testId,
+            isBottomSheetInput = false,
+            autoCapitalize,
+        },
+        ref,
+    ) => {
+        const { applyStyle, utils } = useNativeStyles();
+
+        // Keep an internal ref so tap-to-focus and clear work even when no ref is
+        // forwarded, and expose the underlying TextInput instance to forwarded refs.
+        const inputRef = useRef<TextInput>(null);
+        useImperativeHandle(ref, () => inputRef.current as TextInput, []);
+
+        const {
+            handleClear,
+            handleInputFocus,
+            handleOnChangeText,
+            isFocused,
+            isClearButtonVisible,
+            setIsFocused,
+        } = useSearchInputCallbacks(inputRef, onChange);
+
+        // Both branches accept `TextInputProps`, but `BottomSheetTextInput` forwards its ref to
+        // gesture-handler's `TextInput` — a nominally different type from react-native's. Cast to
+        // a single signature so the shared `ref`/props type-check against both.
+        const InputComponent = (
+            isBottomSheetInput ? BottomSheetTextInput : TextInput
+        ) as ComponentType<TextInputProps & RefAttributes<TextInput>>;
+
+        return (
+            <Pressable onPress={handleInputFocus}>
+                <Box style={applyStyle(inputWrapperStyle, { isFocused, size })}>
+                    <SearchInputMagnifyingGlass />
+
+                    <InputComponent
+                        ref={inputRef}
+                        onChangeText={handleOnChangeText}
+                        placeholder={placeholder}
+                        accessibilityLabel={placeholder}
+                        placeholderTextColor={utils.colors.contentSecondary}
+                        // eslint-disable-next-line jsx-a11y/no-autofocus
+                        autoFocus={autoFocus}
+                        editable={!isDisabled}
+                        onFocus={() => {
+                            setIsFocused(true);
+                            onFocus?.();
+                        }}
+                        onBlur={() => {
+                            setIsFocused(false);
+                            onBlur?.();
+                        }}
+                        style={applyStyle(inputStyle)}
+                        maxLength={maxLength}
+                        value={value}
+                        autoCorrect={autoCorrect}
+                        testID={testId}
+                        autoCapitalize={autoCapitalize}
+                    />
+
+                    <SearchInputClearButton
+                        onPress={handleClear}
+                        isVisible={isClearButtonVisible}
+                    />
+                </Box>
+            </Pressable>
+        );
+    },
 );
-
-export const SearchInput = ({
-    onChange,
-    placeholder,
-    maxLength,
-    isDisabled = false,
-    elevation = '0',
-}: InputProps) => {
-    const { applyStyle, utils } = useNativeStyles();
-    const [isFocused, setIsFocused] = useState<boolean>(false);
-    const [isClearButtonVisible, setIsClearButtonVisible] = useState<boolean>(false);
-    const searchInputRef = useRef<TextInput | null>(null);
-    const handleClear = () => {
-        setIsClearButtonVisible(false);
-        searchInputRef.current?.clear();
-        onChange('');
-    };
-
-    const handleInputFocus = () => {
-        searchInputRef?.current?.focus();
-    };
-
-    const handleOnChangeText = (value: string) => {
-        setIsClearButtonVisible(!!value.length);
-        onChange(value);
-    };
-
-    return (
-        <Pressable onPress={handleInputFocus}>
-            <Box style={applyStyle(inputWrapperStyle, { isFocused, elevation })}>
-                <Icon name="search" color="iconSubdued" size="large" />
-                <TextInput
-                    ref={searchInputRef}
-                    onChangeText={handleOnChangeText}
-                    placeholder={placeholder}
-                    placeholderTextColor={utils.colors.textSubdued}
-                    editable={!isDisabled}
-                    onFocus={() => setIsFocused(true)}
-                    onBlur={() => setIsFocused(false)}
-                    style={applyStyle(inputStyle)}
-                    maxLength={maxLength}
-                />
-                {isClearButtonVisible && (
-                    <TouchableOpacity onPress={handleClear}>
-                        <Icon name="closeCircle" size="large" color="iconSubdued" />
-                    </TouchableOpacity>
-                )}
-            </Box>
-        </Pressable>
-    );
-};

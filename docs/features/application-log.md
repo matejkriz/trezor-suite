@@ -8,12 +8,12 @@ The application log is in JSON format. It starts with App & Platform information
 
 Contains basic information about the user's platform and app status at the time of displaying the Application log such as:
 
--   app version
--   browser name and version
--   transport type
--   number of connected devices
--   enabled networks and custom backends
--   ...
+- app version
+- browser name and version
+- transport type
+- number of connected devices
+- enabled networks and custom backends
+- ...
 
 See `getApplicationInfo` method in `logsUtils.ts` in `suite` package.
 
@@ -22,9 +22,9 @@ See `getApplicationInfo` method in `logsUtils.ts` in `suite` package.
 Hundreds of redux actions are fired when using Trezor Suite. The actions, which should help the Support Team understand the user's problem, are logged.
 Each log record consists of:
 
--   `type` which should express the type of user's action.
--   `datetime` showing UTC when user action occurred
--   `payload` containing additional information
+- `type` which should express the type of user's action.
+- `datetime` showing UTC when user action occurred
+- `payload` containing additional information
 
 Example log record occurred when user's internet connectivity status changed to offline
 
@@ -53,6 +53,6 @@ Some of the redux actions are modified even before they are logged. For example,
 
 There is a page in Notion [Engineering/Suite/Application Log](https://www.notion.so/satoshilabs/Application-log-1908fc91f1564da480a55ea487fdd6e6) where the Support Team can add requests to extend the application log either by new items to App & Platform information or by logging new redux action / extending current ones.
 
-## New redux action
+## New redux action
 
 Redux action name has to be added to `logsMiddleware.ts` and if it contains sensitive information, it should be redacted using `redactAction` method in `logsUtils.ts`.

@@ -1,123 +1,90 @@
 import styled from 'styled-components';
-import { LayoutGroup, motion } from 'framer-motion';
-import { spacingsPx, zIndices } from '@trezor/theme';
-import { motionEasing, variables } from '@trezor/components';
+
+import { selectFullSelectedAccount } from '@suite/account';
+import { type Route, selectRouteName } from '@suite/router';
+import { Tabs } from '@trezor/components';
+import { zIndices } from '@trezor/theme';
+
+import { HEADER_HEIGHT } from 'src/constants/suite/layout';
 import { useSelector } from 'src/hooks/suite';
-import { selectRouteName } from 'src/reducers/suite/routerReducer';
-import { SUBPAGE_NAV_HEIGHT } from 'src/constants/suite/layout';
-import { selectIsLoggedOut } from 'src/reducers/suite/suiteReducer';
-import { HoverAnimation } from '../../HoverAnimation';
+
 import { AppNavigationTooltip } from '../../AppNavigation/AppNavigationTooltip';
 
-const Container = styled.div<{ $isFullWidth: boolean }>`
+const Container = styled.div`
     position: sticky;
-    top: 64px;
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    gap: ${spacingsPx.sm};
-    min-height: ${SUBPAGE_NAV_HEIGHT};
-    background: ${({ theme }) => theme.backgroundSurfaceElevation0};
-    padding: ${spacingsPx.xs} 0 ${spacingsPx.sm};
-    border-bottom: 1px solid ${({ theme }) => theme.borderElevation1};
-    overflow: auto hidden;
-    z-index: ${zIndices.pageHeader};
+    top: ${HEADER_HEIGHT};
+    background: ${({ theme }) => theme.surfaceFillPage};
+    border-bottom: 1px solid ${({ theme }) => theme.borderNeutral};
+    z-index: ${zIndices.stickyBar};
     width: 100%;
-    padding-left: ${spacingsPx.md};
-    padding-right: ${spacingsPx.md};
 `;
 
-const MenuElement = styled.div<{ $isActive: boolean }>`
-    position: relative;
-    display: flex;
-    align-items: center;
-    color: ${({ $isActive, theme }) => !$isActive && theme.textOnTertiary};
-    white-space: nowrap;
-
-    @media (max-width: ${variables.SCREEN_SIZE.SM}) {
-        margin-right: ${spacingsPx.md};
-    }
+const ScrollContainer = styled.div`
+    padding: 16px 16px 0;
+    overflow: auto hidden;
+    width: 100%;
+    height: 100%;
 `;
 
-const Underline = styled(motion.div)`
-    position: absolute;
-    bottom: -${spacingsPx.sm};
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: ${({ theme }) => theme.iconDefault};
-`;
+type TabRoute = Route['name'] | undefined;
 
-const StyledNavLink = styled.div<{ $isActive: boolean; $isNavigationDisabled: boolean }>`
-    padding: ${spacingsPx.xs} ${spacingsPx.sm};
-    opacity: ${({ $isActive, $isNavigationDisabled }) =>
-        !$isActive && $isNavigationDisabled && '.5'};
-    cursor: ${({ $isActive, $isNavigationDisabled }) =>
-        $isActive || $isNavigationDisabled ? 'default' : 'pointer'};
-`;
-
-export type NavigationItem = {
-    id: string;
+export type NavigationItem<TId extends string = Route['name']> = {
+    id: TId;
     callback: () => void;
-    title: JSX.Element;
-    'data-test'?: string;
+    title: React.ReactNode;
+    'data-testid'?: string;
     isHidden?: boolean;
+    activeRoutes?: TabRoute[];
 };
 
-interface SubpageNavigationProps {
-    items: NavigationItem[];
-    className?: string;
-}
+type SubpageNavigationProps<TId extends string> = {
+    items: NavigationItem<TId>[];
+    ['data-testid']: string;
+    /**
+     * Controlled active tab. When omitted, the active tab is derived from the current route.
+     */
+    activeItemId?: TId;
+};
 
-export const SubpageNavigation = ({ items, className }: SubpageNavigationProps) => {
+export const SubpageNavigation = <TId extends string = Route['name']>({
+    'data-testid': dataTest,
+    items,
+    activeItemId,
+}: SubpageNavigationProps<TId>) => {
     const routeName = useSelector(selectRouteName);
-    const selectedAccount = useSelector(state => state.wallet.selectedAccount);
-    const isLoggedOut = useSelector(selectIsLoggedOut);
+    const selectedAccount = useSelector(selectFullSelectedAccount);
 
     const isAccountLoading = selectedAccount.status === 'loading';
-
-    const visibleItems = items.filter(item => !item.isHidden);
+    const resolvedActiveItemId =
+        activeItemId ??
+        items.find(({ id, activeRoutes }) => activeRoutes?.includes(routeName) || id === routeName)
+            ?.id;
 
     return (
-        <Container $isFullWidth={isLoggedOut} className={className}>
-            <LayoutGroup id={items[0].id}>
-                {visibleItems.map(item => {
-                    const { id, title } = item;
-
-                    const isActive = routeName === id;
-                    const isHoverable = !isActive && !isAccountLoading;
-                    const onClick = isAccountLoading ? undefined : item.callback;
-
-                    return (
-                        <MenuElement key={id} $isActive={isActive}>
-                            <HoverAnimation isHoverable={isHoverable}>
-                                <AppNavigationTooltip isActiveTab={isActive}>
-                                    <StyledNavLink
-                                        $isActive={isActive}
-                                        $isNavigationDisabled={isAccountLoading}
-                                        onClick={onClick}
-                                        data-test={item['data-test']}
-                                    >
-                                        {title}
-                                    </StyledNavLink>
-                                </AppNavigationTooltip>
-                            </HoverAnimation>
-
-                            {isActive && (
-                                <Underline
-                                    // TODO: get rid of the weird jump when switching tabs on the account page before enabling this
-                                    // layoutId="underline"
-                                    transition={{
-                                        layout: {
-                                            ease: motionEasing.transition,
-                                        },
-                                    }}
-                                />
-                            )}
-                        </MenuElement>
-                    );
-                })}
-            </LayoutGroup>
+        <Container data-testid={dataTest}>
+            <ScrollContainer>
+                <AppNavigationTooltip>
+                    <Tabs
+                        hasBorder={false}
+                        size="large"
+                        isDisabled={isAccountLoading}
+                        activeItemId={resolvedActiveItemId}
+                    >
+                        {items
+                            .filter(item => !item.isHidden)
+                            .map(({ id, callback, title, 'data-testid': dataTestId }) => (
+                                <Tabs.Item
+                                    key={id}
+                                    id={id}
+                                    onClick={callback}
+                                    data-testid={dataTestId}
+                                >
+                                    {title}
+                                </Tabs.Item>
+                            ))}
+                    </Tabs>
+                </AppNavigationTooltip>
+            </ScrollContainer>
         </Container>
     );
 };

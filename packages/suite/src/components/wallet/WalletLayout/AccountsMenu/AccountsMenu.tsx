@@ -1,93 +1,60 @@
-import React from 'react';
-import styled from 'styled-components';
+import { useMemo } from 'react';
 
-import { spacingsPx, zIndices } from '@trezor/theme';
-import { selectDevice } from '@suite-common/wallet-core';
+import { Translation } from '@suite/intl';
+import { selectSelectedDevice } from '@suite-common/device';
+import { Column, useScrollShadow } from '@trezor/components';
 
-import { useDiscovery, useSelector } from 'src/hooks/suite';
-import { AccountSearchBox } from './AccountSearchBox';
-import { AddAccountButton } from './AddAccountButton';
-import { CoinsFilter } from './CoinsFilter';
+import { useSelector } from 'src/hooks/suite';
+import { ReduxAccountSearchProvider } from 'src/hooks/suite/useAccountSearch';
+import { useResponsiveContext } from 'src/support/suite/ResponsiveContext';
+import { selectDiscoveryOverallStatus } from 'src/utils/wallet/selectDiscoveryOverallStatus';
+
 import { AccountsList } from './AccountsList';
-import { Translation } from 'src/components/suite';
+import { AccountsMenuHeader } from './AccountsMenuHeader';
 import { AccountsMenuNotice } from './AccountsMenuNotice';
-import { getFailedAccounts, sortByCoin } from '@suite-common/wallet-utils';
-import { RefreshAfterDiscoveryNeeded } from './RefreshAfterDiscoveryNeeded';
-import { useScrollShadow } from '@trezor/components';
-
-const Wrapper = styled.div`
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    z-index: ${zIndices.expandableNavigationHeader};
-    width: 100%;
-    overflow: auto;
-`;
-
-const MenuHeader = styled.div`
-    display: flex;
-    flex-direction: column;
-    border-top: 1px solid ${({ theme }) => theme.borderElevation1};
-    padding: ${spacingsPx.xs} ${spacingsPx.xs} 0 ${spacingsPx.xs};
-`;
-
-const Row = styled.div`
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: ${spacingsPx.xs};
-`;
-
-const Scroll = styled.div`
-    height: auto;
-    overflow: hidden auto;
-`;
 
 export const AccountsMenu = () => {
-    const device = useSelector(selectDevice);
-    const accounts = useSelector(state => state.wallet.accounts);
+    const device = useSelector(selectSelectedDevice);
+    const discoveryStatus = useSelector(selectDiscoveryOverallStatus);
+    const { scrollElementRef, ScrollSentinels, ShadowTop, ShadowBottom, ShadowContainer } =
+        useScrollShadow({
+            backgroundColor: 'surfaceFillSunken',
+        });
+    const { isSidebarCollapsed } = useResponsiveContext();
 
-    const { discovery } = useDiscovery();
-    const { scrollElementRef, onScroll, ShadowTop, ShadowBottom, ShadowContainer } =
-        useScrollShadow();
+    // Kept referentially stable so that the shadows switching on and off cannot re-render the
+    // list itself.
+    const scrollSentinels = useMemo(() => <ScrollSentinels />, [ScrollSentinels]);
 
-    if (!device || !discovery) {
+    const isDiscoveryEmpty = discoveryStatus?.type === 'discovery-empty';
+
+    if (isDiscoveryEmpty) {
+        return null;
+    }
+
+    if (!device) {
+        if (isSidebarCollapsed) return null;
+
         return (
-            <Wrapper>
-                <AccountsMenuNotice>
-                    <Translation id="TR_ACCOUNT_NO_ACCOUNTS" />
-                </AccountsMenuNotice>
-            </Wrapper>
+            <AccountsMenuNotice>
+                <Translation id="TR_ACCOUNT_NO_ACCOUNTS" />
+            </AccountsMenuNotice>
         );
     }
 
-    const failed = getFailedAccounts(discovery);
-    const list = sortByCoin(accounts.filter(a => a.deviceState === device.state).concat(failed));
-    const isEmpty = list.length === 0;
-
     return (
-        <Wrapper>
-            <MenuHeader>
-                <Row>
-                    {!isEmpty && <AccountSearchBox />}
-                    <AddAccountButton
-                        isFullWidth={isEmpty}
-                        data-test="@account-menu/add-account"
-                        device={device}
+        <ReduxAccountSearchProvider>
+            <AccountsMenuHeader />
+            <Column minHeight={0}>
+                <ShadowContainer>
+                    <ShadowTop />
+                    <AccountsList
+                        scrollElementRef={scrollElementRef}
+                        scrollSentinels={scrollSentinels}
                     />
-                </Row>
-
-                <CoinsFilter />
-            </MenuHeader>
-
-            <ShadowContainer>
-                <ShadowTop backgroundColor="backgroundSurfaceElevationNegative" />
-                <Scroll ref={scrollElementRef} onScroll={onScroll}>
-                    <AccountsList />
-                    <RefreshAfterDiscoveryNeeded />
-                </Scroll>
-                <ShadowBottom backgroundColor="backgroundSurfaceElevationNegative" />
-            </ShadowContainer>
-        </Wrapper>
+                    <ShadowBottom />
+                </ShadowContainer>
+            </Column>
+        </ReduxAccountSearchProvider>
     );
 };

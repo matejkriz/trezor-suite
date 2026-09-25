@@ -1,0 +1,59 @@
+import {
+    type TxSimulationEVMResult,
+    getEvmSimulationFailure,
+    getSimulationErrorRiskLevel,
+} from '@suite-common/tx-simulation';
+
+import {
+    TxSimulationBanner,
+    type TxSimulationBannerProps,
+} from '../../common/components/TxSimulationBanner';
+
+export type EvmTxSimulationDisclaimerProps = {
+    result: TxSimulationEVMResult;
+} & Pick<TxSimulationBannerProps, 'isAccepted' | 'onChange'>;
+
+export function EvmTxSimulationDisclaimer({
+    result,
+    isAccepted,
+    onChange,
+}: EvmTxSimulationDisclaimerProps) {
+    const simulationFailure = getEvmSimulationFailure(result);
+
+    if (simulationFailure) {
+        return (
+            <TxSimulationBanner
+                type={getSimulationErrorRiskLevel(simulationFailure.error)}
+                title="TR_SIMULATION_ERROR"
+                isAccepted={isAccepted}
+                onChange={onChange}
+            />
+        );
+    }
+
+    switch (result.validation?.result_type) {
+        case 'Malicious':
+            return (
+                <TxSimulationBanner
+                    type="error"
+                    title="TR_SIMULATION_MALICIOUS"
+                    description="TR_SIMULATION_MALICIOUS_DESC"
+                    isAccepted={isAccepted}
+                    onChange={onChange}
+                />
+            );
+        case 'Warning':
+            return (
+                <TxSimulationBanner
+                    type="warning"
+                    title="TR_SIMULATION_WARNING"
+                    description="TR_SIMULATION_WARNING_DESC"
+                    isAccepted={isAccepted}
+                    onChange={onChange}
+                />
+            );
+
+        default:
+            return null;
+    }
+}

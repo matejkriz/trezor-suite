@@ -1,64 +1,56 @@
-import styled from 'styled-components';
-import { Button } from '@trezor/components';
-import { useSelector } from 'src/hooks/suite/useSelector';
-import { Modal, Translation } from 'src/components/suite';
-import { selectSelectedAccount } from 'src/reducers/wallet/selectedAccountReducer';
-import { useDispatch } from 'src/hooks/suite';
-import { stopCoinjoinSession } from 'src/actions/wallet/coinjoinClientActions';
+import { selectSelectedAccount } from '@suite/account';
+import { stopCoinjoinSessionThunk } from '@suite/coinjoin';
+import { Translation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { Column, H3, Modal, Paragraph } from '@trezor/components';
+import { ArrowsInIcon } from '@trezor/icons';
 
-const StyledModal = styled(Modal)`
-    width: 435px;
-`;
+import { useSelector } from 'src/hooks/suite';
 
-const StyledButton = styled(Button)`
-    flex: 1;
-`;
-
-const CancelButton = styled(StyledButton)`
-    color: ${({ theme }) => theme.TYPE_DARK_GREY};
-    background: ${({ theme }) => theme.BG_WHITE_ALT_HOVER};
-
-    &:hover {
-        background: ${({ theme }) => theme.STROKE_GREY};
-    }
-`;
-
-interface CancelCoinjoinModalProps {
+type CancelCoinjoinModalProps = {
     onClose: () => void;
-}
+};
 
 export const CancelCoinjoinModal = ({ onClose }: CancelCoinjoinModalProps) => {
     const account = useSelector(selectSelectedAccount);
 
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
 
     if (!account) {
         return null;
     }
 
     return (
-        <StyledModal
-            isCancelable
+        <Modal
             onCancel={onClose}
-            heading={<Translation id="TR_CANCEL_COINJOIN" />}
-            bottomBarComponents={
+            intent="warning"
+            icon={ArrowsInIcon}
+            width={600}
+            bottomContent={
                 <>
-                    <CancelButton variant="secondary" onClick={onClose}>
-                        <Translation id="TR_CANCEL_COINJOIN_NO" />
-                    </CancelButton>
-                    <StyledButton
-                        variant="destructive"
+                    <Modal.Button
                         onClick={() => {
-                            dispatch(stopCoinjoinSession(account.key));
+                            dispatch(stopCoinjoinSessionThunk(account.key));
                             onClose();
                         }}
                     >
                         <Translation id="TR_CANCEL_COINJOIN_YES" />
-                    </StyledButton>
+                    </Modal.Button>
+                    <Modal.Button intent="neutral" priority="secondary" onClick={onClose}>
+                        <Translation id="TR_CANCEL_COINJOIN_NO" />
+                    </Modal.Button>
                 </>
             }
         >
-            <Translation id="TR_CANCEL_COINJOIN_QUESTION" />
-        </StyledModal>
+            <Column gap={4}>
+                <H3>
+                    <Translation id="TR_CANCEL_COINJOIN" />
+                </H3>
+                <Paragraph intent="neutral" priority="secondary">
+                    <Translation id="TR_CANCEL_COINJOIN_QUESTION" />
+                </Paragraph>
+            </Column>
+        </Modal>
     );
 };

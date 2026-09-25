@@ -1,69 +1,96 @@
 import { useMemo } from 'react';
 
+import {
+    type DebugModeOptions,
+    selectDebugTransports,
+    suiteSettingsActions,
+} from '@suite/settings';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { injectTransports } from '@suite-common/suite-types';
 import { Checkbox } from '@trezor/components';
+import TrezorConnect from '@trezor/connect';
 import { isDesktop } from '@trezor/env-utils';
-import { useDispatch, useSelector } from 'src/hooks/suite';
-import { ArrayElement } from '@trezor/type-utils';
+import { ActionColumn, SectionItem, TextColumn } from '@trezor/product-components';
+import { type ArrayElement } from '@trezor/type-utils';
 
-import { setDebugMode } from 'src/actions/suite/suiteActions';
-import { DebugModeOptions } from 'src/reducers/suite/suiteReducer';
-import { ActionColumn, SectionItem, TextColumn } from 'src/components/suite';
+import { useSelector } from 'src/hooks/suite';
+import { selectActiveTransports } from 'src/selectors/suite/suiteSelectors';
+
+type Transport = ArrayElement<NonNullable<DebugModeOptions['transports']>>;
 
 type TransportMenuItem = {
-    name: ArrayElement<NonNullable<DebugModeOptions['transports']>>;
-    // todo: this is not true, at the moment it means something like "registered by connect"
-    // @trezor/connect is actively using this transport
+    name: Transport;
+    description: string;
     active?: boolean;
+    checked: boolean;
+};
+
+const TRANSPORTS_WEB = ['BridgeTransport', 'WebUsbTransport'] as const;
+const TRANSPORTS_DESKTOP = ['BridgeTransport', 'NodeUsbTransport', 'UdpTransport'] as const;
+const TRANSPORT_DESCRIPTIONS: Record<Transport, string> = {
+    BridgeTransport:
+        'Client for bridge http interface. It expects bridge to run on http://127.0.0.1:21328/.\
+        This is the most general transport that may be used for both desktop and web version of Trezor Suite.',
+    WebUsbTransport: 'Similar to NodeUsbTransport but using WebUSB API. Supported only in Chrome.',
+    NodeUsbTransport: 'Direct access to usb using node.js implementation.',
+    UdpTransport: 'Direct communication with emulators over udp.',
+};
+
+const useTransportItems = (transports: readonly Transport[]): TransportMenuItem[] => {
+    const activeTransports = useSelector(selectActiveTransports);
+    const debugTransports = useSelector(selectDebugTransports);
+
+    return useMemo(
+        () =>
+            transports.map(type => ({
+                name: type,
+                description: TRANSPORT_DESCRIPTIONS[type],
+                active: activeTransports.some(a => a.type === type),
+                checked: debugTransports?.includes(type),
+            })),
+        [transports, activeTransports, debugTransports],
+    );
 };
 
 export const Transport = () => {
-    const debug = useSelector(state => state.suite.settings.debug);
-    const transport = useSelector(state => state.suite.transport);
-    const dispatch = useDispatch();
-
-    // fallback [] to avoid need of migration.
-    const debugTransports = useMemo(() => debug.transports || [], [debug.transports]);
-
-    const transports: TransportMenuItem[] = useMemo(() => {
-        const transports: TransportMenuItem['name'][] = ['BridgeTransport'];
-
-        if (isDesktop()) {
-            transports.push('NodeUsbTransport');
-            transports.push('UdpTransport');
-        } else {
-            transports.push('WebUsbTransport');
-        }
-
-        return transports.map(t => ({
-            active: t === transport?.type,
-            name: t,
-        }));
-    }, [transport]);
+    const transports = isDesktop() ? TRANSPORTS_DESKTOP : TRANSPORTS_WEB;
+    const items = useTransportItems(transports);
+    const { createTransports, dispatch } = useServices(injectTransports, injectDispatch);
 
     return (
         <>
-            <SectionItem data-test="@settings/debug/transport">
+            <SectionItem data-testid="@settings/debug/transport">
                 <TextColumn
-                    title="Transports"
-                    description="You may override TrezorConnect default settings here. Select preferred transports that are to be used. You will need to reload after changes"
+                    title="Transport clients"
+                    description="You may override TrezorConnect default settings here. Select your preferred transport clients that are to be used. You will need to reload after changes"
                 />
             </SectionItem>
             {/* todo: make it drag and drop sortable */}
-            {transports.map(transport => (
+            {items.map(transport => (
                 <SectionItem
-                    data-test={`@settings/debug/transport/${transport.name}`}
                     key={transport.name}
+                    data-testid={`@settings/debug/transport/${transport.name}`}
                 >
-                    <TextColumn title={`${transport.name} ${transport.active ? '(Active)' : ''}`} />
+                    <TextColumn
+                        title={`${transport.name}${transport.active ? ' (Active)' : ''}`}
+                        description={transport.description}
+                    />
                     <ActionColumn>
                         <Checkbox
-                            isChecked={debugTransports.includes(transport.name)}
-                            onClick={() => {
-                                const nextTransports = debugTransports.includes(transport.name)
-                                    ? debugTransports.filter(t => t !== transport.name)
-                                    : [...debugTransports, transport.name];
-
-                                dispatch(setDebugMode({ transports: nextTransports }));
+                            isChecked={transport.checked}
+                            onChange={() => {
+                                const nextTransports = items
+                                    .filter(t => (t.name === transport.name) !== t.checked)
+                                    .map(t => t.name);
+                                dispatch(
+                                    suiteSettingsActions.setDebugMode({
+                                        transports: nextTransports,
+                                    }),
+                                );
+                                TrezorConnect.updateConnectSettings({
+                                    transports: createTransports(nextTransports),
+                                });
                             }}
                         />
                     </ActionColumn>

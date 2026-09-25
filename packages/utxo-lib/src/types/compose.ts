@@ -32,19 +32,19 @@ export interface ComposeOutputPaymentNoAddress {
 export interface ComposeOutputSendMax {
     type: 'send-max'; // only one in TX request
     address: string;
-    amount?: typeof undefined;
+    amount?: string;
 }
 
 export interface ComposeOutputSendMaxNoAddress {
     type: 'send-max-noaddress';
-    amount?: typeof undefined;
+    amount?: never;
 }
 
 export interface ComposeOutputOpreturn {
     type: 'opreturn'; // it doesn't need to have address
     dataHex: string;
-    amount?: typeof undefined;
-    address?: typeof undefined;
+    amount?: never;
+    address?: never;
 }
 
 // NOTE: this interface **is not** accepted by ComposeRequest['utxos']
@@ -56,9 +56,7 @@ export interface ComposeOutputChange {
 }
 
 export type ComposeFinalOutput =
-    | ComposeOutputPayment
-    | ComposeOutputSendMax
-    | ComposeOutputOpreturn;
+    ComposeOutputPayment | ComposeOutputSendMax | ComposeOutputOpreturn;
 
 export type ComposeNotFinalOutput = ComposeOutputPaymentNoAddress | ComposeOutputSendMaxNoAddress;
 
@@ -68,24 +66,38 @@ export interface ComposeChangeAddress {
     address: string;
 }
 
-export interface ComposeRequest<
+export type TransactionInputOutputSortingStrategy =
+    // BIP69 sorting
+    | 'bip69'
+
+    // Inputs are randomized, outputs are kept as they were provided in the request,
+    // and change is randomly placed somewhere between outputs
+    | 'random'
+
+    // It keeps the inputs and outputs as they were provided in the request.
+    // This is useful for RBF transactions where the order of inputs and outputs must be preserved.
+    | 'none';
+
+export type ComposeFeePolicy = 'bitcoin' | 'doge' | 'zcash';
+
+export type ComposeRequest<
     Input extends ComposeInput,
     Output extends ComposeOutput,
     Change extends ComposeChangeAddress,
-> {
+> = {
     txType?: CoinSelectPaymentType;
     utxos: Input[]; // all inputs
     outputs: Output[]; // all outputs
     feeRate: string | number; // in sat/byte, virtual size
+    feePolicy?: ComposeFeePolicy; // explicit fee policy
     longTermFeeRate?: string | number; // dust output feeRate multiplier in sat/byte, virtual size
     network: Network;
     changeAddress: Change;
     dustThreshold: number; // explicit dust threshold, in satoshi
     baseFee?: number; // DOGE or RBF base fee
-    floorBaseFee?: boolean; // DOGE floor base fee to the nearest integer
     skipUtxoSelection?: boolean; // use custom utxo selection, without algorithm
-    skipPermutation?: boolean; // Do not sort inputs/outputs and preserve the given order. Handy for RBF.
-}
+    sortingStrategy: TransactionInputOutputSortingStrategy;
+};
 
 type ComposedTransactionOutputs<T> = T extends ComposeOutputSendMax
     ? Omit<T, 'type'> & ComposeOutputPayment // NOTE: replace ComposeOutputSendMax (no amount) with ComposeOutputPayment (with amount)

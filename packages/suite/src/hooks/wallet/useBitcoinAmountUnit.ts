@@ -1,38 +1,39 @@
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { type NetworkSymbol, getNetworkOptional } from '@suite-common/wallet-config';
+import {
+    selectBitcoinAmountUnit,
+    setBitcoinAmountUnits,
+    toggleBitcoinAmountUnitsThunk,
+} from '@suite-common/wallet-core';
 import { PROTO } from '@trezor/connect';
-import { selectDeviceUnavailableCapabilities } from '@suite-common/wallet-core';
 
-import { useSelector } from 'src/hooks/suite/useSelector';
-import { useActions } from 'src/hooks/suite/useActions';
-import * as walletSettingsActions from 'src/actions/settings/walletSettingsActions';
-import { NETWORKS } from 'src/config/wallet';
-import { NetworkSymbol } from 'src/types/wallet';
+import { useSelector } from 'src/hooks/suite';
 
 export const useBitcoinAmountUnit = (symbol?: NetworkSymbol) => {
-    const bitcoinAmountUnit = useSelector(state => state.wallet.settings.bitcoinAmountUnit);
-    const unavailableCapabilities = useSelector(selectDeviceUnavailableCapabilities);
+    const bitcoinAmountUnit = useSelector(selectBitcoinAmountUnit);
+    const { dispatch } = useServices(injectDispatch);
 
-    const { toggleBitcoinAmountUnits, setBitcoinAmountUnits } = useActions({
-        toggleBitcoinAmountUnits: walletSettingsActions.toggleBitcoinAmountUnits,
-        setBitcoinAmountUnits: walletSettingsActions.setBitcoinAmountUnits,
-    });
+    const toggleBitcoinAmountUnitsAction = () => {
+        dispatch(toggleBitcoinAmountUnitsThunk());
+    };
+
+    const setBitcoinAmountUnitsAction = (unit: PROTO.AmountUnit) => {
+        dispatch(setBitcoinAmountUnits(unit));
+    };
 
     const areSatsDisplayed = bitcoinAmountUnit === PROTO.AmountUnit.SATOSHI;
+    const isBtcSatsAmountUnit = areSatsDisplayed && symbol === 'btc';
 
-    const areUnitsSupportedByDevice = !unavailableCapabilities?.amountUnit;
-
-    const areUnitsSupportedByNetwork =
-        symbol &&
-        NETWORKS.find(({ symbol: networkSymbol }) => networkSymbol === symbol)?.features?.includes(
-            'amount-unit',
-        );
+    const areUnitsSupportedByNetwork = getNetworkOptional(symbol)?.features.includes('amount-unit');
 
     return {
         bitcoinAmountUnit,
         areSatsDisplayed,
-        shouldSendInSats:
-            areSatsDisplayed && areUnitsSupportedByNetwork && areUnitsSupportedByDevice,
-        toggleBitcoinAmountUnits,
-        setBitcoinAmountUnits,
+        isBtcSatsAmountUnit,
+        shouldSendInSats: areSatsDisplayed && areUnitsSupportedByNetwork,
+        toggleBitcoinAmountUnits: toggleBitcoinAmountUnitsAction,
+        setBitcoinAmountUnits: setBitcoinAmountUnitsAction,
         areUnitsSupportedByNetwork,
     };
 };

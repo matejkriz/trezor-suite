@@ -1,12 +1,14 @@
-import { ReactNode } from 'react';
+import React, { type ReactNode } from 'react';
+import { type View } from 'react-native';
+import Animated from 'react-native-reanimated';
 
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-import { NativeSpacing } from '@trezor/theme';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
+import { type NativeSpacing } from '@trezor/theme';
 
-import { Box, BoxProps } from './Box';
+import { Box, type BoxProps } from './Box';
 
 type StackOrientation = 'horizontal' | 'vertical';
-interface StackProps extends BoxProps {
+export interface StackProps extends BoxProps {
     children: ReactNode;
     spacing?: NativeSpacing | number;
     orientation?: StackOrientation;
@@ -18,7 +20,7 @@ type SpacerStyleProps = {
 };
 
 const spacerStyle = prepareNativeStyle<SpacerStyleProps>((utils, { spacing, orientation }) => {
-    const spacingValue = typeof spacing === 'number' ? spacing : utils.spacings[spacing ?? 'small'];
+    const spacingValue = typeof spacing === 'number' ? spacing : utils.spacings[spacing ?? 'sp8'];
     const flexDirection = orientation === 'horizontal' ? 'row' : 'column';
 
     return {
@@ -27,30 +29,34 @@ const spacerStyle = prepareNativeStyle<SpacerStyleProps>((utils, { spacing, orie
     };
 });
 
-export const Stack = ({
-    children,
-    style,
-    spacing,
-    orientation = 'vertical',
-    ...rest
-}: StackProps) => {
-    const { applyStyle } = useNativeStyles();
+export const Stack = React.forwardRef<View, StackProps>(
+    ({ children, style, spacing, orientation = 'vertical', ...rest }: StackProps, ref) => {
+        const { applyStyle } = useNativeStyles();
 
-    return (
-        <Box
-            style={[
-                applyStyle(spacerStyle, {
-                    spacing,
-                    orientation,
-                }),
-                style,
-            ]}
-            {...rest}
-        >
-            {children}
-        </Box>
-    );
-};
+        return (
+            <Box
+                ref={ref}
+                style={[
+                    applyStyle(spacerStyle, {
+                        spacing,
+                        orientation,
+                    }),
+                    style,
+                ]}
+                {...rest}
+            >
+                {children}
+            </Box>
+        );
+    },
+);
 
 export const VStack = Stack;
 export const HStack = (props: StackProps) => <Stack {...props} orientation="horizontal" />;
+
+Stack.displayName = 'Stack';
+VStack.displayName = 'VStack';
+HStack.displayName = 'HStack';
+
+export const AnimatedVStack = Animated.createAnimatedComponent(VStack);
+export const AnimatedHStack = Animated.createAnimatedComponent(HStack);

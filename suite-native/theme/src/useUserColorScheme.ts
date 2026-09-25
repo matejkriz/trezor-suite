@@ -1,20 +1,20 @@
 import { useAtom } from 'jotai';
 
-import { ThemeColorVariant } from '@trezor/theme';
+import { useServices } from '@suite-common/dependency-injection';
+import { events, injectNativeAnalytics } from '@suite-native/analytics';
 import { atomWithUnecryptedStorage } from '@suite-native/storage';
-import { analytics, EventType } from '@suite-native/analytics';
-
+import { type ThemeColorVariant } from '@trezor/theme';
 export type AppColorScheme = ThemeColorVariant | 'system';
 
 const userColorSchemeAtom = atomWithUnecryptedStorage<AppColorScheme>('colorScheme', 'system');
 
 export const useUserColorScheme = () => {
     const [userColorScheme, setUserColorScheme] = useAtom(userColorSchemeAtom);
-
+    const { analytics } = useServices(injectNativeAnalytics);
     const handleSetUserColorScheme = (colorScheme: AppColorScheme) => {
         setUserColorScheme(colorScheme);
         analytics.report({
-            type: EventType.SettingsChangeTheme,
+            type: events.settingsChangeThemeEvent.name,
             payload: { theme: colorScheme },
         });
     };

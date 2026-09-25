@@ -1,91 +1,202 @@
-import { initMessageSystemThunk } from '@suite-common/message-system';
-import * as trezorConnectActions from '@suite-common/connect-init';
+import { type UnknownAction } from '@reduxjs/toolkit';
+import { type ThunkDispatch } from 'redux-thunk';
+
+import { type DesktopApiDep } from '@suite/desktop-app-api';
+import { type FlagsRootState, selectFlags, setFlag } from '@suite/flags';
+import { type MetadataRootState, metadataLabelingActions } from '@suite/metadata';
 import {
-    initBlockchainThunk,
-    initDevices,
+    type GotoThunkDeps,
+    type GotoThunkState,
+    initialRedirectionThunk,
+    routerInitThunk,
+} from '@suite/router';
+import {
+    type SuiteSettingsRootState,
+    selectEarnYieldWorkerBaseUrl,
+    selectLanguage,
+    suiteSettingsActions,
+} from '@suite/settings';
+import { onSuiteInit, onSuiteReady } from '@suite/suite-lifecycle';
+import * as trezorConnectActions from '@suite-common/connect-init';
+import { type ConnectInitThunkDeps, type ConnectInitThunkState } from '@suite-common/connect-init';
+import { type DeviceRootState } from '@suite-common/device';
+import { earnYieldWorkerBaseUrl } from '@suite-common/earn-stablecoin-api';
+import {
+    type MessageSystemRootState,
+    initMessageSystemThunk,
+    prepareCachedEnvData,
+    selectActiveKillswitchMessage,
+} from '@suite-common/message-system';
+import { type WithServices } from '@suite-common/redux-utils';
+import {
+    type InitTokenDefinitionsThunkDeps,
+    type InitTokenDefinitionsThunkState,
     periodicCheckTokenDefinitionsThunk,
+} from '@suite-common/token-definitions';
+import {
+    type InitBlockchainThunkDeps,
+    type InitBlockchainThunkState,
+    type InitStakeDataThunkState,
+    type PeriodicFetchFiatRatesThunkDeps,
+    type PeriodicFetchFiatRatesThunkState,
+    type UpdateMissingTxFiatRatesThunkState,
+    type WalletSettingsRootState,
+    initBlockchainThunk,
+    initDevicesThunk,
+    periodicCheckStakeDataThunk,
     periodicFetchFiatRatesThunk,
+    selectBaseCurrency,
+    updateMissingTxFiatRatesThunk,
 } from '@suite-common/wallet-core';
+import {
+    type WalletConnectInitThunkDeps,
+    type WalletConnectInitThunkState,
+} from '@suite-common/walletconnect';
+import * as walletConnectActions from '@suite-common/walletconnect';
+import { isDesktop } from '@trezor/env-utils';
 
-import * as routerActions from 'src/actions/suite/routerActions';
-import * as analyticsActions from 'src/actions/suite/analyticsActions';
-import * as metadataLabelingActions from 'src/actions/suite/metadataLabelingActions';
-import * as languageActions from 'src/actions/settings/languageActions';
-import type { Dispatch, GetState } from 'src/types/suite';
-import { selectLocalCurrency } from 'src/reducers/wallet/settingsReducer';
+import * as bioAuthThunks from 'src/actions/suite/bioAuthThunks';
+import { type SuiteRootState } from 'src/reducers/suite/suiteReducer';
+import { selectSuiteLifecycleStatus } from 'src/selectors/suite/suiteSelectors';
 
-import { SUITE } from './constants';
-import { onSuiteReady } from './suiteActions';
+import { setSuiteError } from './suiteActions';
 
-export const init = () => async (dispatch: Dispatch, getState: GetState) => {
-    const {
-        suite: {
-            settings: { language },
-            lifecycle: { status },
-        },
-    } = getState();
+type InitThunkState = ConnectInitThunkState &
+    DeviceRootState &
+    FlagsRootState &
+    GotoThunkState &
+    InitBlockchainThunkState &
+    InitStakeDataThunkState &
+    InitTokenDefinitionsThunkState &
+    MessageSystemRootState &
+    MetadataRootState &
+    PeriodicFetchFiatRatesThunkState &
+    SuiteRootState &
+    SuiteSettingsRootState &
+    UpdateMissingTxFiatRatesThunkState &
+    WalletConnectInitThunkState &
+    WalletSettingsRootState;
 
-    if (status !== 'initial') return;
+type InitThunkDeps = ConnectInitThunkDeps &
+    GotoThunkDeps &
+    InitBlockchainThunkDeps &
+    InitTokenDefinitionsThunkDeps &
+    PeriodicFetchFiatRatesThunkDeps &
+    WalletConnectInitThunkDeps &
+    WithServices<InitThunkDesktopApiDep>;
 
-    dispatch({ type: SUITE.INIT });
+export type InitThunkDesktopApiDep = DesktopApiDep<
+    | 'setAutomaticUpdateEnabled'
+    | 'getBioAuthSettings'
+    | 'getBioAuthStatus'
+    | 'isBioAuthAvailable'
+    | 'on'
+>;
 
-    dispatch(initDevices());
+export const initThunk =
+    () =>
+    async (
+        dispatch: ThunkDispatch<InitThunkState, InitThunkDeps, UnknownAction>,
+        getState: () => InitThunkState,
+        extra: InitThunkDeps,
+    ) => {
+        const status = selectSuiteLifecycleStatus(getState());
+        const language = selectLanguage(getState());
+        const localCurrency = selectBaseCurrency(getState());
+        const { enableAutoupdateOnNextRun } = selectFlags(getState());
 
-    // right after storage is loaded, we might start:
+        if (status !== 'initial') return;
 
-    // 1. init analytics
-    dispatch(analyticsActions.init());
+        dispatch(onSuiteInit());
 
-    // 2. fetching locales
-    dispatch(languageActions.setLanguage(language));
+        // apply the earn yield worker base url from debug settings (or the default for this build)
+        earnYieldWorkerBaseUrl.set(selectEarnYieldWorkerBaseUrl(getState()));
 
-    // 3. fetch message system config
-    dispatch(initMessageSystemThunk({ jwsPublicKey: process.env.JWS_PUBLIC_KEY }));
+        await dispatch(initDevicesThunk());
 
-    // 4. redirecting user into welcome screen (if needed)
-    dispatch(routerActions.initialRedirection());
+        /**
+         * ----------------------------------------------
+         * Right after storage is loaded, we might start:
+         * ----------------------------------------------
+         *
+         * Todo: This is good place to be refactored into separate functions.
+         *       Those number-comments are very strong indicator that this code
+         *       has many responsibilities and should be split into smaller parts.
+         */
 
-    // 5. init connect (could throw an error,
-    // then the error is caught in <ErrorBoundary /> in Main.tsx
-    try {
-        // it is necessary to unwrap the result here because init calls async thunk from redux-toolkit which is always resolved
-        // see more details here: https://redux-toolkit.js.org/api/createAsyncThunk#unwrapping-result-actions
-        await dispatch(trezorConnectActions.connectInitThunk()).unwrap();
-    } catch (err) {
-        dispatch({ type: SUITE.ERROR, error: err.message });
-        throw err;
-    }
+        // 2. fetching locales
+        dispatch(suiteSettingsActions.setLanguage(language));
 
-    // 6. init backends
-    await dispatch(initBlockchainThunk())
-        .unwrap()
-        .catch(err => console.error(err));
+        // 3. fetch message system config
+        await prepareCachedEnvData();
+        await dispatch(initMessageSystemThunk());
 
-    // 7. fetch token definitions (has to be fetched before fiat rates)
-    await dispatch(periodicCheckTokenDefinitionsThunk());
+        // 4. turn on auto updates if needed
+        if (isDesktop() && enableAutoupdateOnNextRun) {
+            dispatch(setFlag({ key: 'enableAutoupdateOnNextRun', value: false }));
+            extra.services.desktopApi.setAutomaticUpdateEnabled(true);
+        }
 
-    // 8. init periodic fetching of fiat rates
-    await dispatch(
-        periodicFetchFiatRatesThunk({
-            rateType: 'current',
-            localCurrency: selectLocalCurrency(getState()),
-        }),
-    );
-    await dispatch(
-        periodicFetchFiatRatesThunk({
-            rateType: 'lastWeek',
-            localCurrency: selectLocalCurrency(getState()),
-        }),
-    );
+        // 5. redirecting user into welcome screen (if needed)
+        dispatch(initialRedirectionThunk({ isInitialRun: selectFlags(getState()).initialRun }));
 
-    // 9. dispatch initial location change
-    dispatch(routerActions.init());
+        // Do not initialize Connect or anything else related to it, if there is an app-wide killswitch via message-system.
+        const activeKillswitchMessage = selectActiveKillswitchMessage(getState());
+        if (activeKillswitchMessage) return;
 
-    // 10. fetch metadata. metadata is not saved together with other data in storage.
-    // historically it was saved in indexedDB together with devices and accounts and we did not need to load them
-    // immediately after suite start.
-    dispatch(metadataLabelingActions.fetchAndSaveMetadataForAllDevices());
+        // 6. init connect (could throw an error, then the error is caught in <ErrorBoundary /> in Main.tsx.
+        try {
+            // it is necessary to unwrap the result here because init calls async thunk from redux-toolkit which is always resolved
+            // see more details here: https://redux-toolkit.js.org/api/createAsyncThunk#unwrapping-result-actions
+            await dispatch(trezorConnectActions.connectInitThunk()).unwrap();
+        } catch (err) {
+            dispatch(setSuiteError(err.message));
 
-    // 11. backend connected, suite is ready to use
-    dispatch(onSuiteReady());
-};
+            return;
+        }
+
+        // 7. init backends
+        await dispatch(initBlockchainThunk())
+            .unwrap()
+            .catch(err => console.error(err));
+
+        // 8. fetch token definitions (has to be fetched before fiat rates)
+        await dispatch(periodicCheckTokenDefinitionsThunk());
+
+        // 9. init periodic fetching of fiat rates
+        await dispatch(
+            periodicFetchFiatRatesThunk({
+                rateType: 'current',
+                localCurrency,
+            }),
+        );
+        await dispatch(
+            periodicFetchFiatRatesThunk({
+                rateType: 'lastWeek',
+                localCurrency,
+            }),
+        );
+
+        // 10. fetch rates for transactions with missing rates
+        await dispatch(updateMissingTxFiatRatesThunk({ localCurrency }));
+
+        // 11. dispatch initial location change
+        dispatch(routerInitThunk());
+
+        // 12. fetch metadata. metadata is not saved together with other data in storage.
+        // historically it was saved in indexedDB together with devices and accounts and we did not need to load them
+        // immediately after suite start.
+        dispatch(metadataLabelingActions.fetchAndSaveMetadataForAllDevicesThunk());
+
+        // 13. start fetching staking data if needed, does need to be waited
+        dispatch(periodicCheckStakeDataThunk());
+
+        // 14. init wallet connect
+        dispatch(walletConnectActions.walletConnectInitThunk());
+        // 15. bio auth
+        if (isDesktop()) {
+            dispatch(bioAuthThunks.initBioAuthThunk());
+        }
+        // 16. backend connected, suite is ready to use
+        dispatch(onSuiteReady());
+    };

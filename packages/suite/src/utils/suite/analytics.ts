@@ -1,80 +1,139 @@
-import { AppUpdateEvent } from '@trezor/suite-analytics';
+import type { SuiteReadyPayload } from '@suite/analytics';
+import { type DesktopUpdateRootState } from '@suite/desktop-update';
 import {
-    getScreenWidth,
-    getScreenHeight,
+    type LegacyLabelingVisibleRootState,
+    selectIsLegacyLabelingVisible,
+} from '@suite/metadata';
+import { AccountTransactionBaseAnchor, EarnAnchor, isEarnYieldRowAnchor } from '@suite/router';
+import {
+    selectAutodetectLanguage,
+    selectAutodetectTheme,
+    selectExperimentalFeatures,
+    selectLanguage,
+    selectTheme,
+} from '@suite/settings';
+import { type DesktopSuiteSyncRootState } from '@suite/suite-sync';
+import { type TorRootState, selectIsTorEnabled } from '@suite/tor';
+import { type AnalyticsRootState } from '@suite-common/analytics-redux';
+import {
+    selectRememberedHiddenWalletsCount,
+    selectRememberedStandardWalletsCount,
+} from '@suite-common/device';
+import { type DiscreetModeRootState } from '@suite-common/discreet-mode';
+import {
+    formatExperimentVariantsForAnalytics,
+    selectActiveExperimentsWithVariants,
+} from '@suite-common/message-system';
+import { type MetadataProviderType } from '@suite-common/metadata-types';
+import { type NetworksRootState } from '@suite-common/networks';
+import { UNIT_ABBREVIATIONS } from '@suite-common/suite-constants';
+import {
     getBrowserName,
     getBrowserVersion,
-    getOsName,
+    getCpuArch,
     getOsVersion,
-    getWindowWidth,
-    getWindowHeight,
+} from '@suite-common/suite-utils';
+import {
+    type BlockchainRootState,
+    type WalletSettingsRootState,
+    selectCustomBackends,
+} from '@suite-common/wallet-core';
+import {
+    getOsName,
     getPlatformLanguages,
+    getScreenHeight,
+    getScreenWidth,
+    getWindowHeight,
+    getWindowWidth,
 } from '@trezor/env-utils';
-import { getCustomBackends } from '@suite-common/wallet-utils';
-import { UNIT_ABBREVIATIONS } from '@suite-common/suite-constants';
-import type { UpdateInfo } from '@trezor/suite-desktop-api';
-import { selectDevices } from '@suite-common/wallet-core';
 
-import { AccountTransactionBaseAnchor } from 'src/constants/suite/anchors';
-import { AppState } from 'src/types/suite';
+export type GetSuiteReadyPayloadState = AnalyticsRootState &
+    BlockchainRootState &
+    DesktopUpdateRootState &
+    DesktopSuiteSyncRootState &
+    DiscreetModeRootState &
+    LegacyLabelingVisibleRootState &
+    TorRootState &
+    WalletSettingsRootState &
+    NetworksRootState;
 
-import { getIsTorEnabled } from './tor';
+const resolveLabelingType = (
+    state: GetSuiteReadyPayloadState,
+): MetadataProviderType | 'missing-provider' | 'suite-sync' | 'off' => {
+    if (selectIsLegacyLabelingVisible(state)) {
+        return (
+            state.metadata.providers.find(
+                p => p.clientId === state.metadata.selectedProvider.labels,
+            )?.type || 'missing-provider'
+        );
+    }
 
-// redact transaction id from account transaction anchor
-export const redactTransactionIdFromAnchor = (anchor?: string) => {
+    return state.suiteSync.settings.isSuiteSyncEnabled ? 'suite-sync' : 'off';
+};
+
+// Collapses the per-item part of anchors (transaction id, earn yield row) — anchors reach
+// analytics and logs, so they must never carry account-identifying data.
+export const redactAnchor = (anchor?: string) => {
     if (!anchor) {
         return undefined;
     }
 
-    return anchor.startsWith(AccountTransactionBaseAnchor) ? AccountTransactionBaseAnchor : anchor;
+    if (anchor.startsWith(AccountTransactionBaseAnchor)) {
+        return AccountTransactionBaseAnchor;
+    }
+
+    if (isEarnYieldRowAnchor(anchor)) {
+        return EarnAnchor.Yield;
+    }
+
+    return anchor;
 };
 
 // 1. replace coinjoin by taproot
 export const redactRouterUrl = (url: string) => url.replace(/coinjoin/g, 'taproot');
 
-export const getSuiteReadyPayload = (state: AppState) => ({
-    language: state.suite.settings.language,
-    enabledNetworks: state.wallet.settings.enabledNetworks,
-    customBackends: getCustomBackends(state.wallet.blockchain)
-        .map(({ coin }) => coin)
-        .filter(coin => state.wallet.settings.enabledNetworks.includes(coin)),
-    localCurrency: state.wallet.settings.localCurrency,
-    bitcoinUnit: UNIT_ABBREVIATIONS[state.wallet.settings.bitcoinAmountUnit],
-    discreetMode: state.wallet.settings.discreetMode,
-    screenWidth: getScreenWidth(),
-    screenHeight: getScreenHeight(),
-    platformLanguages: getPlatformLanguages().join(','),
-    tor: getIsTorEnabled(state.suite.torStatus),
-    // todo: duplicated with suite/src/utils/suite/logUtils
-    labeling: state.metadata.enabled
-        ? state.metadata.providers.find(p => p.clientId === state.metadata.selectedProvider.labels)
-              ?.type || 'missing-provider'
-        : '',
-    rememberedStandardWallets: selectDevices(state).filter(d => d.remember && d.useEmptyPassphrase)
-        .length,
-    rememberedHiddenWallets: selectDevices(state).filter(d => d.remember && !d.useEmptyPassphrase)
-        .length,
-    theme: state.suite.settings.theme.variant,
-    suiteVersion: process.env.VERSION || '',
-    earlyAccessProgram: state.desktopUpdate.allowPrerelease,
-    browserName: getBrowserName(),
-    browserVersion: getBrowserVersion(),
-    osName: getOsName(),
-    osVersion: getOsVersion(),
-    windowWidth: getWindowWidth(),
-    windowHeight: getWindowHeight(),
-    autodetectLanguage: state.suite.settings.autodetect.language,
-    autodetectTheme: state.suite.settings.autodetect.theme,
-});
+export const getSuiteReadyPayload = async (
+    state: GetSuiteReadyPayloadState,
+): Promise<SuiteReadyPayload> => {
+    const experimentVariants = selectActiveExperimentsWithVariants(state);
+    const [osVersion, osCpuArch] = await Promise.all([getOsVersion(), getCpuArch()]);
 
-export const getAppUpdatePayload = (
-    status: AppUpdateEvent['status'],
-    earlyAccessProgram: boolean,
-    updateInfo?: UpdateInfo,
-): AppUpdateEvent => ({
-    fromVersion: process.env.VERSION || '',
-    toVersion: updateInfo?.version,
-    status,
-    earlyAccessProgram,
-    isPrerelease: updateInfo?.prerelease,
-});
+    return {
+        language: selectLanguage(state),
+        enabledNetworks: state.wallet.settings.enabledNetworks,
+        customBackends: selectCustomBackends(state)
+            .map(({ symbol }) => symbol)
+            .filter(symbol => state.wallet.settings.enabledNetworks.includes(symbol)),
+        localCurrency: state.wallet.settings.localCurrency,
+        bitcoinUnit: UNIT_ABBREVIATIONS[state.wallet.settings.bitcoinAmountUnit],
+        discreetMode: state.discreetMode.isActive,
+        screenWidth: getScreenWidth(),
+        screenHeight: getScreenHeight(),
+        platformLanguages: getPlatformLanguages().join(','),
+        tor: selectIsTorEnabled(state),
+        labeling: resolveLabelingType(state),
+        rememberedStandardWallets: selectRememberedStandardWalletsCount(state),
+        rememberedHiddenWallets: selectRememberedHiddenWalletsCount(state),
+        theme: selectTheme(state),
+        suiteVersion: process.env.VERSION || '',
+        earlyAccessProgram: state.desktopUpdate.allowPrerelease,
+        experimentalFeatures: selectExperimentalFeatures(state),
+        browserName: getBrowserName(),
+        browserVersion: getBrowserVersion(),
+        osName: getOsName(),
+        osVersion,
+        osCpuArch,
+
+        windowWidth: getWindowWidth(),
+        windowHeight: getWindowHeight(),
+        autodetectLanguage: selectAutodetectLanguage(state),
+        autodetectTheme: selectAutodetectTheme(state),
+
+        isAutomaticUpdateEnabled: state.desktopUpdate.isAutomaticUpdateEnabled,
+
+        experimentVariants: formatExperimentVariantsForAnalytics(experimentVariants),
+
+        mevProtection: state.wallet.settings.mevProtection,
+        networkReserve: state.wallet.settings.networkReserve,
+    };
+};

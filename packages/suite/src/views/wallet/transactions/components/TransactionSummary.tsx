@@ -1,47 +1,29 @@
-import styled from 'styled-components';
 import { getUnixTime } from 'date-fns';
+import styled from 'styled-components';
 
-import { Account } from 'src/types/wallet';
-import {
-    GraphRangeSelector,
-    HiddenPlaceholder,
-    TransactionsGraph,
-    Translation,
-} from 'src/components/suite';
-import { useDispatch, useSelector } from 'src/hooks/suite';
-import { getGraphDataForInterval, updateGraphData } from 'src/actions/wallet/graphActions';
-
+import { Translation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
 import { calcTicks, calcTicksFromData } from '@suite-common/suite-utils';
-import { variables, Button, Card } from '@trezor/components';
+import { selectBaseCurrency } from '@suite-common/wallet-core';
+import { Button, Card, Column, Row } from '@trezor/components';
+import { RepeatIcon } from '@trezor/icons';
+import { typography } from '@trezor/theme';
+import { BigNumber } from '@trezor/utils';
 
-import { TransactionSummaryDropdown } from './TransactionSummaryDropdown';
+import { updateGraphDataThunk } from 'src/actions/wallet/graphActions';
+import { GraphRangeSelector, HiddenPlaceholder } from 'src/components/suite';
+import { TransactionsGraphLoader } from 'src/components/suite/graph/TransactionsGraph/TransactionsGraphLoader';
+import { useSelector } from 'src/hooks/suite';
+import { selectGraph, selectGraphSelectedRange } from 'src/reducers/wallet/graphReducer';
+import { type Account } from 'src/types/wallet';
+import {
+    aggregateBalanceHistory,
+    getGraphDataForInterval,
+    getMinMaxValueFromData,
+} from 'src/utils/wallet/graph';
+
 import { SummaryCards } from './SummaryCards';
-import { aggregateBalanceHistory, getMinMaxValueFromData } from 'src/utils/wallet/graph';
-import { selectLocalCurrency } from 'src/reducers/wallet/settingsReducer';
-
-const Wrapper = styled.div`
-    display: flex;
-    flex-direction: column;
-`;
-
-const ContentWrapper = styled.div`
-    display: flex;
-    width: 100%;
-    flex-direction: column;
-`;
-
-const GraphWrapper = styled(Card)`
-    flex-direction: row;
-    display: flex;
-    height: 320px;
-`;
-
-const Actions = styled.div`
-    display: flex;
-    margin-bottom: 20px;
-    justify-content: space-between;
-    align-items: center;
-`;
 
 const ErrorMessage = styled.div`
     display: flex;
@@ -51,8 +33,8 @@ const ErrorMessage = styled.div`
     padding: 20px;
     align-items: center;
     justify-content: center;
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    font-size: ${variables.FONT_SIZE.SMALL};
+    color: ${({ theme }) => theme.contentSecondary};
+    ${typography['body-sm']}
     text-align: center;
 `;
 
@@ -61,11 +43,14 @@ interface TransactionSummaryProps {
 }
 
 export const TransactionSummary = ({ account }: TransactionSummaryProps) => {
-    const selectedRange = useSelector(state => state.wallet.graph.selectedRange);
-    const localCurrency = useSelector(selectLocalCurrency);
-    const dispatch = useDispatch();
+    const selectedRange = useSelector(selectGraphSelectedRange);
+    const graph = useSelector(selectGraph);
 
-    const intervalGraphData = dispatch(getGraphDataForInterval({ account }));
+    const baseCurrencyCode = useSelector(selectBaseCurrency);
+    const { dispatch } = useServices(injectDispatch);
+
+    const intervalGraphData = getGraphDataForInterval({ account, graph });
+    const isGraphDataLoaded = intervalGraphData.length > 0;
     const data = intervalGraphData[0]?.data
         ? aggregateBalanceHistory(intervalGraphData, selectedRange.groupBy, 'account')
         : [];
@@ -77,9 +62,9 @@ export const TransactionSummary = ({ account }: TransactionSummaryProps) => {
     const minMaxValues = getMinMaxValueFromData(
         data,
         'account',
-        d => d.sent,
-        d => d.received,
-        d => d.balance,
+        d => new BigNumber(d.sent),
+        d => new BigNumber(d.received),
+        d => new BigNumber(d.balance),
     );
 
     const xTicks =
@@ -90,64 +75,92 @@ export const TransactionSummary = ({ account }: TransactionSummaryProps) => {
     // Interval shown in InfoCard below the graph
     // For 'all' range pick first and last datapoint's timestamps
     // For other intervals do same date calculation as in calcTicks func
-    const dataInterval: [number, number] =
+    const dataInterval: [number | undefined, number | undefined] =
         selectedRange.label === 'all'
             ? [
                   intervalGraphData[0]?.data[0]?.time,
-                  intervalGraphData[0]?.data[intervalGraphData[0].data.length - 1]?.time,
+                  intervalGraphData[0]?.data[(intervalGraphData[0]?.data.length ?? 1) - 1]?.time,
               ]
             : [getUnixTime(selectedRange.startDate), getUnixTime(selectedRange.endDate)];
 
-    const onRefresh = () => dispatch(updateGraphData([account]));
-    const onSelectedRange = () => dispatch(updateGraphData([account], { newAccountsOnly: true }));
+    const onRefresh = (abortSignal?: AbortSignal) =>
+        dispatch(
+            updateGraphDataThunk({
+                accounts: [account],
+                abortSignal,
+            }),
+        ).unwrap();
+    const onSelectedRange = () =>
+        dispatch(
+            updateGraphDataThunk({
+                accounts: [account],
+            }),
+        );
 
     return (
-        <Wrapper>
-            <Actions>
-                <GraphRangeSelector onSelectedRange={onSelectedRange} align="bottom-left" />
-                <TransactionSummaryDropdown />
-            </Actions>
-            <ContentWrapper>
-                {error ? (
-                    <GraphWrapper>
-                        <ErrorMessage>
-                            <Translation id="TR_COULD_NOT_RETRIEVE_DATA" />
-                            <Button onClick={onRefresh} icon="REFRESH" variant="tertiary">
-                                <Translation id="TR_RETRY" />
-                            </Button>
-                        </ErrorMessage>
-                    </GraphWrapper>
-                ) : (
-                    <HiddenPlaceholder enforceIntensity={8}>
-                        <GraphWrapper>
-                            <TransactionsGraph
-                                hideToolbar
-                                variant="one-asset"
-                                xTicks={xTicks}
-                                account={account}
+        <Column alignItems="stretch" gap={20}>
+            {error ? (
+                <Card paddingType="none">
+                    <Column alignItems="stretch" padding={24} gap={16}>
+                        <Row height={320} overflow="visible" alignItems="stretch">
+                            <ErrorMessage>
+                                <Translation id="TR_COULD_NOT_RETRIEVE_DATA" />
+                                <Button
+                                    onClick={() => onRefresh()}
+                                    iconLeft={RepeatIcon}
+                                    intent="neutral"
+                                    priority="secondary"
+                                >
+                                    <Translation id="TR_RETRY" />
+                                </Button>
+                            </ErrorMessage>
+                        </Row>
+                        <GraphRangeSelector
+                            onSelectedRange={onSelectedRange}
+                            isLoading={isLoading}
+                        />
+                    </Column>
+                </Card>
+            ) : (
+                <HiddenPlaceholder enforceIntensity={8}>
+                    <Card overflow="visible" paddingType="none">
+                        <Column alignItems="stretch" padding={24} gap={16}>
+                            <Row height={320} overflow="visible" alignItems="stretch">
+                                <TransactionsGraphLoader
+                                    variant="one-asset"
+                                    xTicks={xTicks}
+                                    account={account}
+                                    isLoading={isLoading}
+                                    data={data}
+                                    minMaxValues={[
+                                        minMaxValues[0].toNumber(),
+                                        minMaxValues[1].toNumber(),
+                                    ]}
+                                    localCurrency={baseCurrencyCode}
+                                    onRefresh={onRefresh}
+                                    selectedRange={selectedRange}
+                                    receivedValueFn={entry => entry.received}
+                                    sentValueFn={entry => entry.sent}
+                                    balanceValueFn={entry => entry.balance}
+                                />
+                            </Row>
+                            <GraphRangeSelector
+                                onSelectedRange={onSelectedRange}
                                 isLoading={isLoading}
-                                data={data}
-                                minMaxValues={minMaxValues}
-                                localCurrency={localCurrency}
-                                onRefresh={onRefresh}
-                                selectedRange={selectedRange}
-                                receivedValueFn={data => data.received}
-                                sentValueFn={data => data.sent}
-                                balanceValueFn={data => data.balance}
                             />
-                        </GraphWrapper>
-                    </HiddenPlaceholder>
-                )}
-
-                <SummaryCards
-                    selectedRange={selectedRange}
-                    dataInterval={dataInterval}
-                    data={data}
-                    localCurrency={localCurrency}
-                    symbol={account.symbol}
-                    isLoading={isLoading}
-                />
-            </ContentWrapper>
-        </Wrapper>
+                        </Column>
+                    </Card>
+                </HiddenPlaceholder>
+            )}
+            <SummaryCards
+                selectedRange={selectedRange}
+                dataInterval={dataInterval}
+                data={data}
+                localCurrency={baseCurrencyCode}
+                account={account}
+                isLoading={isLoading}
+                isGraphDataLoaded={isGraphDataLoaded}
+            />
+        </Column>
     );
 };

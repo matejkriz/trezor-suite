@@ -1,0 +1,960 @@
+import { spawn, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
+import { getWeakRandomInt, scheduleAction, unique } from '@trezor/utils';
+
+import { error, log, output, printProblemSummary, warn } from '../logger';
+import { githubRunLink, postSlackMessage } from '../slack';
+import type { CoverageIndex } from '../testCoverage/types';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type Priority = 'high' | 'medium' | 'low';
+
+interface TestRecommendation {
+    test: string;
+    priority: Priority;
+    reasoning: string;
+    related_changes: string[];
+}
+
+interface SelectionResult {
+    changed_files: string[];
+    uncovered_changes: string[];
+    recommendations: TestRecommendation[];
+    summary: string;
+}
+
+interface PromptParts {
+    /** Large semi-stable blob — the filtered LLM analysis. */
+    analysisPart: string;
+    /** Small dynamic blob — changed files, coverage mapping, instructions. */
+    taskPart: string;
+}
+
+interface TestMatchByFile {
+    changedFile: string;
+    tests: string[];
+}
+
+interface ClaudeCliEnvelope {
+    is_error?: boolean;
+    result?: string;
+    structured_output?: Omit<SelectionResult, 'changed_files'>;
+}
+
+interface OpenRouterCompletion {
+    id?: string;
+    choices?: {
+        finish_reason?: string;
+        native_finish_reason?: string;
+        message?: {
+            tool_calls?: { function?: { name?: string; arguments?: string } }[];
+        };
+    }[];
+    usage?: { completion_tokens?: number };
+}
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const COVERAGE_INDEX_URL = 'https://dev.suite.sldev.cz/coverage/e2e/index.json';
+const LLM_ANALYSIS_URL = 'https://dev.suite.sldev.cz/coverage/e2e/llm-analysis.json';
+const DEFAULT_COVERAGE_MAP_DIR = 'coverage-map';
+const DEFAULT_INDEX_FILE = `${DEFAULT_COVERAGE_MAP_DIR}/index.json`;
+const DEFAULT_LLM_ANALYSIS_FILE = `${DEFAULT_COVERAGE_MAP_DIR}/llm-analysis.json`;
+
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const OPENROUTER_MODEL = 'moonshotai/kimi-k2.7-code';
+// Pinned to the cheaper (int4) tag of the model author's own endpoint — the only provider this account's OpenRouter privacy settings currently allow for this model.
+const OPENROUTER_PROVIDER_ORDER = ['moonshotai/int4'];
+const OPENROUTER_MAX_TOKENS = 49152;
+
+const ALLOWED_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.css', '.json']);
+
+/**
+ * Patterns for files that should be excluded from consideration even if their extension matches.
+ * Lockfiles, markdown, and non-app config files.
+ */
+const EXCLUDED_PATTERNS = [
+    /yarn\.lock$/,
+    /package-lock\.json$/,
+    /pnpm-lock\.yaml$/,
+    /\.md$/,
+    /\.config\.(ts|js|mjs|cjs)$/, // generic config files — app configs are matched below
+];
+
+/**
+ * App-level config files that SHOULD be included despite matching *.config.ts.
+ * These directly affect runtime app behaviour.
+ */
+const APP_CONFIG_ALLOWLIST = [/\/app\.config\.(ts|js)$/, /\/next\.config\.(ts|js|mjs)$/];
+
+const OUTPUT_JSON_SCHEMA = JSON.stringify({
+    type: 'object',
+    properties: {
+        recommendations: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    test: { type: 'string' },
+                    priority: { type: 'string', enum: ['high', 'medium', 'low'] },
+                    reasoning: { type: 'string' },
+                    related_changes: { type: 'array', items: { type: 'string' } },
+                },
+                required: ['test', 'priority', 'reasoning', 'related_changes'],
+            },
+        },
+        summary: { type: 'string' },
+        uncovered_changes: { type: 'array', items: { type: 'string' } },
+    },
+    required: ['recommendations', 'summary', 'uncovered_changes'],
+});
+
+// ---------------------------------------------------------------------------
+// Usage
+// ---------------------------------------------------------------------------
+
+const printUsage = (): void => {
+    log(
+        [
+            'Usage: yarn workspace @trezor/e2e-utils select-tests-llm [options]',
+            '',
+            'Uses git diff origin/develop...HEAD to find changed files, maps them to E2E',
+            'tests via the coverage index, downloads the LLM test analysis, then asks',
+            'an LLM to recommend which tests to run and at what priority.',
+            '',
+            'Options:',
+            '  --api-key, -k <key>        OpenRouter API key. Overrides the OPENROUTER_API_KEY',
+            '                             env variable. When provided, uses OpenRouter (Kimi',
+            '                             K2.7 Code) instead of the local Claude Code CLI.',
+            `  --coverage-map <file>      Path to the coverage index JSON. Default: ${DEFAULT_INDEX_FILE}`,
+            `  --llm-analysis <file>      Path to the LLM analysis JSON. Default: ${DEFAULT_LLM_ANALYSIS_FILE}`,
+            '  --head-ref <ref>           Git ref for the PR head. Default: HEAD. Use pr-head',
+            '                             when running from a trusted base branch checkout.',
+            '  --help, -h                 Show this help message and exit.',
+            '',
+            'Output:',
+            '  JSON object with:',
+            '    changed_files      — filtered list of changed source files',
+            '    recommendations    — tests sorted by priority (high/medium/low) with reasoning',
+            '    summary            — overall risk and testing strategy',
+            '    uncovered_changes  — changed files with no known test coverage',
+            '',
+            'Prerequisites (CLI mode, default):',
+            '  claude CLI must be installed and authenticated (run `claude` to verify).',
+            '',
+            'Prerequisites (API mode):',
+            '  Set OPENROUTER_API_KEY env variable or pass --api-key <key>.',
+            '',
+            'Examples:',
+            '  # Default (uses local Claude Code CLI):',
+            '  yarn workspace @trezor/e2e-utils select-tests-llm',
+            '',
+            '  # Using the OpenRouter API:',
+            '  OPENROUTER_API_KEY=sk-or-... yarn workspace @trezor/e2e-utils select-tests-llm',
+            '',
+            '  # Pre-downloaded files:',
+            '  yarn workspace @trezor/e2e-utils select-tests-llm \\',
+            '    --coverage-map coverage-map/index.json \\',
+            '    --llm-analysis coverage-map/llm-analysis.json',
+        ].join('\n'),
+    );
+};
+
+// ---------------------------------------------------------------------------
+// File filtering
+// ---------------------------------------------------------------------------
+
+const isAllowedFile = (filePath: string): boolean => {
+    const ext = path.extname(filePath);
+    if (!ALLOWED_EXTENSIONS.has(ext)) return false;
+
+    const isAppConfig = APP_CONFIG_ALLOWLIST.some(re => re.test(filePath));
+    if (isAppConfig) return true;
+
+    const isExcluded = EXCLUDED_PATTERNS.some(re => re.test(filePath));
+
+    return !isExcluded;
+};
+
+// ---------------------------------------------------------------------------
+// Git diff
+// ---------------------------------------------------------------------------
+
+const getChangedFiles = (headRef = 'HEAD'): string[] => {
+    const result = spawnSync('git', ['diff', `origin/develop...${headRef}`, '--name-only'], {
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    if (result.error) {
+        throw new Error(`Failed to run git diff: ${result.error.message}`);
+    }
+    if (result.status !== 0) {
+        throw new Error(`git diff exited with status ${result.status}:\n${result.stderr}`);
+    }
+
+    const files = result.stdout
+        .split('\n')
+        .map((l: string) => l.trim())
+        .filter((l: string) => l.length > 0);
+
+    // Deduplicate
+    return unique(files).filter(isAllowedFile);
+};
+
+// ---------------------------------------------------------------------------
+// Remote file download with etag / md5 freshness check
+// ---------------------------------------------------------------------------
+
+const downloadIfStale = async (url: string, localFile: string): Promise<void> => {
+    const dir = path.dirname(localFile);
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+
+    if (fs.existsSync(localFile)) {
+        try {
+            const localMd5 = createHash('md5').update(fs.readFileSync(localFile)).digest('hex');
+            const head = await fetch(url, { method: 'HEAD' });
+            if (head.ok) {
+                const remoteEtag = head.headers.get('etag')?.replace(/"/g, '');
+                if (localMd5 === remoteEtag) {
+                    log(`${path.basename(localFile)} is up to date, skipping download.`);
+
+                    return;
+                }
+            } else {
+                log(
+                    `Freshness check for ${path.basename(localFile)} failed (${head.status}), using existing local file.`,
+                );
+
+                return;
+            }
+        } catch (err) {
+            log(
+                `Freshness check for ${path.basename(localFile)} failed (${err instanceof Error ? err.message : err}), using existing local file.`,
+            );
+
+            return;
+        }
+    }
+
+    log(`Downloading ${path.basename(localFile)} from ${url}...`);
+    const response = await fetch(url);
+    if (!response.ok) {
+        if (fs.existsSync(localFile)) {
+            log(
+                `Download failed (${response.status} ${response.statusText}), using existing local file.`,
+            );
+
+            return;
+        }
+        throw new Error(`Failed to download ${url}: ${response.status} ${response.statusText}`);
+    }
+    const content = await response.text();
+    fs.writeFileSync(localFile, content, 'utf8');
+    log(`${path.basename(localFile)} downloaded successfully.`);
+};
+
+// ---------------------------------------------------------------------------
+// Coverage-map lookup
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns per-file coverage data rather than a flat merged list.
+ * Keeping the changedFile→tests relationship intact lets the prompt reason about
+ * how "broad" each match is: a file that maps to many tests is likely a global
+ * utility, whereas one that maps to 1–2 tests is a targeted feature file.
+ */
+const selectTestsByChangedFiles = (
+    index: CoverageIndex,
+    changedFiles: string[],
+): { matchedByFile: TestMatchByFile[]; uncovered: string[] } => {
+    const matchedByFile: TestMatchByFile[] = [];
+    const uncovered: string[] = [];
+
+    for (const changedFile of changedFiles) {
+        const tests = index[changedFile];
+        if (tests && tests.length > 0) {
+            matchedByFile.push({ changedFile, tests: [...tests].sort() });
+        } else {
+            uncovered.push(changedFile);
+        }
+    }
+
+    matchedByFile.sort((a, b) => a.changedFile.localeCompare(b.changedFile));
+
+    return { matchedByFile, uncovered };
+};
+
+// ---------------------------------------------------------------------------
+// Analysis filtering
+// ---------------------------------------------------------------------------
+
+/**
+ * Extracts lowercase keywords from a list of file paths for source_hint matching.
+ * Splits on path separators, hyphens, and underscores; drops short segments.
+ */
+const extractKeywords = (filePaths: string[]): Set<string> => {
+    const keywords = new Set<string>();
+    for (const filePath of filePaths) {
+        for (const segment of filePath.split(/[/\-_]/)) {
+            const base = segment.replace(/\.[^.]+$/, '');
+            if (base.length > 3) keywords.add(base.toLowerCase());
+        }
+    }
+
+    return keywords;
+};
+
+/**
+ * Reduces the full llmAnalysis to only the entries relevant to this PR:
+ * - Tests matched by static coverage (always included).
+ * - Tests whose source_hints contain a keyword from uncovered changed files
+ *   (best-effort inference for files with no static coverage data).
+ */
+const filterLlmAnalysis = (
+    llmAnalysis: Record<string, unknown>,
+    matchedTests: Set<string>,
+    uncoveredFiles: string[],
+): Record<string, unknown> => {
+    const filtered: Record<string, unknown> = {};
+
+    for (const testPath of matchedTests) {
+        if (llmAnalysis[testPath] !== undefined) {
+            filtered[testPath] = llmAnalysis[testPath];
+        }
+    }
+
+    if (uncoveredFiles.length > 0) {
+        const keywords = extractKeywords(uncoveredFiles);
+        const keywordList = [...keywords];
+        for (const [testPath, analysis] of Object.entries(llmAnalysis)) {
+            if (filtered[testPath] !== undefined) continue;
+            const rawHints = (analysis as Record<string, unknown>)?.source_hints;
+            const hints = Array.isArray(rawHints) ? (rawHints as string[]) : [];
+            const hintText = hints.join(' ').toLowerCase();
+            if (keywordList.some(kw => hintText.includes(kw))) {
+                filtered[testPath] = analysis;
+            }
+        }
+    }
+
+    return filtered;
+};
+
+// ---------------------------------------------------------------------------
+// Prompt
+// ---------------------------------------------------------------------------
+
+/** Maximum number of test names shown per changed file before truncating. */
+const MAX_TESTS_SHOWN_PER_FILE = 20;
+
+const buildPromptParts = (
+    changedFiles: string[],
+    matchedByFile: TestMatchByFile[],
+    uncoveredFiles: string[],
+    filteredAnalysis: Record<string, unknown>,
+): PromptParts => {
+    const coverageMappingSection =
+        matchedByFile.length === 0
+            ? '(none — no static mapping available for these changes)'
+            : matchedByFile
+                  .map(({ changedFile, tests }) => {
+                      const shown = tests.slice(0, MAX_TESTS_SHOWN_PER_FILE);
+                      const extra = tests.length - shown.length;
+                      const lines = [
+                          `**${changedFile}** → ${tests.length} test${tests.length === 1 ? '' : 's'}`,
+                          ...shown.map(t => `  - ${t}`),
+                          ...(extra > 0 ? [`  … and ${extra} more`] : []),
+                      ];
+
+                      return lines.join('\n');
+                  })
+                  .join('\n\n');
+
+    const analysisCount = Object.keys(filteredAnalysis).length;
+    const analysisPart = `### LLM analysis of ${analysisCount} candidate test${analysisCount === 1 ? '' : 's'}
+Each entry describes what a test does: its user-facing \`behaviors\`, \`entry_points\`, \`key_assertions\`, and \`source_hints\` (which parts of the app it touches).
+
+\`\`\`json
+${JSON.stringify(filteredAnalysis, null, 2)}
+\`\`\``;
+
+    const taskPart = `You are helping a CI/CD system identify which Playwright E2E tests to run based on code changes in a pull request.
+
+## Your goal
+Recommend the **minimal set of tests** that provides maximum confidence that the changed code works correctly, ranked by how critical each test is to run given these specific changes. Prefer a short, targeted list over broad coverage — running fewer, well-chosen tests is better than running everything.
+
+## Priority definitions
+- **high**: The test directly exercises functionality that was changed, or a regression here would be immediately user-visible and hard to catch otherwise. Run these unconditionally.
+- **medium**: The test covers functionality that meaningfully shares infrastructure, state, or user flows with the changed code. A regression is plausible but not certain.
+- **low**: Use this priority sparingly. Only assign **low** when there is a concrete, articulable reason the change could affect this specific test's behaviour — not merely because they share a common utility or component. When in doubt between **low** and omitting, **omit**.
+
+## Inputs
+
+### Changed source files (${changedFiles.length})
+${changedFiles.map(f => `- ${f}`).join('\n')}
+
+### Tests identified by static coverage mapping — per changed file
+
+Each changed file is listed with the tests that statically reference it, along with the total count.
+**A file that maps to many tests is very likely a broad global utility or shared component.**
+For such files, apply extra scrutiny: only recommend a test if you have specific evidence (from the LLM analysis above) that the change plausibly affects that test's own code path. Do not include a test just because it transitively imports the changed file.
+
+${coverageMappingSection}
+
+### Source files with no static coverage data (${uncoveredFiles.length})
+${uncoveredFiles.length > 0 ? uncoveredFiles.map(f => `- ${f}`).join('\n') : '(none)'}
+
+## Instructions
+1. For every test you consider including, assign a **priority** and write a concise **reasoning** (1–3 sentences) that explains *why* this test matters given the specific changed files. Reasoning must be concrete — avoid generic justifications like "shares a utility with the changed file".
+2. Apply the broad-utility heuristic: if a changed file maps to ≥ 10 tests, treat it as a global dependency. Only include those tests at **high** or **medium** if you have specific evidence from the LLM analysis that the change affects that test's behaviour directly. Demote or omit the rest.
+3. If static coverage mapping found no tests but you can infer from the LLM analysis that certain tests likely cover the changed functionality, include those with appropriate priority and note that they were inferred rather than statically mapped.
+4. Populate **related_changes** with the subset of changed files that are most relevant to each test.
+5. In **uncovered_changes** list the changed files that have no known test coverage at all (neither static nor inferred).
+6. Write a short **summary** (2–4 sentences) describing the overall risk profile of this change set and the recommended test strategy.
+
+## Output format
+Return a single JSON object — no prose outside the JSON. The schema is:
+\`\`\`json
+{
+  "recommendations": [
+    {
+      "test": "<relative path to test file>",
+      "priority": "high" | "medium" | "low",
+      "reasoning": "<why this test is relevant>",
+      "related_changes": ["<changed file>", ...]
+    }
+  ],
+  "summary": "<overall risk assessment and testing strategy>",
+  "uncovered_changes": ["<changed file with no coverage>", ...]
+}
+\`\`\`
+
+Sort recommendations by priority (high → medium → low), then alphabetically within each tier.`;
+
+    return { analysisPart, taskPart };
+};
+
+// ---------------------------------------------------------------------------
+// LLM invocation — Claude Code CLI
+// ---------------------------------------------------------------------------
+
+const selectTestsViaCli = ({
+    analysisPart,
+    taskPart,
+}: PromptParts): Promise<Omit<SelectionResult, 'changed_files'>> =>
+    new Promise((resolve, reject) => {
+        const proc = spawn(
+            'claude',
+            ['--print', '--output-format', 'json', '--json-schema', OUTPUT_JSON_SCHEMA],
+            { stdio: ['pipe', 'pipe', 'pipe'] },
+        );
+
+        if (!proc.pid) {
+            reject(
+                new Error(
+                    'Failed to start claude CLI. Is Claude Code installed? Run: npm install -g @anthropic-ai/claude-code',
+                ),
+            );
+
+            return;
+        }
+
+        // Stream Claude's progress output (it writes status lines to stderr)
+        proc.stderr.on('data', (chunk: Buffer) => {
+            process.stderr.write(chunk);
+        });
+
+        let stdout = '';
+        proc.stdout.on('data', (chunk: Buffer) => {
+            stdout += chunk.toString();
+        });
+
+        proc.on('error', err => {
+            reject(
+                new Error(
+                    `Failed to run claude CLI: ${err.message}\nIs Claude Code installed? Run: npm install -g @anthropic-ai/claude-code`,
+                ),
+            );
+        });
+
+        proc.on('close', code => {
+            if (code !== 0) {
+                reject(new Error(`claude exited with status ${code}`));
+
+                return;
+            }
+
+            let envelope: ClaudeCliEnvelope;
+            try {
+                envelope = JSON.parse(stdout) as ClaudeCliEnvelope;
+            } catch {
+                reject(new Error(`claude returned unexpected output:\n${stdout}`));
+
+                return;
+            }
+
+            if (envelope.is_error) {
+                reject(new Error(`claude reported an error:\n${envelope.result}`));
+
+                return;
+            }
+            if (!envelope.structured_output) {
+                reject(new Error(`claude envelope missing structured_output:\n${stdout}`));
+
+                return;
+            }
+
+            resolve(envelope.structured_output);
+        });
+
+        proc.stdin.end(`${analysisPart}\n\n${taskPart}`);
+    });
+
+// ---------------------------------------------------------------------------
+// LLM invocation — OpenRouter API (Kimi K2.7 Code)
+// ---------------------------------------------------------------------------
+
+// Forced tool_choice errors on this model ("incompatible with thinking enabled") — auto + this instruction is the reliable alternative.
+const MUST_CALL_TOOL_INSTRUCTION =
+    '\n\nYou MUST call the `recommend_tests` function with your recommendation. Do not respond with plain text.';
+
+const RECOMMEND_TESTS_TOOL = {
+    type: 'function' as const,
+    function: {
+        name: 'recommend_tests',
+        description:
+            'Produce a structured recommendation of which E2E tests to run given a set of changed source files.',
+        parameters: {
+            type: 'object' as const,
+            properties: {
+                recommendations: {
+                    type: 'array',
+                    description: 'Ordered list of test recommendations (high → medium → low)',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            test: {
+                                type: 'string',
+                                description: 'Relative path to the test file',
+                            },
+                            priority: {
+                                type: 'string',
+                                enum: ['high', 'medium', 'low'],
+                                description: 'How critical this test is to run',
+                            },
+                            reasoning: {
+                                type: 'string',
+                                description:
+                                    'Why this test matters given the specific changes (1–3 sentences)',
+                            },
+                            related_changes: {
+                                type: 'array',
+                                items: { type: 'string' },
+                                description: 'Subset of changed files most relevant to this test',
+                            },
+                        },
+                        required: ['test', 'priority', 'reasoning', 'related_changes'],
+                    },
+                },
+                summary: {
+                    type: 'string',
+                    description:
+                        'Overall risk assessment and recommended testing strategy (2–4 sentences)',
+                },
+                uncovered_changes: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Changed files that have no known test coverage',
+                },
+            },
+            required: ['recommendations', 'summary', 'uncovered_changes'],
+        },
+    },
+};
+
+class OpenRouterHttpError extends Error {
+    constructor(
+        public readonly status: number,
+        public readonly body: string,
+        message: string,
+    ) {
+        super(message);
+    }
+}
+
+const logDiagnostic = (fields: Record<string, unknown>): void => {
+    warn(`SELECTOR_DIAG ${JSON.stringify(fields)}`);
+};
+
+const selectTestsViaApi = async (
+    { analysisPart, taskPart }: PromptParts,
+    apiKey: string,
+): Promise<Omit<SelectionResult, 'changed_files'>> => {
+    const promptChars = analysisPart.length + taskPart.length;
+    const startedAt = Date.now();
+
+    let response: Response;
+    try {
+        response = await fetch(OPENROUTER_URL, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                model: OPENROUTER_MODEL,
+                max_tokens: OPENROUTER_MAX_TOKENS,
+                provider: { order: OPENROUTER_PROVIDER_ORDER, allow_fallbacks: false },
+                tools: [RECOMMEND_TESTS_TOOL],
+                tool_choice: 'auto',
+                messages: [
+                    {
+                        role: 'user',
+                        content: `${analysisPart}\n\n${taskPart}${MUST_CALL_TOOL_INSTRUCTION}`,
+                    },
+                ],
+            }),
+        });
+    } catch (err) {
+        // The socket died before a complete response arrived — never reaches the parser below.
+        const { cause } = err as { cause?: { code?: string } };
+        logDiagnostic({
+            stage: 'transport',
+            elapsedMs: Date.now() - startedAt,
+            errorCode: cause?.code ?? 'unknown',
+            message: err instanceof Error ? err.message : String(err),
+            promptChars,
+        });
+        throw err;
+    }
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new OpenRouterHttpError(
+            response.status,
+            errorText,
+            `OpenRouter API returned ${response.status}:\n${errorText}`,
+        );
+    }
+
+    // Read as text first: response.json() would hide a truncated body behind a bare SyntaxError.
+    const rawBody = await response.text();
+    let completion: OpenRouterCompletion;
+    try {
+        completion = JSON.parse(rawBody) as OpenRouterCompletion;
+    } catch {
+        logDiagnostic({
+            stage: 'parse',
+            elapsedMs: Date.now() - startedAt,
+            status: response.status,
+            bytesReceived: Buffer.byteLength(rawBody, 'utf8'),
+            contentLength: response.headers.get('content-length'),
+            transferEncoding: response.headers.get('transfer-encoding'),
+            // Dump every header: we do not yet know which one is diagnostic here.
+            headers: Object.fromEntries(response.headers.entries()),
+            bodyHead: rawBody.slice(0, 300),
+            bodyTail: rawBody.slice(-300),
+            promptChars,
+        });
+        throw new Error(
+            `OpenRouter returned HTTP 200 with an unparseable body (${Buffer.byteLength(rawBody, 'utf8')} bytes) — the response was truncated mid-generation.`,
+        );
+    }
+
+    // The generation id is the only handle for reconciling a call against OpenRouter billing.
+    log(`OpenRouter generation id: ${completion.id ?? '(absent)'}`);
+
+    const choice = completion.choices?.[0];
+
+    const isTruncated =
+        choice?.finish_reason === 'length' ||
+        choice?.native_finish_reason === 'length' ||
+        (completion.usage?.completion_tokens ?? 0) >= OPENROUTER_MAX_TOKENS;
+
+    if (isTruncated) {
+        throw new Error(
+            `OpenRouter response was truncated at max_tokens (${OPENROUTER_MAX_TOKENS}) — the recommendation set was too large to fit. Increase OPENROUTER_MAX_TOKENS or narrow the candidate tests.`,
+        );
+    }
+
+    const toolCall = choice?.message?.tool_calls?.find(
+        tc => tc.function?.name === 'recommend_tests',
+    );
+    if (!toolCall?.function?.arguments) {
+        logDiagnostic({
+            stage: 'no-tool-call',
+            elapsedMs: Date.now() - startedAt,
+            finishReason: choice?.finish_reason ?? null,
+            generationId: completion.id ?? null,
+            promptChars,
+        });
+        throw new Error(
+            `OpenRouter did not return a recommend_tests tool call:\n${JSON.stringify(choice, null, 2)}`,
+        );
+    }
+
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(toolCall.function.arguments);
+    } catch {
+        throw new Error(
+            `OpenRouter tool call arguments were not valid JSON:\n${toolCall.function.arguments}`,
+        );
+    }
+
+    if (
+        typeof parsed !== 'object' ||
+        parsed === null ||
+        !Array.isArray((parsed as Record<string, unknown>).recommendations) ||
+        typeof (parsed as Record<string, unknown>).summary !== 'string'
+    ) {
+        throw new Error(
+            `OpenRouter returned malformed tool arguments:\n${JSON.stringify(parsed, null, 2)}`,
+        );
+    }
+
+    return parsed as Omit<SelectionResult, 'changed_files'>;
+};
+
+// ---------------------------------------------------------------------------
+// Retries
+// ---------------------------------------------------------------------------
+
+const RETRY_DELAYS_MS = [1_000, 2_000, 3_000, 4_000];
+
+const buildAttempts = () => [
+    ...RETRY_DELAYS_MS.map(delay => ({ gap: getWeakRandomInt(delay, delay * 2) })),
+    {},
+];
+
+// Rate limits and 5xx are rejected at the gateway in under a second, so retrying them is nearly free
+const isRetryableError = (err: unknown): boolean =>
+    err instanceof OpenRouterHttpError && (err.status === 429 || err.status >= 500);
+
+const selectTestsViaApiWithRetry = (
+    promptParts: PromptParts,
+    apiKey: string,
+): Promise<Omit<SelectionResult, 'changed_files'>> =>
+    scheduleAction(() => selectTestsViaApi(promptParts, apiKey), {
+        attempts: buildAttempts(),
+        // Returning the error stops the loop and rethrows it; returning nothing waits and retries.
+        attemptFailureHandler: err => {
+            if (!isRetryableError(err)) return err;
+
+            warn(`OpenRouter attempt failed, retrying: ${err.message.split('\n')[0]}`);
+        },
+    });
+
+const isInsufficientCreditsError = (err: unknown): boolean =>
+    err instanceof OpenRouterHttpError && err.status === 402;
+
+// ---------------------------------------------------------------------------
+// Degraded output and alerting
+// ---------------------------------------------------------------------------
+
+// An empty recommendation set makes the caller run everything. The reason goes in `summary`
+// because that is the only field the PR-description action renders.
+const emitSkippedSelection = (changedFiles: string[], reason: string): void => {
+    output(
+        JSON.stringify(
+            {
+                changed_files: changedFiles,
+                recommendations: [],
+                summary: `LLM test selector skipped: ${reason}. Falling back to the full e2e suite.`,
+                uncovered_changes: [],
+            } satisfies SelectionResult,
+            null,
+            2,
+        ),
+    );
+};
+
+const notifySelectorFailure = async (headline: string): Promise<void> => {
+    const runLink = githubRunLink('open run');
+    // Local run skips Slack notification
+    if (runLink === undefined) return;
+
+    await postSlackMessage(
+        process.env.SLACK_WEBHOOK,
+        `❌ *E2E LLM test selector* — ${headline} · ${runLink}`,
+    );
+};
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
+
+const main = async () => {
+    const args = process.argv.slice(2);
+
+    let apiKey: string | undefined;
+    let indexFile = DEFAULT_INDEX_FILE;
+    let llmAnalysisFile = DEFAULT_LLM_ANALYSIS_FILE;
+    let headRef = 'HEAD';
+
+    for (let i = 0; i < args.length; i++) {
+        const nextArg = args[i + 1];
+        if ((args[i] === '--api-key' || args[i] === '-k') && nextArg) {
+            apiKey = nextArg;
+            i++;
+        } else if (args[i] === '--coverage-map' && nextArg) {
+            indexFile = nextArg;
+            i++;
+        } else if (args[i] === '--llm-analysis' && nextArg) {
+            llmAnalysisFile = nextArg;
+            i++;
+        } else if (args[i] === '--head-ref' && nextArg) {
+            headRef = nextArg;
+            i++;
+        }
+    }
+
+    // Fall back to env variable
+    if (!apiKey && process.env.OPENROUTER_API_KEY) {
+        apiKey = process.env.OPENROUTER_API_KEY;
+    }
+
+    if (args.includes('--help') || args.includes('-h')) {
+        printUsage();
+        process.exit(0);
+    }
+
+    // 1. Get changed files from git
+    log(`Collecting changed files from git diff origin/develop...${headRef} --name-only`);
+    let changedFiles: string[];
+    try {
+        changedFiles = getChangedFiles(headRef);
+    } catch (err) {
+        error(err instanceof Error ? err.message : String(err));
+        process.exit(1);
+    }
+
+    if (changedFiles.length === 0) {
+        log('No relevant changed files found (all filtered out or no diff vs origin/develop).');
+        output(
+            JSON.stringify(
+                {
+                    changed_files: [],
+                    recommendations: [],
+                    summary: 'No relevant source file changes detected against origin/develop.',
+                    uncovered_changes: [],
+                } satisfies SelectionResult,
+                null,
+                2,
+            ),
+        );
+        process.exit(0);
+    }
+    log(`Found ${changedFiles.length} changed file(s) after filtering.`);
+
+    // GitHub withholds repository secrets from fork pull requests. Skipping deliberately
+    if (!apiKey && process.env.GITHUB_ACTIONS === 'true') {
+        log('No OpenRouter API key available (fork pull request); running all e2e tests.');
+        emitSkippedSelection(changedFiles, 'no API key available (fork pull request)');
+        process.exit(0);
+    }
+
+    // 2. Download / refresh coverage index
+    try {
+        await downloadIfStale(COVERAGE_INDEX_URL, indexFile);
+    } catch (err) {
+        error(`Could not obtain coverage index: ${err instanceof Error ? err.message : err}`);
+        process.exit(1);
+    }
+
+    if (!fs.existsSync(indexFile)) {
+        error(`Coverage index not found at ${indexFile}.`);
+        process.exit(1);
+    }
+
+    // 3. Download / refresh LLM analysis
+    try {
+        await downloadIfStale(LLM_ANALYSIS_URL, llmAnalysisFile);
+    } catch (err) {
+        error(`Could not obtain LLM analysis: ${err instanceof Error ? err.message : err}`);
+        process.exit(1);
+    }
+
+    if (!fs.existsSync(llmAnalysisFile)) {
+        error(`LLM analysis not found at ${llmAnalysisFile}.`);
+        process.exit(1);
+    }
+
+    // 4. Map changed files → tests via coverage index
+    const index: CoverageIndex = JSON.parse(fs.readFileSync(indexFile, 'utf8'));
+    const llmAnalysis: Record<string, unknown> = JSON.parse(
+        fs.readFileSync(llmAnalysisFile, 'utf8'),
+    );
+
+    const { matchedByFile, uncovered: uncoveredFiles } = selectTestsByChangedFiles(
+        index,
+        changedFiles,
+    );
+    const uniqueMatchedTests = new Set(matchedByFile.flatMap(({ tests }) => tests));
+    log(
+        `Coverage mapping: ${uniqueMatchedTests.size} unique test(s) matched across ${matchedByFile.length} of ${changedFiles.length} changed file(s) with coverage data, ${uncoveredFiles.length} file(s) with no coverage data.`,
+    );
+
+    // 5. Filter analysis to relevant tests, build prompt parts, call Claude
+    const filteredAnalysis = filterLlmAnalysis(llmAnalysis, uniqueMatchedTests, uncoveredFiles);
+    log(
+        `LLM analysis filtered: ${Object.keys(filteredAnalysis).length} of ${Object.keys(llmAnalysis).length} test entries included in prompt.`,
+    );
+
+    const promptParts = buildPromptParts(
+        changedFiles,
+        matchedByFile,
+        uncoveredFiles,
+        filteredAnalysis,
+    );
+
+    log(apiKey ? 'Calling OpenRouter (Kimi K2.7 Code)...' : 'Calling local Claude Code CLI...');
+
+    let llmResult: Omit<SelectionResult, 'changed_files'>;
+    try {
+        llmResult = apiKey
+            ? await selectTestsViaApiWithRetry(promptParts, apiKey)
+            : await selectTestsViaCli(promptParts);
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+
+        if (isInsufficientCreditsError(err)) {
+            warn(`LLM test selection skipped (credits exhausted); running all e2e tests.`);
+            await notifySelectorFailure('OpenRouter credit balance exhausted');
+            emitSkippedSelection(changedFiles, 'OpenRouter credit balance exhausted');
+            process.exit(0);
+        }
+
+        error(`LLM invocation failed: ${message}`);
+        await notifySelectorFailure('LLM invocation failed');
+        process.exit(1);
+    }
+
+    // 6. Emit result
+    const result: SelectionResult = {
+        changed_files: changedFiles,
+        ...llmResult,
+    };
+
+    output(JSON.stringify(result, null, 2));
+};
+
+process.on('exit', () => {
+    printProblemSummary();
+});
+
+main().catch(err => {
+    error('[FATAL]', err);
+    process.exit(1);
+});

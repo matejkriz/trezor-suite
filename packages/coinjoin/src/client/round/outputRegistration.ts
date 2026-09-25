@@ -1,14 +1,14 @@
-import { getWeakRandomId, arrayShuffle } from '@trezor/utils';
+import { arrayShuffle, getWeakRandomId, getWeakRandomInt } from '@trezor/utils';
 
+import { SessionPhase, WabiSabiProtocolErrorCode } from '../../enums';
+import type { AccountAddress } from '../../types/account';
+import type { AliceShape } from '../../types/alice';
 import * as coordinator from '../coordinator';
 import * as middleware from '../middleware';
-import { outputDecomposition, Bob } from './outputDecomposition';
-import type { Account } from '../Account';
-import type { Alice } from '../Alice';
-import type { CoinjoinRound, CoinjoinRoundOptions } from '../CoinjoinRound';
-import { AccountAddress } from '../../types';
+import { type Bob, outputDecomposition } from './outputDecomposition';
+import type { CoinjoinRoundOptions, CoinjoinRoundShape } from '../../types/round';
 import { scheduleDelay } from '../../utils/roundUtils';
-import { SessionPhase, WabiSabiProtocolErrorCode } from '../../enums';
+import type { Account } from '../Account';
 
 /**
  * RoundPhase: 2, OutputRegistration
@@ -21,7 +21,7 @@ import { SessionPhase, WabiSabiProtocolErrorCode } from '../../enums';
  */
 
 const registerOutput = async (
-    round: CoinjoinRound,
+    round: CoinjoinRoundShape,
     { accountKey, changeAddresses }: Account,
     { amountCredentials, vsizeCredentials }: Bob,
     assignedAddresses: AccountAddress[],
@@ -95,8 +95,10 @@ const registerOutput = async (
                         return tryToRegisterOutput(false);
                     }
                     if (error.errorCode === WabiSabiProtocolErrorCode.NotEnoughFunds) {
+                        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+                        const firstCred: (typeof amountCredentials)[number] = amountCredentials[0];
                         logger.error(
-                            `NotEnoughFunds. Amount: ${amountCredentials[0].Value} Delta: ${outputAmountCredentials.CredentialsRequest.Delta} FeeRate: ${roundParameters.MiningFeeRate}`,
+                            `NotEnoughFunds. Amount: ${firstCred.Value} Delta: ${outputAmountCredentials.CredentialsRequest.Delta} FeeRate: ${roundParameters.MiningFeeRate}`,
                         );
                     }
                 }
@@ -118,8 +120,8 @@ const registerOutput = async (
 };
 
 const readyToSign = (
-    { id, phaseDeadline }: CoinjoinRound,
-    input: Alice,
+    { id, phaseDeadline }: CoinjoinRoundShape,
+    input: AliceShape,
     { signal, coordinatorUrl }: CoinjoinRoundOptions,
 ) =>
     coordinator.readyToSign(id, input.registrationData!.AliceId, !!input.affiliationFlag, {
@@ -131,7 +133,7 @@ const readyToSign = (
     });
 
 export const outputRegistration = async (
-    round: CoinjoinRound,
+    round: CoinjoinRoundShape,
     accounts: Account[],
     options: CoinjoinRoundOptions,
 ) => {
@@ -160,7 +162,7 @@ export const outputRegistration = async (
                 const assignedAddresses: AccountAddress[] = [];
 
                 return Promise.all(
-                    arrayShuffle(outputs).map(output =>
+                    arrayShuffle(outputs, { randomInt: getWeakRandomInt }).map(output =>
                         registerOutput(round, account, output, assignedAddresses, options),
                     ),
                 );
@@ -170,7 +172,9 @@ export const outputRegistration = async (
         round.setSessionPhase(SessionPhase.AwaitingOthersOutputs);
         // inform coordinator that each registered input is ready to sign
         await Promise.all(
-            arrayShuffle(round.inputs).map(input => readyToSign(round, input, options)),
+            arrayShuffle(round.inputs, { randomInt: getWeakRandomInt }).map(input =>
+                readyToSign(round, input, options),
+            ),
         );
         logger.info(`Ready to sign ~~${round.id}~~`);
     } catch (error) {

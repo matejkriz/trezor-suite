@@ -1,0 +1,254 @@
+import { events, injectDesktopAnalytics } from '@suite/analytics';
+import { Translation } from '@suite/intl';
+import { gotoThunk } from '@suite/router';
+import { selectShouldAnimateLoadingSkeleton } from '@suite/ui-animations';
+import { type AssetFiatBalance } from '@suite-common/assets';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { selectCoinDefinitions } from '@suite-common/token-definitions';
+import { type Network, type NetworkSymbol } from '@suite-common/wallet-config';
+import { selectAnyAccountIsStakingActive, useDisplayBaseCurrency } from '@suite-common/wallet-core';
+import { type Account, type RatesByKey } from '@suite-common/wallet-types';
+import { type AmountUnit } from '@suite-common/wallet-utils';
+import type { BaseCurrencyCode } from '@trezor/blockchain-link-types';
+import { Card, Column, Icon, InfoItem, Note, Row, Skeleton, Text } from '@trezor/components';
+import { type TokenInfo } from '@trezor/connect';
+import { ArrowRightIcon, WarningIcon } from '@trezor/icons';
+
+import {
+    AmountUnitSwitchWrapper,
+    CoinBalance,
+    PriceTicker,
+    TrendTicker,
+} from 'src/components/suite';
+import { FiatHeader } from 'src/components/wallet/FiatHeader';
+import { useSelector } from 'src/hooks/suite';
+
+import { AssetActionButton } from '../AssetActionButton';
+import { handleTokensAndStakingData } from '../assetsViewUtils';
+import { AssetCardInfo, AssetCardInfoSkeleton } from './AssetCardInfo';
+import { AssetCardTokensAndStakingInfo } from './AssetCardTokensAndStakingInfo';
+
+type AmountComponentProps = {
+    failed: boolean;
+    cryptoValue: AmountUnit;
+    symbol: NetworkSymbol;
+    localCurrency: BaseCurrencyCode;
+    shallDisplayBaseCurrency: boolean;
+};
+
+const AmountComponent = ({ failed, cryptoValue, symbol, localCurrency }: AmountComponentProps) =>
+    !failed ? (
+        <Column gap={4}>
+            <Row data-testid={`@dashboard/asset/${symbol}/fiat-amount`}>
+                <FiatHeader
+                    symbol={symbol}
+                    amount={cryptoValue}
+                    size="medium"
+                    localCurrency={localCurrency}
+                />
+            </Row>
+            <Text typographyStyle="body-sm" intent="neutral" priority="secondary">
+                <AmountUnitSwitchWrapper symbol={symbol}>
+                    <CoinBalance value={cryptoValue} symbol={symbol} />
+                </AmountUnitSwitchWrapper>
+            </Text>
+        </Column>
+    ) : (
+        <Note intent="critical" icon={WarningIcon}>
+            <Translation id="TR_DASHBOARD_ASSET_FAILED" />
+        </Note>
+    );
+
+type AssetCardProps = {
+    network: Network;
+    failed: boolean;
+    cryptoValue: AmountUnit;
+    assetsFiatBalances: AssetFiatBalance[];
+    stakingAccounts: Account[];
+    assetTokens: TokenInfo[];
+    index?: number;
+    localCurrency: BaseCurrencyCode;
+    currentFiatRates?: RatesByKey;
+    accounts: Account[];
+    isStakeNetwork?: boolean;
+};
+
+export const AssetCard = ({
+    network,
+    failed,
+    cryptoValue,
+    assetsFiatBalances,
+    stakingAccounts,
+    assetTokens,
+    index,
+    localCurrency,
+    currentFiatRates,
+    accounts,
+    isStakeNetwork,
+}: AssetCardProps) => {
+    const { symbol } = network;
+    const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
+    const { shallDisplayBaseCurrency } = useDisplayBaseCurrency(symbol);
+
+    const handleCardClick = () => {
+        dispatch(
+            gotoThunk({
+                routeName: 'wallet-index',
+                params: {
+                    symbol,
+                    accountIndex: 0,
+                    accountType: 'normal',
+                },
+            }),
+        );
+    };
+
+    const stakingAccountsForAsset = stakingAccounts.filter(account => account.symbol === symbol);
+    const coinDefinitions = useSelector(state => selectCoinDefinitions(state, symbol));
+
+    const isStakingActive = useSelector(state =>
+        selectAnyAccountIsStakingActive(state, stakingAccountsForAsset),
+    );
+
+    const { tokensFiatBalance, assetStakingBalance, shouldRenderStakingRow, shouldRenderTokenRow } =
+        handleTokensAndStakingData(
+            assetTokens,
+            stakingAccountsForAsset,
+            isStakingActive,
+            symbol,
+            localCurrency,
+            coinDefinitions,
+            currentFiatRates,
+        );
+
+    const onStakeButtonClick = () => {
+        analytics.report({
+            type: events.stakingNavigateEvent.name,
+            payload: {
+                action: 'navigate',
+                from: 'dashboard/assets',
+                networkSymbol: symbol,
+            },
+        });
+    };
+
+    const onBuyButtonClick = () => {
+        analytics.report({
+            type: events.tradeNavigateEvent.name,
+            payload: {
+                action: 'navigate',
+                type: 'buy',
+                from: 'dashboard/assets',
+                networkSymbol: symbol,
+            },
+        });
+    };
+
+    return (
+        <Card
+            paddingType="none"
+            onClick={handleCardClick}
+            data-testid={`@dashboard/asset-item/${symbol}`}
+        >
+            <Column
+                justifyContent="space-between"
+                height="100%"
+                gap={20}
+                padding={{ bottom: 12, horizontal: 12, top: 20 }}
+            >
+                <Column gap={40} flex="1" margin={{ horizontal: 8 }}>
+                    <Row justifyContent="space-between">
+                        <AssetCardInfo
+                            network={network}
+                            assetsFiatBalances={assetsFiatBalances}
+                            index={index}
+                        />
+                        <Icon size={16} as={ArrowRightIcon} isDisabled={true} />
+                    </Row>
+                    <AmountComponent
+                        symbol={symbol}
+                        failed={failed}
+                        localCurrency={localCurrency}
+                        cryptoValue={cryptoValue}
+                        shallDisplayBaseCurrency={shallDisplayBaseCurrency}
+                    />
+                </Column>
+                {(shouldRenderStakingRow || shouldRenderTokenRow) && (
+                    <AssetCardTokensAndStakingInfo
+                        symbol={symbol}
+                        tokensFiatBalance={tokensFiatBalance.toString()}
+                        assetStakingBalance={assetStakingBalance.toString()}
+                        shouldRenderStaking={shouldRenderStakingRow}
+                        shouldRenderTokens={shouldRenderTokenRow}
+                        accounts={accounts}
+                    />
+                )}
+                {shallDisplayBaseCurrency && (
+                    <Card data-testid="@dashboard/asset/bottom-info" type="contrast">
+                        <Row justifyContent="space-between" flexWrap="wrap" gap={16}>
+                            <InfoItem
+                                data-testid="@dashboard/asset/exchange-rate"
+                                label={<Translation id="TR_EXCHANGE_RATE" />}
+                                flex="0"
+                            >
+                                <PriceTicker symbol={symbol} />
+                            </InfoItem>
+                            <InfoItem
+                                data-testid="@dashboard/asset/week-change"
+                                label={<Translation id="TR_7D_CHANGE" />}
+                                flex="0"
+                            >
+                                <TrendTicker symbol={symbol} />
+                            </InfoItem>
+
+                            <Row gap={8}>
+                                {isStakeNetwork && (
+                                    <AssetActionButton
+                                        symbol={symbol}
+                                        data-testid={`@dashboard/asset/${symbol}/stake-button`}
+                                        onClick={onStakeButtonClick}
+                                        routeName="wallet-staking"
+                                    >
+                                        <Translation id="TR_STAKE_STAKE" />
+                                    </AssetActionButton>
+                                )}
+
+                                <AssetActionButton
+                                    symbol={symbol}
+                                    routeName="wallet-trading-buy"
+                                    data-testid={`@dashboard/asset/${symbol}/buy-button`}
+                                    onClick={onBuyButtonClick}
+                                >
+                                    <Translation id="TR_BUY_BUY" />
+                                </AssetActionButton>
+                            </Row>
+                        </Row>
+                    </Card>
+                )}
+            </Column>
+        </Card>
+    );
+};
+
+export const AssetCardSkeleton = (props: { animate?: boolean }) => {
+    const shouldAnimate = useSelector(selectShouldAnimateLoadingSkeleton);
+    const animate = props.animate ?? shouldAnimate;
+
+    return (
+        <Card>
+            <Column gap={40} flex="1" margin={8}>
+                <Row justifyContent="space-between">
+                    <AssetCardInfoSkeleton animate={animate} />
+                </Row>
+                <Column gap={4}>
+                    <Skeleton animate={animate} width={95} height={32} />
+                    <Skeleton animate={animate} width={50} height={16} />
+                </Column>
+            </Column>
+            <Card type="contrast">
+                <Skeleton animate={animate} width="100%" height={40} />
+            </Card>
+        </Card>
+    );
+};

@@ -1,12 +1,13 @@
-import { ReactNode } from 'react';
-import { TouchableOpacity } from 'react-native';
+import { type ReactNode } from 'react';
 
 import { G } from '@mobily/ts-belt';
 
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
 
 import { Box } from '../Box';
+import { PressableOpacity } from '../Pressable';
 import { Radio } from '../Radio';
+import { HStack } from '../Stack';
 import { Text } from '../Text';
 
 export type SelectItemValue = string | number;
@@ -15,40 +16,38 @@ export type SelectItemProps = {
     value: SelectItemValue;
     onSelect: () => void;
     isSelected: boolean;
-    isLastChild?: boolean;
-    icon: ReactNode;
+    icon?: ReactNode;
+    badge?: ReactNode;
 };
 
 type SelectItemStyleProps = {
-    isLastChild: boolean;
     isSelected: boolean;
 };
-const selectItemStyle = prepareNativeStyle(() => ({
-    flexDirection: 'row',
-    alignItems: 'center',
+
+const selectItemStyle = prepareNativeStyle(utils => ({
+    ...utils.boxShadows.small,
 }));
 
-const underlineSectionStyle = prepareNativeStyle<SelectItemStyleProps>(
-    (utils, { isLastChild, isSelected }) => ({
+const selectItemContentStyle = prepareNativeStyle<SelectItemStyleProps>(
+    (utils, { isSelected }) => ({
+        flex: 1,
         flexDirection: 'row',
         justifyContent: 'space-between',
-        flex: 1,
-        color: utils.colors.textSubdued,
-        paddingVertical: 20,
-        marginLeft: 10,
-        borderBottomWidth: utils.borders.widths.small,
-        borderColor: utils.colors.backgroundTertiaryDefaultOnElevation1,
+        margin: utils.spacings.sp1, // prevents layout shift after selection
+        padding: utils.spacings.sp16,
+        borderWidth: utils.borders.widths.small,
+        borderRadius: utils.borders.radii.r12,
+        borderColor: utils.colors.borderNeutral,
+        backgroundColor: utils.colors.surfaceFillRaised,
+        color: utils.colors.contentPrimary,
         extend: [
-            {
-                condition: isLastChild,
-                style: {
-                    borderBottomWidth: 0,
-                },
-            },
             {
                 condition: isSelected,
                 style: {
-                    color: utils.colors.textDefault,
+                    margin: 0,
+                    borderWidth: utils.borders.widths.large,
+                    borderColor: utils.colors.elementFillFieldSelected,
+                    color: utils.colors.contentPrimary,
                 },
             },
         ],
@@ -61,25 +60,34 @@ export const SelectItem = ({
     onSelect,
     isSelected,
     icon,
-    isLastChild = false,
+    badge,
 }: SelectItemProps) => {
     const { applyStyle } = useNativeStyles();
 
     if (G.isNullable(value)) return null;
 
     return (
-        <TouchableOpacity
+        <PressableOpacity
             style={applyStyle(selectItemStyle)}
             onPress={onSelect}
             accessibilityRole="radio"
             accessibilityState={{ checked: isSelected }}
             accessibilityLabel={label}
+            testID={`@select/item/${value}`}
         >
-            {icon}
-            <Box style={applyStyle(underlineSectionStyle, { isLastChild, isSelected })}>
-                <Text numberOfLines={1}>{label}</Text>
-                <Radio value={value} onPress={onSelect} isChecked={isSelected} />
+            <Box
+                style={applyStyle(selectItemContentStyle, { isSelected })}
+                testID={`@select/item/${value}/content`}
+            >
+                <HStack>
+                    {icon}
+                    <Text numberOfLines={1}>{label}</Text>
+                </HStack>
+                <HStack spacing="sp12">
+                    {badge}
+                    <Radio value={value} onPress={onSelect} isChecked={isSelected} />
+                </HStack>
             </Box>
-        </TouchableOpacity>
+        </PressableOpacity>
     );
 };

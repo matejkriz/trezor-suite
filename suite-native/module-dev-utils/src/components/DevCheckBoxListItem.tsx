@@ -1,6 +1,4 @@
-import { TouchableOpacity } from 'react-native';
-
-import { Box, Text, CheckBox } from '@suite-native/atoms';
+import { CheckBox, HStack, PressableOpacity, Text } from '@suite-native/atoms';
 
 export const DevCheckBoxListItem = ({
     title,
@@ -11,15 +9,10 @@ export const DevCheckBoxListItem = ({
     onPress: () => void;
     isChecked: boolean;
 }) => (
-    <TouchableOpacity onPress={onPress}>
-        <Box
-            flexDirection="row"
-            justifyContent="space-between"
-            alignItems="center"
-            paddingVertical="small"
-        >
-            <Text variant="body">{title}</Text>
+    <PressableOpacity onPress={onPress}>
+        <HStack justifyContent="space-between" alignItems="center">
+            <Text variant="body-md">{title}</Text>
             <CheckBox isChecked={isChecked} onChange={onPress} />
-        </Box>
-    </TouchableOpacity>
+        </HStack>
+    </PressableOpacity>
 );

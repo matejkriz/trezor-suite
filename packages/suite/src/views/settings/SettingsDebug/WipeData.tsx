@@ -1,11 +1,14 @@
 import styled from 'styled-components';
-import { desktopApi } from '@trezor/suite-desktop-api';
 
-import { ActionButton, ActionColumn, SectionItem, TextColumn } from 'src/components/suite';
-import { useDispatch, useSelector } from 'src/hooks/suite';
-import { useAnchor } from 'src/hooks/suite/useAnchor';
+import { injectDesktopApi } from '@suite/desktop-app-api';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { injectReloadApp } from '@suite-common/suite-types';
 import { notificationsActions } from '@suite-common/toast-notifications';
-import { SettingsAnchor } from 'src/constants/suite/anchors';
+import { ActionButton, ActionColumn, SectionItem, TextColumn } from '@trezor/product-components';
+
+import { useSelector } from 'src/hooks/suite';
+import { selectDesktopUserDataDirectory } from 'src/reducers/desktop';
 
 const UserDataLink = styled.span`
     cursor: pointer;
@@ -16,49 +19,44 @@ const UserDataLink = styled.span`
 `;
 
 export const WipeData = () => {
-    const userDataDir = useSelector(state => state.desktop?.paths.userDir);
-    const dispatch = useDispatch();
-    const { anchorRef, shouldHighlight } = useAnchor(SettingsAnchor.WipeData);
+    const userDataDir = useSelector(selectDesktopUserDataDirectory);
+    const { desktopApi, reloadApp, dispatch } = useServices(
+        injectReloadApp,
+        injectDispatch,
+        injectDesktopApi,
+    );
+
+    const openUserDataDir = async () => {
+        const result = await desktopApi.openUserDataDirectory();
+        if (!result.success) {
+            dispatch(notificationsActions.addToast({ type: 'error', error: result.error }));
+        }
+    };
+
+    const clearUserData = async () => {
+        const result = await desktopApi.clearUserData();
+        if (!result.success) {
+            dispatch(notificationsActions.addToast({ type: 'error', error: result.error }));
+
+            return;
+        }
+        reloadApp();
+    };
 
     return (
-        <SectionItem
-            data-test="@settings/debug/wipe-data"
-            ref={anchorRef}
-            shouldHighlight={shouldHighlight}
-        >
+        <SectionItem>
             <TextColumn
                 title="Wipe app data"
                 description={
                     <span>
                         Clicking this button restarts your application and wipes all your data
                         including locally saved labels. Your local folder is:{' '}
-                        <UserDataLink
-                            onClick={async () => {
-                                const result = await desktopApi.openUserDataDirectory();
-
-                                if (!result.success) {
-                                    dispatch(
-                                        notificationsActions.addToast({
-                                            type: 'error',
-                                            error: result.error,
-                                        }),
-                                    );
-                                }
-                            }}
-                        >
-                            {userDataDir}
-                        </UserDataLink>
+                        <UserDataLink onClick={openUserDataDir}>{userDataDir}</UserDataLink>
                     </span>
                 }
             />
             <ActionColumn>
-                <ActionButton
-                    variant="destructive"
-                    onClick={async () => {
-                        await desktopApi.clearUserData();
-                        desktopApi.appRestart();
-                    }}
-                >
+                <ActionButton intent="critical" onClick={clearUserData}>
                     Wipe data
                 </ActionButton>
             </ActionColumn>

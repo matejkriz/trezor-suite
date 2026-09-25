@@ -1,0 +1,91 @@
+import { useState } from 'react';
+
+import { Translation } from '@suite/intl';
+import { type AccountType, type Network } from '@suite-common/wallet-config';
+import {
+    type ChainedTransactions,
+    type WalletAccountTransaction,
+} from '@suite-common/wallet-types';
+import { isTestnet } from '@suite-common/wallet-utils';
+import { Card, Tabs } from '@trezor/components';
+
+import { AmountDetails } from './AmountDetails';
+import { Data } from './Data';
+import { IODetails } from './IODetails/IODetails';
+import { ChainedTxs } from '../../ChainedTxs';
+
+export type TabID = 'amount' | 'io' | 'chained' | 'data';
+
+type AdvancedTxDetailsProps = {
+    defaultTab?: TabID;
+    network: Network;
+    accountType: AccountType;
+    tx: WalletAccountTransaction;
+    chainedTxs?: ChainedTransactions;
+    explorerUrl: string;
+};
+
+export const AdvancedTxDetails = ({
+    defaultTab,
+    network,
+    accountType,
+    tx,
+    chainedTxs,
+    explorerUrl,
+}: AdvancedTxDetailsProps) => {
+    const [selectedTab, setSelectedTab] = useState<TabID>(defaultTab ?? 'amount');
+
+    const getContent = () => {
+        switch (selectedTab) {
+            case 'amount':
+                return <AmountDetails tx={tx} isTestnet={isTestnet(network.symbol)} />;
+            case 'io':
+                return <IODetails tx={tx} />;
+            case 'chained':
+                return (
+                    chainedTxs && (
+                        <ChainedTxs
+                            txs={chainedTxs}
+                            explorerUrl={explorerUrl}
+                            accountType={accountType}
+                            network={network}
+                        />
+                    )
+                );
+            case 'data':
+                return <Data tx={tx} />;
+            default:
+                return null;
+        }
+    };
+
+    return (
+        <Card type="contrast">
+            <Tabs activeItemId={selectedTab} margin={{ bottom: 16 }}>
+                <Tabs.Item id="amount" onClick={() => setSelectedTab('amount')}>
+                    <Translation id="TR_TX_TAB_AMOUNT" />
+                </Tabs.Item>
+                {network.networkType !== 'ripple' && (
+                    <Tabs.Item
+                        data-testid="@tx-detail/inputs-and-outputs"
+                        id="io"
+                        onClick={() => setSelectedTab('io')}
+                    >
+                        <Translation id="TR_INPUTS_OUTPUTS" />
+                    </Tabs.Item>
+                )}
+                {chainedTxs && (
+                    <Tabs.Item id="chained" onClick={() => setSelectedTab('chained')}>
+                        <Translation id="TR_CHAINED_TXS" />
+                    </Tabs.Item>
+                )}
+                {tx.ethereumSpecific?.data && (
+                    <Tabs.Item id="data" onClick={() => setSelectedTab('data')}>
+                        <Translation id="TR_DATA" />
+                    </Tabs.Item>
+                )}
+            </Tabs>
+            {getContent()}
+        </Card>
+    );
+};

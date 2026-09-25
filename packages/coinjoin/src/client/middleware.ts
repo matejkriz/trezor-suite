@@ -1,19 +1,19 @@
-import { coordinatorRequest as request, RequestOptions } from './coordinatorRequest';
+import { type RequestOptions, coordinatorRequest as request } from './coordinatorRequest';
 import {
-    AllowedRange,
-    AllowedScriptTypes,
-    IssuerParameter,
-    ZeroCredentials,
-    RealCredentials,
-    CredentialsResponseValidation,
-    CoordinationFeeRate,
+    type AllowedRange,
+    type AllowedScriptTypes,
+    type CoordinationFeeRate,
+    type CredentialsResponseValidation,
+    type IssuerParameter,
+    type RealCredentials,
+    type ZeroCredentials,
 } from '../types/coordinator';
 import {
-    Credentials,
-    UtxoForRound,
-    AnalyzeTransactionDetails,
-    AnalyzeResult,
-    RawLiquidityClue,
+    type AnalyzeResult,
+    type AnalyzeTransactionDetails,
+    type Credentials,
+    type RawLiquidityClue,
+    type UtxoForRound,
 } from '../types/middleware';
 
 export const getRealCredentials = async (
@@ -154,4 +154,4 @@ export const getLiquidityClue = async (
 };
 
 // reexport all middleware types
-export * from '../types/middleware';
+export type * from '../types/middleware';

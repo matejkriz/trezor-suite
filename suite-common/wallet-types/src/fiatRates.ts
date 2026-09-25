@@ -1,35 +1,36 @@
-import type { FiatRatesLegacy } from '@trezor/connect';
-import { NetworkSymbol } from '@suite-common/wallet-config';
+import { type NetworkSymbol } from '@suite-common/wallet-config';
+import type { BaseCurrencyCode } from '@trezor/blockchain-link-types';
+import type { FiatRatesBySymbol } from '@trezor/connect';
+import { type Branded } from '@trezor/type-utils';
 
-import { TokenAddress } from './account';
+import { type TokenAddress } from './account';
 
 export interface TickerId {
     symbol: NetworkSymbol;
     tokenAddress?: TokenAddress;
-}
-
-export interface CurrentFiatRates {
-    symbol: string;
-    rates: FiatRatesLegacy;
-    ts: number;
+    protocols?: 'erc4626'[];
 }
 
 export interface TimestampedRates {
-    rates: FiatRatesLegacy;
+    rates: FiatRatesBySymbol;
     ts: number;
 }
 
-export interface LastWeekRates {
+export interface HistoricRates {
     symbol: string;
     tickers: TimestampedRates[];
     ts: number;
 }
 
-export type FiatRateKey = string & { __type: 'FiatRateKey' };
+export type CryptoBaseCurrencyPair = string & Branded<'CryptoBaseCurrencyCode'>;
+export const asCryptoBaseCurrencyCode = (value: string) => value as CryptoBaseCurrencyPair;
 
-export type Timestamp = number & { __type: 'Timestamp' };
+// Unix Timestamp in milliseconds
+export type Timestamp = number & Branded<'Timestamp'>;
+export const asTimestamp = (number: number) => number as Timestamp;
 
-export type RateType = 'current' | 'lastWeek';
+type RateType = 'current' | 'lastWeek' | 'historic';
+export type RateTypeWithoutHistoric = Exclude<RateType, 'historic'>;
 
 export type Rate = {
     rate?: number;
@@ -40,4 +41,16 @@ export type Rate = {
     ticker: TickerId;
 };
 
-export type FiatRates = Record<FiatRateKey, Rate>;
+export type FiatRatesResult = {
+    rate?: number;
+    lastTickerTimestamp: Timestamp;
+};
+
+export type TickerResult = {
+    tickerId: TickerId;
+    localCurrency: BaseCurrencyCode;
+    rates: FiatRatesResult[];
+};
+
+export type RatesByKey = Record<CryptoBaseCurrencyPair, Rate>;
+export type RatesByTimestamps = Record<CryptoBaseCurrencyPair, Record<Timestamp, number>>;

@@ -1,34 +1,37 @@
-import styled from 'styled-components';
-import { Paragraph } from '@trezor/components';
-import { Network } from 'src/types/wallet';
-import { Translation } from 'src/components/suite';
+import { LearnMoreButton } from '@suite/external-links';
+import { Translation } from '@suite/intl';
+import {
+    type AccountType,
+    type NetworkSymbol,
+    type NetworkType,
+    getNetwork,
+} from '@suite-common/wallet-config';
 import { getAccountTypeDesc, getAccountTypeUrl } from '@suite-common/wallet-utils';
-import { spacingsPx } from '@trezor/theme';
-import { LearnMoreButton } from 'src/components/suite/LearnMoreButton';
-
-const Info = styled(Paragraph)`
-    margin: ${spacingsPx.md} 0 ${spacingsPx.xs};
-`;
+import { Column, Paragraph } from '@trezor/components';
+import type { Bip43PathTemplate } from '@trezor/crypto-utils';
 
 interface AccountTypeDescriptionProps {
-    bip43Path: Network['bip43Path'];
-    hasMultipleAccountTypes: boolean;
+    bip43Path: Bip43PathTemplate;
+    accountType: AccountType;
+    symbol: NetworkSymbol;
+    networkType: NetworkType;
 }
 
 export const AccountTypeDescription = ({
     bip43Path,
-    hasMultipleAccountTypes,
+    accountType,
+    symbol,
+    networkType,
 }: AccountTypeDescriptionProps) => {
-    if (!hasMultipleAccountTypes) return null;
     const accountTypeUrl = getAccountTypeUrl(bip43Path);
-    const accountTypeDesc = getAccountTypeDesc(bip43Path);
+    const accountTypeDescId = getAccountTypeDesc({ path: bip43Path, accountType, networkType });
 
     return (
-        <>
-            <Info>
-                <Translation id={accountTypeDesc} />
-            </Info>
+        <Column alignItems="flex-start" gap={12}>
+            <Paragraph>
+                <Translation id={accountTypeDescId} values={{ value: getNetwork(symbol).name }} />
+            </Paragraph>
             {accountTypeUrl && <LearnMoreButton url={accountTypeUrl} />}
-        </>
+        </Column>
     );
 };

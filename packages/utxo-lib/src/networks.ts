@@ -1,10 +1,10 @@
 // upstream: https://github.com/bitcoinjs/bitcoinjs-lib/blob/master/ts_src/networks.ts
 // fork: https://github.com/trezor/trezor-utxo-lib/blob/trezor/src/networks.js
 // differences:
-// - more specific networks (zcash/komodo, dash, peercoin, decred)
+// - more specific networks (zcash/komodo)
 // - network type validation function.
 
-import { typeforce } from './types/typeforce';
+import { Type, UInt16, UInt32, UInt8, checkType } from './types/validation';
 
 export interface Bip32 {
     public: number;
@@ -120,30 +120,6 @@ export const litecoinTest: Network = {
     wif: 0xb0,
 };
 
-export const dash: Network = {
-    messagePrefix: '\x19DarkCoin Signed Message:\n',
-    bech32: '',
-    bip32: {
-        public: 0x02fe52cc,
-        private: 0x2fe52f8,
-    },
-    pubKeyHash: 0x4c, // https://dash-docs.github.io/en/developer-reference#opcodes
-    scriptHash: 0x10,
-    wif: 0xcc,
-};
-
-export const dashTest: Network = {
-    messagePrefix: '\x19DarkCoin Signed Message:\n',
-    bech32: '',
-    bip32: {
-        public: 0x043587cf,
-        private: 0x04358394,
-    },
-    pubKeyHash: 0x8c, // https://dash-docs.github.io/en/developer-reference#opcodes
-    scriptHash: 0x13,
-    wif: 0xef, // https://github.com/dashpay/godashutil/blob/master/wif.go#L72
-};
-
 export const zcash: Network = {
     messagePrefix: '\x18ZCash Signed Message:\n',
     bech32: '',
@@ -168,30 +144,6 @@ export const zcashTest: Network = {
     wif: 0xef,
 };
 
-export const peercoin: Network = {
-    messagePrefix: '\x18Peercoin Signed Message:\n',
-    bech32: 'pc',
-    bip32: {
-        public: 0x488b21e,
-        private: 0x0488ade4,
-    },
-    pubKeyHash: 0x37,
-    scriptHash: 0x75,
-    wif: 0,
-};
-
-export const peercoinTest: Network = {
-    messagePrefix: '\x18Peercoin Signed Message:\n',
-    bech32: 'tpc',
-    bip32: {
-        public: 0x43587cf,
-        private: 0x04358394,
-    },
-    pubKeyHash: 0x6f,
-    scriptHash: 0xc4,
-    wif: 0,
-};
-
 export const komodo: Network = {
     messagePrefix: '\x18Komodo Signed Message:\n',
     bech32: '',
@@ -202,42 +154,6 @@ export const komodo: Network = {
     pubKeyHash: 0x3c,
     scriptHash: 0x55,
     wif: 0xbc,
-};
-
-export const decred: Network = {
-    messagePrefix: '\x17Decred Signed Message:\n',
-    bech32: '',
-    bip32: {
-        public: 0x02fda926,
-        private: 0x02fda4e8,
-    },
-    pubKeyHash: 0x073f,
-    scriptHash: 0x071a,
-    wif: 0x22de,
-};
-
-export const decredTest: Network = {
-    messagePrefix: '\x17Decred Signed Message:\n',
-    bech32: '',
-    bip32: {
-        public: 0x043587d1,
-        private: 0x04358397,
-    },
-    pubKeyHash: 0x0f21,
-    scriptHash: 0x0efc,
-    wif: 0x230e,
-};
-
-export const decredSim: Network = {
-    messagePrefix: '\x17Decred Signed Message:\n',
-    bech32: '',
-    bip32: {
-        public: 0x0420bd3d,
-        private: 0x0420b903,
-    },
-    pubKeyHash: 0x0e91,
-    scriptHash: 0x0e6c,
-    wif: 0x2307,
 };
 
 export const doge: Network = {
@@ -254,9 +170,6 @@ export const doge: Network = {
 
 const NETWORK_TYPES = {
     bitcoinCash: [bitcoincash, bitcoincashTest],
-    dash: [dash, dashTest],
-    decred: [decred, decredTest, decredSim],
-    peercoin: [peercoin, peercoinTest],
     zcash: [zcash, zcashTest, komodo],
     litecoin: [litecoin, litecoinTest],
     doge: [doge],
@@ -264,23 +177,25 @@ const NETWORK_TYPES = {
 
 export type NetworkTypes = keyof typeof NETWORK_TYPES;
 
+const networkSchema = Type.Object(
+    {
+        bip32: Type.Object(
+            {
+                public: UInt32,
+                private: UInt32,
+            },
+            { additionalProperties: true },
+        ),
+        pubKeyHash: Type.Union([UInt8, UInt16]),
+        scriptHash: Type.Union([UInt8, UInt16]),
+    },
+    { additionalProperties: true },
+);
+
 export function isNetworkType(type: NetworkTypes, network?: Network) {
     if (typeof type !== 'string' || !network || !NETWORK_TYPES[type]) return false;
-    try {
-        typeforce(
-            {
-                bip32: {
-                    public: typeforce.UInt32,
-                    private: typeforce.UInt32,
-                },
-                pubKeyHash: typeforce.anyOf(typeforce.UInt8, typeforce.UInt16),
-                scriptHash: typeforce.anyOf(typeforce.UInt8, typeforce.UInt16),
-            },
-            network,
-        );
-    } catch (e) {
-        return false;
-    }
+
+    if (!checkType(networkSchema, network)) return false;
 
     return !!NETWORK_TYPES[type].find(
         n =>

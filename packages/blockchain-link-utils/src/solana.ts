@@ -1,66 +1,63 @@
-import { A, D, F, pipe } from '@mobily/ts-belt';
-import BigNumber from 'bignumber.js';
-
-import { Target, TokenTransfer, Transaction } from '@trezor/blockchain-link-types/src';
-import { arrayPartition } from '@trezor/utils';
+import type {
+    InternalTransfer,
+    StakeType,
+    Target,
+    TokenDetailByMint,
+    TokenInfo,
+    TokenStandard,
+    TokenTransfer,
+    Transaction,
+} from '@trezor/blockchain-link-types/src';
+import { isCodesignBuild } from '@trezor/env-utils';
+import {
+    ASSOCIATED_TOKEN_PROGRAM_PUBLIC_KEY,
+    COMPUTE_BUDGET_PROGRAM_ID,
+    MEMO_PROGRAM_PUBLIC_KEY,
+    MEMO_PROGRAM_PUBLIC_KEY_V1,
+    SERUM_ASSET_OWNER_PHANTOM_DEPLOYMENT_PROGRAM_ID,
+    SERUM_ASSET_OWNER_PROGRAM_ID,
+    STAKE_PROGRAM_PUBLIC_KEY,
+    SYSTEM_PROGRAM_PUBLIC_KEY,
+    WSOL_MINT,
+    tokenProgramNames,
+    tokenProgramsInfo,
+} from '@trezor/network-solana/constants';
 import type {
     AccountInfo,
+    Address,
     ParsedAccountData,
     ParsedInstruction,
     ParsedTransactionWithMeta,
-    SolanaValidParsedTxWithMeta,
-    SolanaTokenAccountInfo,
     PartiallyDecodedInstruction,
-    TokenDetailByMint,
-    PublicKey,
-} from '@trezor/blockchain-link-types/src/solana';
-import type { TokenInfo } from '@trezor/blockchain-link-types/src';
+    SolanaTokenAccountInfo,
+    SolanaValidParsedTxWithMeta,
+    TokenProgramName,
+} from '@trezor/network-solana/types';
+import { arrayPartition, isArrayMember, isNotNullOrUndefined } from '@trezor/utils';
+import { BigNumber } from '@trezor/utils/src/bigNumber';
 
-export type ApiTokenAccount = { account: AccountInfo<ParsedAccountData>; pubkey: PublicKey };
-
-// Docs regarding solana programs: https://spl.solana.com/
-// Token program docs: https://spl.solana.com/token
-export const TOKEN_PROGRAM_PUBLIC_KEY = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
-// Associated token program docs: https://spl.solana.com/associated-token-account
-export const ASSOCIATED_TOKEN_PROGRAM_PUBLIC_KEY = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL';
-// System program docs: https://docs.solana.com/developing/runtime-facilities/programs#system-program
-export const SYSTEM_PROGRAM_PUBLIC_KEY = '11111111111111111111111111111111';
-// WSOL transfers are denoted as transfers of SOL as well as WSOL, so we use this to filter out SOL values
-// when parsing tx effects.
-export const WSOL_MINT = 'So11111111111111111111111111111111111111112';
-
-// https://github.com/viaprotocol/tokenlists
-// Aggregated token list with tokens listed on multiple exchanges
-const SOLANA_TOKEN_LIST_URL =
-    'https://cdn.jsdelivr.net/gh/viaprotocol/tokenlists/all_tokens/solana.json';
-
-const LOCAL_TOKEN_METADATA: TokenDetailByMint = {
-    DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263: {
-        name: 'Bonk',
-        symbol: 'BONK',
-    },
+export type ApiTokenAccount = {
+    account: AccountInfo<ParsedAccountData>;
+    pubkey: Address;
 };
 
 export const getTokenMetadata = async (): Promise<TokenDetailByMint> => {
-    const tokenListResult: { address: string; name: string; symbol: string }[] = await (
-        await fetch(SOLANA_TOKEN_LIST_URL)
-    ).json();
+    const env = isCodesignBuild() ? 'stable' : 'develop';
 
-    const tokenMap = tokenListResult.reduce(
-        (acc, token) => ({
-            [token.address]: {
-                name: token.name,
-                symbol: token.symbol,
-            },
-            ...acc,
-        }),
-        {} as TokenDetailByMint,
+    const response = await fetch(
+        `https://data.trezor.io/suite/definitions/${env}/solana.advanced.coin.definitions.v1.json`,
     );
 
-    // Explicitly set Wrapped SOL symbol to WSOL instead of the official 'SOL' which leads to confusion in UI
-    tokenMap[WSOL_MINT].symbol = 'WSOL';
+    if (!response.ok) {
+        throw Error(response.statusText);
+    }
 
-    return { ...LOCAL_TOKEN_METADATA, ...tokenMap };
+    const data: TokenDetailByMint = await response.json();
+
+    // Explicitly set Wrapped SOL symbol to wSol instead of the official 'SOL' which leads to confusion in UI
+    data[WSOL_MINT] = { symbol: 'wSOL', name: 'Wrapped SOL' };
+
+    return data;
 };
 
 export const getTokenNameAndSymbol = (mint: string, tokenDetailByMint: TokenDetailByMint) => {
@@ -70,13 +67,26 @@ export const getTokenNameAndSymbol = (mint: string, tokenDetailByMint: TokenDeta
         ? { name: tokenDetail.name, symbol: tokenDetail.symbol }
         : {
               name: mint,
-              symbol: `${mint.slice(0, 3)}...`,
+              symbol: mint,
           };
+};
+
+const isTokenProgramName = (programName: string): programName is TokenProgramName =>
+    isArrayMember(programName, tokenProgramNames);
+
+export const tokenStandardToTokenProgramName = (standard: TokenStandard): TokenProgramName => {
+    const tokenProgram = Object.entries(tokenProgramsInfo).find(
+        ([_, programInfo]) => programInfo.tokenStandard === standard,
+    );
+    if (!tokenProgram)
+        throw new Error(`Cannot convert token standard ${standard} to Solana token program name`);
+
+    return tokenProgram[0] as TokenProgramName;
 };
 
 type SplTokenAccountData = {
     /** Name of the program that owns this account */
-    program: 'spl-token';
+    program: TokenProgramName;
     /** Parsed account data */
     parsed: {
         info: {
@@ -86,80 +96,77 @@ type SplTokenAccountData = {
                 decimals: number;
             };
         };
+        type: string;
     };
     /** Space used by account data */
-    space: number;
+    space: bigint;
 };
 
-type SplTokenAccount = { account: AccountInfo<SplTokenAccountData>; pubkey: PublicKey };
+type SplTokenAccount = { account: AccountInfo<SplTokenAccountData>; pubkey: Address };
 
 const isSplTokenAccount = (tokenAccount: ApiTokenAccount): tokenAccount is SplTokenAccount => {
     const { parsed } = tokenAccount.account.data;
 
     return (
-        tokenAccount.account.data.program === 'spl-token' &&
+        isTokenProgramName(tokenAccount.account.data.program) &&
         'info' in parsed &&
+        !!parsed.info &&
         'mint' in parsed.info &&
         typeof parsed.info.mint === 'string' &&
         'tokenAmount' in parsed.info &&
+        !!parsed.info.tokenAmount &&
+        typeof parsed.info.tokenAmount === 'object' &&
+        'amount' in parsed.info.tokenAmount &&
         typeof parsed.info.tokenAmount.amount === 'string' &&
+        'decimals' in parsed.info.tokenAmount &&
         typeof parsed.info.tokenAmount.decimals === 'number'
     );
 };
 
 export const transformTokenInfo = (
-    tokenAccounts: ApiTokenAccount[],
+    tokenAccounts: readonly ApiTokenAccount[],
     tokenDetailByMint: TokenDetailByMint,
 ) => {
-    const tokens: TokenInfo[] = F.toMutable(
-        pipe(
-            tokenAccounts,
-            // since ApiTokenAccount type is not precise enough, we type-guard the account to make sure they contain all the necessary data
-            A.filter(isSplTokenAccount),
-            A.map(tokenAccount => {
-                const { info } = tokenAccount.account.data.parsed;
-
-                return {
-                    type: 'SPL', // Designation for Solana tokens
-                    contract: info.mint,
-                    balance: info.tokenAmount.amount,
-                    decimals: info.tokenAmount.decimals,
-                    ...getTokenNameAndSymbol(info.mint, tokenDetailByMint),
-                    address: tokenAccount.pubkey.toString(),
-                };
-            }),
-            A.reduce(
-                {},
-                (acc: { [mint: string]: TokenInfo }, token: TokenInfo & { address: string }) => {
-                    if (acc[token.contract] != null) {
-                        acc[token.contract].balance = new BigNumber(
-                            acc[token.contract].balance || '0',
-                        )
-                            .plus(token.balance || '0')
-                            .toString();
-                        acc[token.contract].accounts!.push({
-                            publicKey: token.address,
-                            balance: token.balance || '0',
-                        });
-                    } else {
-                        const { type, contract, balance, decimals, name, symbol } = token;
-                        acc[token.contract] = {
-                            type,
-                            contract,
-                            balance,
-                            decimals,
-                            name,
-                            symbol,
-                            accounts: [{ publicKey: token.address, balance: balance || '0' }],
-                        };
-                    }
-
-                    return acc;
-                },
-            ),
-            D.values,
-        ),
-    );
+    const acc: { [mint: string]: TokenInfo } = {};
+    // since ApiTokenAccount type is not precise enough, we type-guard the account to make sure they contain all the necessary data
+    for (const tokenAccount of tokenAccounts) {
+        if (!isSplTokenAccount(tokenAccount)) continue;
+        const {
+            parsed: { info },
+            program,
+        } = tokenAccount.account.data;
+        const token = {
+            type: tokenProgramsInfo[program].tokenStandard,
+            contract: info.mint,
+            balance: info.tokenAmount.amount,
+            decimals: info.tokenAmount.decimals,
+            ...getTokenNameAndSymbol(info.mint, tokenDetailByMint),
+            address: tokenAccount.pubkey,
+            standard: tokenProgramsInfo[program].tokenStandard,
+        };
+        const existing = acc[token.contract];
+        if (existing != null) {
+            existing.balance = new BigNumber(existing.balance || '0')
+                .plus(token.balance || '0')
+                .toString();
+            existing.accounts?.push({
+                publicKey: token.address,
+                balance: token.balance || '0',
+            });
+        } else {
+            const { standard, contract, balance, decimals, name, symbol } = token;
+            acc[token.contract] = {
+                standard,
+                contract,
+                balance,
+                decimals,
+                name,
+                symbol,
+                accounts: [{ publicKey: token.address, balance: balance || '0' }],
+            };
+        }
+    }
+    const tokens: TokenInfo[] = Object.values(acc);
 
     return tokens;
 };
@@ -174,7 +181,7 @@ export const extractAccountBalanceDiff = (
     postBalance: BigNumber;
 } | null => {
     const pubKeyIndex = transaction.transaction.message.accountKeys.findIndex(
-        ak => ak.pubkey.toString() === address,
+        ak => ak.pubkey === address,
     );
 
     if (pubKeyIndex === -1) {
@@ -200,16 +207,22 @@ export const extractAccountBalanceDiff = (
     const postBalance = transaction.meta?.postBalances[pubKeyIndex];
 
     return {
-        preBalance: new BigNumber(preBalance ?? 0),
-        postBalance: new BigNumber(postBalance ?? 0),
+        preBalance: new BigNumber(preBalance?.toString(10) ?? 0),
+        postBalance: new BigNumber(postBalance?.toString(10) ?? 0),
     };
 };
 
-const isWSolTransfer = (ixs: (ParsedInstruction | PartiallyDecodedInstruction)[]) =>
-    ixs.find(ix => 'parsed' in ix && ix.parsed.info?.mint === WSOL_MINT);
+const isWSolTransfer = (ixs: readonly (ParsedInstruction | PartiallyDecodedInstruction)[]) =>
+    ixs.find(
+        ix =>
+            'parsed' in ix &&
+            !!ix.parsed.info &&
+            'mint' in ix.parsed.info &&
+            ix.parsed.info.mint === WSOL_MINT,
+    );
 
 type TransactionEffect = {
-    address: string;
+    address: Address;
     amount: BigNumber;
 };
 
@@ -220,15 +233,19 @@ export function getNativeEffects(transaction: ParsedTransactionWithMeta): Transa
 
     return transaction.transaction.message.accountKeys
         .map(ak => {
-            const targetAddress = ak.pubkey.toString();
+            const targetAddress = ak.pubkey;
             const balanceDiff = extractAccountBalanceDiff(transaction, targetAddress);
 
             // WSOL Transfers are counted as SOL transfers in the transaction effects, leading to duplicate
             // entries in the tx history. This serves to filter out the WSOL transfers from the native effects.
             if (wSolTransferInstruction && 'parsed' in wSolTransferInstruction) {
                 if (
-                    wSolTransferInstruction.parsed.info.destination === targetAddress ||
-                    wSolTransferInstruction.parsed.info.source === targetAddress
+                    (!!wSolTransferInstruction.parsed.info &&
+                        'destination' in wSolTransferInstruction.parsed.info &&
+                        wSolTransferInstruction.parsed.info.destination === targetAddress) ||
+                    (!!wSolTransferInstruction.parsed.info &&
+                        'source' in wSolTransferInstruction.parsed.info &&
+                        wSolTransferInstruction.parsed.info.source === targetAddress)
                 ) {
                     return null;
                 }
@@ -243,23 +260,54 @@ export function getNativeEffects(transaction: ParsedTransactionWithMeta): Transa
                 amount: balanceDiff.postBalance.minus(balanceDiff.preBalance),
             };
         })
-        .filter((effect): effect is TransactionEffect => !!effect)
+        .filter(isNotNullOrUndefined)
         .filter(({ amount }) => !amount.isZero()); // filter out zero effects
 }
+
+const isUnknownProgramInstruction = (
+    instruction: ParsedTransactionWithMeta['transaction']['message']['instructions'][number],
+) =>
+    ![
+        SYSTEM_PROGRAM_PUBLIC_KEY,
+        ...Object.values(tokenProgramsInfo).map(info => info.publicKey),
+        ASSOCIATED_TOKEN_PROGRAM_PUBLIC_KEY,
+        STAKE_PROGRAM_PUBLIC_KEY,
+        COMPUTE_BUDGET_PROGRAM_ID,
+        // some wallets use Serum's Assert Owner program during SPL transfer transactions
+        SERUM_ASSET_OWNER_PROGRAM_ID,
+        SERUM_ASSET_OWNER_PHANTOM_DEPLOYMENT_PROGRAM_ID,
+        MEMO_PROGRAM_PUBLIC_KEY,
+        MEMO_PROGRAM_PUBLIC_KEY_V1,
+    ].includes(instruction.programId);
+
+export const hasUnknownProgramInstructions = (transaction: ParsedTransactionWithMeta) =>
+    transaction.transaction.message.instructions.some(isUnknownProgramInstruction);
 
 export const getTargets = (
     effects: TransactionEffect[],
     txType: Transaction['type'],
     accountAddress: string,
+    hasOwnBalanceInternalTransfers: boolean,
 ): Transaction['targets'] =>
     effects
         .filter(effect => {
-            // for 'self` transaction there is only one effect
+            // exclude target for 'self` transaction because it is redundant with fee
             if (txType === 'self') {
-                return true;
+                return false;
             }
             // ignore all targets for unknown transactions
             if (txType === 'unknown') {
+                return false;
+            }
+
+            // the account's own balance change is represented as an internal transfer
+            if (hasOwnBalanceInternalTransfers) {
+                return false;
+            }
+
+            // Exclude effects on foreign addresses for tx types other than sent, otherwise it
+            // leads to the foreign address being displayed next to user's own address which might lead to confusion.
+            if (txType !== 'sent' && effect.address !== accountAddress) {
                 return false;
             }
 
@@ -277,6 +325,62 @@ export const getTargets = (
 
             return target;
         });
+
+function getTransactionStakeType(tx: ParsedTransactionWithMeta): StakeType | undefined {
+    const { instructions } = tx.transaction.message;
+
+    if (!instructions) {
+        throw new Error('Invalid transaction data');
+    }
+
+    for (const instruction of instructions) {
+        if (instruction.programId === STAKE_PROGRAM_PUBLIC_KEY && 'parsed' in instruction) {
+            const { type } = instruction.parsed || {};
+
+            if (type === 'delegate') return 'stake';
+            if (type === 'deactivate') return 'unstake';
+            if (type === 'withdraw') return 'claim';
+        }
+    }
+
+    return undefined;
+}
+
+export const getInternalTransfers = (
+    transaction: ParsedTransactionWithMeta,
+    effects: TransactionEffect[],
+    accountAddress: string,
+): InternalTransfer[] => {
+    const emitsOwnBalanceChange =
+        hasUnknownProgramInstructions(transaction) ||
+        getTransactionStakeType(transaction) === 'claim';
+    if (!emitsOwnBalanceChange) {
+        return [];
+    }
+
+    const feePayer = transaction.transaction.message.accountKeys[0]?.pubkey;
+    const fee = new BigNumber(transaction.meta?.fee.toString() || 0);
+
+    return effects
+        .filter(effect => effect.address === accountAddress)
+        .flatMap(effect => {
+            // the fee payer's balance change includes the fee, which is reported separately
+            const amount = effect.address === feePayer ? effect.amount.plus(fee) : effect.amount;
+
+            if (amount.isZero()) {
+                return [];
+            }
+
+            const type = amount.isNegative() ? 'sent' : 'recv';
+
+            return {
+                type,
+                from: type === 'sent' ? accountAddress : '',
+                to: type === 'recv' ? accountAddress : '',
+                amount: amount.abs().toString(),
+            };
+        });
+};
 
 const getTokenTransferTxType = (transfers: TokenTransfer[]) => {
     if (transfers.some(transfer => transfer.to === transfer.from)) {
@@ -302,7 +406,7 @@ const getNativeTransferTxType = (
     if (
         effects.length === 1 &&
         effects[0]?.address === accountAddress &&
-        effects[0]?.amount.abs().isEqualTo(new BigNumber(transaction.meta?.fee || 0))
+        effects[0]?.amount.abs().isEqualTo(new BigNumber(transaction.meta?.fee.toString() || 0))
     ) {
         return 'self';
     }
@@ -330,13 +434,47 @@ export const getTxType = (
         return 'failed';
     }
 
-    // we consider only parsed instructions because only based on them we can determine the type of transaction
+    // classify by balance changes when instructions alone cannot determine the type
+    const getTxTypeFromBalanceChanges = (): Transaction['type'] => {
+        // the fee payer signed and funded the transaction, which matches the semantics of `sent`
+        const feePayer = transaction.transaction.message.accountKeys[0]?.pubkey;
+        if (accountAddress === feePayer) {
+            return 'sent';
+        }
+
+        if (tokenTransfers.length > 0) {
+            const tokenTransferType = getTokenTransferTxType(tokenTransfers);
+            if (tokenTransferType !== 'unknown') {
+                return tokenTransferType;
+            }
+        }
+
+        const accountEffect = effects.find(({ address }) => address === accountAddress);
+        if (accountEffect?.amount.isGreaterThan(0)) {
+            return 'recv';
+        }
+
+        const fee = new BigNumber(transaction.meta?.fee.toString() || 0);
+        if (accountEffect?.amount.isNegative() && accountEffect.amount.abs().isGreaterThan(fee)) {
+            return 'sent';
+        }
+
+        return 'unknown';
+    };
+
+    // transactions interacting with unknown programs cannot be classified from instructions,
+    // mirroring ethereum, calling a program is not a special transaction type
+    if (hasUnknownProgramInstructions(transaction)) {
+        return getTxTypeFromBalanceChanges();
+    }
+
+    // then, we consider only parsed instructions because only based on them we can determine the type of transaction
     const parsedInstructions = transaction.transaction.message.instructions.filter(
         (instruction): instruction is ParsedInstruction => 'parsed' in instruction,
     );
 
     if (parsedInstructions.length === 0) {
-        return 'unknown';
+        return getTxTypeFromBalanceChanges();
     }
 
     const isInstructionCreatingTokenAccount = (instruction: ParsedInstruction) =>
@@ -348,17 +486,18 @@ export const getTxType = (
             instruction.parsed.type === 'transfer' ||
             instruction.parsed.type === 'transferChecked' ||
             (instruction.program === 'system' && instruction.parsed.type === 'advanceNonce') ||
-            isInstructionCreatingTokenAccount(instruction),
+            isInstructionCreatingTokenAccount(instruction) ||
+            instruction.programId === MEMO_PROGRAM_PUBLIC_KEY ||
+            instruction.programId === MEMO_PROGRAM_PUBLIC_KEY_V1,
     );
 
-    // for now we support only transfers, so we interpret all other transactions as `unknown`
     if (isTransfer) {
         return tokenTransfers.length > 0
             ? getTokenTransferTxType(tokenTransfers)
             : getNativeTransferTxType(effects, accountAddress, transaction);
     }
 
-    return 'unknown';
+    return getTxTypeFromBalanceChanges();
 };
 
 export const getDetails = (
@@ -368,11 +507,23 @@ export const getDetails = (
     txType: Transaction['type'],
 ): Transaction['details'] => {
     const senders = effects.filter(({ amount }) => amount.isNegative());
-    const receivers = effects.filter(({ amount }) => amount.isPositive());
+
+    // include positive effects only on accountAddress for tx types other then sent, otherwise it
+    // leads to foreign address being displayed next to users own address which might lead to confusion
+    const receivers = effects
+        .filter(
+            ({ amount, address }) =>
+                amount.isPositive() && (txType !== 'sent' ? address === accountAddress : true),
+        )
+        .filter(({ address }) => !(txType === 'self' && address === accountAddress));
+
+    const { signatures } = transaction.transaction;
+    // @ts-expect-error: indexing with noUncheckedIndexedAccess
+    const txSignature: string = signatures[0];
 
     const getVin = ({ address, amount }: { address: string; amount?: BigNumber }, i: number) => ({
-        txid: transaction.transaction.signatures[0].toString(),
-        version: transaction.version,
+        txid: txSignature.toString(),
+        version: transaction.version?.toString(),
         isAddress: true,
         isAccountOwned: address === accountAddress,
         n: i,
@@ -389,7 +540,10 @@ export const getDetails = (
     }
 
     return {
-        size: transaction.meta?.computeUnitsConsumed || 0,
+        size:
+            transaction.meta?.computeUnitsConsumed != null
+                ? Number(transaction.meta?.computeUnitsConsumed)
+                : 0,
         totalInput: senders
             .reduce((acc, curr) => acc.plus(curr.amount.abs()), new BigNumber(0))
             .toString(),
@@ -409,15 +563,16 @@ export const getAmount = (
         return '0';
     }
     if (txType === 'self') {
-        return accountEffect.amount?.abs().toString();
+        // we do not want to show amount because its redundant with fee
+        return '0';
     }
 
-    return accountEffect.amount.toString();
+    return accountEffect.amount.abs().toString();
 };
 
 type TokenTransferInstruction = {
-    program: 'spl-token';
-    programId: PublicKey;
+    program: TokenProgramName;
+    programId: Address;
     parsed: {
         type: 'transferChecked' | 'transfer';
         info: {
@@ -447,7 +602,7 @@ const isTokenTransferInstruction = (
     return (
         'program' in ix &&
         typeof ix.program === 'string' &&
-        ix.program === 'spl-token' &&
+        isTokenProgramName(ix.program) &&
         'type' in parsed &&
         typeof parsed.type === 'string' &&
         (parsed.type === 'transferChecked' || parsed.type === 'transfer') &&
@@ -461,6 +616,7 @@ const isTokenTransferInstruction = (
         'destination' in parsed.info &&
         typeof parsed.info.destination === 'string' &&
         (('tokenAmount' in parsed.info &&
+            !!parsed.info.tokenAmount &&
             typeof parsed.info.tokenAmount === 'object' &&
             'amount' in parsed.info.tokenAmount &&
             typeof parsed.info.tokenAmount.amount === 'string') ||
@@ -500,10 +656,22 @@ export const getTokens = (
         address === parsed.info.destination ||
         address === parsed.info?.authority;
 
-    const effects = tx.transaction.message.instructions
-        .filter(isTokenTransferInstruction)
+    const instructions = [
+        ...tx.transaction.message.instructions,
+        ...(tx.meta?.innerInstructions?.flatMap(innerIx => innerIx.instructions) ?? []),
+    ];
+
+    const effects = instructions
+        // filter token transfer instructions that are relevant to the user token accounts
+        .filter(
+            (instruction): instruction is TokenTransferInstruction =>
+                isTokenTransferInstruction(instruction) &&
+                tokenAccountsInfos.some(tokenAccountInfo =>
+                    matchTokenAccountInfo(instruction, tokenAccountInfo.address),
+                ),
+        )
         .map<TokenTransfer>((ix): TokenTransfer => {
-            const { parsed } = ix;
+            const { parsed, program } = ix;
 
             // some data, like `mint` and `decimals` may not be present in the instruction, but can be found in the token account info
             // so we try to find the token account info that matches the instruction and use it's data
@@ -514,8 +682,9 @@ export const getTokens = (
             // when sending tokens to associated token account, the instruction does not contain mint
             const mint = parsed.info.mint || instructionTokenInfo?.mint || 'Unknown token contract';
 
-            const decimals =
-                parsed.info.tokenAmount?.decimals || instructionTokenInfo?.decimals || 0;
+            const decimals = Number(
+                parsed.info.tokenAmount?.decimals || instructionTokenInfo?.decimals || 0,
+            );
             const amount = parsed.info.tokenAmount?.amount || parsed.info.amount || '-1';
 
             const source = parsed.info.authority || parsed.info.source;
@@ -531,7 +700,7 @@ export const getTokens = (
 
             return {
                 type: getUiType(ix),
-                standard: 'SPL',
+                standard: tokenProgramsInfo[program].tokenStandard,
                 from,
                 to,
                 contract: mint,
@@ -539,45 +708,177 @@ export const getTokens = (
                 ...getTokenNameAndSymbol(mint, tokenDetailByMint),
                 amount,
             };
+            // consider only effects on users address
+        })
+        .filter(effect => effect.to === accountAddress || effect.from === accountAddress);
+
+    if (effects.length === 0) {
+        // no transfer instructions to parse, derive token transfers from the account token balance changes
+        return tokenAccountsInfos.flatMap(({ address, mint, decimals }) => {
+            if (!mint) {
+                return [];
+            }
+
+            const balanceDiff = extractAccountBalanceDiff(tx, address, true);
+            if (!balanceDiff) {
+                return [];
+            }
+
+            const amount = balanceDiff.postBalance.minus(balanceDiff.preBalance);
+            if (amount.isZero()) {
+                return [];
+            }
+
+            const type = amount.isNegative() ? 'sent' : 'recv';
+
+            return [
+                {
+                    type,
+                    standard: 'SPL',
+                    from: type === 'sent' ? accountAddress : '',
+                    to: type === 'recv' ? accountAddress : '',
+                    contract: mint,
+                    decimals: decimals ?? 0,
+                    ...getTokenNameAndSymbol(mint, tokenDetailByMint),
+                    amount: amount.abs().toString(),
+                },
+            ];
         });
+    }
 
     return effects;
 };
 
-export const transformTransaction = async (
+const getUnstakeAmount = (tx: SolanaValidParsedTxWithMeta): string => {
+    const { transaction, meta } = tx;
+    const { instructions, accountKeys } = transaction.message;
+
+    if (!instructions || !meta) {
+        throw new Error('Invalid transaction data');
+    }
+
+    const stakeAccountIndexes = instructions
+        .filter(
+            (instruction): instruction is ParsedInstruction =>
+                instruction.programId === STAKE_PROGRAM_PUBLIC_KEY &&
+                'parsed' in instruction &&
+                instruction.parsed?.type === 'deactivate',
+        )
+        .map(instruction => {
+            if (
+                typeof instruction.parsed?.info === 'object' &&
+                'stakeAccount' in instruction.parsed.info
+            ) {
+                const stakeAccount = instruction.parsed.info?.stakeAccount;
+
+                return accountKeys.findIndex(key => key.pubkey === stakeAccount);
+            }
+
+            return -1;
+        })
+        .filter(index => index >= 0);
+
+    const totalPostBalance = stakeAccountIndexes.reduce(
+        (sum, stakeAccountIndex) =>
+            sum.plus(new BigNumber(meta.postBalances[stakeAccountIndex]?.toString(10) || 0)),
+        new BigNumber(0),
+    );
+
+    return totalPostBalance.toString();
+};
+
+const determineTransactionType = (
+    type: Transaction['type'],
+    stakeType?: StakeType,
+): Transaction['type'] => {
+    if (type !== 'unknown' || !stakeType) {
+        return type;
+    }
+
+    switch (stakeType) {
+        case 'claim':
+        case 'stake':
+        case 'unstake':
+            return 'sent';
+        default:
+            return 'unknown';
+    }
+};
+
+const getMemo = (tx: SolanaValidParsedTxWithMeta): string | undefined => {
+    const memos = tx.transaction.message.instructions
+        .filter(
+            ix =>
+                ix.programId === MEMO_PROGRAM_PUBLIC_KEY ||
+                ix.programId === MEMO_PROGRAM_PUBLIC_KEY_V1,
+        )
+        .map(ix => ('parsed' in ix ? (ix.parsed as unknown) : undefined))
+        .filter((p): p is string => typeof p === 'string');
+
+    return memos.length > 0 ? memos.join('\n') : undefined;
+};
+
+export const transformTransaction = (
     tx: SolanaValidParsedTxWithMeta,
     accountAddress: string,
     tokenAccountsInfos: SolanaTokenAccountInfo[],
-): Promise<Transaction> => {
-    const tokenDetailByMint = await getTokenMetadata();
+    tokenDetailByMint: TokenDetailByMint = {},
+): Transaction => {
     const nativeEffects = getNativeEffects(tx);
 
     const tokens = getTokens(tx, accountAddress, tokenDetailByMint, tokenAccountsInfos);
 
     const type = getTxType(tx, nativeEffects, accountAddress, tokens);
 
-    const targets = getTargets(nativeEffects, type, accountAddress);
+    const stakeType = getTransactionStakeType(tx);
 
-    const amount = getAmount(
+    const txType = determineTransactionType(type, stakeType);
+
+    const internalTransfers = getInternalTransfers(tx, nativeEffects, accountAddress);
+
+    const targets = getTargets(nativeEffects, txType, accountAddress, internalTransfers.length > 0);
+
+    const isUnstakeTx = stakeType === 'unstake';
+
+    const accountBalanceChange = getAmount(
         nativeEffects.find(({ address }) => address === accountAddress),
         type,
     );
 
+    const amount =
+        isUnstakeTx || internalTransfers.length > 0
+            ? '0' // hidden, the movement is represented by stakeOperation or internalTransfers
+            : accountBalanceChange;
+
+    const stakeAmount = isUnstakeTx ? getUnstakeAmount(tx) : accountBalanceChange;
+
     const details = getDetails(tx, nativeEffects, accountAddress, type);
 
+    const { signatures } = tx.transaction;
+    // @ts-expect-error: indexing with noUncheckedIndexedAccess
+    const txid: string = signatures[0];
+
     return {
-        type,
-        txid: tx.transaction.signatures[0].toString(),
-        blockTime: tx.blockTime,
+        type: txType,
+        txid: txid.toString(),
+        blockTime: tx.blockTime == null ? undefined : Number(tx.blockTime),
+        blockHeight: tx.slot == null ? undefined : Number(tx.slot),
         amount,
-        fee: tx.meta.fee.toString(),
+        fee: (tx.meta?.fee || 0).toString(),
         targets,
         tokens,
-        internalTransfers: [], // not relevant for solana
+        internalTransfers,
         details,
         blockHash: tx.transaction.message.recentBlockhash,
         solanaSpecific: {
             status: 'confirmed',
+            stakeOperation: stakeType
+                ? {
+                      type: stakeType,
+                      amount: stakeAmount,
+                  }
+                : undefined,
+            memo: getMemo(tx),
         },
     };
 };

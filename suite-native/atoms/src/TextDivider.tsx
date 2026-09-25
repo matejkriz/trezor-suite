@@ -1,35 +1,50 @@
-import { View } from 'react-native';
+import { Translation, type TxKeyPath } from '@suite-native/intl';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
+import { type Color } from '@trezor/theme';
 
-import { NativeStyleObject, prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-
-import { Box, BoxProps } from './Box';
-import { Divider } from './Divider';
+import { Box } from './Box';
+import { HStack } from './Stack';
 import { Text } from './Text';
 
-interface TextDividerProps extends BoxProps {
-    title: string;
-    style?: NativeStyleObject;
-}
+export type TextDividerProps = {
+    title?: TxKeyPath;
+    horizontalMargin?: number;
+    lineColor?: Color;
+    textColor?: Color;
+};
 
-const textDividerStyle = prepareNativeStyle(utils => ({
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: utils.spacings.medium,
+const separatorStyle = prepareNativeStyle<{ horizontalMargin?: number; color: Color }>(
+    (utils, { horizontalMargin, color }) => ({
+        backgroundColor: utils.colors[color],
+        height: utils.borders.widths.small,
+        flex: 1,
+        // We want the separator to be full width, but we need to offset it by the parent padding
+        marginHorizontal: typeof horizontalMargin === 'number' ? -horizontalMargin : 0,
+    }),
+);
+
+const separatorTitleStyle = prepareNativeStyle(utils => ({
+    paddingHorizontal: utils.spacings.sp12,
+    paddingVertical: utils.spacings.sp4,
 }));
 
-export const TextDivider = ({ title, style }: TextDividerProps) => {
+export const TextDivider = ({
+    title = 'generic.orSeparator',
+    horizontalMargin = 0,
+    lineColor = 'borderNeutral',
+    textColor = 'contentPrimary',
+}: TextDividerProps) => {
     const { applyStyle } = useNativeStyles();
 
     return (
-        <View style={[applyStyle(textDividerStyle), style]}>
-            <Divider />
-            <Box marginHorizontal="extraLarge">
-                <Text variant="body" color="textSubdued">
-                    {title}
+        <HStack alignItems="center">
+            <Box style={applyStyle(separatorStyle, { horizontalMargin, color: lineColor })} />
+            <Box style={applyStyle(separatorTitleStyle)}>
+                <Text variant="body-xs" color={textColor}>
+                    <Translation id={title} />
                 </Text>
             </Box>
-            <Divider />
-        </View>
+            <Box style={applyStyle(separatorStyle, { horizontalMargin, color: lineColor })} />
+        </HStack>
     );
 };

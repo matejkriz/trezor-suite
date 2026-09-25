@@ -1,13 +1,10 @@
-import styled, { keyframes, useTheme } from 'styled-components';
-import { CSSColor, Color, spacingsPx, typography } from '@trezor/theme';
-import { Icon } from '@suite-common/icons/src/webComponents';
-import { IconName } from '@suite-common/icons';
+import { type ReactNode } from 'react';
 
-import { getInputStateTextColor } from './InputStyles';
-import { ReactNode } from 'react';
-import { InputState } from './inputTypes';
+import styled, { keyframes } from 'styled-components';
 
-export const BOTTOM_TEXT_MIN_HEIGHT = 26; // 1 line of text + top padding
+import { Row } from '../Flex/Flex';
+import { Icon, type IconComponent, type IconProps } from '../Icon/Icon';
+import { Text } from '../typography/Text/Text';
 
 const slideDown = keyframes`
     from {
@@ -20,42 +17,52 @@ const slideDown = keyframes`
     }
 `;
 
-export const Container = styled.div<{ $inputState?: InputState; $isDisabled?: boolean }>`
-    display: flex;
-    align-items: center;
-    gap: ${spacingsPx.xxs};
-    padding: ${spacingsPx.xs} ${spacingsPx.sm} 0 ${spacingsPx.sm};
-    min-height: ${BOTTOM_TEXT_MIN_HEIGHT}px;
-    color: ${({ $inputState, $isDisabled, theme }) =>
-        $isDisabled ? theme.textDisabled : getInputStateTextColor($inputState, theme)};
-    ${typography.label}
+export const Container = styled.div`
     animation: ${slideDown} 0.18s ease-in-out forwards;
 `;
 
-interface BottomTextProps {
-    inputState?: InputState;
+type BottomTextProps = {
+    hasError?: boolean;
     isDisabled?: boolean;
-    icon?: IconName;
+    iconComponent?: ReactNode;
+    icon?: IconComponent;
     children: ReactNode;
-}
+    'data-testid'?: string;
+};
 
 export const BottomText = ({
-    inputState,
+    hasError,
     isDisabled,
-    icon = 'warningCircle',
+    iconComponent,
+    icon,
     children,
+    'data-testid': dataTestId,
 }: BottomTextProps) => {
-    const theme = useTheme();
-
-    const iconColor: Color | CSSColor = isDisabled
-        ? 'iconDisabled'
-        : getInputStateTextColor(inputState, theme);
+    const textIntent = hasError ? 'critical' : 'neutral';
+    const textPriority = hasError ? 'primary' : 'secondary';
+    const iconProps: Pick<IconProps, 'intent' | 'priority' | 'isDisabled'> = {
+        intent: textIntent,
+        priority: textPriority,
+        isDisabled,
+    };
 
     return (
-        <Container $inputState={inputState} $isDisabled={isDisabled}>
-            {icon && <Icon name={icon} size="medium" color={iconColor} />}
-
-            {children}
+        <Container>
+            <Row gap={4}>
+                {iconComponent ?? (icon && <Icon as={icon} size={16} {...iconProps} />)}
+                <Text
+                    data-testid={dataTestId}
+                    intent={textIntent}
+                    priority={textPriority}
+                    isDisabled={isDisabled}
+                    typographyStyle="body-sm"
+                    as="div"
+                    flex="auto"
+                    overflowWrap="anywhere"
+                >
+                    {children}
+                </Text>
+            </Row>
         </Container>
     );
 };

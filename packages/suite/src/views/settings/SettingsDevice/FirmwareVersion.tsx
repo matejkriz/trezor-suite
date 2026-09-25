@@ -1,53 +1,22 @@
-import styled from 'styled-components';
-
-import { getChangelogUrl, getFwUpdateVersion } from '@suite-common/suite-utils';
-import { getFirmwareVersion } from '@trezor/device-utils';
+import { useDevice } from '@suite/device';
+import { Translation, useTranslation } from '@suite/intl';
+import { Anchor, SettingsAnchor, gotoThunk } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { getChangelogUrl } from '@suite-common/suite-utils';
 import { Button, Tooltip } from '@trezor/components';
+import { getFirmwareVersion } from '@trezor/device-utils';
+import { ActionButton, ActionColumn, SectionItem, TextColumn } from '@trezor/product-components';
 
-import {
-    ActionButton,
-    ActionColumn,
-    SectionItem,
-    TextColumn,
-    Translation,
-    TrezorLink,
-} from 'src/components/suite';
-import { useDevice, useDispatch } from 'src/hooks/suite';
-import { goto } from 'src/actions/suite/routerActions';
-import { AcquiredDevice } from 'src/types/suite';
-import { useAnchor } from 'src/hooks/suite/useAnchor';
-import { SettingsAnchor } from 'src/constants/suite/anchors';
+import { type AcquiredDevice } from 'src/types/suite';
 
-const Version = styled.div`
-    span {
-        display: flex;
-        align-items: center;
-
-        > :last-child {
-            margin-left: 6px;
-        }
-    }
-`;
-
-const VersionTooltip = styled(Tooltip)`
-    display: inline-flex;
-`;
-
-const getButtonLabelId = ({
-    availableFwVersion,
-    currentFwVersion,
-    device,
-}: {
-    availableFwVersion: string | null;
-    currentFwVersion: string | null;
-    device: AcquiredDevice;
-}) => {
-    if (currentFwVersion && availableFwVersion && currentFwVersion === availableFwVersion) {
-        return 'TR_UP_TO_DATE';
+const getButtonLabelId = ({ device }: { device: AcquiredDevice }) => {
+    if (!device.firmwareReleaseConfigInfo?.isNewer) {
+        return 'TR_REINSTALL';
     }
     switch (device.firmware) {
         case 'valid':
-            return 'TR_UP_TO_DATE';
+            return 'TR_REINSTALL';
         case 'required':
         case 'outdated':
             return 'TR_UPDATE_AVAILABLE';
@@ -62,80 +31,76 @@ interface FirmwareVersionProps {
 }
 
 export const FirmwareVersion = ({ isDeviceLocked }: FirmwareVersionProps) => {
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
     const { device } = useDevice();
-    const { anchorRef, shouldHighlight } = useAnchor(SettingsAnchor.FirmwareVersion);
+    const { translationString } = useTranslation();
 
     if (!device?.features) {
         return null;
     }
 
     const currentFwVersion = getFirmwareVersion(device);
-    const availableFwVersion = getFwUpdateVersion(device);
     const { revision } = device.features;
     const changelogUrl = getChangelogUrl(device, revision);
-    const githubButtonIcon = revision ? 'EXTERNAL_LINK' : undefined;
 
-    const handleUpdate = () => dispatch(goto('firmware-index', { params: { cancelable: true } }));
-
-    const GithubButton = () => (
-        <Button
-            variant="tertiary"
-            size="tiny"
-            icon={githubButtonIcon}
-            iconAlignment="right"
-            isDisabled={!revision}
-        >
-            {currentFwVersion}
-        </Button>
-    );
+    const handleUpdate = () => {
+        dispatch(gotoThunk({ routeName: 'firmware-index', params: { cancelable: true } }));
+    };
 
     return (
-        <SectionItem
-            data-test="@settings/device/firmware-version"
-            ref={anchorRef}
-            shouldHighlight={shouldHighlight}
-        >
-            <TextColumn
-                title={<Translation id="TR_FIRMWARE_VERSION" />}
-                description={
-                    currentFwVersion ? (
-                        <Version>
-                            <Translation
-                                id="TR_YOUR_FIRMWARE_VERSION"
-                                values={{
-                                    version: (
-                                        <VersionTooltip content={revision} disabled={!revision}>
-                                            {revision ? (
-                                                <TrezorLink href={changelogUrl} variant="nostyle">
-                                                    <GithubButton />
-                                                </TrezorLink>
-                                            ) : (
-                                                // remove the link if revision is unknown (in bootloader mode)
-                                                <GithubButton />
-                                            )}
-                                        </VersionTooltip>
-                                    ),
-                                }}
-                            />
-                        </Version>
-                    ) : (
-                        <Translation id="TR_YOUR_CURRENT_FIRMWARE_UNKNOWN" />
-                    )
-                }
-            />
-            <ActionColumn>
-                <ActionButton
-                    variant="secondary"
-                    onClick={handleUpdate}
-                    data-test="@settings/device/update-button"
-                    isDisabled={isDeviceLocked}
+        <Anchor anchorId={SettingsAnchor.FirmwareVersion}>
+            {({ anchorId, anchorRef, shouldHighlight }) => (
+                <SectionItem
+                    data-testid={anchorId}
+                    ref={anchorRef}
+                    shouldHighlight={shouldHighlight}
                 >
-                    <Translation
-                        id={getButtonLabelId({ device, currentFwVersion, availableFwVersion })}
+                    <TextColumn
+                        title={<Translation id="TR_FIRMWARE_VERSION" />}
+                        description={
+                            currentFwVersion ? (
+                                <Translation
+                                    id="TR_YOUR_FIRMWARE_VERSION"
+                                    values={{
+                                        version: (
+                                            <Tooltip content={revision} display="inline-flex">
+                                                <Button
+                                                    intent="neutral"
+                                                    priority="secondary"
+                                                    size="small"
+                                                    isDisabled={!revision}
+                                                    href={revision ? changelogUrl : undefined}
+                                                    margin={{ left: 4 }}
+                                                >
+                                                    {device.firmware === 'valid'
+                                                        ? `${currentFwVersion} (${translationString('TR_UP_TO_DATE').toLowerCase()})`
+                                                        : currentFwVersion}
+                                                </Button>
+                                            </Tooltip>
+                                        ),
+                                    }}
+                                />
+                            ) : (
+                                <Translation id="TR_YOUR_CURRENT_FIRMWARE_UNKNOWN" />
+                            )
+                        }
                     />
-                </ActionButton>
-            </ActionColumn>
-        </SectionItem>
+                    <ActionColumn>
+                        <ActionButton
+                            intent="brand"
+                            onClick={handleUpdate}
+                            data-testid="@settings/device/update-button"
+                            isDisabled={isDeviceLocked}
+                            isTooltipActive={isDeviceLocked}
+                            tooltipContent={
+                                <Translation id="TR_SETTINGS_DEVICE_BANNER_TITLE_REMEMBERED" />
+                            }
+                        >
+                            <Translation id={getButtonLabelId({ device })} />
+                        </ActionButton>
+                    </ActionColumn>
+                </SectionItem>
+            )}
+        </Anchor>
     );
 };

@@ -1,9 +1,15 @@
+import type {
+    MessageTypes,
+    ResponseTypes,
+    ElectrumUtxo as Utxo,
+} from '@trezor/blockchain-link-types';
 import { throwError } from '@trezor/utils';
 import { discovery } from '@trezor/utxo-lib';
-import { Api, tryGetScripthash, discoverAddress } from '../utils';
-import type { GetAccountUtxo as Req } from '@trezor/blockchain-link-types/src/messages';
-import type { GetAccountUtxo as Res } from '@trezor/blockchain-link-types/src/responses';
-import type { Utxo } from '@trezor/blockchain-link-types/src/electrum';
+
+import { type Api, discoverAddress, tryGetScripthash } from '../utils';
+
+type Req = MessageTypes.GetAccountUtxo;
+type Res = ResponseTypes.GetAccountUtxo;
 
 const transformUtxo =
     (currentHeight: number, addressInfo: { address?: string; path?: string } = {}) =>
@@ -25,7 +31,7 @@ const transformUtxo =
               }),
     });
 
-const getAccountUtxo: Api<Req, Res> = async (client, descriptor) => {
+const getAccountUtxo: Api<Req, Res> = async ({ client, addressCache }, descriptor) => {
     const {
         block: { height },
         network,
@@ -40,8 +46,8 @@ const getAccountUtxo: Api<Req, Res> = async (client, descriptor) => {
     }
 
     const discover = discoverAddress(client);
-    const receive = await discovery(discover, descriptor, 'receive', network);
-    const change = await discovery(discover, descriptor, 'change', network);
+    const receive = await discovery(discover, addressCache(descriptor, 'receive'));
+    const change = await discovery(discover, addressCache(descriptor, 'change'));
     const result = await Promise.all(
         receive
             .concat(change)

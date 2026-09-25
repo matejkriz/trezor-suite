@@ -1,22 +1,22 @@
-import { ReactNode } from 'react';
+import { type ReactNode } from 'react';
 
-import { RequireAllOrNone } from 'type-fest';
+import { type RequireAllOrNone } from 'type-fest';
 
-import { IconName } from '@suite-common/icons';
+import { type IconName } from '@suite-native/icons';
 
-import { Card, CardProps } from './Card';
-import { Text } from '../Text';
+import { Card, type CardProps } from './Card';
+import { TextButton } from '../Button/TextButton';
 import { Headered } from '../Headered';
 import { HStack } from '../Stack';
-import { TextButton } from '../Button/TextButton';
+import { Text } from '../Text';
 
-type HeaderedCardProps = CardProps & CardHeaderProps;
+export type HeaderedCardProps = CardProps & CardHeaderProps;
 
 type CardHeaderProps = RequireAllOrNone<
     {
         title: ReactNode;
         onButtonPress: () => void;
-        buttonTitle: string;
+        buttonTitle: ReactNode;
         buttonIcon?: IconName;
     },
     'buttonTitle' | 'onButtonPress'
@@ -24,7 +24,7 @@ type CardHeaderProps = RequireAllOrNone<
 
 const CardHeader = ({ title, onButtonPress, buttonTitle, buttonIcon }: CardHeaderProps) => (
     <HStack justifyContent="space-between">
-        <Text color="textSubdued" variant="hint">
+        <Text color="contentSecondary" variant="body-sm">
             {title}
         </Text>
         {buttonTitle && (

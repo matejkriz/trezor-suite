@@ -1,7 +1,8 @@
+import { type DesktopApiDep, type SuiteThemeVariant } from '@suite/desktop-app-api';
 import { isDesktop } from '@trezor/env-utils';
-import { desktopApi, SuiteThemeVariant } from '@trezor/suite-desktop-api';
 
 export const submitRequestForm = async (
+    deps: DesktopApiDep<'getHttpReceiverAddress'>,
     formMethod: 'GET' | 'POST' | 'IFRAME',
     formAction: string,
     formTarget: '_blank' | '_self',
@@ -23,20 +24,20 @@ export const submitRequestForm = async (
 
     if (isDesktop()) {
         let params = `a=${encodeURIComponent(formAction)}`;
-        Object.keys(fields).forEach(k => {
-            params += `&${k}=${encodeURIComponent(fields[k])}`;
+        Object.entries(fields).forEach(([k, v]) => {
+            params += `&${k}=${encodeURIComponent(v)}`;
         });
-        const serverUrl = await desktopApi.getHttpReceiverAddress('/buy-post');
+        const serverUrl = await deps.desktopApi.getHttpReceiverAddress('/buy-post');
         window.open(`${serverUrl}?${params}`, '_blank');
     } else {
         const form = document.createElement('form');
         form.method = formMethod;
         form.action = formAction;
-        Object.keys(fields).forEach(key => {
+        Object.entries(fields).forEach(([key, value]) => {
             const hiddenField = document.createElement('input');
             hiddenField.type = 'hidden';
             hiddenField.name = key;
-            hiddenField.value = fields[key];
+            hiddenField.value = value;
             form.appendChild(hiddenField);
         });
 
@@ -49,7 +50,7 @@ export const submitRequestForm = async (
 const getDarkThemeQuery = (): MediaQueryList | undefined => {
     const matchMedia = window?.matchMedia;
 
-    return matchMedia && matchMedia('(prefers-color-scheme: dark)');
+    return matchMedia?.('(prefers-color-scheme: dark)');
 };
 
 export const getOsTheme = () => (getDarkThemeQuery()?.matches ? 'dark' : 'light');

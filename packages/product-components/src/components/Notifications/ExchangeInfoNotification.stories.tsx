@@ -1,0 +1,93 @@
+import { type Meta, type StoryObj } from '@storybook/react';
+
+import { asNetworkSymbol } from '@suite-common/wallet-config';
+import { type IconComponent, Toast, type ToastProps } from '@trezor/components';
+import * as generatedIcons from '@trezor/icons';
+
+import { ExchangeInfoNotification } from './ExchangeInfoNotification';
+
+const meta: Meta<typeof ExchangeInfoNotification> = {
+    title: 'Notifications/ExchangeInfoNotification',
+    component: ExchangeInfoNotification,
+    parameters: {
+        controls: {
+            exclude: ['message', 'send', 'receive', 'renderAmount'],
+        },
+    },
+};
+
+export default meta;
+
+type NotificationVariant = 'success' | 'info' | 'warning' | 'error' | 'transparent';
+
+type ExchangeInfoToastStoryArgs = {
+    variant: NotificationVariant;
+    icon?: IconComponent;
+    dismissible: boolean;
+};
+
+const mapNotificationVariantToIntent = (variant: NotificationVariant): ToastProps['intent'] => {
+    const variantMap: Record<NotificationVariant, ToastProps['intent']> = {
+        success: 'brand',
+        info: 'info',
+        warning: 'warning',
+        error: 'critical',
+        transparent: 'neutral',
+    };
+
+    return variantMap[variant];
+};
+
+const exchangeInfoContent = (
+    <ExchangeInfoNotification
+        message="Swap transaction from Solana #1 to Ethereum #1 was broadcast"
+        send={{
+            symbol: asNetworkSymbol('sol'),
+            amount: 3,
+            displaySymbol: 'SOL',
+        }}
+        receive={{
+            symbol: asNetworkSymbol('eth'),
+            amount: 0.0051663,
+            displaySymbol: 'ETH',
+        }}
+    />
+);
+
+export const Default: StoryObj<typeof ExchangeInfoNotification> = {
+    render: () => exchangeInfoContent,
+};
+
+export const InToast: StoryObj<ExchangeInfoToastStoryArgs> = {
+    args: {
+        variant: 'success',
+        icon: generatedIcons.ArrowUpIcon,
+        dismissible: true,
+    },
+    argTypes: {
+        variant: {
+            control: {
+                type: 'select',
+            },
+            options: ['success', 'info', 'warning', 'error', 'transparent'],
+        },
+        icon: {
+            options: ['none', ...Object.keys(generatedIcons)],
+            mapping: { none: undefined, ...generatedIcons },
+            control: { type: 'select' },
+        },
+        dismissible: {
+            control: {
+                type: 'boolean',
+            },
+        },
+    },
+    render: ({ variant, icon, dismissible }) => (
+        <Toast
+            intent={mapNotificationVariantToIntent(variant)}
+            icon={icon}
+            dismissible={dismissible}
+            content={exchangeInfoContent}
+        />
+    ),
+};

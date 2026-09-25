@@ -1,0 +1,29 @@
+{
+    "name": "@suite-native/labeling",
+    "version": "1.0.0",
+    "private": true,
+    "license": "See LICENSE.md in repo root",
+    "sideEffects": false,
+    "main": "src/index",
+    "scripts": {
+        "depcheck": "yarn g:depcheck",
+        "type-check": "yarn g:tsc --build",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'"
+    },
+    "dependencies": {
+        "@gorhom/bottom-sheet": "5.2.9",
+        "@suite-common/device": "workspace:*",
+        "@suite-common/message-system": "workspace:*",
+        "@suite-common/suite-sync": "workspace:*",
+        "@suite-common/validators": "workspace:*",
+        "@suite-common/wallet-core": "workspace:*",
+        "@suite-native/atoms": "workspace:*",
+        "@suite-native/forms": "workspace:*",
+        "@suite-native/intl": "workspace:*",
+        "@suite-native/settings": "workspace:*",
+        "@suite-native/suite-sync": "workspace:*",
+        "react": "19.2.3",
+        "react-native": "0.86.0",
+        "react-redux": "9.3.0"
+    }
+}

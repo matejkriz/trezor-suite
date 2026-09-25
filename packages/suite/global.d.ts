@@ -1,9 +1,13 @@
-interface Window {
-    __REDUX_DEVTOOLS_EXTENSION_COMPOSE__?: typeof compose;
-    chrome?: any; // Only in Chromium browsers
+import { compose } from 'redux';
 
-    // Needed for Cypress
-    Cypress?: any;
-    TrezorConnect?: any;
-    store?: any;
+declare global {
+    interface Window {
+        __REDUX_DEVTOOLS_EXTENSION_COMPOSE__?: typeof compose;
+        electronFind: {
+            onShow: (callback: () => void) => void;
+            offShow: (callback: () => void) => void;
+        };
+    }
 }
+
+export {};

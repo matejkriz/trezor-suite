@@ -1,30 +1,38 @@
-import { decode, verify } from 'jws';
-
-import { getEnvironment, isCodesignBuild } from '@trezor/env-utils';
-import { scheduleAction } from '@trezor/utils';
 import { createThunk } from '@suite-common/redux-utils';
-import { MessageSystem } from '@suite-common/suite-types';
+import { type MessageSystem } from '@suite-common/suite-types';
+import { PollingController, decodeJws, verifyJws } from '@suite-common/suite-utils';
+import { isCodesignBuild, isNative } from '@trezor/env-utils';
+import { scheduleAction } from '@trezor/utils';
 
+import { ACTION_PREFIX, messageSystemActions } from './messageSystemActions';
 import {
-    VERSION,
-    JWS_SIGN_ALGORITHM,
     CONFIG_URL_REMOTE,
+    FETCH_CHECK_INTERVAL_IN_MS,
+    FETCH_CHECK_INTERVAL_IN_MS_MOBILE,
     FETCH_INTERVAL_IN_MS,
     FETCH_INTERVAL_IN_MS_MOBILE,
     FETCH_TIMEOUT_IN_MS,
-    FETCH_CHECK_INTERVAL_IN_MS,
-    FETCH_CHECK_INTERVAL_IN_MS_MOBILE,
+    JWS_SIGN_ALGORITHM,
+    VERSION,
 } from './messageSystemConstants';
-import { ACTION_PREFIX, messageSystemActions } from './messageSystemActions';
 import {
-    selectMessageSystemTimestamp,
+    selectMessageSystemConfigSource,
     selectMessageSystemCurrentSequence,
+    selectMessageSystemTimestamp,
 } from './messageSystemSelectors';
+import { type MessageSystemRootState } from './messageSystemTypes';
 import { jws as configJwsLocal } from '../files/config.v1';
 
-const isMobile = () => getEnvironment() === 'mobile';
+const messageSystemPolling = new PollingController();
 
-const getConfigJws = async () => {
+const getConfigJws = async (forceLocalJws: boolean) => {
+    if (forceLocalJws) {
+        return {
+            configJws: configJwsLocal,
+            isRemote: false,
+        };
+    }
+
     const remoteConfigUrl = isCodesignBuild()
         ? CONFIG_URL_REMOTE.stable
         : CONFIG_URL_REMOTE.develop;
@@ -45,7 +53,7 @@ const getConfigJws = async () => {
             isRemote: true,
         };
     } catch (error) {
-        console.error(`Fetching of remote JWS config failed: ${error}`);
+        console.warn(`Fetching of remote JWS config failed: ${error}`);
 
         return {
             configJws: configJwsLocal,
@@ -54,20 +62,30 @@ const getConfigJws = async () => {
     }
 };
 
-export const fetchConfigThunk = createThunk(
+const shouldFetchConfig = (isLocal: boolean, lastTimestamp: number) => {
+    if (isLocal) return true;
+
+    const now = Date.now();
+    const interval = isNative() ? FETCH_INTERVAL_IN_MS_MOBILE : FETCH_INTERVAL_IN_MS;
+
+    return now >= lastTimestamp + interval;
+};
+
+type FetchConfigThunkState = MessageSystemRootState;
+
+export const fetchConfigThunk = createThunk<void, void, { state: FetchConfigThunkState }>(
     `${ACTION_PREFIX}/fetchConfig`,
-    async (jwsPublicKey: string, { dispatch, getState }) => {
+    async (_, { dispatch, getState }) => {
         const timestamp = selectMessageSystemTimestamp(getState());
         const currentSequence = selectMessageSystemCurrentSequence(getState());
+        const configSource = selectMessageSystemConfigSource(getState());
+        const useLocalConfig = configSource === 'local';
 
-        if (
-            Date.now() >=
-            timestamp + (isMobile() ? FETCH_INTERVAL_IN_MS_MOBILE : FETCH_INTERVAL_IN_MS)
-        ) {
+        if (shouldFetchConfig(useLocalConfig, timestamp)) {
             try {
-                const { configJws, isRemote } = await getConfigJws();
+                const { configJws, isRemote } = await getConfigJws(useLocalConfig);
 
-                const decodedJws = decode(configJws);
+                const decodedJws = decodeJws(configJws);
 
                 if (!decodedJws) {
                     throw Error('Decoding of config failed');
@@ -78,7 +96,7 @@ export const fetchConfigThunk = createThunk(
                     throw Error(`Wrong algorithm in JWS config header: ${algorithmInHeader}`);
                 }
 
-                const isAuthenticityValid = verify(configJws, JWS_SIGN_ALGORITHM, jwsPublicKey);
+                const isAuthenticityValid = verifyJws(configJws, JWS_SIGN_ALGORITHM);
 
                 if (!isAuthenticityValid) {
                     throw Error('Config authenticity is invalid');
@@ -92,15 +110,15 @@ export const fetchConfigThunk = createThunk(
 
                 const timestampNew = isRemote ? Date.now() : 0;
 
-                if (currentSequence < config.sequence) {
-                    await dispatch(
+                if (currentSequence < config.sequence || useLocalConfig) {
+                    dispatch(
                         messageSystemActions.fetchSuccessUpdate({
                             config,
                             timestamp: timestampNew,
                         }),
                     );
                 } else if (currentSequence === config.sequence) {
-                    await dispatch(messageSystemActions.fetchSuccess({ timestamp: timestampNew }));
+                    dispatch(messageSystemActions.fetchSuccess({ timestamp: timestampNew }));
                 } else {
                     throw Error(
                         `Sequence of config (${config.sequence}) is older than the current one (${currentSequence}).`,
@@ -114,24 +132,17 @@ export const fetchConfigThunk = createThunk(
     },
 );
 
-export const initMessageSystemThunk = createThunk(
-    `${ACTION_PREFIX}/init`,
-    async ({ jwsPublicKey }: { jwsPublicKey?: string }, { dispatch }) => {
-        if (!jwsPublicKey) {
-            throw Error('JWS public key is not defined!');
-        }
+type InitMessageSystemThunkState = FetchConfigThunkState;
 
-        const checkConfig = async () => {
-            await dispatch(fetchConfigThunk(jwsPublicKey));
+export const initMessageSystemThunk = createThunk<
+    void,
+    void,
+    { state: InitMessageSystemThunkState }
+>(`${ACTION_PREFIX}/init`, async (_, { dispatch }) => {
+    const run = async () => {
+        await dispatch(fetchConfigThunk()).unwrap();
+    };
+    const interval = isNative() ? FETCH_CHECK_INTERVAL_IN_MS_MOBILE : FETCH_CHECK_INTERVAL_IN_MS;
 
-            setTimeout(
-                () => {
-                    checkConfig();
-                },
-                isMobile() ? FETCH_CHECK_INTERVAL_IN_MS_MOBILE : FETCH_CHECK_INTERVAL_IN_MS,
-            );
-        };
-
-        await checkConfig();
-    },
-);
+    await messageSystemPolling.restart(run, interval);
+});

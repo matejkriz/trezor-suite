@@ -1,32 +1,50 @@
-import { useMemo, useRef, ReactNode } from 'react';
+import { type ReactNode, createContext, useMemo, useRef, useState } from 'react';
 
-import * as Sentry from '@sentry/react-native';
 import {
-    NavigationContainer,
-    useNavigationContainerRef,
-    DefaultTheme,
     DarkTheme,
+    DefaultTheme,
+    NavigationContainer,
+    createNavigationContainerRef,
 } from '@react-navigation/native';
+import { useReactNavigationDevTools } from '@rozenite/react-navigation-plugin';
 
-import { analytics, EventType } from '@suite-native/analytics';
-import { useNativeStyles } from '@trezor/styles';
+import { useServices } from '@suite-common/dependency-injection';
+import { events, injectNativeAnalytics } from '@suite-native/analytics';
+import {
+    addSentryBreadcrumb,
+    registerSentryNavigationContainer,
+    setSentryTag,
+} from '@suite-native/sentry';
+import { useNativeStyles } from '@trezor/styles-native';
+
+import { useReportSendFlowExitToAnalytics } from '../hooks/useReportSendFlowExitToAnalytics';
+import { type RootStackParamList } from '../navigators';
+
+export const IsNavigationReadyContext = createContext(false);
+
+export const navigationContainerRef = createNavigationContainerRef<RootStackParamList>();
 
 export const NavigationContainerWithAnalytics = ({ children }: { children: ReactNode }) => {
-    const navigationContainerRef = useNavigationContainerRef();
-    const routeNameRef = useRef<string | undefined>();
+    const [isNavigationReady, setIsNavigationReady] = useState(false);
+    const routeNameRef = useRef<string | undefined>(undefined);
+    const { analytics } = useServices(injectNativeAnalytics);
     const {
         utils: { colors, isDarkColor },
     } = useNativeStyles();
+    const reportSendFlowExitToAnalytics = useReportSendFlowExitToAnalytics();
+
+    // Enable React Navigation DevTools in development
+    useReactNavigationDevTools({ ref: navigationContainerRef });
 
     const themeColors = useMemo(() => {
         // setting theme colors to match the background color of the screen to prevent white flash on screen change in dark mode
-        const isDarkTheme = isDarkColor(colors.backgroundSurfaceElevation0);
+        const isDarkTheme = isDarkColor(colors.surfaceFillPage);
         if (isDarkTheme) {
             return {
                 ...DarkTheme,
                 colors: {
                     ...DarkTheme.colors,
-                    background: colors.backgroundSurfaceElevation0,
+                    background: colors.surfaceFillPage,
                 },
             };
         }
@@ -35,18 +53,25 @@ export const NavigationContainerWithAnalytics = ({ children }: { children: React
             ...DefaultTheme,
             colors: {
                 ...DefaultTheme.colors,
-                background: colors.backgroundSurfaceElevation0,
+                background: colors.surfaceFillPage,
             },
         };
     }, [colors, isDarkColor]);
 
     const handleNavigationReady = () => {
+        registerSentryNavigationContainer(navigationContainerRef);
         routeNameRef.current = navigationContainerRef.getCurrentRoute()?.name;
+        if (!isNavigationReady) setIsNavigationReady(true);
     };
 
     const handleStateChange = () => {
+        if (!navigationContainerRef.isReady()) return;
+
         const previousRouteName = routeNameRef.current;
         const currentRouteName = navigationContainerRef.getCurrentRoute()?.name;
+
+        // If the user abandons the send flow, this function reports from which step.
+        reportSendFlowExitToAnalytics(currentRouteName);
 
         if (previousRouteName !== currentRouteName) {
             // Save the current route name for later comparison
@@ -55,15 +80,15 @@ export const NavigationContainerWithAnalytics = ({ children }: { children: React
             if (!currentRouteName || !previousRouteName) return;
 
             analytics.report({
-                type: EventType.ScreenChange,
+                type: events.screenChangeEvent.name,
                 payload: {
                     previousScreen: previousRouteName,
                     currentScreen: currentRouteName,
                 },
             });
 
-            Sentry.addBreadcrumb({
-                category: EventType.ScreenChange,
+            addSentryBreadcrumb({
+                category: events.screenChangeEvent.name,
                 message: 'screen changed',
                 level: 'info',
                 data: {
@@ -72,18 +97,20 @@ export const NavigationContainerWithAnalytics = ({ children }: { children: React
                 },
             });
 
-            Sentry.setTag('route', currentRouteName);
+            setSentryTag('route', currentRouteName);
         }
     };
 
     return (
-        <NavigationContainer
-            ref={navigationContainerRef}
-            onReady={handleNavigationReady}
-            onStateChange={handleStateChange}
-            theme={themeColors}
-        >
-            {children}
-        </NavigationContainer>
+        <IsNavigationReadyContext.Provider value={isNavigationReady}>
+            <NavigationContainer
+                ref={navigationContainerRef}
+                onReady={handleNavigationReady}
+                onStateChange={handleStateChange}
+                theme={themeColors}
+            >
+                {children}
+            </NavigationContainer>
+        </IsNavigationReadyContext.Provider>
     );
 };

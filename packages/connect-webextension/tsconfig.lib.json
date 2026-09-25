@@ -1,29 +1,15 @@
 {
     "extends": "../../tsconfig.lib.json",
+    "include": ["./src"],
     "compilerOptions": {
-        "outDir": "lib",
-        "target": "es2017",
+        "outDir": "./lib",
+        "rootDir": "./src",
         "types": ["chrome", "w3c-web-usb"]
     },
-    "include": ["./src"],
     "references": [
-        {
-            "path": "../connect"
-        },
-        {
-            "path": "../connect-common"
-        },
-        {
-            "path": "../connect-web"
-        },
-        {
-            "path": "../utils"
-        },
-        {
-            "path": "../node-utils"
-        },
-        {
-            "path": "../trezor-user-env-link"
-        }
+        { "path": "../connect-common" },
+        { "path": "../connect-web" },
+        { "path": "../eslint" },
+        { "path": "../requirements" }
     ]
 }

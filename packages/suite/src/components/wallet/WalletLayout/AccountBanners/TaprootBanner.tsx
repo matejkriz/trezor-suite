@@ -1,25 +1,28 @@
-import { Translation } from 'src/components/suite';
-import { CloseableBanner } from './CloseableBanner';
-import { useSelector } from 'src/hooks/suite/useSelector';
-import { useDispatch } from 'src/hooks/suite/useDispatch';
-import { setFlag } from 'src/actions/suite/suiteActions';
-import { getBip43Type } from '@suite-common/wallet-utils';
-import { Account } from 'src/types/wallet';
-import { BannerPoints } from './BannerPoints';
 import styled from 'styled-components';
-import { selectSuiteFlags } from '../../../../reducers/suite/suiteReducer';
+
+import { selectFlags, setFlag } from '@suite/flags';
+import { Translation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { getBip43Type } from '@suite-common/wallet-utils';
+
+import { useSelector } from 'src/hooks/suite';
+import { type Account } from 'src/types/wallet';
+
+import { BannerPoints } from './BannerPoints';
+import { CloseableBanner } from './CloseableBanner';
 
 interface TaprootBannerProps {
     account?: Account;
 }
 
 const Dark = styled.span`
-    color: ${({ theme }) => theme.textDefault};
+    color: ${({ theme }) => theme.contentPrimary};
 `;
 
 export const TaprootBanner = ({ account }: TaprootBannerProps) => {
-    const { taprootBannerClosed } = useSelector(selectSuiteFlags);
-    const dispatch = useDispatch();
+    const { taprootBannerClosed } = useSelector(selectFlags);
+    const { dispatch } = useServices(injectDispatch);
 
     const isVisible =
         !taprootBannerClosed && account && account.empty && getBip43Type(account.path) === 'bip86';
@@ -28,12 +31,12 @@ export const TaprootBanner = ({ account }: TaprootBannerProps) => {
         return null;
     }
 
-    const closeTaprootBanner = () => dispatch(setFlag('taprootBannerClosed', true));
+    const closeTaprootBanner = () => dispatch(setFlag({ key: 'taprootBannerClosed', value: true }));
 
     return (
         <CloseableBanner
             onClose={closeTaprootBanner}
-            variant="primary"
+            intent="info"
             title={<Translation id="TR_TAPROOT_BANNER_TITLE" />}
         >
             <BannerPoints

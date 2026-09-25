@@ -1,57 +1,54 @@
-import { Translation } from 'src/components/suite/Translation';
-import { useAnchor } from 'src/hooks/suite/useAnchor';
-import { SettingsAnchor } from 'src/constants/suite/anchors';
+import { events, injectDesktopAnalytics } from '@suite/analytics';
+import { Translation } from '@suite/intl';
+import { Anchor, SettingsAnchor } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { selectAddressDisplayType, setAddressDisplayType } from '@suite-common/wallet-core';
+import { AddressDisplayOptions } from '@suite-common/wallet-types';
+import { Switch } from '@trezor/components';
+import { ActionColumn, SectionItem, TextColumn } from '@trezor/product-components';
 
-import { SelectBar } from '@trezor/components';
-import { AddressDisplayOptions } from 'src/reducers/suite/suiteReducer';
-import { useDispatch, useSelector } from 'src/hooks/suite';
-import { EventType, analytics } from '@trezor/suite-analytics';
-import { setAddressDisplayType } from 'src/actions/suite/suiteActions';
-import { ActionColumn, SectionItem, TextColumn } from 'src/components/suite';
+import { useSelector } from 'src/hooks/suite';
 
-const options = [
-    {
-        label: <Translation id="TR_ORIGINAL_ADDRESS" />,
-        value: AddressDisplayOptions.ORIGINAL,
-    },
-    {
-        label: <Translation id="TR_CHUNKED_ADDRESS" />,
-        value: AddressDisplayOptions.CHUNKED,
-    },
-];
+const getAddressDisplayType = (value: boolean) =>
+    value ? AddressDisplayOptions.CHUNKED : AddressDisplayOptions.ORIGINAL;
 
 export const AddressDisplay = () => {
-    const selectedAddressDisplay = useSelector(state => state.suite.settings.addressDisplayType);
-    const dispatch = useDispatch();
-    const { anchorRef, shouldHighlight } = useAnchor(SettingsAnchor.AddressDisplay);
+    const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
 
-    const onChange = (value: AddressDisplayOptions) => {
+    const selectedAddressDisplay = useSelector(selectAddressDisplayType);
+
+    const onChange = (value: boolean) => {
+        const addressDisplayType = getAddressDisplayType(value);
+
         analytics.report({
-            type: EventType.SettingsGeneralAddressDisplayType,
-            payload: {
-                addressDisplayType: value,
-            },
+            type: events.settingsGeneralAddressDisplayTypeEvent.name,
+            payload: { addressDisplayType },
         });
-        dispatch(setAddressDisplayType(value));
+
+        dispatch(setAddressDisplayType(addressDisplayType));
     };
 
     return (
-        <SectionItem
-            data-test="@settings/address-display"
-            ref={anchorRef}
-            shouldHighlight={shouldHighlight}
-        >
-            <TextColumn
-                title={<Translation id="TR_ADDRESS_DISPLAY" />}
-                description={<Translation id="TR_ADDRESS_DISPLAY_DESCRIPTION" />}
-            />
-            <ActionColumn>
-                <SelectBar
-                    selectedOption={selectedAddressDisplay}
-                    options={options}
-                    onChange={onChange}
-                />
-            </ActionColumn>
-        </SectionItem>
+        <Anchor anchorId={SettingsAnchor.AddressDisplay}>
+            {({ anchorId, anchorRef, shouldHighlight }) => (
+                <SectionItem
+                    data-testid={anchorId}
+                    ref={anchorRef}
+                    shouldHighlight={shouldHighlight}
+                >
+                    <TextColumn
+                        title={<Translation id="TR_ADDRESS_DISPLAY" />}
+                        description={<Translation id="TR_ADDRESS_DISPLAY_DESCRIPTION" />}
+                    />
+                    <ActionColumn>
+                        <Switch
+                            isChecked={selectedAddressDisplay === AddressDisplayOptions.CHUNKED}
+                            onChange={onChange}
+                        />
+                    </ActionColumn>
+                </SectionItem>
+            )}
+        </Anchor>
     );
 };

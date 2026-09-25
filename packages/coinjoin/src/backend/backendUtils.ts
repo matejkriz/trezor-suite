@@ -1,8 +1,11 @@
 import { arrayDistinct } from '@trezor/utils';
-import { deriveAddresses as deriveNewAddresses, Network } from '@trezor/utxo-lib';
-import { getAddressType } from '@trezor/utxo-lib/src/address';
+import {
+    type Network,
+    address as btcAddress,
+    deriveAddresses as deriveNewAddresses,
+} from '@trezor/utxo-lib';
 
-import type { VinVout, PrederivedAddress } from '../types/backend';
+import type { PrederivedAddress, VinVout } from '../types/backend';
 
 export const isTxConfirmed = ({ blockHeight = -1 }: { blockHeight?: number }) => blockHeight > 0;
 
@@ -20,10 +23,7 @@ const doesAnyAddressFulfill = (
 ) => getAllTxAddresses({ vin, vout }).some(condition);
 
 export const isTaprootAddress = (address: string, network: Network) =>
-    getAddressType(address, network) === 'p2tr';
-
-export const isTaprootTx = (tx: VinVoutAddressTx, network: Network) =>
-    doesAnyAddressFulfill(tx, address => isTaprootAddress(address, network));
+    btcAddress.getAddressType(address, network) === 'p2tr';
 
 export const doesTxContainAddress = (address: string) => (tx: VinVoutAddressTx) =>
     doesAnyAddressFulfill(tx, addr => addr === address);

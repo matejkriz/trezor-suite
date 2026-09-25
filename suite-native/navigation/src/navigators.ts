@@ -1,85 +1,332 @@
-import { NavigatorScreenParams } from '@react-navigation/native';
-import { RequireAllOrNone } from 'type-fest';
+import { type NavigatorScreenParams } from '@react-navigation/native';
+import { type RequireAllOrNone } from 'type-fest';
 
-import { AccountKey, TokenAddress, XpubAddress } from '@suite-common/wallet-types';
-import { AccountType, NetworkSymbol } from '@suite-common/wallet-config';
-import { AccountInfo, TokenTransfer } from '@trezor/connect';
+import { type BackupType, type Locale } from '@suite-common/suite-types';
+import { type TradingType } from '@suite-common/trading';
+import { type AccountType, type NetworkSymbol } from '@suite-common/wallet-config';
+import {
+    type Account,
+    type AccountKey,
+    type GeneralPrecomposedTransactionFinal,
+    type TokenAddress,
+    type XpubAddress,
+} from '@suite-common/wallet-types';
+import { type ExperimentalFeature } from '@suite-native/settings';
+import { type AccountInfo } from '@trezor/connect';
+import { type DeviceModelInternal } from '@trezor/device-utils';
 
 import {
-    AppTabsRoutes,
-    AccountsImportStackRoutes,
-    HomeStackRoutes,
-    RootStackRoutes,
-    SettingsStackRoutes,
-    ReceiveStackRoutes,
-    AccountsStackRoutes,
-    DevUtilsStackRoutes,
-    OnboardingStackRoutes,
-    ConnectDeviceStackRoutes,
-    AddCoinAccountStackRoutes,
+    type AccountsImportStackRoutes,
+    type AccountsStackRoutes,
+    type ActivityCenterStackRoutes,
+    type AddCoinAccountStackRoutes,
+    type AppTabsRoutes,
+    type AuthorizeDeviceStackRoutes,
+    type DemoAccountQuestionnaireStackRoutes,
+    type DeviceAuthenticityStackRoutes,
+    type DeviceAutoConnectStackRoutes,
+    type DeviceCheckBackupStackRoutes,
+    type DeviceNameStackRoutes,
+    type DeviceOnboardingStackRoutes,
+    type DevicePassphraseStackRoutes,
+    type DevicePinProtectionStackRoutes,
+    type DeviceSettingsStackRoutes,
+    type EarnStackRoutes,
+    type FirmwareLanguageStackRoutes,
+    type FirmwareUpdateStackRoutes,
+    type ForgetDeviceStackRoutes,
+    type HomeStackRoutes,
+    type OnboardingStackRoutes,
+    type PassphraseStackRoutes,
+    type ReceiveAddressVerificationSource,
+    type ReceiveAddressVerificationStackRoutes,
+    type ReceiveStackRoutes,
+    type RootStackRoutes,
+    type SendStackRoutes,
+    type SettingsStackRoutes,
+    type StellarManageTokenStackRoutes,
+    type TradingStackRoutes,
+    type TransactionDetailStackRoutes,
+    type WipeDeviceStackRoutes,
+    type WrappedNativeTokenStackRoutes,
+    type YieldStackRoutes,
 } from './routes';
+import { type NavigateParameters } from './types';
 
-type AddCoinFlowParams = RequireAllOrNone<
+type AccountIdentityParams = RequireAllOrNone<
     { networkSymbol: NetworkSymbol; accountType: AccountType; accountIndex: number },
     'networkSymbol' | 'accountType' | 'accountIndex'
 >;
 
 export type CloseActionType = 'back' | 'close';
+export type AccountAssetsTab = 'tokens' | 'defi' | 'hidden' | 'inactive';
+export type AccountAssetsFlow = 'assets' | 'send';
+export type DeviceSuspicionCause =
+    | 'deviceLooksDifferent'
+    | 'firmwareAlreadyInstalled'
+    | 'untrustedReseller'
+    | 'securitySeal'
+    | 'packaging';
+
+type DeviceCompromisedModalFailedCheck =
+    | 'device-id'
+    | 'device-invariability'
+    | 'device-authenticity'
+    | 'entropy'
+    | 'firmware-authenticity';
 
 type AccountDetailParams = {
     accountKey?: AccountKey;
     tokenContract?: TokenAddress;
     closeActionType: CloseActionType;
-} & AddCoinFlowParams;
+} & AccountIdentityParams;
 
 export type AccountsStackParamList = {
-    [AccountsStackRoutes.Accounts]: undefined;
+    [AccountsStackRoutes.Accounts]: { networksFilter?: NetworkSymbol[] } | undefined;
+};
+
+export type EarnStackParamList = {
+    [EarnStackRoutes.Earn]: undefined;
+};
+
+export type YieldFlowParams = {
+    accountKey: AccountKey;
+    tokenContract: TokenAddress;
+    yieldId?: string;
+};
+
+export type YieldClaimVaultParams = {
+    name: string;
+    tokenContract: TokenAddress;
+};
+
+export type YieldClaimParams = {
+    accountKey: AccountKey;
+    vault?: YieldClaimVaultParams;
+};
+
+export type WrappedNativeTokenPendingTxParams = {
+    amount: string;
+    fee?: string;
+    submittedAt: number;
+    txid: string;
+};
+
+type YieldDepositApprovalReviewParams = YieldFlowParams & {
+    amount: string;
+    approvalLimitType: 'per-deposit' | 'unlimited';
+};
+
+export type YieldDepositRevokeParams = YieldFlowParams & {
+    amount?: string;
+    shouldShowLowLimitWarning?: boolean;
+};
+
+export type YieldDepositRevokeReviewParams = YieldFlowParams & {
+    amount: string;
+    isAmountUnlimited: boolean;
+};
+
+export type YieldWithdrawParams = YieldFlowParams & {
+    withdrawFlowType?: 'withdraw' | 'redeem';
+};
+
+export type YieldStackParamList = {
+    [YieldStackRoutes.HowYieldWorks]: YieldFlowParams & { isInfoOnly?: boolean };
+    [YieldStackRoutes.YieldConsents]: YieldFlowParams;
+    [YieldStackRoutes.YieldClaim]: YieldClaimParams;
+    [YieldStackRoutes.YieldClaimReview]: YieldClaimParams;
+    [YieldStackRoutes.YieldClaimComplete]: YieldClaimParams;
+    [YieldStackRoutes.YieldDepositWrap]: YieldFlowParams;
+    [YieldStackRoutes.YieldDepositWrapReview]: YieldFlowParams;
+    [YieldStackRoutes.YieldDepositApproval]: YieldFlowParams;
+    [YieldStackRoutes.YieldDeposit]: YieldFlowParams;
+    [YieldStackRoutes.YieldDepositNoBalance]: YieldFlowParams;
+    [YieldStackRoutes.YieldDepositRevoke]: YieldDepositRevokeParams;
+    [YieldStackRoutes.YieldWithdraw]: YieldWithdrawParams;
+    [YieldStackRoutes.YieldDepositApprovalReview]: YieldDepositApprovalReviewParams;
+    [YieldStackRoutes.YieldDepositRevokeReview]: YieldDepositRevokeReviewParams;
+    [YieldStackRoutes.YieldDepositReview]: YieldFlowParams;
+    [YieldStackRoutes.YieldWithdrawUnwrap]: YieldWithdrawParams;
+    [YieldStackRoutes.YieldWithdrawUnwrapReview]: YieldWithdrawParams;
+    [YieldStackRoutes.YieldWithdrawReview]: YieldWithdrawParams;
+    [YieldStackRoutes.YieldDepositComplete]: YieldFlowParams;
+    [YieldStackRoutes.YieldWithdrawComplete]: YieldWithdrawParams;
+};
+
+type WrappedNativeTokenFormParams = {
+    accountKey: AccountKey;
+    pendingTransaction?: WrappedNativeTokenPendingTxParams;
+};
+
+type WrappedNativeTokenReviewParams = {
+    accountKey: AccountKey;
+    amount: string;
+    unsignedTransaction: string;
+};
+
+type WrappedNativeTokenCompleteParams = {
+    accountKey: AccountKey;
+    amount: string;
+};
+
+export type WrappedNativeTokenStackParamList = {
+    [WrappedNativeTokenStackRoutes.WrapNativeToken]: WrappedNativeTokenFormParams;
+    [WrappedNativeTokenStackRoutes.WrapNativeTokenReview]: WrappedNativeTokenReviewParams;
+    [WrappedNativeTokenStackRoutes.WrapNativeTokenComplete]: WrappedNativeTokenCompleteParams;
+    [WrappedNativeTokenStackRoutes.UnwrapNativeToken]: WrappedNativeTokenFormParams;
+    [WrappedNativeTokenStackRoutes.UnwrapNativeTokenReview]: WrappedNativeTokenReviewParams;
+    [WrappedNativeTokenStackRoutes.UnwrapNativeTokenComplete]: WrappedNativeTokenCompleteParams;
 };
 
 export type HomeStackParamList = {
     [HomeStackRoutes.Home]: undefined;
 };
 
-export type DevUtilsStackParamList = {
-    [DevUtilsStackRoutes.DevUtils]: undefined;
-    [DevUtilsStackRoutes.Demo]: undefined;
+export type DemoAccountQuestionnaireStackParamList = {
+    [DemoAccountQuestionnaireStackRoutes.Intro]: undefined;
+    [DemoAccountQuestionnaireStackRoutes.Reason]: undefined;
+    [DemoAccountQuestionnaireStackRoutes.SuiteAction]: undefined;
+    [DemoAccountQuestionnaireStackRoutes.Success]: undefined;
 };
 
 export type SettingsStackParamList = {
-    [SettingsStackRoutes.Settings]: undefined;
-    [SettingsStackRoutes.SettingsLocalization]: undefined;
-    [SettingsStackRoutes.SettingsCustomization]: undefined;
-    [SettingsStackRoutes.SettingsPrivacyAndSecurity]: undefined;
-    [SettingsStackRoutes.SettingsAbout]: undefined;
-    [SettingsStackRoutes.SettingsFAQ]: undefined;
+    [SettingsStackRoutes.SettingsPreferences]: undefined;
+    [SettingsStackRoutes.SettingsPrivacy]: undefined;
+    [SettingsStackRoutes.SettingsViewOnly]: undefined;
+    [SettingsStackRoutes.SettingsSupport]: undefined;
+    [SettingsStackRoutes.SettingsAppLog]: undefined;
+    [SettingsStackRoutes.SettingsNetworks]: undefined;
+    [SettingsStackRoutes.SettingsNetworkBackends]: {
+        networkSymbol: NetworkSymbol;
+    };
+    [SettingsStackRoutes.SettingsSuiteSync]: undefined;
+    [SettingsStackRoutes.SettingsSecurity]: undefined;
+    [SettingsStackRoutes.SettingsAdvanced]: undefined;
+    [SettingsStackRoutes.SettingsDustPhishing]: undefined;
+    [SettingsStackRoutes.SettingsExperimental]: undefined;
+    [SettingsStackRoutes.TurnOffDeviceAuthenticityCheck]: undefined;
+    [SettingsStackRoutes.TurnOffFirmwareAuthenticityCheck]: undefined;
+    [SettingsStackRoutes.SettingsTradingLocation]: undefined;
 };
 
 export type ReceiveStackParamList = {
     [ReceiveStackRoutes.ReceiveAccounts]: undefined;
+    [ReceiveStackRoutes.ReceiveAddress]: AccountDetailParams;
+    [ReceiveStackRoutes.ReceiveAddressVerification]: {
+        accountKey: AccountKey;
+        addressPath: string;
+        source: ReceiveAddressVerificationSource;
+    };
+    [ReceiveStackRoutes.ReceiveAddressList]: {
+        accountKey: AccountKey;
+    };
+    [ReceiveStackRoutes.ReceiveAddressDetail]: {
+        accountKey: AccountKey;
+        addressPath: string;
+    };
+};
+
+export type ReceiveAddressVerificationStackParamList = {
+    [ReceiveAddressVerificationStackRoutes.DeviceConnectionGuard]: undefined;
+    [ReceiveAddressVerificationStackRoutes.ContinueOnTrezor]: {
+        accountKey: AccountKey;
+        addressPath: string;
+        source: ReceiveAddressVerificationSource;
+    };
+};
+
+export type SendStackParamList = {
+    [SendStackRoutes.SendAccounts]: undefined;
+    [SendStackRoutes.SendOutputs]: {
+        accountKey: AccountKey;
+        tokenContract?: TokenAddress;
+        postNavigationAction?: 'deviceDisconnectedAlert';
+        initialAddress?: string;
+        initialAmount?: string;
+    };
+    [SendStackRoutes.SendUtxo]: {
+        accountKey: AccountKey;
+        amount?: string;
+    };
+    [SendStackRoutes.SendDestinationTagReview]: {
+        destinationTag: string;
+        transaction: GeneralPrecomposedTransactionFinal;
+        accountKey: AccountKey;
+        tokenContract?: TokenAddress;
+    };
+    [SendStackRoutes.SendAddressReview]: {
+        transaction: GeneralPrecomposedTransactionFinal;
+        accountKey: AccountKey;
+        tokenContract?: TokenAddress;
+        prevHeaderHeight?: number;
+        initialSnapIndex?: number;
+    };
+    [SendStackRoutes.SendOutputsReview]: {
+        accountKey: AccountKey;
+        tokenContract?: TokenAddress;
+        prevHeaderHeight?: number;
+        initialSnapIndex?: number;
+    };
 };
 
 export type AppTabsParamList = {
     [AppTabsRoutes.HomeStack]: NavigatorScreenParams<HomeStackParamList>;
     [AppTabsRoutes.AccountsStack]: NavigatorScreenParams<AccountsStackParamList>;
-    [AppTabsRoutes.ReceiveStack]: NavigatorScreenParams<ReceiveStackParamList>;
-    [AppTabsRoutes.SettingsStack]: NavigatorScreenParams<SettingsStackParamList>;
+    [AppTabsRoutes.EarnStack]: NavigatorScreenParams<EarnStackParamList>;
+    [AppTabsRoutes.TradeStack]: NavigatorScreenParams<TradingStackParamList>;
+    [AppTabsRoutes.Settings]: undefined;
 };
 
 export type OnboardingStackParamList = {
     [OnboardingStackRoutes.Welcome]: undefined;
-    [OnboardingStackRoutes.AboutReceiveCoinsFeature]: undefined;
-    [OnboardingStackRoutes.TrackBalances]: undefined;
     [OnboardingStackRoutes.AnalyticsConsent]: undefined;
-    [OnboardingStackRoutes.ConnectTrezor]: undefined;
+    [OnboardingStackRoutes.Biometrics]: undefined;
+    [OnboardingStackRoutes.TradingLocation]: undefined;
+};
+
+export type DeviceOnboardingStackParamList = {
+    [DeviceOnboardingStackRoutes.DeviceDisconnected]: {
+        wasDeviceConnectedViaBluetooth: boolean;
+    };
+    [DeviceOnboardingStackRoutes.UninitializedDeviceLanding]: {
+        deviceModel: DeviceModelInternal;
+    };
+    [DeviceOnboardingStackRoutes.SuspiciousDevice]: {
+        suspicionCause: DeviceSuspicionCause;
+    };
+    [DeviceOnboardingStackRoutes.SecurityCheck]: undefined;
+    [DeviceOnboardingStackRoutes.FirmwareInfo]: undefined;
+    [DeviceOnboardingStackRoutes.ConfirmFirmwareUpdate]: undefined;
+    [DeviceOnboardingStackRoutes.FirmwareInstallation]: undefined;
+    [DeviceOnboardingStackRoutes.ThpPairingInfo]: undefined;
+    [DeviceOnboardingStackRoutes.ThpConfirmation]: undefined;
+    [DeviceOnboardingStackRoutes.ThpCodeEntry]: undefined;
+    [DeviceOnboardingStackRoutes.ThpPairingSuccess]: undefined;
+    [DeviceOnboardingStackRoutes.DeviceAuthenticity]: undefined;
+    [DeviceOnboardingStackRoutes.DeviceAuthenticitySuccess]: undefined;
+    [DeviceOnboardingStackRoutes.DeviceTutorial]: undefined;
+    [DeviceOnboardingStackRoutes.CreateOrRecoverCrossroads]: undefined;
+    [DeviceOnboardingStackRoutes.CreateWalletLoading]: undefined;
+    [DeviceOnboardingStackRoutes.WalletBackupTutorial]: undefined;
+    [DeviceOnboardingStackRoutes.WalletCreation]: {
+        walletBackupType: BackupType;
+    };
+    [DeviceOnboardingStackRoutes.RecoveryInstructions]: undefined;
+    [DeviceOnboardingStackRoutes.WalletRecovery]: undefined;
+    [DeviceOnboardingStackRoutes.WalletCreatedSuccess]: {
+        flowType: 'create' | 'recover';
+    };
+    [DeviceOnboardingStackRoutes.WalletBackupRecap]: undefined;
+    [DeviceOnboardingStackRoutes.WalletRecoveryRecap]: undefined;
+    [DeviceOnboardingStackRoutes.CreatePin]: undefined;
+    [DeviceOnboardingStackRoutes.Congratulations]: undefined;
 };
 
 export type AccountsImportStackParamList = {
     [AccountsImportStackRoutes.SelectNetwork]: undefined;
     [AccountsImportStackRoutes.XpubScan]: {
         qrCode?: string;
-        networkSymbol: NetworkSymbol;
-    };
-    [AccountsImportStackRoutes.XpubScanModal]: {
         networkSymbol: NetworkSymbol;
     };
     [AccountsImportStackRoutes.AccountImportLoading]: {
@@ -92,7 +339,18 @@ export type AccountsImportStackParamList = {
     };
 };
 
-export type AddCoinFlowType = 'home' | 'receive' | 'accounts';
+export type AddCoinFlowType = 'home' | 'receive' | 'accounts' | 'trade' | 'earn';
+
+export type AddCoinEarnFlowParams =
+    | { earnType: 'staking' }
+    | {
+          earnType: 'yield';
+          yieldId: string;
+          underlyingTokenContract: TokenAddress;
+          receiptTokenContract: TokenAddress | null;
+      };
+
+export type PinActionType = 'enable' | 'change' | 'disable';
 
 export type AddCoinAccountStackParamList = {
     [AddCoinAccountStackRoutes.AddCoinAccount]: {
@@ -103,28 +361,307 @@ export type AddCoinAccountStackParamList = {
         networkSymbol: NetworkSymbol;
         flowType: AddCoinFlowType;
     };
+    [AddCoinAccountStackRoutes.AddCoinDiscoveryRunning]: {
+        networkSymbol: NetworkSymbol;
+        flowType: AddCoinFlowType;
+        earnFlowParams?: AddCoinEarnFlowParams;
+    };
+    [AddCoinAccountStackRoutes.AddCoinDiscoveryFinished]: {
+        networkSymbol: NetworkSymbol;
+        flowType: AddCoinFlowType;
+        earnFlowParams?: AddCoinEarnFlowParams;
+    };
 };
 
-export type ConnectDeviceStackParamList = {
-    [ConnectDeviceStackRoutes.ConnectAndUnlockDevice]: undefined;
-    [ConnectDeviceStackRoutes.PinMatrix]: undefined;
-    [ConnectDeviceStackRoutes.ConnectingDevice]: undefined;
+export type DeviceSettingsStackParamList = {
+    [DeviceSettingsStackRoutes.DeviceSettings]: undefined;
+    [DeviceSettingsStackRoutes.DeviceNameStack]: undefined;
+    [DeviceSettingsStackRoutes.DeviceFirmware]: {
+        closeActionType: CloseActionType;
+    };
+    [DeviceSettingsStackRoutes.FirmwareUpdateStack]: undefined;
+    [DeviceSettingsStackRoutes.FirmwareLanguageStack]: {
+        language: Locale;
+    };
+    [DeviceSettingsStackRoutes.DeviceConnection]: undefined;
+    [DeviceSettingsStackRoutes.DeviceAutoConnectStack]: undefined;
+    [DeviceSettingsStackRoutes.ForgetDevice]: undefined;
+    [DeviceSettingsStackRoutes.ForgetDeviceStack]: NavigatorScreenParams<ForgetDeviceStackParamList>;
+    [DeviceSettingsStackRoutes.DevicePinProtection]: undefined;
+    [DeviceSettingsStackRoutes.DevicePinProtectionStack]: {
+        type: PinActionType;
+    };
+    [DeviceSettingsStackRoutes.DeviceBackupAndPassphrase]: undefined;
+    [DeviceSettingsStackRoutes.DeviceCheckBackupStack]: undefined;
+    [DeviceSettingsStackRoutes.DevicePassphraseStack]: undefined;
+    [DeviceSettingsStackRoutes.DeviceAuthenticity]: undefined;
+    [DeviceSettingsStackRoutes.DeviceAuthenticityStack]:
+        NavigatorScreenParams<DeviceAuthenticityStackParamList> | undefined;
+    [DeviceSettingsStackRoutes.WipeDevice]: undefined;
+    [DeviceSettingsStackRoutes.WipeDeviceStack]:
+        NavigatorScreenParams<WipeDeviceStackParamList> | undefined;
+};
+
+export type DeviceNameStackParamList = {
+    [DeviceNameStackRoutes.DeviceConnectionGuard]: undefined;
+    [DeviceNameStackRoutes.DeviceName]: undefined;
+    [DeviceNameStackRoutes.ContinueOnTrezor]: undefined;
+    [DeviceNameStackRoutes.DeviceNameLoadingScreen]: undefined;
+};
+
+export type FirmwareUpdateStackParamList = {
+    [FirmwareUpdateStackRoutes.DeviceConnectionGuard]: undefined;
+    [FirmwareUpdateStackRoutes.ConfirmFirmwareUpdate]: undefined;
+    [FirmwareUpdateStackRoutes.FirmwareInstallation]: undefined;
+    [FirmwareUpdateStackRoutes.ThpConfirmation]: undefined;
+};
+
+export type FirmwareLanguageStackParamList = {
+    [FirmwareLanguageStackRoutes.DeviceConnectionGuard]: undefined;
+    [FirmwareLanguageStackRoutes.ConfirmLanguageChange]: undefined;
+};
+
+export type DeviceAutoConnectStackParamList = {
+    [DeviceAutoConnectStackRoutes.DeviceConnectionGuard]: undefined;
+    [DeviceAutoConnectStackRoutes.ConfirmAutoConnect]: undefined;
+};
+
+export type ForgetDeviceStackParamList = {
+    [ForgetDeviceStackRoutes.ForgetDeviceConfirmation]: undefined;
+    [ForgetDeviceStackRoutes.ForgetDeviceGuide]: undefined;
+    [ForgetDeviceStackRoutes.ForgetDeviceFinish]: undefined;
+};
+
+export type DevicePinProtectionStackParamList = {
+    [DevicePinProtectionStackRoutes.DeviceConnectionGuard]: undefined;
+    [DevicePinProtectionStackRoutes.ContinueOnTrezor]: undefined;
+    [DevicePinProtectionStackRoutes.EnterCurrentPin]: undefined;
+    [DevicePinProtectionStackRoutes.EnterNewPin]: undefined;
+    [DevicePinProtectionStackRoutes.ConfirmNewPin]: undefined;
+};
+
+export type WipeDeviceStackParamList = {
+    [WipeDeviceStackRoutes.DeviceConnectionGuard]: undefined;
+    [WipeDeviceStackRoutes.ContinueOnTrezor]: undefined;
+    [WipeDeviceStackRoutes.WipeDeviceLoadingScreen]: undefined;
+    [WipeDeviceStackRoutes.FactoryReset]: undefined;
+};
+
+export type DeviceCheckBackupStackParamList = {
+    [DeviceCheckBackupStackRoutes.DeviceConnectionGuard]: undefined;
+    [DeviceCheckBackupStackRoutes.CheckBackupTutorial]: undefined;
+    [DeviceCheckBackupStackRoutes.CheckBackup]: undefined;
+    [DeviceCheckBackupStackRoutes.CheckBackupSuccess]: undefined;
+    [DeviceCheckBackupStackRoutes.CheckBackupRecap]: undefined;
+    [DeviceCheckBackupStackRoutes.UnsupportedModel]: {
+        deviceModel: string;
+    };
+    [DeviceCheckBackupStackRoutes.CheckBackupSupport]: undefined;
+    [DeviceCheckBackupStackRoutes.CheckBackupFail]: undefined;
+};
+
+export type DevicePassphraseStackParamList = {
+    [DevicePassphraseStackRoutes.DeviceConnectionGuard]: undefined;
+    [DevicePassphraseStackRoutes.ContinueOnTrezor]: undefined;
+};
+
+export type DeviceAuthenticityStackParamList = {
+    [DeviceAuthenticityStackRoutes.DeviceConnectionGuard]: undefined;
+    [DeviceAuthenticityStackRoutes.AuthenticityCheck]: undefined;
+    [DeviceAuthenticityStackRoutes.AuthenticitySuccess]: undefined;
+};
+
+export type AuthorizeDeviceStackParamList = {
+    [AuthorizeDeviceStackRoutes.DeviceConnectionGuard]:
+        { onCancelNavigationTarget: NavigateParameters<RootStackParamList> } | undefined;
+    [AuthorizeDeviceStackRoutes.ConnectDeviceCrossroads]: undefined;
+    [AuthorizeDeviceStackRoutes.ConnectAndUnlockDevice]: undefined;
+    [AuthorizeDeviceStackRoutes.TurnOnAndUnlockDevice]: undefined;
+    [AuthorizeDeviceStackRoutes.ConnectBluetoothDevice]: undefined;
+    [AuthorizeDeviceStackRoutes.RemoveBluetoothDevice]: undefined;
+    [AuthorizeDeviceStackRoutes.PinMatrix]: undefined;
+    [AuthorizeDeviceStackRoutes.ConnectingDevice]: undefined;
+    [AuthorizeDeviceStackRoutes.ThpConfirmation]: undefined;
+    [AuthorizeDeviceStackRoutes.ThpCodeEntry]: undefined;
+    [AuthorizeDeviceStackRoutes.PassphraseConfirmOnTrezor]: undefined;
+    [AuthorizeDeviceStackRoutes.PassphraseEnterOnTrezor]: undefined;
+    [AuthorizeDeviceStackRoutes.PassphraseForm]: undefined;
+    [AuthorizeDeviceStackRoutes.CoinEnablingInit]: undefined;
+    [AuthorizeDeviceStackRoutes.ContinueOnTrezor]: undefined;
+};
+
+export type PassphraseStackParamList = {
+    [PassphraseStackRoutes.PassphraseForm]: undefined;
+    [PassphraseStackRoutes.PassphraseEnterOnTrezor]: undefined;
+    [PassphraseStackRoutes.PassphraseConfirmOnTrezor]: undefined;
+    [PassphraseStackRoutes.PassphraseLoading]: undefined;
+    [PassphraseStackRoutes.PassphraseRedirecting]: undefined;
+    [PassphraseStackRoutes.PassphraseDuplicateAlert]: undefined;
+    [PassphraseStackRoutes.PassphraseEmptyWallet]: undefined;
+    [PassphraseStackRoutes.PassphraseMismatchAlert]: undefined;
+    [PassphraseStackRoutes.PassphraseVerifyEmptyWallet]: undefined;
 };
 
 export type RootStackParamList = {
     [RootStackRoutes.AppTabs]: NavigatorScreenParams<AppTabsParamList>;
-    [RootStackRoutes.Onboarding]: NavigatorScreenParams<AppTabsParamList>;
-    [RootStackRoutes.ConnectDevice]: NavigatorScreenParams<ConnectDeviceStackParamList>;
+    [RootStackRoutes.OnboardingStack]: NavigatorScreenParams<OnboardingStackParamList>;
+    [RootStackRoutes.DeviceOnboardingStack]: NavigatorScreenParams<DeviceOnboardingStackParamList>;
+    [RootStackRoutes.AuthorizeDeviceStack]: NavigatorScreenParams<AuthorizeDeviceStackParamList>;
     [RootStackRoutes.AccountsImport]: NavigatorScreenParams<AccountsImportStackParamList>;
-    [RootStackRoutes.ReceiveModal]: AccountDetailParams;
+    [RootStackRoutes.DemoAccountQuestionnaireStack]: NavigatorScreenParams<DemoAccountQuestionnaireStackParamList>;
     [RootStackRoutes.AccountSettings]: { accountKey: AccountKey };
-    [RootStackRoutes.TransactionDetail]: {
+    [RootStackRoutes.TransactionDetailStack]: NavigatorScreenParams<TransactionDetailStackParamList>;
+    [RootStackRoutes.DevUtils]: undefined;
+    [RootStackRoutes.MessageSystemManager]: undefined;
+    [RootStackRoutes.MessageSystemExperiments]: undefined;
+    [RootStackRoutes.AccountAssets]: {
+        accountKey: AccountKey;
+        tab?: AccountAssetsTab;
+        flowType?: AccountAssetsFlow;
+    } & AccountIdentityParams;
+    [RootStackRoutes.AccountDetail]: AccountDetailParams;
+    [RootStackRoutes.StakingDetail]: { accountKey: AccountKey };
+    [RootStackRoutes.StakingManagement]: { accountKey: AccountKey };
+    [RootStackRoutes.YieldVaultDetail]: { accountKey: AccountKey; tokenContract: TokenAddress };
+    [RootStackRoutes.HowStakeWorksScreen]: {
+        isInfoOnly?: boolean;
+        accountKey?: AccountKey;
+        symbol: NetworkSymbol;
+    };
+    [RootStackRoutes.YieldNavigator]: NavigatorScreenParams<YieldStackParamList>;
+    [RootStackRoutes.WrappedNativeTokenNavigator]: NavigatorScreenParams<WrappedNativeTokenStackParamList>;
+    [RootStackRoutes.StakingForm]: {
+        accountKey: AccountKey;
+    };
+    [RootStackRoutes.EarnConsents]: {
+        accountKey: AccountKey;
+        amount: string;
+        account: Account;
+    };
+    [RootStackRoutes.StakingTransactionDataReview]: {
+        accountKey: AccountKey;
+        stakeType: 'stake' | 'unstake' | 'claim';
+        amount?: string;
+    };
+    [RootStackRoutes.StakingTransactionComplete]: {
+        accountKey: AccountKey;
+        stakeType: 'stake' | 'unstake' | 'claim';
+        amountInBaseUnits: string;
+    };
+    [RootStackRoutes.UnstakeFlow]: { accountKey: AccountKey };
+    [RootStackRoutes.StakingClaimReview]: {
+        accountKey: AccountKey;
+        symbol: NetworkSymbol;
+    };
+    [RootStackRoutes.DeviceSettingsStack]: NavigatorScreenParams<DeviceSettingsStackParamList>;
+    [RootStackRoutes.AddCoinAccountStack]: NavigatorScreenParams<AddCoinAccountStackParamList>;
+    [RootStackRoutes.ReceiveStack]: NavigatorScreenParams<ReceiveStackParamList>;
+    [RootStackRoutes.SendStack]: NavigatorScreenParams<SendStackParamList>;
+    [RootStackRoutes.ConnectPopup]: undefined;
+    [RootStackRoutes.ConnectPermissions]: undefined;
+    [RootStackRoutes.WalletConnectSessionPopup]: undefined;
+    [RootStackRoutes.WalletConnectSwitchAccount]: {
+        sessionTopic: string;
+    };
+    [RootStackRoutes.WalletConnectPair]: undefined;
+    [RootStackRoutes.SettingsScreenStack]: NavigatorScreenParams<SettingsStackParamList>;
+    [RootStackRoutes.BackupFailedModal]: undefined;
+    [RootStackRoutes.DeviceCompromisedModal]: {
+        failedCheck: DeviceCompromisedModalFailedCheck;
+    };
+    [RootStackRoutes.BootloaderMode]: undefined;
+    [RootStackRoutes.TradingLocationModal]: undefined;
+    [RootStackRoutes.Storybook]: undefined;
+    [RootStackRoutes.PassphraseStack]: NavigatorScreenParams<PassphraseStackParamList>;
+    [RootStackRoutes.StellarManageTokenStack]: NavigatorScreenParams<StellarManageTokenStackParamList>;
+    [RootStackRoutes.FeatureFeedbackModal]: { feature: ExperimentalFeature };
+    [RootStackRoutes.TradingExchangePreview]: {
+        isApproved?: boolean;
+    };
+    [RootStackRoutes.TradingExchangeApproval]: {
+        shouldIncreaseLimit?: boolean;
+        isRevoked?: boolean;
+    };
+    [RootStackRoutes.TradingExchangeRevoke]: {
+        shouldIncreaseLimit?: boolean;
+    };
+    [RootStackRoutes.TradingSellPreview]: undefined;
+    [RootStackRoutes.TradingSellCompletion]: undefined;
+    [RootStackRoutes.TradingSellOutputsReview]: {
+        accountKey: AccountKey;
+        tokenContract?: TokenAddress;
+        orderId: string;
+    };
+    [RootStackRoutes.TradingExchangeOutputsReview]: {
+        accountKey: AccountKey;
+        tokenContract?: TokenAddress;
+        orderId: string;
+        flowType: ExchangeFlowType;
+    };
+    [RootStackRoutes.TradingConfirming]: {
+        flowType: ConfirmingScreenFlowType;
+    };
+    [RootStackRoutes.TradingMyAsset]: {
+        tradingType: Extract<TradingType, 'sell' | 'exchange'>;
+    };
+    [RootStackRoutes.TradingTradeableAsset]: {
+        tradingType: Extract<TradingType, 'buy' | 'exchange'>;
+    };
+    [RootStackRoutes.ReceiveAccounts]: {
+        symbol: NetworkSymbol;
+        tradingType: Exclude<TradingType, 'sell'>;
+    };
+    [RootStackRoutes.TradingReceiveAddress]: {
+        accountKey: AccountKey;
+        tradingType: Exclude<TradingType, 'sell'>;
+    };
+    [RootStackRoutes.TradingHistory]: undefined;
+    [RootStackRoutes.TradingHistoryDetail]: { orderId: string };
+    [RootStackRoutes.TradingBuyPreview]: undefined;
+    [RootStackRoutes.ActivityCenterStack]: NavigatorScreenParams<ActivityCenterStackParamList>;
+};
+
+export type ActivityCenterStackParamList = {
+    [ActivityCenterStackRoutes.ActivityCenter]: undefined;
+};
+
+export type TransactionDetailStackParamList = {
+    [TransactionDetailStackRoutes.TransactionDetail]: {
         txid: string;
         accountKey: AccountKey;
-        tokenTransfer?: TokenTransfer;
+        closeActionType?: CloseActionType;
+        tokenContract?: TokenAddress;
+        source?: 'send';
     };
-    [RootStackRoutes.DevUtilsStack]: undefined;
-    [RootStackRoutes.AccountDetail]: AccountDetailParams;
-    [RootStackRoutes.DeviceInfo]: undefined;
-    [RootStackRoutes.AddCoinAccountStack]: NavigatorScreenParams<AddCoinAccountStackParamList>;
+    [TransactionDetailStackRoutes.TransactionDetailOverview]: {
+        txid: string;
+        accountKey: AccountKey;
+    };
+};
+
+export type ConfirmingScreenFlowType = 'approve' | 'revoke' | 'revoke-and-approve';
+export type ExchangeFlowType = 'swap' | 'sign-data' | ConfirmingScreenFlowType;
+
+export type TradingStackParamList = {
+    [TradingStackRoutes.Trading]: {
+        tradingType?: TradingType;
+        selectedMyAssetAccountKey?: AccountKey;
+        selectedMyAssetCryptoId?: string;
+        selectedTradeableAssetCryptoId?: string;
+    };
+};
+
+export type StellarManageTokenStackParamList = {
+    [StellarManageTokenStackRoutes.ManualTokenInput]: {
+        accountKey: AccountKey;
+    };
+    [StellarManageTokenStackRoutes.ActivationFee]: {
+        accountKey: AccountKey;
+        tokenContract: TokenAddress;
+        isTrading?: boolean;
+    };
+    [StellarManageTokenStackRoutes.DeactivationFee]: {
+        accountKey: AccountKey;
+        tokenContract: TokenAddress;
+    };
 };

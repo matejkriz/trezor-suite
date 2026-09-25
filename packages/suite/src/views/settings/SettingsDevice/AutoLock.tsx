@@ -1,17 +1,16 @@
-import { analytics, EventType } from '@trezor/suite-analytics';
+import type { Locale } from 'date-fns';
 
-import {
-    ActionColumn,
-    ActionSelect,
-    SectionItem,
-    TextColumn,
-    Translation,
-} from 'src/components/suite';
-import { useDevice, useDispatch, useLocales } from 'src/hooks/suite';
-import { applySettings } from 'src/actions/settings/deviceSettingsActions';
+import { events, injectDesktopAnalytics } from '@suite/analytics';
+import { useDevice } from '@suite/device';
+import { Translation } from '@suite/intl';
+import { Anchor, SettingsAnchor } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
 import { formatDurationStrict } from '@suite-common/suite-utils';
-import { useAnchor } from 'src/hooks/suite/useAnchor';
-import { SettingsAnchor } from 'src/constants/suite/anchors';
+import { ActionColumn, ActionSelect, SectionItem, TextColumn } from '@trezor/product-components';
+
+import { applySettingsThunk } from 'src/actions/settings/deviceSettingsActions';
+import { useLocales } from 'src/hooks/suite';
 
 // auto lock times in seconds; allowed lock times by device: <1 minute, 6 days>
 const AUTO_LOCK_TIMES = {
@@ -32,11 +31,9 @@ interface AutoLockProps {
 }
 
 export const AutoLock = ({ isDeviceLocked }: AutoLockProps) => {
-    const dispatch = useDispatch();
-    const { anchorRef, shouldHighlight } = useAnchor(SettingsAnchor.Autolock);
     const { device } = useDevice();
     const locale = useLocales();
-
+    const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
     const autoLockDelay = device?.features?.auto_lock_delay_ms;
 
     if (typeof autoLockDelay !== 'number') {
@@ -51,9 +48,9 @@ export const AutoLock = ({ isDeviceLocked }: AutoLockProps) => {
     const handleChange = (option: { value: number; label: string }) => {
         const value = option.value * 1000;
 
-        dispatch(applySettings({ auto_lock_delay_ms: value }));
+        dispatch(applySettingsThunk({ auto_lock_delay_ms: value }));
         analytics.report({
-            type: EventType.SettingsDeviceUpdateAutoLock,
+            type: events.settingsDeviceUpdateAutoLockEvent.name,
             payload: {
                 value,
             },
@@ -61,28 +58,35 @@ export const AutoLock = ({ isDeviceLocked }: AutoLockProps) => {
     };
 
     return (
-        <SectionItem
-            data-test="@settings/device/autolock"
-            ref={anchorRef}
-            shouldHighlight={shouldHighlight}
-        >
-            <TextColumn
-                title={<Translation id="TR_DEVICE_SETTINGS_AUTO_LOCK" />}
-                description={<Translation id="TR_DEVICE_SETTINGS_AUTO_LOCK_SUBHEADING" />}
-            />
-            <ActionColumn>
-                <ActionSelect
-                    useKeyPressScroll
-                    placeholder=""
-                    onChange={handleChange}
-                    options={[AUTO_LOCK_OPTIONS]}
-                    value={AUTO_LOCK_OPTIONS.options.find(
-                        option => autoLockDelay && autoLockDelay / 1000 === option.value,
-                    )}
-                    isDisabled={isDeviceLocked}
-                    data-test="@settings/auto-lock-select"
-                />
-            </ActionColumn>
-        </SectionItem>
+        <Anchor anchorId={SettingsAnchor.Autolock}>
+            {({ anchorId, anchorRef, shouldHighlight }) => (
+                <SectionItem
+                    data-testid={anchorId}
+                    ref={anchorRef}
+                    shouldHighlight={shouldHighlight}
+                >
+                    <TextColumn
+                        title={<Translation id="TR_DEVICE_SETTINGS_AUTO_LOCK" />}
+                        description={<Translation id="TR_DEVICE_SETTINGS_AUTO_LOCK_SUBHEADING" />}
+                    />
+                    <ActionColumn>
+                        <ActionSelect
+                            placeholder=""
+                            onChange={handleChange}
+                            options={[AUTO_LOCK_OPTIONS]}
+                            value={AUTO_LOCK_OPTIONS.options.find(
+                                option => autoLockDelay && autoLockDelay / 1000 === option.value,
+                            )}
+                            isDisabled={isDeviceLocked}
+                            isTooltipActive={isDeviceLocked}
+                            tooltipContent={
+                                <Translation id="TR_SETTINGS_DEVICE_BANNER_TITLE_REMEMBERED" />
+                            }
+                            data-testid="@settings/auto-lock-select"
+                        />
+                    </ActionColumn>
+                </SectionItem>
+            )}
+        </Anchor>
     );
 };

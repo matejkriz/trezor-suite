@@ -1,46 +1,56 @@
-import { analytics, EventType } from '@trezor/suite-analytics';
-
-import { setOnionLinks } from 'src/actions/suite/suiteActions';
-import { useDispatch, useSelector } from 'src/hooks/suite';
+import { events, injectDesktopAnalytics } from '@suite/analytics';
+import { Translation } from '@suite/intl';
+import { Anchor, SettingsAnchor } from '@suite/router';
+import { selectTorOnionLinks, suiteSettingsActions } from '@suite/settings';
+import { selectIsTorEnabled, selectIsTorEnabling } from '@suite/tor';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
 import { Switch } from '@trezor/components';
-import { ActionColumn, SectionItem, TextColumn, Translation } from 'src/components/suite';
-import { useAnchor } from 'src/hooks/suite/useAnchor';
-import { SettingsAnchor } from 'src/constants/suite/anchors';
+import { ActionColumn, SectionItem, TextColumn } from '@trezor/product-components';
 
+import { useSelector } from 'src/hooks/suite';
 /* keep torOnionLinks value as it is but hide this section when tor is off.
    when tor is off this value has no effect anyway (handled by ExternalLink hook) */
 export const TorOnionLinks = () => {
-    const torOnionLinks = useSelector(state => state.suite.settings.torOnionLinks);
-    const dispatch = useDispatch();
-    const { anchorRef, shouldHighlight } = useAnchor(SettingsAnchor.TorOnionLinks);
-
+    const torOnionLinks = useSelector(selectTorOnionLinks);
+    const isTorEnabled = useSelector(selectIsTorEnabled);
+    const isTorEnabling = useSelector(selectIsTorEnabling);
+    const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
     const handleChange = () => {
-        dispatch(setOnionLinks(!torOnionLinks));
+        dispatch(suiteSettingsActions.setOnionLinks(!torOnionLinks));
         analytics.report({
-            type: EventType.SettingsTorOnionLinks,
+            type: events.settingsTorOnionLinksEvent.name,
             payload: {
                 value: !torOnionLinks,
             },
         });
     };
 
+    if (!isTorEnabled && !isTorEnabling) {
+        return null;
+    }
+
     return (
-        <SectionItem
-            data-test="@settings/tor-onion-links"
-            ref={anchorRef}
-            shouldHighlight={shouldHighlight}
-        >
-            <TextColumn
-                title={<Translation id="TR_ONION_LINKS_TITLE" />}
-                description={<Translation id="TR_ONION_LINKS_DESCRIPTION" />}
-            />
-            <ActionColumn>
-                <Switch
-                    dataTest="@settings/general/onion-links-switch"
-                    isChecked={torOnionLinks}
-                    onChange={handleChange}
-                />
-            </ActionColumn>
-        </SectionItem>
+        <Anchor anchorId={SettingsAnchor.TorOnionLinks}>
+            {({ anchorId, anchorRef, shouldHighlight }) => (
+                <SectionItem
+                    data-testid={anchorId}
+                    ref={anchorRef}
+                    shouldHighlight={shouldHighlight}
+                >
+                    <TextColumn
+                        title={<Translation id="TR_ONION_LINKS_TITLE" />}
+                        description={<Translation id="TR_ONION_LINKS_DESCRIPTION" />}
+                    />
+                    <ActionColumn>
+                        <Switch
+                            data-testid="@settings/general/onion-links-switch"
+                            isChecked={torOnionLinks}
+                            onChange={handleChange}
+                        />
+                    </ActionColumn>
+                </SectionItem>
+            )}
+        </Anchor>
     );
 };

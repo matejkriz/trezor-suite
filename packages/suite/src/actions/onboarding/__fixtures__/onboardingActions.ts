@@ -1,46 +1,40 @@
-import { testMocks } from '@suite-common/test-utils';
+import { mockSuiteDevice } from '@suite-common/suite-types/mocks';
 
 import * as onboardingActions from 'src/actions/onboarding/onboardingActions';
-import onboardingReducer from 'src/reducers/onboarding/onboardingReducer';
 import * as STEP from 'src/constants/onboarding/steps';
-
-const { getSuiteDevice } = testMocks;
+import onboardingReducer from 'src/reducers/onboarding/onboardingReducer';
 
 export default [
     {
-        description: 'goToNextStep (without param)',
+        description: 'goToNextStepThunk (without param)',
         initialState: {
-            suite: {
-                device: getSuiteDevice(),
-            },
+            device: mockSuiteDevice(),
         },
-        action: () => onboardingActions.goToNextStep(),
+        action: () => onboardingActions.goToNextStepThunk(),
         expect: {
             toMatchObject: { activeStepId: STEP.ID_AUTHENTICATE_DEVICE_STEP },
         },
     },
     {
-        description: 'goToNextStep (with param)',
+        description: 'goToNextStepThunk (with param)',
         initialState: {
-            suite: {
-                device: getSuiteDevice(),
-            },
+            device: mockSuiteDevice(),
         },
-        action: () => onboardingActions.goToNextStep('firmware'),
+        action: () => onboardingActions.goToNextStepThunk('firmware'),
         expect: {
             toMatchObject: { activeStepId: STEP.ID_FIRMWARE_STEP },
         },
     },
     {
-        description: 'goToPreviousStep',
+        description: 'goToPreviousStepThunk',
         initialState: {
             onboarding: {
                 activeStepId: STEP.ID_RECOVERY_STEP,
             },
         },
-        action: () => onboardingActions.goToPreviousStep(),
+        action: () => onboardingActions.goToPreviousStepThunk(),
         expect: {
-            toMatchObject: { activeStepId: STEP.ID_RESET_DEVICE_STEP },
+            toMatchObject: { activeStepId: STEP.ID_BACKUP_TYPE_STEP },
         },
     },
     {
@@ -49,9 +43,7 @@ export default [
             onboarding: {
                 path: ['new'],
             },
-            suite: {
-                device: getSuiteDevice(),
-            },
+            device: mockSuiteDevice(),
         },
         action: () => onboardingActions.addPath('create'),
         expect: {
@@ -64,9 +56,7 @@ export default [
             onboarding: {
                 path: ['create'],
             },
-            suite: {
-                device: getSuiteDevice(),
-            },
+            device: mockSuiteDevice(),
         },
         action: () => onboardingActions.addPath('create'),
         expect: {
@@ -91,9 +81,7 @@ export default [
             onboarding: {
                 path: ['create', 'recovery'],
             },
-            suite: {
-                device: getSuiteDevice(),
-            },
+            device: mockSuiteDevice(),
         },
         action: () => onboardingActions.removePath(['recovery']),
         expect: {
@@ -107,9 +95,7 @@ export default [
                 path: ['create'],
                 activeStepId: STEP.ID_RECOVERY_STEP,
             },
-            suite: {
-                device: getSuiteDevice(),
-            },
+            device: mockSuiteDevice(),
         },
         action: () => onboardingActions.resetOnboarding(),
         expect: {

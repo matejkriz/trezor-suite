@@ -1,40 +1,43 @@
-import styled from 'styled-components';
-import { Paragraph } from '@trezor/components';
+import { Translation } from '@suite/intl';
+import { type NetworkSymbol } from '@suite-common/wallet-config';
+import { selectNetworkBlockchainInfo } from '@suite-common/wallet-core';
+import { Column, InfoItem, Paragraph } from '@trezor/components';
+
 import { useSelector } from 'src/hooks/suite';
-import { Translation } from 'src/components/suite/Translation';
-import type { Network } from 'src/types/wallet';
 
-const Wrapper = styled(Paragraph)`
-    display: flex;
-    flex-direction: column;
-    text-align: left;
-`;
+type ConnectionInfoProps = {
+    symbol: NetworkSymbol;
+};
 
-interface ConnectionInfoProps {
-    coin: Network['symbol'];
-}
+const ConnectionInfo = ({ symbol }: ConnectionInfoProps) => {
+    const blockchain = useSelector(state => selectNetworkBlockchainInfo(state, symbol));
 
-const ConnectionInfo = ({ coin }: ConnectionInfoProps) => {
-    const blockchain = useSelector(state => state.wallet.blockchain);
-
-    const { connected, url, blockHash: hash, blockHeight: height, version } = blockchain[coin];
+    const { connected, url, blockHash: hash, blockHeight: height, version } = blockchain;
 
     return (
-        <Wrapper typographyStyle="hint">
+        <Paragraph typographyStyle="body-sm">
             {connected ? (
-                <>
-                    <Translation id="SETTINGS_ADV_COIN_CONN_INFO_URL" values={{ url }} />
-                    <Translation id="SETTINGS_ADV_COIN_CONN_INFO_BLOCK_HASH" values={{ hash }} />
-                    <Translation
-                        id="SETTINGS_ADV_COIN_CONN_INFO_BLOCK_HEIGHT"
-                        values={{ height }}
-                    />
-                    <Translation id="SETTINGS_ADV_COIN_CONN_INFO_VERSION" values={{ version }} />
-                </>
+                <Column gap={12}>
+                    <InfoItem label={<Translation id="SETTINGS_ADV_COIN_CONN_INFO_URL" />}>
+                        {url}
+                    </InfoItem>
+
+                    <InfoItem label={<Translation id="SETTINGS_ADV_COIN_CONN_INFO_BLOCK_HASH" />}>
+                        {hash}
+                    </InfoItem>
+
+                    <InfoItem label={<Translation id="SETTINGS_ADV_COIN_CONN_INFO_BLOCK_HEIGHT" />}>
+                        {height}
+                    </InfoItem>
+
+                    <InfoItem label={<Translation id="SETTINGS_ADV_COIN_CONN_INFO_VERSION" />}>
+                        {version}
+                    </InfoItem>
+                </Column>
             ) : (
                 <Translation id="SETTINGS_ADV_COIN_CONN_INFO_NO_CONNECTED" />
             )}
-        </Wrapper>
+        </Paragraph>
     );
 };
 

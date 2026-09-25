@@ -1,0 +1,60 @@
+# Deep linking specification
+
+To support connecting to Trezor devices from 3rd party apps on mobile devices, Trezor Suite provides a communication interface via deep linking.
+
+## Base URL
+
+The base URL for deep linking is different depending on the environment.
+Last segment of the URL tracks the version of the deeplinking API.
+
+| Environment       | Base URL                                                 |
+| ----------------- | -------------------------------------------------------- |
+| Production build  | `https://connect.trezor.io/9/deeplink/1/`                |
+| Development build | `https://dev.suite.sldev.cz/connect/develop/deeplink/1/` |
+| Local (emulator)  | `trezorsuite://connect/1/`                               |
+
+## Query parameters
+
+The method call is specified using the query parameters.
+
+| Parameter  | Type        | Required | Description                                                                                                                                                                                    |
+| ---------- | ----------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `method`   | string      | yes      | The name of the Connect method to call (eg. getAddress).                                                                                                                                       |
+| `params`   | JSON object | yes      | The parameters for the method call encoded as JSON.                                                                                                                                            |
+| `callback` | string      | yes      | The URL to redirect to after the method call is made. This URL is controlled by your application and should include an ID to track the request. Example: `exampleapp://trezor-callback?id=123` |
+
+## Callback
+
+To receive the result of the method call, the app must specify a callback URL. The callback URL is called with the result of the method call.
+
+The following query parameters are passed in the callback URL:
+
+| Parameter  | Type        | Description                                                                                   |
+| ---------- | ----------- | --------------------------------------------------------------------------------------------- |
+| `id`       | integer     | ID of the call. This is set by your application in the callback URL and can be in any format. |
+| `response` | JSON object | Result of the method call, equivalent to the object returned by the method.                   |
+
+## Example
+
+Let's imagine we want to convert the following call to a deep link:
+
+```
+const address = await TrezorConnect.getAddress({
+    coin: 'btc',
+    path: "m/44'/0'/0'/0/0",
+});
+```
+
+The parameters would be:
+
+- **method**: `getAddress`
+- **params**: `{"coin":"btc","path":"m/44'/0'/0'/0/0"}`
+- **callback**: `https://httpbin.org/get?id=123` (as an example)
+
+The encoded deep link URL would then be:
+
+```
+trezorsuite://connect/1/?method=getAddress&params=%7B%22coin%22%3A%22btc%22%2C%22path%22%3A%22m%2F44%27%2F0%27%2F0%27%2F0%2F0%22%7D&callback=https%3A%2F%2Fhttpbin.org%2Fget%3Fid%3D123
+```
+
+When the user returns to the app, the callback URL is called with the result of the method call.

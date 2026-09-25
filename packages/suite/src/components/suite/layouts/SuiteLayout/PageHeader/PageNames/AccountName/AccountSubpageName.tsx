@@ -1,41 +1,38 @@
-import styled from 'styled-components';
-import { IconButton } from '@trezor/components';
-import { Account } from '@suite-common/wallet-types';
-import { spacingsPx } from '@trezor/theme';
-import { useDispatch } from 'src/hooks/suite';
-import { AccountDetails } from './AccountDetails';
-import { goto } from 'src/actions/suite/routerActions';
-import { Route } from '@suite-common/suite-types';
+import { Translation } from '@suite/intl';
+import { gotoThunk, selectSettingsBackRoute } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { type Account } from '@suite-common/wallet-types';
+import { IconButton, Row } from '@trezor/components';
+import { CaretLeftIcon } from '@trezor/icons';
 
-const Container = styled.div`
-    display: flex;
-    align-items: center;
-    gap: ${spacingsPx.md};
-`;
+import { useSelector } from 'src/hooks/suite';
+
+import { AccountDetails } from './AccountDetails';
 
 interface AccountSubpageNameProps {
     selectedAccount: Account;
-    backRoute?: Route['name'];
 }
 
-export const AccountSubpageName = ({
-    selectedAccount,
-    backRoute = 'wallet-index',
-}: AccountSubpageNameProps) => {
-    const dispatch = useDispatch();
+export const AccountSubpageName = ({ selectedAccount }: AccountSubpageNameProps) => {
+    const { dispatch } = useServices(injectDispatch);
+    const previousRoute = useSelector(selectSettingsBackRoute);
 
-    const handleBackClick = () => dispatch(goto(backRoute, { preserveParams: true }));
+    const handleBackClick = () =>
+        dispatch(gotoThunk({ routeName: previousRoute.name, params: previousRoute.params }));
 
     return (
-        <Container>
+        <Row alignItems="center" gap={16}>
             <IconButton
-                icon="ARROW_LEFT"
-                variant="tertiary"
-                size="medium"
+                icon={CaretLeftIcon}
+                intent="neutral"
+                priority="secondary"
+                size="large"
                 onClick={handleBackClick}
-                data-test="@account-subpage/back"
+                data-testid="@account-subpage/back"
+                tooltip={{ content: <Translation id="TR_BACK" /> }}
             />
-            <AccountDetails selectedAccount={selectedAccount} />
-        </Container>
+            <AccountDetails selectedAccount={selectedAccount} isBalanceShown />
+        </Row>
     );
 };

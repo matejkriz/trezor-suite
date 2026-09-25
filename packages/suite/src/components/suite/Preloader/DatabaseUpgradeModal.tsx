@@ -1,35 +1,24 @@
-import styled from 'styled-components';
+import { Translation } from '@suite/intl';
+import { H3, Modal, Paragraph } from '@trezor/components';
+import { DatabaseIcon } from '@trezor/icons';
 
-import { Image } from '@trezor/components';
-
-import { Modal, Translation } from 'src/components/suite';
-
-const ImageWrapper = styled.div`
-    display: flex;
-    justify-content: center;
-    margin: 20px;
-`;
-
-const StyledModal = styled(Modal)`
-    width: 600px;
-`;
-
-interface DatabaseUpgradeModalProps {
+type DatabaseUpgradeModalProps = {
     variant: 'blocking' | 'blocked';
-}
-
-export const DatabaseUpgradeModal = ({ variant }: DatabaseUpgradeModalProps) => {
-    const heading =
-        variant === 'blocked' ? 'TR_DATABASE_UPGRADE_BLOCKED' : 'TR_THIS_INSTANCE_IS_BLOCKING';
-
-    return (
-        <StyledModal
-            heading={<Translation id={heading} />}
-            description={<Translation id="TR_RUNNING_MULTIPLE_INSTANCES" />}
-        >
-            <ImageWrapper>
-                <Image image="DEVICE_ANOTHER_SESSION" width="250" />
-            </ImageWrapper>
-        </StyledModal>
-    );
 };
+
+export const DatabaseUpgradeModal = ({ variant }: DatabaseUpgradeModalProps) => (
+    <Modal icon={DatabaseIcon} intent="warning">
+        <H3 data-testid="@modal/database-upgrade/heading">
+            <Translation
+                id={
+                    variant === 'blocked'
+                        ? 'TR_DATABASE_UPGRADE_BLOCKED'
+                        : 'TR_THIS_INSTANCE_IS_BLOCKING'
+                }
+            />
+        </H3>
+        <Paragraph intent="neutral" priority="secondary">
+            <Translation id="TR_RUNNING_MULTIPLE_INSTANCES" />
+        </Paragraph>
+    </Modal>
+);

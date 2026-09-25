@@ -3,25 +3,49 @@
     "version": "1.0.0",
     "private": true,
     "license": "See LICENSE.md in repo root",
-    "sideEffects": false,
+    "sideEffects": [
+        "globalOverrides/index.ts",
+        "fakeIndexedDb/index.ts"
+    ],
     "main": "src/index",
+    "exports": {
+        ".": {
+            "types": "./libDev/src/index.d.ts",
+            "default": "./src/index.ts"
+        },
+        "./globalOverrides": {
+            "types": "./libDev/globalOverrides/index.d.ts",
+            "default": "./globalOverrides/index.ts"
+        },
+        "./fakeIndexedDb": {
+            "types": "./libDev/fakeIndexedDb/index.d.ts",
+            "default": "./fakeIndexedDb/index.ts"
+        }
+    },
     "scripts": {
-        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "type-check": "yarn g:tsc --build"
+        "depcheck": "yarn g:depcheck",
+        "type-check": "yarn g:tsc --build",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'"
     },
     "dependencies": {
-        "@mobily/ts-belt": "^3.13.1",
-        "@reduxjs/toolkit": "1.9.5",
+        "@reduxjs/toolkit": "2.12.0",
+        "@suite-common/dependency-injection": "workspace:*",
+        "@suite-common/legacy-network-config": "workspace:*",
+        "@suite-common/react-query": "workspace:*",
         "@suite-common/redux-utils": "workspace:*",
         "@suite-common/suite-types": "workspace:*",
         "@suite-common/wallet-config": "workspace:*",
         "@suite-common/wallet-types": "workspace:*",
+        "@testing-library/dom": "^10.4.1",
+        "@testing-library/react": "^16.3.2",
         "@trezor/connect": "workspace:*",
         "@trezor/device-utils": "workspace:*",
         "@trezor/utils": "workspace:*",
-        "dropbox": "^10.34.0",
-        "fake-indexeddb": "^4.0.2",
-        "redux": "^4.2.1",
-        "redux-thunk": "^2.4.2"
+        "core-js": "^3.49.0",
+        "fake-indexeddb": "^6.2.5",
+        "react": "19.2.3",
+        "react-redux": "9.3.0",
+        "redux": "^5.0.1",
+        "redux-thunk": "^3.1.0"
     }
 }

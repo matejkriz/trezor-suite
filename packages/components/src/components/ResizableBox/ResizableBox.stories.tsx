@@ -1,0 +1,67 @@
+import { type Meta, type StoryObj } from '@storybook/react';
+import styled from 'styled-components';
+
+import { ResizableBox as ResizableBoxComponent, type ResizableBoxProps } from './ResizableBox';
+
+const Container = styled.div`
+    position: relative;
+    width: 100%;
+    display: flex;
+`;
+
+const Content = styled.div`
+    background: green;
+    padding: 10px;
+    font-weight: 900;
+    width: 100%;
+    height: 100%;
+`;
+
+const meta: Meta<typeof ResizableBoxComponent> = {
+    title: 'ResizableBox',
+    component: ResizableBoxComponent,
+};
+export default meta;
+
+export const ResizableBox: StoryObj<ResizableBoxProps> = {
+    render: props => (
+        <Container>
+            <ResizableBoxComponent {...props} />
+        </Container>
+    ),
+    args: {
+        children: <Content>Resize me from any side!</Content>,
+        directions: ['top', 'left', 'right', 'bottom'],
+        isLocked: false,
+        width: 240,
+        minWidth: 80,
+        maxWidth: 400,
+        height: 100,
+        minHeight: 50,
+        maxHeight: 300,
+        disabledWidthInterval: [51, 100],
+        disabledHeightInterval: undefined,
+    },
+    argTypes: {
+        children: {
+            table: {
+                type: {
+                    summary: 'ReactNode',
+                },
+            },
+        },
+        directions: {
+            control: {
+                type: 'check',
+            },
+            options: ['top', 'left', 'right', 'bottom'],
+        },
+        isLocked: { control: 'boolean' },
+        width: { control: 'number' },
+        minWidth: { control: 'number' },
+        maxWidth: { control: 'number' },
+        height: { control: 'number' },
+        minHeight: { control: 'number' },
+        maxHeight: { control: 'number' },
+    },
+};

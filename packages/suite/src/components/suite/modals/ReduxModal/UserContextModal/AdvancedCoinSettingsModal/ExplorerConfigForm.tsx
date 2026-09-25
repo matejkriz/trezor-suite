@@ -1,0 +1,106 @@
+import { type ReactNode, useMemo } from 'react';
+import { type RefCallBack } from 'react-hook-form';
+
+import { Translation } from '@suite/intl';
+import { type Explorer } from '@suite-common/wallet-config';
+import { Button, Column, InfoItem, Input, Row, Text } from '@trezor/components';
+import { ChangeIcon } from '@trezor/icons';
+import { typedObjectKeys } from '@trezor/utils';
+
+import { type useExplorerForm } from 'src/hooks/settings/useExplorerForm';
+
+type InputRowProps = {
+    value: { ref: RefCallBack; field: Omit<RefCallBack, 'ref'>; error?: string };
+    title: ReactNode;
+    placeholder: string;
+    base: string;
+    defaultBase: string;
+};
+
+const InputRow = ({ value, title, placeholder, base, defaultBase }: InputRowProps) => (
+    <InfoItem label={title}>
+        <Row gap={12} alignItems="flex-start">
+            <Input value={base} type="text" placeholder={defaultBase} isDisabled={true} />
+
+            <Text intent="neutral" priority="secondary" margin={{ top: 16 }}>
+                /
+            </Text>
+
+            <Input
+                type="text"
+                innerRef={value.ref}
+                hasError={!!value.error}
+                bottomText={value.error}
+                placeholder={placeholder}
+                {...value.field}
+            />
+        </Row>
+    </InfoItem>
+);
+
+type ExplorerConfigProps = {
+    form: ReturnType<typeof useExplorerForm>;
+};
+
+export const ExplorerConfigForm = ({ form }: ExplorerConfigProps) => {
+    const { explorerConfig, setDefaultValues, usesDefaultExplorer, input, explorer } = form;
+
+    const explorerKeys = useMemo(() => {
+        const keys = typedObjectKeys(explorer);
+
+        return keys.filter(key => key !== 'base' && input.fields[key].value !== undefined);
+    }, [explorer, input]);
+
+    const getInputTranslation = (key: keyof Explorer) => {
+        switch (key) {
+            case 'tx':
+                return <Translation id="TR_EXPLORER_TX" />;
+            case 'address':
+                return <Translation id="TR_EXPLORER_ADDRESS" />;
+            case 'nft':
+                return <Translation id="TR_EXPLORER_NFT" />;
+            case 'token':
+                return <Translation id="TR_EXPLORER_TOKEN" />;
+            case 'queryString':
+                return <Translation id="TR_EXPLORER_QUERY_STRING" />;
+        }
+    };
+
+    return (
+        <Column gap={12}>
+            <InfoItem label={<Translation id="TR_EXPLORER_BASE_URL" />}>
+                <Input
+                    type="text"
+                    placeholder={explorerConfig.default.base}
+                    innerRef={input.fields.base.ref}
+                    hasError={!!input.fields.base.error}
+                    bottomText={input.fields.base.error}
+                    rightContent={
+                        <Button
+                            intent="neutral"
+                            priority="secondary"
+                            size="small"
+                            iconLeft={ChangeIcon}
+                            isDisabled={usesDefaultExplorer}
+                            onClick={setDefaultValues}
+                        >
+                            <Translation id="TR_EXPLORER_SET_DEFAULT" />
+                        </Button>
+                    }
+                    {...input.fields.base.field}
+                />
+            </InfoItem>
+
+            {explorerKeys.map(key => (
+                <InputRow
+                    key={key}
+                    value={input.fields[key]}
+                    title={getInputTranslation(key)}
+                    placeholder={explorerConfig.default[key] ?? ''}
+                    base={input.fields['base'].value}
+                    defaultBase={explorerConfig.default.base}
+                />
+            ))}
+        </Column>
+    );
+};

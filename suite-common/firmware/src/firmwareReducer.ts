@@ -1,0 +1,159 @@
+import { type PayloadAction } from '@reduxjs/toolkit';
+
+import { type ActionTypesDep, createReducerWithExtraDeps } from '@suite-common/redux-utils';
+import { type FirmwareStatus, type TrezorDevice } from '@suite-common/suite-types';
+import {
+    DEVICE,
+    type DeviceButtonRequest,
+    type FirmwareChannel,
+    type FirmwareType,
+    UI_EVENTS,
+    UI_REQUESTS,
+    type UiEventFirmwareProgress,
+    type UiEventFirmwareProgressUnexpectedDelay,
+    type UiEventFirmwareReconnect,
+    type UiRequestConfirmation,
+} from '@trezor/connect';
+
+import { firmwareActions } from './firmwareActions';
+
+type FirmwareUpdateUiEvent =
+    | DeviceButtonRequest
+    | UiEventFirmwareProgress
+    | UiEventFirmwareReconnect
+    | UiEventFirmwareProgressUnexpectedDelay;
+
+type FirmwareUpdateCommon = {
+    // Device before installation begun. Used to display the original firmware type and version during the installation.
+    cachedDevice?: TrezorDevice;
+    // Stores firmware type currently being installed so that it can be displayed to the user during installation
+    targetType?: FirmwareType;
+    useDevkit: boolean;
+    uiEvent?: FirmwareUpdateUiEvent;
+    firmwareChannel: FirmwareChannel;
+    switchFirmwareType: boolean;
+};
+
+export type FirmwareUpdateState =
+    | (FirmwareUpdateCommon & {
+          error: string | undefined;
+          status: FirmwareStatus | 'error';
+      })
+    | (FirmwareUpdateCommon & {
+          status: 'error';
+          error: string;
+      });
+
+const initialState: FirmwareUpdateState = {
+    status: 'initial',
+    error: undefined,
+    cachedDevice: undefined,
+    targetType: undefined,
+    useDevkit: false,
+    uiEvent: undefined,
+    firmwareChannel: 'production',
+    switchFirmwareType: false, // NOTE: flag that indicates when the user intents to change the type of FW universal -> bitcoin-only
+};
+export const firmwareInitialState = initialState;
+
+export type FirmwareRootState = {
+    firmware: typeof initialState;
+};
+
+type StorageActionPayload = {
+    firmware: {
+        firmwareChannel: FirmwareChannel;
+    };
+};
+
+type FirmwareReducerDeps = ActionTypesDep<'storageLoad'>;
+
+export const prepareFirmwareReducer = createReducerWithExtraDeps(
+    initialState,
+    (builder, extra: FirmwareReducerDeps) => {
+        builder
+            .addCase(
+                extra.actionTypes.storageLoad,
+                (state, { payload }: PayloadAction<StorageActionPayload>) => {
+                    if (payload.firmware) state.firmwareChannel = payload.firmware.firmwareChannel;
+                },
+            )
+            .addCase(firmwareActions.setStatus, (state, { payload }) => {
+                state.status = payload;
+            })
+            .addCase(firmwareActions.setSwitchFirmwareType, (state, { payload }) => {
+                state.switchFirmwareType = payload;
+            })
+            .addCase(firmwareActions.setFirmwareUpdateError, (state, { payload }) => {
+                state.error = payload;
+                if (payload) {
+                    state.status = 'error';
+                }
+                state.uiEvent = undefined;
+            })
+            .addCase(firmwareActions.setTargetType, (state, { payload }) => {
+                state.targetType = payload;
+            })
+            .addCase(firmwareActions.resetReducer, state => ({
+                ...initialState,
+                firmwareChannel: state.firmwareChannel,
+                useDevkit: state.useDevkit,
+            }))
+            .addCase(firmwareActions.toggleUseDevkit, (state, { payload }) => {
+                state.useDevkit = payload;
+            })
+            .addCase(firmwareActions.cacheDevice, (state, { payload }) => {
+                state.cachedDevice = payload;
+            })
+            .addCase(firmwareActions.setFirmwareChannel, (state, { payload }) => {
+                state.firmwareChannel = payload;
+            })
+            .addMatcher<UiRequestConfirmation>(
+                action => action.type === UI_REQUESTS.REQUEST_CONFIRMATION,
+                (state, action) => {
+                    if (state.status === 'started' && action.payload.view === 'thp-pairing-start') {
+                        state.status = 'thp-pairing';
+                    }
+                },
+            )
+            .addMatcher<FirmwareUpdateUiEvent>(
+                (action: FirmwareUpdateUiEvent) =>
+                    action.type === UI_EVENTS.FIRMWARE_RECONNECT ||
+                    action.type === UI_EVENTS.FIRMWARE_PROGRESS ||
+                    action.type === UI_EVENTS.FIRMWARE_PROGRESS_UNEXPECTED_DELAY ||
+                    action.type === DEVICE.BUTTON,
+                (state, action) => {
+                    // DEVICE.BUTTON can be dispatched outside the firmware update flow and that should not change the uiEvent,
+                    // otherwise it could result in confirmation pill being displayed unintentionally.
+                    if (!(action.type === DEVICE.BUTTON && state.status === 'initial')) {
+                        state.uiEvent = action;
+                    }
+                },
+            );
+    },
+);
+
+export const selectFirmware = (state: FirmwareRootState) => state.firmware;
+export const selectUseDevkit = (state: FirmwareRootState) => state.firmware.useDevkit;
+export const selectFirmwareChannel = (state: FirmwareRootState) => state.firmware.firmwareChannel;
+export const selectSwitchFirmwareType = (state: FirmwareRootState) =>
+    state.firmware.switchFirmwareType;
+
+export const selectIsFirmwareInstallationRunning = (state: FirmwareRootState) =>
+    state.firmware.status === 'started';
+
+// When a user is in the Early Access Program, the firmware channel is forced to
+// `production-early-access`. `allowPrerelease` is passed in as a parameter because it is a
+// platform-specific extra dependency, not a part of the state.
+export const selectEffectiveFirmwareChannel = (
+    state: FirmwareRootState,
+    allowPrerelease: boolean,
+): FirmwareChannel => (allowPrerelease ? 'production-early-access' : selectFirmwareChannel(state));
+
+export const selectIsProductionFirmwareChannel = (
+    state: FirmwareRootState,
+    allowPrerelease: boolean,
+): boolean =>
+    ['production', 'production-early-access'].includes(
+        selectEffectiveFirmwareChannel(state, allowPrerelease),
+    );

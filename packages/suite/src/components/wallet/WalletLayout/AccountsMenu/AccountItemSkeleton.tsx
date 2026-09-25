@@ -1,30 +1,33 @@
-import styled from 'styled-components';
-import { useLoadingSkeleton } from 'src/hooks/suite';
-import { Left, Right } from './AccountItem';
-import { NavigationItemBase } from 'src/components/suite/layouts/SuiteLayout/Sidebar/NavigationItem';
-import { SkeletonCircle, SkeletonStack, SkeletonRectangle } from '@trezor/components';
+import { selectShouldAnimateLoadingSkeleton } from '@suite/ui-animations';
+import { Column, Row, Skeleton } from '@trezor/components';
 
-const StyledSkeletonStack = styled(SkeletonStack)`
-    > :last-child {
-        margin-bottom: 0;
-    }
-`;
+import { useSelector } from 'src/hooks/suite';
+import { useResponsiveContext } from 'src/support/suite/ResponsiveContext';
 
 export const AccountItemSkeleton = () => {
-    const { shouldAnimate } = useLoadingSkeleton();
+    const shouldAnimate = useSelector(selectShouldAnimateLoadingSkeleton);
+    const { isSidebarCollapsed } = useResponsiveContext();
+
+    if (isSidebarCollapsed) {
+        return (
+            <Row
+                gap={16}
+                justifyContent="center"
+                alignItems="center"
+                data-testid="@account-menu/account-item-skeleton"
+            >
+                <Skeleton type="circle" size={24} />
+            </Row>
+        );
+    }
 
     return (
-        <NavigationItemBase data-test="@account-menu/account-item-skeleton">
-            <Left>
-                <SkeletonCircle size="24px" />
-            </Left>
-
-            <Right>
-                <StyledSkeletonStack $col $childMargin="0px 0px 8px 0px">
-                    <SkeletonRectangle width="140px" animate={shouldAnimate} />
-                    <SkeletonRectangle animate={shouldAnimate} />
-                </StyledSkeletonStack>
-            </Right>
-        </NavigationItemBase>
+        <Row gap={16} margin={8} data-testid="@account-menu/account-item-skeleton">
+            <Skeleton type="circle" size={24} animate={shouldAnimate} />
+            <Column alignItems="flex-start" gap={2}>
+                <Skeleton width={140} animate={shouldAnimate} />
+                <Skeleton animate={shouldAnimate} />
+            </Column>
+        </Row>
     );
 };

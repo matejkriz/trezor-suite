@@ -1,7 +1,9 @@
 import styled from 'styled-components';
 
 import { Paragraph } from '@trezor/components';
+
 import { Loading } from 'src/components/suite';
+
 import { ThemeProvider } from '../ThemeProvider';
 
 const Wrapper = styled.div`
@@ -19,10 +21,6 @@ const Loader = styled(Loading)`
     flex: 0;
 `;
 
-const LoadingText = styled(Paragraph)`
-    height: 0;
-`;
-
 type LoadingScreenProps = {
     message?: string;
 };
@@ -31,7 +29,7 @@ export const LoadingScreen = ({ message }: LoadingScreenProps) => (
     <ThemeProvider>
         <Wrapper>
             <Loader />
-            <LoadingText>{message}</LoadingText>
+            <Paragraph>{message}</Paragraph>
         </Wrapper>
     </ThemeProvider>
 );

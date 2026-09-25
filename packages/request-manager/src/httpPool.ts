@@ -1,5 +1,6 @@
-import http from 'http';
-import { InterceptorOptions } from './types';
+import type http from 'http';
+
+import { type InterceptorOptions } from './types';
 
 export const createRequestPool = (interceptorOptions: InterceptorOptions) => {
     const requestTimeoutLimit = 1000 * 30;

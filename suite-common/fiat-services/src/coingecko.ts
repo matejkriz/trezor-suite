@@ -1,22 +1,35 @@
-import { networks } from '@suite-common/wallet-config';
-import { LastWeekRates, TickerId } from '@suite-common/wallet-types';
-import { FiatCurrencyCode } from '@suite-common/suite-config';
+import { getNetwork } from '@suite-common/wallet-config';
+import { type HistoricRates, type TickerId } from '@suite-common/wallet-types';
+import type { BaseCurrencyCode } from '@trezor/blockchain-link-types';
+import { parseAsset } from '@trezor/blockchain-link-utils/src/blockfrost';
+import stellar from '@trezor/network-stellar/runtime';
 
-import { RateLimiter } from './limiter';
 import { fetchUrl } from './fetch';
+import { RateLimiter } from './limiter';
 
 // a proxy for https://api.coingecko.com/api/v3
 const COINGECKO_API_BASE_URL = 'https://cdn.trezor.io/dynamic/coingecko/api/v3';
 
-interface HistoricalResponse extends LastWeekRates {
+const ONE_DAY_IN_S = 24 * 60 * 60;
+
+interface HistoricalResponse extends HistoricRates {
     symbol: string;
+}
+
+interface FetchCurrentFiatRatesOptions {
+    skipCache?: boolean;
 }
 
 const rateLimiter = new RateLimiter(1_000, 15_000);
 
-const fetchCoinGecko = async (url: string) => {
+const fetchCoinGecko = async (url: string, skipCache?: boolean) => {
     try {
-        const res = await rateLimiter.limit(signal => fetchUrl(url, { signal }));
+        let res: Response;
+        if (skipCache) {
+            res = await fetchUrl(url, { headers: { 'X-Bypass-Cache': '1' } });
+        } else {
+            res = await rateLimiter.limit(signal => fetchUrl(url, { signal }));
+        }
         if (!res.ok) {
             console.warn(`Coingecko: Fiat rates failed to fetch: ${res.status}`);
 
@@ -32,21 +45,61 @@ const fetchCoinGecko = async (url: string) => {
 
 /**
  * Build coinUrl using defined coin ids
- *
- * @param {TickerId} ticker
- * @returns
  */
-const buildCoinUrl = (ticker: TickerId) => {
-    const { coingeckoId } = networks[ticker.symbol];
+const buildCoinUrls = async (ticker: TickerId) => {
+    const { coingeckoId, tradeCryptoId, settlementLayer, networkType } = getNetwork(ticker.symbol);
     if (!coingeckoId) {
-        console.error('buildCoinUrl: cannot find coingecko asset platform id for ', ticker);
+        console.error('buildCoinUrls: cannot find coingeckoId for ', ticker);
 
-        return null;
+        return [];
     }
 
-    const baseUrl = `${COINGECKO_API_BASE_URL}/coins/${coingeckoId}`;
+    let baseId: string = coingeckoId;
+    if (networkType === 'ethereum') {
+        if (ticker.tokenAddress) {
+            // token on network -> network coingecko id
+            baseId = coingeckoId;
+        } else if (settlementLayer) {
+            baseId = getNetwork(settlementLayer)?.coingeckoId ?? coingeckoId;
+        } else {
+            // native token on network -> native token coingecko id
+            if (!tradeCryptoId) {
+                console.error('buildCoinUrls: cannot find tradeCryptoId for', ticker);
 
-    return ticker.tokenAddress ? `${baseUrl}/contract/${ticker.tokenAddress}` : baseUrl;
+                return [];
+            }
+            baseId = tradeCryptoId;
+        }
+    }
+
+    const baseUrl = `${COINGECKO_API_BASE_URL}/coins/${baseId}`;
+
+    if (!ticker.tokenAddress) {
+        return [baseUrl];
+    }
+
+    if (networkType === 'cardano') {
+        const { policyId } = parseAsset(ticker.tokenAddress || '');
+
+        return [`${baseUrl}/contract/${policyId}`, `${baseUrl}/contract/${ticker.tokenAddress}`];
+    }
+
+    if (networkType === 'stellar') {
+        const { computeSorobanAssetContractId } = await stellar();
+        const { assetCode, assetIsuer, sorobanAssetContractId } = computeSorobanAssetContractId(
+            ticker.tokenAddress,
+        );
+
+        // CoinGecko is gradually migrating Stellar assets to Soroban contract ids, so try that URL first.
+        return [
+            `${baseUrl}/contract/${sorobanAssetContractId}`,
+            `${baseUrl}/contract/${assetCode}-${assetIsuer}`,
+            `${baseUrl}/contract/${assetCode}-${assetIsuer}-1`,
+            `${baseUrl}/contract/${assetCode}:${assetIsuer}`,
+        ];
+    }
+
+    return [`${baseUrl}/contract/${ticker.tokenAddress}`];
 };
 
 /**
@@ -56,20 +109,29 @@ const buildCoinUrl = (ticker: TickerId) => {
  * @param {TickerId} ticker
  * @returns
  */
-export const fetchCurrentFiatRates = async (ticker: TickerId) => {
-    const coinUrl = buildCoinUrl(ticker);
-    if (!coinUrl) return null;
+export const fetchCurrentFiatRates = async (
+    ticker: TickerId,
+    options?: FetchCurrentFiatRatesOptions,
+) => {
+    const coinUrls = await buildCoinUrls(ticker);
+    if (!coinUrls || coinUrls.length === 0) return null;
+
     const urlParams =
-        'tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false';
-    const url = `${coinUrl}?${urlParams}`;
+        'tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false&localization=false';
 
-    const rates = await fetchCoinGecko(url);
-    if (!rates) return null;
+    for (const coinUrl of coinUrls) {
+        const url = `${coinUrl}?${urlParams}`;
+        const rates = await fetchCoinGecko(url, options?.skipCache);
 
-    return {
-        ts: new Date().getTime() / 1000,
-        rates: rates.market_data?.current_price,
-    };
+        if (rates) {
+            return {
+                ts: new Date().getTime() / 1000,
+                rates: rates.market_data?.current_price,
+            };
+        }
+    }
+
+    return null;
 };
 
 /**
@@ -80,18 +142,21 @@ export const findClosestTimestampValue = (
     timestamp: number,
     prices: Array<[number, number]>,
 ): number => {
-    let closestTimestamp = prices[0];
+    // @ts-expect-error: indexing with noUncheckedIndexedAccess
+    let closestTimestamp: [number, number] = prices[0];
 
     for (let i = 1; i < prices.length; i++) {
         const currentTimeDelta = Math.abs(timestamp - closestTimestamp[0] / 1000);
-        const nextTimeDelta = Math.abs(timestamp - prices[i][0] / 1000);
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const next: [number, number] = prices[i];
+        const nextTimeDelta = Math.abs(timestamp - next[0] / 1000);
 
         // The timestamps are ordered, if next time delta is higher, we can stop the iteration.
         if (currentTimeDelta < nextTimeDelta) {
             break;
         }
 
-        closestTimestamp = prices[i];
+        closestTimestamp = next;
     }
 
     return closestTimestamp[1];
@@ -103,42 +168,49 @@ export const findClosestTimestampValue = (
  *
  * @param {TickerId} ticker
  * @param {number[]} timestamps
+ * @param {BaseCurrencyCode} fiatCurrencyCode
  */
 export const getFiatRatesForTimestamps = async (
     ticker: TickerId,
     timestamps: number[],
-    fiatCurrencyCode: FiatCurrencyCode,
+    fiatCurrencyCode: BaseCurrencyCode,
 ): Promise<HistoricalResponse | null> => {
-    if (timestamps.length < 2) return null;
-
-    const coinUrl = buildCoinUrl(ticker);
+    const coinUrls = await buildCoinUrls(ticker); // Assuming this now returns an array of URLs
     const urlEndpoint = `market_chart/range`;
-    if (!coinUrl) return null;
+    if (!coinUrls || coinUrls.length === 0) return null;
 
     // sort timestamps chronologically to get the minimum and maximum values
-    const sortedTimestamps = [...timestamps].sort((ts1, ts2) => ts1 - ts2);
+    const sortedTimestampsInSeconds = [...timestamps].sort((ts1, ts2) => ts1 - ts2);
 
-    const params = `?vs_currency=${fiatCurrencyCode}&from=${sortedTimestamps[0]}&to=${
-        sortedTimestamps[sortedTimestamps.length - 1]
-    }`;
-    const url = `${coinUrl}/${urlEndpoint}${params}`;
+    // adjust from and to timestamps to get better range of data
+    const lastIndex = sortedTimestampsInSeconds.length - 1;
+    // @ts-expect-error: indexing with noUncheckedIndexedAccess
+    const firstTs: number = sortedTimestampsInSeconds[0];
+    // @ts-expect-error: indexing with noUncheckedIndexedAccess
+    const lastTs: number = sortedTimestampsInSeconds[lastIndex];
+    const fromTimestamp = firstTs - ONE_DAY_IN_S;
+    const toTimestamp = lastTs + ONE_DAY_IN_S;
 
-    // returns pairs of [timestamp, fiatRate]
-    const response = await fetchCoinGecko(url);
-    if (!response?.prices || response?.prices.length === 0) {
-        return null;
+    const params = `?vs_currency=${fiatCurrencyCode}&from=${fromTimestamp}&to=${toTimestamp}`;
+
+    for (const coinUrl of coinUrls) {
+        const url = `${coinUrl}/${urlEndpoint}${params}`;
+        const response = await fetchCoinGecko(url);
+        if (response?.prices && response.prices.length > 0) {
+            const tickers = timestamps.map(ts => ({
+                ts,
+                rates: { [fiatCurrencyCode]: findClosestTimestampValue(ts, response.prices) },
+            }));
+
+            return {
+                symbol: ticker.symbol,
+                tickers,
+                ts: new Date().getTime(),
+            };
+        }
     }
 
-    const tickers = timestamps.map(ts => ({
-        ts,
-        rates: { [fiatCurrencyCode]: findClosestTimestampValue(ts, response.prices) },
-    }));
-
-    return {
-        symbol: ticker.symbol,
-        tickers,
-        ts: new Date().getTime(),
-    };
+    return null;
 };
 
 /**
@@ -152,25 +224,32 @@ export const getFiatRatesForTimestamps = async (
  */
 export const fetchLastWeekRates = async (
     ticker: TickerId,
-    fiatCurrencyCode: FiatCurrencyCode,
+    fiatCurrencyCode: BaseCurrencyCode,
 ): Promise<HistoricalResponse | null> => {
     const urlEndpoint = `market_chart`;
     const urlParams = `vs_currency=${fiatCurrencyCode}&days=7`;
-    const coinUrl = buildCoinUrl(ticker);
-    if (!coinUrl) return null;
+    const coinUrls = await buildCoinUrls(ticker);
+    if (!coinUrls || coinUrls.length === 0) return null;
 
     const { symbol } = ticker;
-    const url = `${coinUrl}/${urlEndpoint}?${urlParams}`;
-    const data = await fetchCoinGecko(url);
-    const tickers = data?.prices?.map((d: any) => ({
-        ts: Math.floor(d[0] / 1000),
-        rates: { [fiatCurrencyCode]: d[1] },
-    }));
-    if (!tickers) return null;
 
-    return {
-        symbol,
-        tickers,
-        ts: new Date().getTime(),
-    };
+    for (const coinUrl of coinUrls) {
+        const url = `${coinUrl}/${urlEndpoint}?${urlParams}`;
+        const data = await fetchCoinGecko(url);
+        if (data) {
+            const tickers = data.prices?.map((d: [number, number]) => ({
+                ts: Math.floor(d[0] / 1000),
+                rates: { [fiatCurrencyCode]: d[1] },
+            }));
+            if (tickers) {
+                return {
+                    symbol,
+                    tickers,
+                    ts: new Date().getTime(),
+                };
+            }
+        }
+    }
+
+    return null;
 };

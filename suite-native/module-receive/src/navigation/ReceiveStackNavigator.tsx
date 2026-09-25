@@ -1,12 +1,16 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import {
-    ReceiveStackParamList,
+    type ReceiveStackParamList,
     ReceiveStackRoutes,
     stackNavigationOptionsConfig,
 } from '@suite-native/navigation';
 
+import { ReceiveAddressVerificationStackNavigator } from './ReceiveAddressVerificationStackNavigator';
 import { ReceiveAccountsScreen } from '../screens/ReceiveAccountsScreen';
+import { ReceiveAddressDetailScreen } from '../screens/ReceiveAddressDetailScreen';
+import { ReceiveAddressListScreen } from '../screens/ReceiveAddressListScreen';
+import { ReceiveFreshAddressScreen } from '../screens/ReceiveFreshAddressScreen';
 
 const ReceiveStack = createNativeStackNavigator<ReceiveStackParamList>();
 
@@ -18,6 +22,22 @@ export const ReceiveStackNavigator = () => (
         <ReceiveStack.Screen
             name={ReceiveStackRoutes.ReceiveAccounts}
             component={ReceiveAccountsScreen}
+        />
+        <ReceiveStack.Screen
+            name={ReceiveStackRoutes.ReceiveAddress}
+            component={ReceiveFreshAddressScreen}
+        />
+        <ReceiveStack.Screen
+            name={ReceiveStackRoutes.ReceiveAddressVerification}
+            component={ReceiveAddressVerificationStackNavigator}
+        />
+        <ReceiveStack.Screen
+            name={ReceiveStackRoutes.ReceiveAddressList}
+            component={ReceiveAddressListScreen}
+        />
+        <ReceiveStack.Screen
+            name={ReceiveStackRoutes.ReceiveAddressDetail}
+            component={ReceiveAddressDetailScreen}
         />
     </ReceiveStack.Navigator>
 );

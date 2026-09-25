@@ -1,67 +1,64 @@
-import { isWithinInterval, fromUnixTime } from 'date-fns';
-import { Dispatch, GetState } from 'src/types/suite';
-import { Account } from 'src/types/wallet';
+import { type Dispatch, createAction } from '@reduxjs/toolkit';
 
-import { isTrezorConnectBackendType } from '@suite-common/wallet-utils';
-
+import { createThunk } from '@suite-common/redux-utils';
+import { resetTime } from '@suite-common/suite-utils';
+import {
+    type BlockchainRootState,
+    type WalletSettingsRootState,
+    selectBaseCurrency,
+    selectIsElectrumBackendSelected,
+} from '@suite-common/wallet-core';
+import { type AccountKey, createAccountKey } from '@suite-common/wallet-types';
+import { isTrezorConnectBackendType, tryGetAccountIdentity } from '@suite-common/wallet-utils';
 import TrezorConnect from '@trezor/connect';
+import { asCoinSymbol } from '@trezor/connect-common';
+
+import { type GraphState } from 'src/reducers/wallet/graphReducer';
+import { type Account } from 'src/types/wallet';
+import {
+    type AccountHistoryWithBalance,
+    type GraphData,
+    type GraphRange,
+} from 'src/types/wallet/graph';
+import {
+    enhanceBlockchainAccountHistory,
+    ensureHistoryRates,
+    isNetworkWithGraphFeature,
+    mergeAccountBalanceHistory,
+} from 'src/utils/wallet/graph';
 
 import {
-    ACCOUNT_GRAPH_SUCCESS,
     ACCOUNT_GRAPH_FAIL,
+    ACCOUNT_GRAPH_START,
+    ACCOUNT_GRAPH_SUCCESS,
     AGGREGATED_GRAPH_START,
     AGGREGATED_GRAPH_SUCCESS,
-    ACCOUNT_GRAPH_START,
     SET_SELECTED_RANGE,
-    SET_SELECTED_VIEW,
 } from './constants/graphConstants';
-import { GraphData, GraphRange, GraphScale } from 'src/types/wallet/graph';
-import {
-    ensureHistoryRates,
-    enhanceBlockchainAccountHistory,
-    accountGraphDataFilterFn,
-    deviceGraphDataFilterFn,
-} from 'src/utils/wallet/graph';
-import { selectLocalCurrency } from 'src/reducers/wallet/settingsReducer';
-import { selectIsElectrumBackendSelected } from '@suite-common/wallet-core';
 
-export type GraphAction =
-    | {
-          type: typeof ACCOUNT_GRAPH_SUCCESS;
-          payload: GraphData;
-      }
-    | {
-          type: typeof ACCOUNT_GRAPH_START;
-          payload: GraphData;
-      }
-    | {
-          type: typeof ACCOUNT_GRAPH_FAIL;
-          payload: GraphData;
-      }
-    | {
-          type: typeof AGGREGATED_GRAPH_START;
-      }
-    | {
-          type: typeof AGGREGATED_GRAPH_SUCCESS;
-      }
-    | {
-          type: typeof SET_SELECTED_RANGE;
-          payload: GraphRange;
-      }
-    | {
-          type: typeof SET_SELECTED_VIEW;
-          payload: GraphScale;
-      };
+const DAY_IN_SECONDS = 3600 * 24;
 
-export const setSelectedRange = (range: GraphRange): GraphAction => ({
-    type: SET_SELECTED_RANGE,
-    payload: range,
-});
+type GraphRootState = { wallet: { graph: GraphState } };
 
-export const setSelectedView = (view: GraphScale): GraphAction => ({
-    type: SET_SELECTED_VIEW,
-    payload: view,
-});
+const selectAccountGraphData = (state: GraphRootState, account: Account) =>
+    state.wallet.graph.data.find(
+        d =>
+            d.account.deviceState === account.deviceState &&
+            d.account.descriptor === account.descriptor &&
+            d.account.symbol === account.symbol,
+    )?.data;
+const selectGraph = (state: GraphRootState) => state.wallet.graph;
+
+export const accountGraphSuccess = createAction<GraphData>(ACCOUNT_GRAPH_SUCCESS);
+export const accountGraphFail = createAction<Omit<GraphData, 'data'>>(ACCOUNT_GRAPH_FAIL);
+export const accountGraphStart = createAction<Omit<GraphData, 'data'>>(ACCOUNT_GRAPH_START);
+export const aggregatedGraphStart = createAction(AGGREGATED_GRAPH_START);
+export const aggregatedGraphSuccess = createAction(AGGREGATED_GRAPH_SUCCESS);
+export const setSelectedRange = createAction<GraphRange>(SET_SELECTED_RANGE);
+
+type FetchAccountGraphDataThunkState = BlockchainRootState &
+    GraphRootState &
+    WalletSettingsRootState;
 
 /**
  * Fetch the account history (received, sent amounts, num of txs) for the given `startDate`, `endDate`.
@@ -71,28 +68,37 @@ export const setSelectedView = (view: GraphScale): GraphAction => ({
  * @param {Account} account
  * @returns
  */
-export const fetchAccountGraphData =
-    (account: Account) => async (dispatch: Dispatch, getState: GetState) => {
-        dispatch({
-            type: ACCOUNT_GRAPH_START,
-            payload: {
+export const fetchAccountGraphDataThunk =
+    (account: Account, options: { abortSignal?: AbortSignal }) =>
+    async (dispatch: Dispatch, getState: () => FetchAccountGraphDataThunkState) => {
+        dispatch(
+            accountGraphStart({
                 account: {
                     deviceState: account.deviceState,
                     descriptor: account.descriptor,
                     symbol: account.symbol,
                 },
-                data: [],
                 isLoading: true,
                 error: false,
-            },
+            }),
+        );
+
+        const baseCurrencyCode = selectBaseCurrency(getState());
+
+        const cachedData = selectAccountGraphData(getState(), account);
+        // refetch one day earlier than the last cached point so the last cached bucket is always
+        // recomputed, regardless of how backend bucket boundaries align with the local timezone
+        const lastCachedPoint = cachedData && cachedData.length > 2 ? cachedData.at(-1) : undefined;
+
+        const response = await TrezorConnect.blockchainGetAccountBalanceHistory({
+            coin: asCoinSymbol(account.symbol),
+            identity: tryGetAccountIdentity(account),
+            descriptor: account.descriptor,
+            from: lastCachedPoint ? lastCachedPoint.time - DAY_IN_SECONDS : undefined,
+            groupBy: DAY_IN_SECONDS, // day
         });
 
-        const localCurrency = selectLocalCurrency(getState());
-        const response = await TrezorConnect.blockchainGetAccountBalanceHistory({
-            coin: account.symbol,
-            descriptor: account.descriptor,
-            groupBy: 3600 * 24, // day
-        });
+        options.abortSignal?.throwIfAborted();
 
         const isElectrumBackend = selectIsElectrumBackendSelected(getState(), account.symbol);
 
@@ -100,113 +106,124 @@ export const fetchAccountGraphData =
             const responseWithRates = await ensureHistoryRates(
                 account.symbol,
                 response.payload,
-                localCurrency,
+                baseCurrencyCode,
                 isElectrumBackend,
             );
+
+            const firstFreshTime = responseWithRates[0]
+                ? resetTime(responseWithRates[0].time)
+                : undefined;
+            const balanceBeforeFirstFreshPoint =
+                lastCachedPoint && firstFreshTime !== undefined
+                    ? cachedData?.filter(point => point.time < firstFreshTime).at(-1)?.balance
+                    : undefined;
 
             const enhancedResponse = enhanceBlockchainAccountHistory(
                 responseWithRates,
                 account.symbol,
+                balanceBeforeFirstFreshPoint,
             );
 
-            dispatch({
-                type: ACCOUNT_GRAPH_SUCCESS,
-                payload: {
+            const getData = () => {
+                if (!lastCachedPoint || !cachedData) {
+                    return enhancedResponse;
+                }
+                if (responseWithRates.length === 0 || balanceBeforeFirstFreshPoint === undefined) {
+                    return cachedData;
+                }
+
+                return mergeAccountBalanceHistory(cachedData, enhancedResponse);
+            };
+            const data = getData();
+
+            dispatch(
+                accountGraphSuccess({
                     account: {
                         deviceState: account.deviceState,
                         descriptor: account.descriptor,
                         symbol: account.symbol,
                     },
-                    data: enhancedResponse,
+                    data,
                     isLoading: false,
                     error: false,
-                },
-            });
+                }),
+            );
         } else {
-            dispatch({
-                type: ACCOUNT_GRAPH_FAIL,
-                payload: {
+            dispatch(
+                accountGraphFail({
                     account: {
                         deviceState: account.deviceState,
                         descriptor: account.descriptor,
                         symbol: account.symbol,
                     },
-                    data: [],
                     isLoading: false,
                     error: true,
-                },
-            });
+                }),
+            );
         }
     };
 
-export const updateGraphData =
-    (
-        accounts: Account[],
-        options?: {
-            newAccountsOnly?: boolean;
-        },
-    ) =>
-    async (dispatch: Dispatch, getState: GetState) => {
-        const { graph } = getState().wallet;
+type UpdateGraphDataThunkState = FetchAccountGraphDataThunkState;
 
-        // TODO: default behaviour should be fetch only new data (since last timestamp)
-        // exclude accounts with unsupported backend type
-        let filteredAccounts = accounts.filter(a => isTrezorConnectBackendType(a.backendType));
-        if (options?.newAccountsOnly) {
-            // add only accounts for which we don't have any data for given interval
-            filteredAccounts = filteredAccounts.filter(
-                account => !graph.data.find(d => accountGraphDataFilterFn(d, account)),
-            );
-        }
-        if (filteredAccounts.length === 0) {
-            return;
-        }
+export const updateGraphDataThunk = createThunk<
+    void,
+    { accounts: Account[]; abortSignal?: AbortSignal },
+    { state: UpdateGraphDataThunkState }
+>('wallet/updateGraphData', async ({ accounts, abortSignal }, { dispatch, getState }) => {
+    const graph = selectGraph(getState());
 
-        dispatch({
-            type: AGGREGATED_GRAPH_START,
-        });
-        const promises = filteredAccounts.map(
-            a => dispatch(fetchAccountGraphData(a)), // fetch for all range
+    const supportedAccounts = accounts.filter(
+        a =>
+            isTrezorConnectBackendType(a.backendType) &&
+            isNetworkWithGraphFeature(a.symbol, a.backendType),
+    );
+
+    const graphDataPointsByAccount = new Map<AccountKey, AccountHistoryWithBalance[]>(
+        graph.data.map(({ account, data }) => [
+            createAccountKey({
+                accountDescriptor: account.descriptor,
+                networkSymbol: account.symbol,
+                deviceStaticSessionId: account.deviceState,
+            }),
+            data,
+        ]),
+    );
+
+    const graphTxCountByAccount = new Map<AccountKey, number>(
+        Array.from(graphDataPointsByAccount.entries()).map(([key, data]) => {
+            const txCount = data.reduce((acc, point) => acc + point.txs, 0);
+
+            return [key, txCount];
+        }),
+    );
+
+    const accountsToFetch = supportedAccounts.filter(account => {
+        const txCount = graphTxCountByAccount.get(account.key) ?? 0;
+
+        return txCount !== account.history.total;
+    });
+
+    if (accountsToFetch.length === 0) {
+        return;
+    }
+
+    try {
+        dispatch(aggregatedGraphStart());
+        const promises = accountsToFetch.map(a =>
+            dispatch(
+                fetchAccountGraphDataThunk(a, {
+                    abortSignal,
+                }),
+            ),
         );
         await Promise.all(promises);
 
-        dispatch({
-            type: AGGREGATED_GRAPH_SUCCESS,
-        });
-    };
+        abortSignal?.throwIfAborted();
 
-export const getGraphDataForInterval =
-    (options: { account?: Account; deviceState?: string }) =>
-    (_dispatch: Dispatch, getState: GetState) => {
-        const { graph } = getState().wallet;
-        const { selectedRange } = graph;
-
-        const data: GraphData[] = [];
-        graph.data.forEach(accountGraph => {
-            const accountFilter = options.account
-                ? accountGraphDataFilterFn(accountGraph, options.account)
-                : true;
-            const deviceFilter = options.deviceState
-                ? deviceGraphDataFilterFn(accountGraph, options.deviceState)
-                : true;
-
-            if (accountFilter && deviceFilter) {
-                if (selectedRange.startDate && selectedRange.endDate) {
-                    data.push({
-                        ...accountGraph,
-                        data:
-                            accountGraph.data?.filter(d =>
-                                isWithinInterval(fromUnixTime(d.time), {
-                                    start: selectedRange.startDate,
-                                    end: selectedRange.endDate,
-                                }),
-                            ) ?? [],
-                    });
-                } else {
-                    data.push(accountGraph);
-                }
-            }
-        });
-
-        return data;
-    };
+        dispatch(aggregatedGraphSuccess());
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            dispatch(aggregatedGraphSuccess());
+        }
+    }
+});

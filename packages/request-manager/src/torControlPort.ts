@@ -1,10 +1,12 @@
-import net, { Socket } from 'net';
-import fs from 'fs';
 import crypto from 'crypto';
-import util from 'util';
+import fs from 'fs';
+import net, { type Socket } from 'net';
 import path from 'path';
+import util from 'util';
+
 import { promiseAllSequence } from '@trezor/utils';
-import { TorConnectionOptions, TorCommandResponse } from './types';
+
+import { type TorCommandResponse, type TorConnectionOptions } from './types';
 
 const readFile = util.promisify(fs.readFile);
 const randomBytes = util.promisify(crypto.randomBytes);
@@ -27,7 +29,6 @@ export class TorControlPort {
     options: TorConnectionOptions;
     socket: Socket;
     isSocketConnected = false;
-    isCircuitDone = false;
     clientNonce = '';
 
     onMessageReceived: (message: string) => void;
@@ -67,7 +68,7 @@ export class TorControlPort {
                     let cookieString;
                     try {
                         cookieString = await getCookieString(this.options.torDataDir);
-                    } catch (error) {
+                    } catch {
                         reject(new Error('TOR control port control_auth_cookie cannot be read'));
                     }
                     const serverNonce = authchallengeResponse[2];
@@ -117,7 +118,7 @@ export class TorControlPort {
         }
         try {
             return !!this.write('GETINFO');
-        } catch (error) {
+        } catch {
             return false;
         }
     }
@@ -175,11 +176,11 @@ export class TorControlPort {
                     /^[0-9]+ (LAUNCHED|BUILT|GUARD_WAIT|EXTENDED|FAILED|CLOSED)/.test(line),
                 )
                 .map(line => {
-                    const [id, status, ...values] = line.split(' ');
+                    const [id, status2, ...values] = line.split(' ');
 
                     return {
                         id,
-                        status,
+                        status: status2,
                         // not used for now, left as example:
                         // buildFlags: getValue('BUILD_FLAGS', values),
                         // purpose: getValue('PURPOSE', values),
@@ -205,7 +206,9 @@ export class TorControlPort {
         const circuits = await this.getCircuits();
         const circuitsToClose = identity
             ? circuits.filter(circuit => circuit.username === identity)
-            : circuits.filter(circuit => !circuit.username || circuit.username === 'Default');
+            : circuits.filter(
+                  circuit => !circuit.username || circuit.username.toLowerCase() === 'default',
+              );
 
         return promiseAllSequence(
             circuitsToClose.map(circuit => () => this.sendCommand(`closecircuit ${circuit.id}`)),

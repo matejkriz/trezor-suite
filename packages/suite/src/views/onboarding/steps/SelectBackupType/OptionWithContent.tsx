@@ -1,0 +1,181 @@
+import { type ReactNode, forwardRef } from 'react';
+
+import styled, { css } from 'styled-components';
+
+import { Translation } from '@suite/intl';
+import { type BackupType } from '@suite-common/suite-types';
+import { Icon, Radio, Row, Text, Tooltip, variables } from '@trezor/components';
+import { CaretDownIcon, RecoverySeedIcon } from '@trezor/icons';
+
+import { useLayoutSize } from 'src/hooks/suite';
+
+import { typesToLabelMap } from './typesToLabelMap';
+
+export const OptionText = styled.div`
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+`;
+
+export const OptionStyled = styled.div<{ $hasHoverInteraction?: boolean; $disabled?: boolean }>`
+    display: flex;
+    flex-direction: row;
+
+    gap: 16px;
+
+    padding-top: 12px;
+    padding-bottom: 12px;
+
+    ${variables.SCREEN_QUERY.BELOW_LAPTOP} {
+        padding-top: 8px;
+        padding-bottom: 8px;
+    }
+
+    align-items: center;
+    cursor: pointer;
+
+    color: ${({ $disabled, theme }) => ($disabled ? theme.contentSecondary : undefined)};
+
+    ${({ $hasHoverInteraction }) =>
+        $hasHoverInteraction
+            ? css`
+                  &:hover {
+                      background-color: ${({ theme }) => theme.elementFillElevatedHovered};
+                      transition: background 0.2s ease;
+
+                      margin-left: -10px;
+                      margin-right: -10px;
+                      padding-left: 10px;
+                      padding-right: 10px;
+
+                      ${variables.SCREEN_QUERY.BELOW_LAPTOP} {
+                          margin-left: -6px;
+                          margin-right: -6px;
+                          padding-left: 6px;
+                          padding-right: 6px;
+                      }
+
+                      border-radius: 4px;
+                  }
+              `
+            : ''};
+`;
+
+const DownIconCircle = styled.div`
+    border-radius: calc(infinity * 1px);
+    border: 1px solid ${({ theme }) => theme.elementBorderNeutralSofter};
+    background: ${({ theme }) => theme.elementFillElevated};
+    height: 36px;
+    width: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+`;
+
+const ArrowDown = () => (
+    <DownIconCircle>
+        <Icon as={CaretDownIcon} size={16} />
+    </DownIconCircle>
+);
+
+type OptionProps = {
+    children: ReactNode;
+    onSelect: () => void;
+    isChecked: boolean;
+    'data-testid'?: string;
+    disabled?: boolean;
+};
+
+const Option = ({
+    children,
+    onSelect,
+    isChecked,
+    'data-testid': dataTest,
+    disabled,
+}: OptionProps) => (
+    <OptionStyled
+        onClick={disabled ? undefined : onSelect}
+        $hasHoverInteraction={!disabled}
+        $disabled={disabled}
+    >
+        <Radio
+            isChecked={isChecked}
+            onChange={onSelect}
+            data-testid={dataTest}
+            isDisabled={disabled}
+        />
+        {children}
+    </OptionStyled>
+);
+
+type SelectedOptionProps = { children: ReactNode; onClick: () => void; isDisabled: boolean };
+
+const SelectedOptionStyled = styled.div<{ $isDisabled: boolean }>`
+    cursor: ${({ $isDisabled }) => ($isDisabled ? undefined : 'pointer')};
+
+    padding: 4px 24px;
+
+    ${variables.SCREEN_QUERY.BELOW_LAPTOP} {
+        padding: 0 12px;
+    }
+`;
+
+export const SelectedOption = forwardRef<HTMLDivElement, SelectedOptionProps>(
+    ({ children, onClick, isDisabled }, ref) => (
+        <SelectedOptionStyled $isDisabled={isDisabled}>
+            <OptionStyled ref={ref} onClick={isDisabled ? undefined : onClick}>
+                <div>
+                    <Icon as={RecoverySeedIcon} size={24} />
+                </div>
+                {children}
+                <ArrowDown />
+            </OptionStyled>
+        </SelectedOptionStyled>
+    ),
+);
+type OptionWithContentProps = {
+    value: BackupType;
+    selected: BackupType;
+    onSelect: (value: BackupType) => void;
+    children?: ReactNode;
+    tags: ReactNode;
+    disabled?: boolean;
+    tooltip?: ReactNode;
+};
+
+export const OptionWithContent = ({
+    onSelect,
+    selected,
+    value,
+    children,
+    tags,
+    disabled,
+    tooltip,
+}: OptionWithContentProps) => {
+    const { isBelowTablet } = useLayoutSize();
+
+    const inner = (
+        <Option
+            onSelect={() => onSelect(value)}
+            isChecked={selected === value}
+            data-testid={`@onboarding/select-seed-type-${value}`}
+            disabled={disabled}
+        >
+            <OptionText>
+                <Row alignItems="center">
+                    <Text typographyStyle={isBelowTablet ? 'body-md-strong' : 'headline-sm'}>
+                        <Translation id={typesToLabelMap[value]} />
+                    </Text>
+                    {tags}
+                </Row>
+                <Text intent="neutral" priority="secondary">
+                    {children}
+                </Text>
+            </OptionText>
+        </Option>
+    );
+
+    return tooltip !== undefined ? <Tooltip content={tooltip}>{inner}</Tooltip> : inner;
+};

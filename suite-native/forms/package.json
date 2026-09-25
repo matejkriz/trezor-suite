@@ -6,14 +6,19 @@
     "sideEffects": false,
     "main": "src/index",
     "scripts": {
-        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "type-check": "yarn g:tsc --build"
+        "depcheck": "yarn g:depcheck",
+        "type-check": "yarn g:tsc --build",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'"
     },
     "dependencies": {
-        "@hookform/resolvers": "3.3.4",
+        "@hookform/resolvers": "^5.4.0",
+        "@mobily/ts-belt": "^3.13.1",
         "@suite-native/atoms": "workspace:*",
-        "react": "18.2.0",
-        "react-hook-form": "^7.50.1",
-        "yup": "^0.32.11"
+        "@suite-native/icons": "workspace:*",
+        "@trezor/styles-native": "workspace:*",
+        "react": "19.2.3",
+        "react-hook-form": "^7.77.0",
+        "react-native": "0.86.0",
+        "react-native-reanimated": "4.5.0"
     }
 }

@@ -4,8 +4,8 @@
 
 Please note, that this example needs:
 
--   Trezor bridge running
--   Device connected via USB
+- Trezor bridge running
+- Device connected via USB
 
 ## Install
 
@@ -13,4 +13,4 @@ Please note, that this example needs:
 
 ## Run
 
-`node index.js`
+`yarn start`

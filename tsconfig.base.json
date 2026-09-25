@@ -6,7 +6,7 @@
         "jsx": "preserve",
         "module": "ESNext",
         "moduleResolution": "Bundler",
-        "target": "esnext",
+        "target": "ES2023",
         "removeComments": true,
         "noUnusedLocals": true,
         "noUnusedParameters": true,
@@ -14,6 +14,7 @@
         "sourceMap": true,
         "strict": true,
         "strictNullChecks": true,
+        "noUncheckedIndexedAccess": true,
         "noErrorTruncation": true,
         "noFallthroughCasesInSwitch": true,
         "useUnknownInCatchVariables": false,
@@ -41,12 +42,14 @@
         "**/public",
         "**/protobuf-patches",
         "**/trezor-common",
-        "**/jest.config.*js"
+        "**/jest.config.*js",
+        "**/rollup.*.config.mjs"
     ],
     "ts-node": {
         "compilerOptions": {
-            "module": "CommonJS",
-            "moduleResolution": "node"
+            "module": "Node16",
+            "moduleResolution": "node16",
+            "rootDir": "."
         }
     }
 }

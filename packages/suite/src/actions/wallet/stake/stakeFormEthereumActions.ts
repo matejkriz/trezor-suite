@@ -1,141 +1,96 @@
-import BigNumber from 'bignumber.js';
-import { toWei } from 'web3-utils';
+import { type UnknownAction } from '@reduxjs/toolkit';
+import { type ThunkDispatch } from 'redux-thunk';
 
-import TrezorConnect, { FeeLevel } from '@trezor/connect';
+import { type SelectedAccountRootState, selectFullSelectedAccount } from '@suite/account';
+import { type DesktopAnalyticsDep, events } from '@suite/analytics';
+import { type DeviceRootState, selectSelectedDevice } from '@suite-common/device';
+import { type WithServices } from '@suite-common/redux-utils';
 import { notificationsActions } from '@suite-common/toast-notifications';
+import { type NetworkSymbol } from '@suite-common/wallet-config';
 import {
-    calculateTotal,
-    calculateMax,
-    calculateEthFee,
-    getExternalComposeOutput,
-    formatAmount,
-    isPending,
-} from '@suite-common/wallet-utils';
-import {
-    StakeFormState,
-    ComposeActionContext,
-    PrecomposedLevels,
-    PrecomposedTransaction,
-    PrecomposedTransactionFinal,
-    ExternalOutput,
-} from '@suite-common/wallet-types';
-import { selectDevice } from '@suite-common/wallet-core';
-
-import { Dispatch, GetState } from 'src/types/suite';
-import { AddressDisplayOptions, selectAddressDisplayType } from 'src/reducers/suite/suiteReducer';
-
-import {
+    type EthereumGetCurrentNonceThunkState,
+    MIN_ETH_AMOUNT_FOR_STAKING,
+    MIN_ETH_BALANCE_FOR_STAKING,
+    MIN_ETH_FOR_WITHDRAWALS,
+    UNSTAKE_INTERCHANGES,
+    type WalletSettingsRootState,
+    calculateStakeFormTransaction,
+    composeStakingTransaction,
     getStakeTxGasLimit,
     prepareClaimEthTx,
     prepareStakeEthTx,
     prepareUnstakeEthTx,
-} from 'src/utils/suite/stake';
-// @ts-expect-error
-import { Ethereum } from '@everstake/wallet-sdk';
-import { MIN_ETH_FOR_WITHDRAWALS } from 'src/constants/suite/ethStaking';
-import { NetworkSymbol } from '@suite-common/wallet-config';
+    selectAddressDisplayType,
+    stakeActions,
+} from '@suite-common/wallet-core';
+import { ethereumGetCurrentNonceThunk } from '@suite-common/wallet-core/src/send/sendFormEthereumThunks';
+import {
+    AddressDisplayOptions,
+    type ComposeActionContext,
+    type ExternalOutput,
+    type PrecomposedTransaction,
+    type PrecomposedTransactionFinal,
+    type StakeFormState,
+} from '@suite-common/wallet-types';
+import {
+    calculateTotalGasCost,
+    fromEther,
+    fromGwei,
+    getAccountIdentity,
+} from '@suite-common/wallet-utils';
+import TrezorConnect, { type FeeLevel } from '@trezor/connect';
 
-const calculate = (
+const calculateStakingTransaction = (
     availableBalance: string,
     output: ExternalOutput,
     feeLevel: FeeLevel,
     compareWithAmount = true,
     symbol: NetworkSymbol,
 ): PrecomposedTransaction => {
-    const feeInSatoshi = calculateEthFee(
-        toWei(feeLevel.feePerUnit, 'gwei'),
-        feeLevel.feeLimit || '0',
+    const totalGasCostInWei = calculateTotalGasCost(
+        fromGwei(feeLevel.maxFeePerGas || feeLevel.feePerUnit).toWei(),
+        feeLevel.feeLimit,
     );
 
-    let amount: string;
-    let max: string | undefined;
-
-    if (output.type === 'send-max' || output.type === 'send-max-noaddress') {
-        max = new BigNumber(calculateMax(availableBalance, feeInSatoshi))
-            .minus(toWei(MIN_ETH_FOR_WITHDRAWALS.toString()))
-            .toString();
-        amount = max;
-    } else {
-        amount = output.amount;
-    }
-
-    // total ETH spent (amount + fee), in ERC20 only fee
-    const totalSpent = new BigNumber(calculateTotal(amount, feeInSatoshi));
-
-    if (
-        new BigNumber(feeInSatoshi).gt(availableBalance) ||
-        (compareWithAmount && totalSpent.isGreaterThan(availableBalance))
-    ) {
-        const error = 'TR_STAKE_NOT_ENOUGH_FUNDS';
-
-        // errorMessage declared later
-        return {
-            type: 'error',
-            error,
-            errorMessage: { id: error, values: { symbol: symbol.toUpperCase() } },
-        } as const;
-    }
-
-    const payloadData = {
-        type: 'nonfinal' as const,
-        totalSpent: totalSpent.toString(),
-        max,
-        fee: feeInSatoshi,
-        feePerByte: feeLevel.feePerUnit,
-        feeLimit: feeLevel.feeLimit,
-        bytes: 0, // TODO: calculate
-        inputs: [],
+    const stakingParams = {
+        feeInBaseUnits: totalGasCostInWei,
+        minBalanceForStakingInBaseUnits: fromEther(MIN_ETH_BALANCE_FOR_STAKING.toString()).toWei(),
+        minAmountForStakingInBaseUnits: fromEther(MIN_ETH_AMOUNT_FOR_STAKING.toString()).toWei(),
+        minAmountForWithdrawalInBaseUnits: fromEther(MIN_ETH_FOR_WITHDRAWALS.toString()).toWei(),
     };
 
-    if (output.type === 'send-max' || output.type === 'payment') {
-        return {
-            ...payloadData,
-            type: 'final',
-            // compatibility with BTC PrecomposedTransaction from @trezor/connect
-            inputs: [],
-            outputsPermutation: [0],
-            outputs: [
-                {
-                    address: output.address,
-                    amount,
-                    script_type: 'PAYTOADDRESS',
-                },
-            ],
-        };
-    }
-
-    return payloadData;
+    return calculateStakeFormTransaction(
+        availableBalance,
+        output,
+        feeLevel,
+        compareWithAmount,
+        symbol,
+        stakingParams,
+    );
 };
 
 export const composeTransaction =
     (formValues: StakeFormState, formState: ComposeActionContext) => async () => {
-        const { account, network, feeInfo } = formState;
-        const composeOutputs = getExternalComposeOutput(formValues, account, network);
-        if (!composeOutputs) return; // no valid Output
+        const { account, feeInfo } = formState;
+        if (!account || !feeInfo) return;
 
-        const { output, decimals } = composeOutputs;
-        const { availableBalance } = account;
-        const { amount } = formValues.outputs[0];
+        const amount = formValues.outputs[0]?.amount;
 
-        let customFeeLimit: string | undefined;
+        if (!amount || amount === '0') return;
 
         // gasLimit calculation based on account.descriptor and amount
-        const { ethereumStakeType } = formValues;
+        const { stakeType } = formValues;
         const stakeTxGasLimit = await getStakeTxGasLimit({
-            ethereumStakeType,
+            stakeType,
             from: account.descriptor,
             amount,
             symbol: account.symbol,
+            identity: getAccountIdentity(account),
         });
 
         if (!stakeTxGasLimit.success) return stakeTxGasLimit.error;
 
-        customFeeLimit = stakeTxGasLimit.gasLimit;
-        if (formValues.ethereumAdjustGasLimit && customFeeLimit) {
-            customFeeLimit = new BigNumber(customFeeLimit)
-                .multipliedBy(new BigNumber(formValues.ethereumAdjustGasLimit))
-                .toFixed(0);
-        }
+        const customFeeLimit = stakeTxGasLimit.gasLimit;
 
         // FeeLevels are read-only
         const levels = customFeeLimit ? feeInfo.levels.map(l => ({ ...l })) : feeInfo.levels;
@@ -150,81 +105,39 @@ export const composeTransaction =
                 label: 'custom',
                 feePerUnit: formValues.feePerUnit,
                 feeLimit: formValues.feeLimit,
+                maxFeePerGas: formValues.maxFeePerGas,
+                maxPriorityFeePerGas: formValues.maxPriorityFeePerGas || '0',
                 blocks: -1,
             });
         }
 
-        // wrap response into PrecomposedLevels object where key is a FeeLevel label
-        const wrappedResponse: PrecomposedLevels = {};
-        const compareWithAmount = formValues.ethereumStakeType === 'stake';
-        const response = predefinedLevels.map(level =>
-            calculate(availableBalance, output, level, compareWithAmount, account.symbol),
+        return composeStakingTransaction(
+            formValues,
+            formState,
+            predefinedLevels,
+            calculateStakingTransaction,
+            undefined,
+            customFeeLimit,
         );
-        response.forEach((tx, index) => {
-            const feeLabel = predefinedLevels[index].label as FeeLevel['label'];
-            wrappedResponse[feeLabel] = tx;
-        });
-
-        // Implement adding custom fees.
-        const hasAtLeastOneValid = response.find(r => r.type !== 'error');
-        // there is no valid tx in predefinedLevels and there is no custom level
-        if (!hasAtLeastOneValid && !wrappedResponse.custom) {
-            const { minFee } = feeInfo;
-            const lastKnownFee = predefinedLevels[predefinedLevels.length - 1].feePerUnit;
-            let maxFee = new BigNumber(lastKnownFee).minus(1);
-            // generate custom levels in range from lastKnownFee - 1 to feeInfo.minFee (coinInfo in @trezor/connect)
-            const customLevels: FeeLevel[] = [];
-            while (maxFee.gte(minFee)) {
-                customLevels.push({
-                    feePerUnit: maxFee.toString(),
-                    feeLimit: predefinedLevels[0].feeLimit,
-                    label: 'custom',
-                    blocks: -1,
-                });
-                maxFee = maxFee.minus(1);
-            }
-
-            // check if any custom level is possible
-            const customLevelsResponse = customLevels.map(level =>
-                calculate(availableBalance, output, level, compareWithAmount, account.symbol),
-            );
-
-            const customValid = customLevelsResponse.findIndex(r => r.type !== 'error');
-            if (customValid >= 0) {
-                wrappedResponse.custom = customLevelsResponse[customValid];
-            }
-        }
-
-        // format max (calculate sends it as satoshi)
-        // update errorMessage values (symbol)
-        Object.keys(wrappedResponse).forEach(key => {
-            const tx = wrappedResponse[key];
-            if (tx.type !== 'error') {
-                tx.max = tx.max ? formatAmount(tx.max, decimals) : undefined;
-                tx.estimatedFeeLimit = customFeeLimit;
-            }
-            if (tx.type === 'error' && tx.error === 'AMOUNT_NOT_ENOUGH_CURRENCY_FEE') {
-                tx.errorMessage = {
-                    id: 'AMOUNT_NOT_ENOUGH_CURRENCY_FEE',
-                    values: { symbol: network.symbol.toUpperCase() },
-                };
-            }
-        });
-
-        return wrappedResponse;
     };
 
-export const signTransaction =
+type SignTransactionThunkState = DeviceRootState &
+    EthereumGetCurrentNonceThunkState &
+    SelectedAccountRootState &
+    WalletSettingsRootState;
+
+type SignTransactionThunkDeps = WithServices<DesktopAnalyticsDep>;
+
+export const signTransactionThunk =
     (formValues: StakeFormState, transactionInfo: PrecomposedTransactionFinal) =>
-    async (dispatch: Dispatch, getState: GetState) => {
-        const { selectedAccount, transactions } = getState().wallet;
-        const device = selectDevice(getState());
-        if (
-            selectedAccount.status !== 'loaded' ||
-            !device ||
-            !transactionInfo ||
-            transactionInfo.type !== 'final'
-        )
+    async (
+        dispatch: ThunkDispatch<SignTransactionThunkState, SignTransactionThunkDeps, UnknownAction>,
+        getState: () => SignTransactionThunkState,
+        extra: SignTransactionThunkDeps,
+    ) => {
+        const selectedAccount = selectFullSelectedAccount(getState());
+        const device = selectSelectedDevice(getState());
+        if (selectedAccount.status !== 'loaded' || !device || transactionInfo?.type !== 'final')
             return;
 
         const { account, network } = selectedAccount;
@@ -232,55 +145,65 @@ export const signTransaction =
 
         const addressDisplayType = selectAddressDisplayType(getState());
 
-        // Ethereum account `misc.nonce` is not updated before pending tx is mined
-        // Calculate `pendingNonce`: greatest value in pending tx + 1
-        // This may lead to unexpected/unwanted behavior
-        // whenever pending tx gets rejected all following txs (with higher nonce) will be rejected as well
-        const pendingTxs = (transactions.transactions[account.key] || []).filter(isPending);
-        const pendingNonce = pendingTxs.reduce((value, tx) => {
-            if (!tx.ethereumSpecific) return value;
+        const { nonce } = await dispatch(
+            ethereumGetCurrentNonceThunk({
+                selectedAccount: account,
+                rbfParams: formValues.rbfParams,
+                fetchConfirmedNonce: true,
+            }),
+        ).unwrap();
 
-            return Math.max(value, tx.ethereumSpecific.nonce + 1);
-        }, 0);
-        const pendingNonceBig = new BigNumber(pendingNonce);
-        let nonce =
-            pendingNonceBig.gt(0) && pendingNonceBig.gt(account.misc.nonce)
-                ? pendingNonceBig.toString()
-                : account.misc.nonce;
+        // Store the signed-with nonce (decimal) so the review modal can display it, mirroring the
+        // Send flow. Set before ethereumSignTransaction fires the device button-request below.
+        dispatch(stakeActions.setResolvedEthereumNonce(nonce));
 
-        if (formValues.rbfParams && typeof formValues.rbfParams.ethereumNonce === 'number') {
-            nonce = formValues.rbfParams.ethereumNonce.toString();
-        }
+        const identity = getAccountIdentity(account);
 
         // transform to TrezorConnect.ethereumSignTransaction params
-        const { ethereumStakeType } = formValues;
+        const { stakeType } = formValues;
         let txData;
-        if (ethereumStakeType === 'stake') {
+        if (stakeType === 'stake') {
+            const amount = formValues.outputs[0]?.amount ?? '0';
+
             txData = await prepareStakeEthTx({
                 symbol: account.symbol,
                 from: account.descriptor,
-                amount: formValues.outputs[0].amount,
+                identity,
+                amount,
                 gasPrice: transactionInfo.feePerByte,
+                feeLimit: transactionInfo.feeLimit,
+                maxFeePerGas: transactionInfo.maxFeePerGas,
+                maxPriorityFeePerGas: transactionInfo.maxPriorityFeePerGas,
                 nonce,
                 chainId: network.chainId,
             });
         }
-        if (ethereumStakeType === 'unstake') {
+        if (stakeType === 'unstake') {
+            const amount = formValues.outputs[0]?.amount ?? '0';
+
             txData = await prepareUnstakeEthTx({
                 symbol: account.symbol,
                 from: account.descriptor,
-                amount: formValues.outputs[0].amount,
+                identity,
+                amount,
                 gasPrice: transactionInfo.feePerByte,
+                feeLimit: transactionInfo.feeLimit,
+                maxFeePerGas: transactionInfo.maxFeePerGas,
+                maxPriorityFeePerGas: transactionInfo.maxPriorityFeePerGas,
                 nonce,
                 chainId: network.chainId,
-                interchanges: 0,
+                interchanges: UNSTAKE_INTERCHANGES,
             });
         }
-        if (ethereumStakeType === 'claim') {
+        if (stakeType === 'claim') {
             txData = await prepareClaimEthTx({
                 symbol: account.symbol,
                 from: account.descriptor,
+                identity,
                 gasPrice: transactionInfo.feePerByte,
+                feeLimit: transactionInfo.feeLimit,
+                maxFeePerGas: transactionInfo.maxFeePerGas,
+                maxPriorityFeePerGas: transactionInfo.maxPriorityFeePerGas,
                 nonce,
                 chainId: network.chainId,
             });
@@ -313,20 +236,29 @@ export const signTransaction =
                 path: device.path,
                 instance: device.instance,
                 state: device.state,
+                useEmptyPassphrase: device.useEmptyPassphrase,
             },
-            useEmptyPassphrase: device.useEmptyPassphrase,
             path: account.path,
             transaction: txData.tx,
             chunkify: addressDisplayType === AddressDisplayOptions.CHUNKED,
         });
 
         if (!signedTx.success) {
+            extra.services.analytics.report({
+                type: events.transactionCancelEvent.name,
+                payload: {
+                    txType: 'stake',
+                    networkSymbol: account.symbol,
+                },
+            });
+
             // catch manual error from TransactionReviewModal
-            if (signedTx.payload.error === 'tx-cancelled') return;
+            if (signedTx.error.message === 'tx-cancelled') return;
+
             dispatch(
                 notificationsActions.addToast({
                     type: 'sign-tx-error',
-                    error: signedTx.payload.error,
+                    error: signedTx.error.message,
                 }),
             );
 

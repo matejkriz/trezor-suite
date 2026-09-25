@@ -1,12 +1,3 @@
-export type CSSColor =
-    | `#${string}`
-    | `rgb(${number}, ${number}, ${number})`
-    | `rgba(${number}, ${number}, ${number}, ${number})`
-    | 'transparent';
+import { type RgbColor, type RgbaColor } from '@trezor/utils';
 
-export const isCSSColor = (color: string): color is CSSColor => {
-    const cssColorRegex =
-        /^#([0-9a-fA-F]{3,8})$|^rgba?\((\d{1,3}),\s*(\d{1,3}),\s*(\d{1,3}),?\s*(\d{1,3})\)$/;
-
-    return cssColorRegex.test(color);
-};
+export type CSSColor = `#${string}` | RgbColor | RgbaColor | 'transparent' | 'currentColor';

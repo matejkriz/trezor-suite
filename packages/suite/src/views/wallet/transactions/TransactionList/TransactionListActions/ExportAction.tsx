@@ -1,28 +1,28 @@
-import { useState, useCallback } from 'react';
-import { Spinner, Dropdown } from '@trezor/components';
-import { analytics, EventType } from '@trezor/suite-analytics';
-import { Translation } from 'src/components/suite';
-import { useDispatch } from 'src/hooks/suite';
-import { useTranslation } from 'src/hooks/suite/useTranslation';
-import { useSelector } from 'src/hooks/suite/useSelector';
+import { useCallback, useState } from 'react';
+
+import { events, injectDesktopAnalytics } from '@suite/analytics';
+import { Translation, useTranslation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
 import { notificationsActions } from '@suite-common/toast-notifications';
-import { exportTransactionsThunk, fetchTransactionsThunk } from '@suite-common/wallet-core';
-import { ExportFileType } from '@suite-common/wallet-types';
-import { Account } from 'src/types/wallet';
-import { isFeatureFlagEnabled, getTxsPerPage } from '@suite-common/suite-utils';
-import { getTitleForNetwork, getTitleForCoinjoinAccount } from '@suite-common/wallet-utils';
-import { selectLabelingDataForSelectedAccount } from 'src/reducers/suite/metadataReducer';
-import { AccountLabels } from '@suite-common/metadata-types';
+import { getNetwork } from '@suite-common/wallet-config';
+import { fetchAllTransactionsForAccountThunk } from '@suite-common/wallet-core';
+import { type ExportFileType } from '@suite-common/wallet-types';
+import { getTitleForCoinjoinAccount } from '@suite-common/wallet-utils';
+import { Dropdown, Note } from '@trezor/components';
+import { ChecksIcon, FileArrowDownIcon, InfoIcon } from '@trezor/icons';
+
+import { exportTransactionsThunk } from 'src/actions/wallet/exportTransactionsActions';
+import { type Account } from 'src/types/wallet';
 
 export interface ExportActionProps {
     account: Account;
     searchQuery: string;
-    accountMetadata: AccountLabels;
 }
 
-export const ExportAction = ({ account, searchQuery, accountMetadata }: ExportActionProps) => {
+export const ExportAction = ({ account, searchQuery }: ExportActionProps) => {
     const [isExportRunning, setIsExportRunning] = useState(false);
-    const dispatch = useDispatch();
+    const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
     const { translationString } = useTranslation();
 
     const getAccountTitle = useCallback(() => {
@@ -31,12 +31,10 @@ export const ExportAction = ({ account, searchQuery, accountMetadata }: ExportAc
         }
 
         return translationString('LABELING_ACCOUNT', {
-            networkName: translationString(getTitleForNetwork(account.symbol)),
+            networkName: getNetwork(account.symbol).name,
             index: account.index + 1,
         });
     }, [account, translationString]);
-
-    const { accountLabel } = useSelector(selectLabelingDataForSelectedAccount);
 
     const runExport = useCallback(
         async (type: ExportFileType) => {
@@ -45,7 +43,7 @@ export const ExportAction = ({ account, searchQuery, accountMetadata }: ExportAc
             }
 
             analytics.report({
-                type: EventType.AccountsTransactionsExport,
+                type: events.accountsTransactionsExportEvent.name,
                 payload: {
                     format: type,
                     symbol: account.symbol,
@@ -55,22 +53,17 @@ export const ExportAction = ({ account, searchQuery, accountMetadata }: ExportAc
             setIsExportRunning(true);
             try {
                 await dispatch(
-                    fetchTransactionsThunk({
+                    fetchAllTransactionsForAccountThunk({
                         accountKey: account.key,
-                        page: 2,
-                        perPage: getTxsPerPage(account.networkType),
                         noLoading: true,
-                        recursive: true,
                     }),
                 );
-                const accountName = accountLabel || getAccountTitle();
                 await dispatch(
                     exportTransactionsThunk({
                         account,
-                        accountName,
+                        defaultAccountName: getAccountTitle(),
                         type,
                         searchQuery,
-                        accountMetadata,
                     }),
                 );
             } catch (error) {
@@ -87,55 +80,48 @@ export const ExportAction = ({ account, searchQuery, accountMetadata }: ExportAc
         },
         [
             isExportRunning,
+            analytics,
             account,
             dispatch,
-            translationString,
             getAccountTitle,
-            accountLabel,
             searchQuery,
-            accountMetadata,
+            translationString,
         ],
     );
 
-    if (!isFeatureFlagEnabled('EXPORT_TRANSACTIONS')) {
-        return null;
-    }
-
     const dataTest = '@wallet/accounts/export-transactions';
-
-    if (isExportRunning) {
-        return <Spinner size={18} />;
-    }
+    const exportTypes = ['csv', 'pdf', 'json'] as const;
 
     return (
         <Dropdown
-            alignMenu="bottom-right"
-            items={[
-                {
-                    key: 'export',
-                    options: [
-                        {
-                            key: 'export-csv',
-                            label: <Translation id="TR_EXPORT_AS" values={{ as: 'CSV' }} />,
-                            onClick: () => runExport('csv'),
-                            'data-test': `${dataTest}/csv`,
-                        },
-                        {
-                            key: 'export-pdf',
-                            label: <Translation id="TR_EXPORT_AS" values={{ as: 'PDF' }} />,
-                            onClick: () => runExport('pdf'),
-                            'data-test': `${dataTest}/pdf`,
-                        },
-                        {
-                            key: 'export-json',
-                            label: <Translation id="TR_EXPORT_AS" values={{ as: 'JSON' }} />,
-                            onClick: () => runExport('json'),
-                            'data-test': `${dataTest}/json`,
-                        },
-                    ],
-                },
-            ]}
-            data-test={`${dataTest}/dropdown`}
+            placement={{ position: 'bottom', alignment: 'start' }}
+            content={
+                searchQuery ? (
+                    <Note icon={ChecksIcon}>
+                        <Translation
+                            id={
+                                searchQuery
+                                    ? 'TR_EXPORT_SEARCH_FILTER_ACTIVE'
+                                    : 'TR_EXPORT_SEARCH_FILTER_INACTIVE'
+                            }
+                        />
+                    </Note>
+                ) : (
+                    <Note icon={InfoIcon} priority="secondary">
+                        <Translation id="TR_EXPORT_SEARCH_FILTER_INACTIVE" />
+                    </Note>
+                )
+            }
+            items={exportTypes.map(type => ({
+                label: <Translation id="TR_EXPORT_AS" values={{ as: `.${type}` }} />,
+                onClick: () => runExport(type),
+                'data-testid': `${dataTest}/${type}`,
+            }))}
+            minWidth={240}
+            icon={FileArrowDownIcon}
+            isLoading={isExportRunning}
+            data-testid={`${dataTest}/dropdown`}
+            tooltip={{ content: <Translation id="TR_EXPORT_TO_FILE" />, placement: 'left' }}
         />
     );
 };

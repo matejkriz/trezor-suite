@@ -1,35 +1,38 @@
 import { memo } from 'react';
 import { useSelector } from 'react-redux';
 
-import { useNavigation } from '@react-navigation/native';
-
-import { Box, Button, Divider, Text, VStack } from '@suite-native/atoms';
-import { AccountKey, TokenAddress } from '@suite-common/wallet-types';
+import { selectIsPortfolioTrackerDevice } from '@suite-common/device';
+import { type TokenDefinitionsRootState } from '@suite-common/token-definitions';
 import {
-    AccountsRootState,
-    selectIsTestnetAccount,
-    selectHasAccountTransactions,
+    type AccountsRootState,
+    type TransactionsRootState,
     selectAccountByKey,
+    selectIsTestnetAccount,
+    useDisplayBaseCurrency,
 } from '@suite-common/wallet-core';
-import { isEthereumAccountSymbol } from '@suite-common/wallet-utils';
+import { type AccountKey, type TokenAddress } from '@suite-common/wallet-types';
+import { Box, Text, VStack } from '@suite-native/atoms';
+import { Translation } from '@suite-native/intl';
 import {
-    AppTabsParamList,
-    RootStackParamList,
-    RootStackRoutes,
-    TabToStackCompositeNavigationProp,
-} from '@suite-native/navigation';
-import { Translation, useTranslate } from '@suite-native/intl';
+    type TokensRootState,
+    selectAccountTokenInfo,
+    selectIsUnrecognizedToken,
+} from '@suite-native/tokens';
+import { selectHasAccountAnyTransactionsForToken } from '@suite-native/transactions';
 
+import { AccountDiscoveryFailedBanner } from './AccountBanners/AccountDiscoveryFailedBanner';
+import { SolanaLimitedHistoryBanner } from './AccountBanners/SolanaLimitedHistoryBanner';
+import { StellarLimitedHistoryBanner } from './AccountBanners/StellarLimitedHistoryBanner';
+import { AccountDetailActionButtons } from './AccountDetailActionButtons';
 import { AccountDetailGraph } from './AccountDetailGraph';
-import { AccountDetailCryptoValue } from './AccountDetailCryptoValue';
-import { AccountDetailTokenHeader } from './AccountDetailTokenHeader';
-import { IncludeTokensToggle } from './IncludeTokensToggle';
-import { CoinPriceCard } from './CoinPriceCard';
+import { AssetPriceCard } from './AssetPriceCard';
+import { StellarTokenActions } from './StellarTokenActions';
+import { TronResources } from './TronResources';
+import { YieldVaultBanner } from './YieldVaultBanner';
+import { YourPositionCard } from './YourPositionCard';
 
-type AccountDetailHeaderProps = {
+type TransactionListHeaderProps = {
     accountKey: AccountKey;
-    areTokensIncluded: boolean;
-    toggleIncludeTokenTransactions: () => void;
     tokenContract?: TokenAddress;
 };
 
@@ -38,12 +41,6 @@ type TransactionListHeaderContentProps = {
     tokenContract?: TokenAddress;
 };
 
-type AccountsNavigationProps = TabToStackCompositeNavigationProp<
-    AppTabsParamList,
-    RootStackRoutes.ReceiveModal,
-    RootStackParamList
->;
-
 const TransactionListHeaderContent = ({
     accountKey,
     tokenContract,
@@ -51,114 +48,100 @@ const TransactionListHeaderContent = ({
     const account = useSelector((state: AccountsRootState) =>
         selectAccountByKey(state, accountKey),
     );
-    const accountHasTransactions = useSelector((state: AccountsRootState) =>
-        selectHasAccountTransactions(state, accountKey),
+    const hasAccountTransactions = useSelector((state: AccountsRootState & TransactionsRootState) =>
+        selectHasAccountAnyTransactionsForToken(state, accountKey, tokenContract),
     );
     const isTestnetAccount = useSelector((state: AccountsRootState) =>
         selectIsTestnetAccount(state, accountKey),
     );
+    const isUnrecognizedToken = useSelector(
+        (state: TokenDefinitionsRootState & AccountsRootState) =>
+            selectIsUnrecognizedToken(state, accountKey, tokenContract),
+    );
 
     if (!account) return null;
 
-    const isTokenAccount = !!tokenContract;
+    const isGraphDisplayed = hasAccountTransactions && !isTestnetAccount && !isUnrecognizedToken;
 
-    // Graph is temporarily hidden also for ERC20 tokens.
-    // Will be solved in issue: https://github.com/trezor/trezor-suite/issues/7839
-    const isGraphDisplayed = accountHasTransactions && !isTestnetAccount && !isTokenAccount;
+    if (!isGraphDisplayed) return null;
 
-    if (isGraphDisplayed) {
-        return <AccountDetailGraph accountKey={accountKey} />;
-    }
-    if (isTokenAccount) {
-        return <AccountDetailTokenHeader accountKey={accountKey} tokenContract={tokenContract} />;
-    }
-
-    if (isTestnetAccount) {
-        return (
-            <AccountDetailCryptoValue
-                value={account.availableBalance}
-                networkSymbol={account.symbol}
-                isBalance={false}
-            />
-        );
-    }
-
-    return null;
+    return <AccountDetailGraph accountKey={accountKey} tokenContract={tokenContract} />;
 };
 
 export const TransactionListHeader = memo(
-    ({
-        accountKey,
-        areTokensIncluded,
-        toggleIncludeTokenTransactions,
-        tokenContract,
-    }: AccountDetailHeaderProps) => {
-        const { translate } = useTranslate();
-        const navigation = useNavigation<AccountsNavigationProps>();
-
+    ({ accountKey, tokenContract }: TransactionListHeaderProps) => {
         const account = useSelector((state: AccountsRootState) =>
             selectAccountByKey(state, accountKey),
         );
-        const accountHasTransactions = useSelector((state: AccountsRootState) =>
-            selectHasAccountTransactions(state, accountKey),
+        const { shallDisplayBaseCurrency } = useDisplayBaseCurrency(account?.symbol);
+
+        const hasSelectedAssetTransactions = useSelector(
+            (state: AccountsRootState & TransactionsRootState) =>
+                selectHasAccountAnyTransactionsForToken(state, accountKey, tokenContract),
         );
-        const isTestnetAccount = useSelector((state: AccountsRootState) =>
-            selectIsTestnetAccount(state, accountKey),
+        const isPortfolioTrackerDevice = useSelector(selectIsPortfolioTrackerDevice);
+        const token = useSelector((state: TokensRootState) =>
+            selectAccountTokenInfo(state, accountKey, tokenContract),
+        );
+        const isUnrecognizedToken = useSelector(
+            (state: TokenDefinitionsRootState & AccountsRootState) =>
+                selectIsUnrecognizedToken(state, accountKey, tokenContract),
         );
 
         if (!account) return null;
 
-        const handleReceive = () => {
-            navigation.navigate(RootStackRoutes.ReceiveModal, {
-                accountKey,
-                tokenContract,
-                closeActionType: 'back',
-            });
-        };
-
-        const isTokenDetail = !!tokenContract;
-        const isEthereumAccountDetail = !isTokenDetail && isEthereumAccountSymbol(account.symbol);
-        const isPriceCardDisplayed = !isTestnetAccount && !isTokenDetail;
+        const isPriceCardDisplayed =
+            shallDisplayBaseCurrency && !isUnrecognizedToken && hasSelectedAssetTransactions;
+        const isStellarAccount = account.networkType === 'stellar';
+        const isStellarTokenActionsDisplayed = isStellarAccount && !isPortfolioTrackerDevice;
 
         return (
-            <Box marginBottom="small">
-                <VStack spacing="large">
+            <>
+                <VStack spacing="sp24">
+                    <AccountDiscoveryFailedBanner accountKey={accountKey} />
+
+                    <YourPositionCard account={account} token={token} />
+
                     <TransactionListHeaderContent
                         accountKey={accountKey}
                         tokenContract={tokenContract}
                     />
-                    {accountHasTransactions && (
-                        <Box marginVertical="medium" paddingHorizontal="medium">
-                            <Button iconLeft="receive" size="large" onPress={handleReceive}>
-                                {translate('transactions.receive')}
-                            </Button>
+
+                    {hasSelectedAssetTransactions && (
+                        <Box paddingTop="sp8" paddingHorizontal="sp16">
+                            <AccountDetailActionButtons
+                                accountKey={accountKey}
+                                tokenContract={tokenContract}
+                            />
                         </Box>
                     )}
                     {isPriceCardDisplayed && (
-                        <Box marginBottom={accountHasTransactions ? undefined : 'medium'}>
-                            <CoinPriceCard accountKey={accountKey} />
-                        </Box>
+                        <AssetPriceCard accountKey={accountKey} tokenContract={tokenContract} />
                     )}
-
-                    {accountHasTransactions && (
-                        <>
-                            <Divider />
-                            <Box marginVertical="small" marginHorizontal="large">
-                                <Text variant="titleSmall">
-                                    <Translation id="transactions.title" />
-                                </Text>
-                            </Box>
-                        </>
+                    {tokenContract && (
+                        <YieldVaultBanner accountKey={accountKey} tokenContract={tokenContract} />
                     )}
+                    {isStellarTokenActionsDisplayed && (
+                        <StellarTokenActions
+                            accountKey={accountKey}
+                            tokenContract={tokenContract}
+                        />
+                    )}
+                    {isStellarAccount && <StellarLimitedHistoryBanner />}
+                    {account.networkType === 'solana' && <SolanaLimitedHistoryBanner />}
+                    {account.networkType === 'tron' &&
+                        !tokenContract &&
+                        hasSelectedAssetTransactions && <TronResources accountKey={accountKey} />}
                 </VStack>
 
-                {isEthereumAccountDetail && accountHasTransactions && (
-                    <IncludeTokensToggle
-                        isToggled={areTokensIncluded}
-                        onToggle={toggleIncludeTokenTransactions}
-                    />
+                {hasSelectedAssetTransactions && (
+                    <Box marginTop="sp52" marginHorizontal="sp16">
+                        <Text variant="headline-sm">
+                            <Translation id="transactions.title" />
+                        </Text>
+                    </Box>
                 )}
-            </Box>
+            </>
         );
     },
 );

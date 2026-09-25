@@ -1,29 +1,38 @@
-import type { RequiredKey } from '@trezor/type-utils';
+import type { OptionalKey, RequiredKey } from '@trezor/type-utils';
 
 import type {
+    AvailableVsCurrencies,
+    Address as BlockbookAddress,
+    Block as BlockbookBlock,
+    ContractInfoProtocol as BlockbookContractInfoProtocol,
+    Token as BlockbookToken,
+    TokenTransfer as BlockbookTokenTransfer,
+    Tx as BlockbookTx,
+    Utxo as BlockbookUtxo,
+    ContractInfoResult,
+    EthereumGasData,
+    FiatTicker,
+    MempoolTxidFilterEntries,
+    WsAccountUtxoReq,
+    WsBlockFilterReq,
+    WsBlockFiltersBatchReq,
+    WsBlockHashRes,
+    WsContractInfoReq,
+    WsEstimateFeeRes,
+    WsInfoRes,
+    WsMempoolFiltersReq,
+    WsNewBlock,
+} from './blockbook-api';
+import type { AccountBalanceHistory, FiatRatesBySymbol, TokenStandard } from './common';
+import type {
     AccountBalanceHistoryParams,
+    AccountInfoParams,
+    EstimateFeeParams,
     GetCurrentFiatRatesParams,
     GetFiatRatesForTimestampsParams,
     GetFiatRatesTickersListParams,
-    EstimateFeeParams,
-    AccountInfoParams,
+    RpcCallParams,
 } from './params';
-import type { AccountBalanceHistory, FiatRatesLegacy, TokenStandard, StakingPool } from './common';
-import type {
-    Tx as BlockbookTx,
-    Vin,
-    Vout,
-    Utxo as BlockbookUtxo,
-    WsInfoRes,
-    WsBlockHashRes,
-    WsBlockFilterReq,
-    WsBlockFiltersBatchReq,
-    MempoolTxidFilterEntries,
-    Token as BlockbookToken,
-    TokenTransfer as BlockbookTokenTransfer,
-} from './blockbook-api';
-
-type OptionalKey<M, K extends keyof M> = Omit<M, K> & Partial<Pick<M, K>>;
 
 export type AccountUtxo = RequiredKey<BlockbookUtxo, 'address' | 'height' | 'value' | 'path'>[];
 
@@ -35,24 +44,26 @@ export type ServerInfo = WsInfoRes;
 
 export type BlockHash = WsBlockHashRes;
 
-export interface Block {
-    page: number;
-    totalPages: number;
-    itemsOnPage: number;
-    hash: string;
-    height: number;
+export type Block = Omit<
+    RequiredKey<BlockbookBlock, 'page' | 'totalPages' | 'itemsOnPage'>,
+    'txs' | 'confirmations' | 'size' | 'version' | 'merkleRoot' | 'nonce' | 'bits' | 'difficulty'
+> & {
     txCount: number;
     txs: Transaction[];
-}
+};
 
-export interface FilterRequestParams {
-    scriptType: 'taproot' | 'taproot-noordinals';
-    M?: number;
-}
+type ScriptType = 'taproot' | 'taproot-noordinals';
 
-export interface MempoolFiltersParams extends FilterRequestParams {
-    fromTimestamp?: number;
-}
+export type FilterRequestParams = Omit<WsBlockFilterReq, 'scriptType' | 'blockHash'> & {
+    scriptType: ScriptType;
+};
+
+export type MempoolFiltersParams = Omit<
+    OptionalKey<WsMempoolFiltersReq, 'fromTimestamp'>,
+    'scriptType'
+> & {
+    scriptType: ScriptType;
+};
 
 export interface FilterResponse {
     P: number;
@@ -75,76 +86,71 @@ type BaseERC = Required<Pick<BlockbookToken, 'contract'>> &
     Pick<BlockbookToken, 'name' | 'symbol' | 'decimals'>;
 
 export type ERC20 = BaseERC & {
+    /** @deprecated: Use standard instead. */
     type: 'ERC20';
+    standard: 'ERC20';
 } & Pick<BlockbookToken, 'balance' | 'baseValue' | 'secondaryValue'>;
 
 export type ERC721 = BaseERC & {
+    /** @deprecated: Use standard instead. */
     type: 'ERC721';
+    standard: 'ERC721';
 } & Required<Pick<BlockbookToken, 'ids'>>;
 
 export type ERC1155 = BaseERC & {
+    /** @deprecated: Use standard instead. */
     type: 'ERC1155';
+    standard: 'ERC1155';
 } & Required<Pick<BlockbookToken, 'multiTokenValues'>>;
 
-export interface AccountInfo {
-    address: string;
-    balance: string;
-    totalReceived: string;
-    totalSent: string;
-    txs: number;
-    addrTxCount?: number;
-    unconfirmedBalance: string;
-    unconfirmedTxs: number;
-    page?: number;
-    itemsOnPage: number;
-    totalPages: number;
-    nonTokenTxs?: number;
+export type BEP20 = BaseERC & {
+    /** @deprecated: Use standard instead. */
+    type: 'BEP20';
+    standard: 'BEP20';
+} & Pick<BlockbookToken, 'balance' | 'baseValue' | 'secondaryValue'>;
+
+export type BEP721 = BaseERC & {
+    /** @deprecated: Use standard instead. */
+    type: 'BEP721';
+    standard: 'BEP721';
+} & Required<Pick<BlockbookToken, 'ids'>>;
+
+export type BEP1155 = BaseERC & {
+    /** @deprecated: Use standard instead. */
+    type: 'BEP1155';
+    standard: 'BEP1155';
+} & Required<Pick<BlockbookToken, 'multiTokenValues'>>;
+
+export type AccountInfo = Omit<
+    RequiredKey<BlockbookAddress, 'totalReceived' | 'totalSent' | 'itemsOnPage' | 'totalPages'>,
+    'tokens' | 'transactions'
+> & {
+    tokens?: (XPUBAddress | ERC20 | ERC721 | ERC1155 | BEP20 | BEP721 | BEP1155)[];
     transactions?: Transaction[];
-    nonce?: string;
-    tokens?: (XPUBAddress | ERC20 | ERC721 | ERC1155)[];
-    erc20Contract?: ERC20;
-    stakingPools?: StakingPool[];
-}
+};
 
-export interface AccountUtxoParams {
-    descriptor: string;
-}
+export type AccountUtxoParams = WsAccountUtxoReq;
 
-export type VinVout = OptionalKey<Vin & Vout, 'addresses'>;
-
-export interface EthereumInternalTransfer {
-    type: number;
-    from: string;
-    to: string;
-    value?: string;
-}
-
-export interface Transaction extends BlockbookTx {
-    fees: string; // optional in Tx, seems to always be there
+export type Transaction = Omit<RequiredKey<BlockbookTx, 'fees'>, 'tokenTransfers'> & {
     tokenTransfers?: (BlockbookTokenTransfer & {
         type: TokenStandard; // string in Tx, seems to always be ERC20 | ERC721 | ERC1155
+        standard: TokenStandard;
     })[];
-}
+};
 
 export interface Push {
     result: string;
 }
 
-export type Fee = {
-    feePerUnit: string;
-    feePerTx?: string;
-    feeLimit?: string;
-}[];
+export type Fee = Omit<RequiredKey<WsEstimateFeeRes, 'feePerUnit'>, 'eip1559'>[];
 
-export interface BlockNotification {
-    height: number;
-    hash: string;
-}
+export type BlockNotification = WsNewBlock;
+export type { EthereumGasData };
 
-export interface MempoolTransactionNotification extends Transaction {
-    confirmationETABlocks: number;
-    confirmationETASeconds: number;
-}
+export type MempoolTransactionNotification = RequiredKey<
+    Transaction,
+    'confirmationETASeconds' | 'confirmationETABlocks'
+>;
 
 export interface AddressNotification {
     address: string;
@@ -152,26 +158,31 @@ export interface AddressNotification {
 }
 
 export interface FiatRatesNotification {
-    rates: FiatRatesLegacy;
+    rates: FiatRatesBySymbol;
 }
 
-export interface TimestampedFiatRates {
-    ts: number;
-    rates: FiatRatesLegacy;
-}
+export type TimestampedFiatRates = Omit<RequiredKey<FiatTicker, 'ts'>, 'error' | 'rates'> & {
+    rates: FiatRatesBySymbol;
+};
 
 export interface FiatRatesForTimestamp {
     tickers: TimestampedFiatRates[];
 }
 
-export interface AvailableCurrencies {
-    ts: number;
-    available_currencies: string[];
-}
+export type AvailableCurrencies = Omit<RequiredKey<AvailableVsCurrencies, 'ts'>, 'error'>;
 
+export type ContractInfoProtocol = BlockbookContractInfoProtocol;
+
+export type ContractInfoParams = WsContractInfoReq;
+export type ContractInfoResponse = ContractInfoResult;
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 declare function FSend(method: 'getInfo'): Promise<ServerInfo>;
 declare function FSend(method: 'getBlockHash', params: { height: number }): Promise<BlockHash>;
-declare function FSend(method: 'getBlock', params: { id: string }): Promise<Block>;
+declare function FSend(
+    method: 'getBlock',
+    params: { id: string; page?: number; pageSize?: number },
+): Promise<Block>;
 declare function FSend(
     method: 'getBlockFilter',
     params: WsBlockFilterReq & FilterRequestParams,
@@ -187,7 +198,10 @@ declare function FSend(
 declare function FSend(method: 'getAccountInfo', params: AccountInfoParams): Promise<AccountInfo>;
 declare function FSend(method: 'getAccountUtxo', params: AccountUtxoParams): Promise<AccountUtxo>;
 declare function FSend(method: 'getTransaction', params: { txid: string }): Promise<Transaction>;
-declare function FSend(method: 'sendTransaction', params: { hex: string }): Promise<Push>;
+declare function FSend(
+    method: 'sendTransaction',
+    params: { hex: string; disableAlternativeRPC?: boolean },
+): Promise<Push>;
 declare function FSend(
     method: 'getBalanceHistory',
     params: AccountBalanceHistoryParams,
@@ -205,6 +219,11 @@ declare function FSend(
     params: GetFiatRatesForTimestampsParams,
 ): Promise<FiatRatesForTimestamp>;
 declare function FSend(method: 'estimateFee', params: EstimateFeeParams): Promise<Fee>;
+declare function FSend(method: 'rpcCall', params: RpcCallParams): Promise<{ data: string }>;
+declare function FSend(
+    method: 'getContractInfo',
+    params: ContractInfoParams,
+): Promise<ContractInfoResponse>;
 declare function FSend(
     method: 'subscribeAddresses',
     params: { addresses: string[] },

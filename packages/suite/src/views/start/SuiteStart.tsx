@@ -1,6 +1,7 @@
 import styled from 'styled-components';
-import { WelcomeLayout } from 'src/components/suite';
+
 import { StartContent } from './StartContent';
+import { WelcomeLayoutWithoutModalSwitcher } from '../../components/suite/layouts/WelcomeLayout/WelcomeLayoutWithoutModalSwitcher';
 
 const Content = styled.div`
     display: flex;
@@ -10,9 +11,16 @@ const Content = styled.div`
 `;
 
 export const SuiteStart = () => (
-    <WelcomeLayout>
-        <Content data-test="@onboarding/welcome">
+    /**
+     * In onboarding we have custom confirm dialogs that rely on the fact,
+     * that we do not have the ModalProvider in layout, and therefore it is
+     * handled in a custom way in the onboarding.
+     *
+     * Go to `OnboardingCard` search for `ConfirmOnDevice`.
+     */
+    <WelcomeLayoutWithoutModalSwitcher>
+        <Content data-testid="@onboarding/welcome">
             <StartContent />
         </Content>
-    </WelcomeLayout>
+    </WelcomeLayoutWithoutModalSwitcher>
 );

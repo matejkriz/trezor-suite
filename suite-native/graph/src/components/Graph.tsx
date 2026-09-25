@@ -1,29 +1,32 @@
 import { useEffect, useMemo, useState } from 'react';
+import { PixelRatio } from 'react-native';
 
 import * as Haptics from 'expo-haptics';
 
-import { GraphPoint, LineGraph } from '@suite-native/react-native-graph';
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-import { Box, Loader } from '@suite-native/atoms';
 import {
-    FiatGraphPoint,
-    GroupedBalanceMovementEvent,
-    GroupedBalanceMovementEventPayload,
+    type FiatGraphPoint,
+    type GroupedBalanceMovementEvent,
+    type GroupedBalanceMovementEventPayload,
 } from '@suite-common/graph';
-import { useTranslate } from '@suite-native/intl';
+import { Box, Loader } from '@suite-native/atoms';
+import { Translation } from '@suite-native/intl';
+import { type GraphPoint, LineGraph } from '@suite-native/react-native-graph';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
+import { type TimerId } from '@trezor/type-utils';
 
 import { getExtremaFromGraphPoints } from '../utils';
 import { AxisLabel } from './AxisLabel';
 import { GraphError } from './GraphError';
-import { TransactionEventTooltip } from './TransactionEventTooltip';
 import { SelectionDotWithLine } from './SelectionDotWithLine';
 import { TransactionEvent } from './TransactionEvent';
+import { TransactionEventTooltip } from './TransactionEventTooltip';
 
 type GraphProps<TGraphPoint extends GraphPoint> = {
     points: TGraphPoint[];
     loading?: boolean;
     onPointSelected?: (point: TGraphPoint) => void;
     onGestureEnd?: () => void;
+    onGestureStart?: () => void;
     animated?: boolean;
     error?: string | null;
     onTryAgain: () => void;
@@ -57,9 +60,18 @@ const triggerHaptics = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 };
 
+const BASE_LINE_THICKNESS = 1.5;
+
+const getAccessibilityLineThickness = () => {
+    const fontScale = PixelRatio.getFontScale();
+
+    return Math.max(BASE_LINE_THICKNESS, BASE_LINE_THICKNESS * fontScale);
+};
+
 export const Graph = <TGraphPoint extends FiatGraphPoint>({
     onPointSelected,
     onGestureEnd,
+    onGestureStart,
     onTryAgain,
     error,
     events,
@@ -72,18 +84,17 @@ export const Graph = <TGraphPoint extends FiatGraphPoint>({
         applyStyle,
         utils: { colors },
     } = useNativeStyles();
-    const { translate } = useTranslate();
     const [delayedLoading, setDelayedLoading] = useState(false);
 
     const arePointsEmpty = points.length <= 1;
 
     const areLabelsHidden = loading || !!error || arePointsEmpty;
-    const showBlurredGraph = !loading && !!error && !loading;
+    const showBlurredGraph = !loading && !!error;
 
     useEffect(() => {
         // We need to delay the loading a bit, because when switching between cached timeframes, it will break the
         // path interpolation animation.
-        let timeout: ReturnType<typeof setTimeout>;
+        let timeout: TimerId;
         if (loading) {
             timeout = setTimeout(() => {
                 setDelayedLoading(true);
@@ -126,7 +137,7 @@ export const Graph = <TGraphPoint extends FiatGraphPoint>({
             <LineGraph<GroupedBalanceMovementEventPayload>
                 style={applyStyle(graphStyle, { loading, error })}
                 points={points}
-                color={colors.borderSecondary}
+                color={colors.borderBrand}
                 animated={animated}
                 verticalPadding={20}
                 enablePanGesture
@@ -135,25 +146,30 @@ export const Graph = <TGraphPoint extends FiatGraphPoint>({
                 BottomAxisLabel={axisLabels?.BottomAxisLabel}
                 onPointSelected={onPointSelected as any /* because of ExtendedGraphPoint */}
                 onGestureEnd={onGestureEnd}
+                onGestureStart={onGestureStart}
                 panGestureDelay={panGestureDelay}
                 events={events}
                 EventComponent={TransactionEvent}
                 EventTooltipComponent={TransactionEventTooltip}
                 onEventHover={triggerHaptics}
-                lineThickness={2}
+                lineThickness={getAccessibilityLineThickness()}
                 loading={delayedLoading}
-                loadingLineColor={colors.borderDashed}
+                loadingLineColor={colors.borderNeutral}
                 blurOverlay={showBlurredGraph}
                 showPlaceholder={arePointsEmpty}
             />
             {loading && (
                 <Box style={applyStyle(graphMessageStyleContainer)}>
                     <Loader
-                        title={translate(
-                            loadingTakesLongerThanExpected
-                                ? 'graph.retrievengTakesLongerThanExpected'
-                                : 'graph.retrievingData',
-                        )}
+                        title={
+                            <Translation
+                                id={
+                                    loadingTakesLongerThanExpected
+                                        ? 'graph.retrievengTakesLongerThanExpected'
+                                        : 'graph.retrievingData'
+                                }
+                            />
+                        }
                     />
                 </Box>
             )}

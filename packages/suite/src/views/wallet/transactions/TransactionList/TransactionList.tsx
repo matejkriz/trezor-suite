@@ -1,113 +1,123 @@
-import { useMemo, useState, useEffect, useRef } from 'react';
-import styled from 'styled-components';
-import useDebounce from 'react-use/lib/useDebounce';
+import { type ReactElement, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { useDebounce } from 'react-use';
 
-import { fetchTransactionsThunk } from '@suite-common/wallet-core';
-import {
-    groupTransactionsByDate,
-    advancedSearchTransactions,
-    groupJointTransactions,
-    getAccountNetwork,
-} from '@suite-common/wallet-utils';
-import { CoinjoinBatchItem } from 'src/components/wallet/TransactionItem/CoinjoinBatchItem';
-import { Translation } from 'src/components/suite';
-import { DashboardSection } from 'src/components/dashboard';
-import { useDispatch, useSelector } from 'src/hooks/suite';
-import { WalletAccountTransaction, Account } from 'src/types/wallet';
-import { TransactionListActions } from './TransactionListActions/TransactionListActions';
-import { TransactionItem } from 'src/components/wallet/TransactionItem/TransactionItem';
-import { Pagination } from 'src/components/wallet';
-import { TransactionsGroup } from './TransactionsGroup/TransactionsGroup';
-import { SkeletonTransactionItem } from './SkeletonTransactionItem';
-import { NoSearchResults } from './NoSearchResults';
-import { findAnchorTransactionPage } from 'src/utils/suite/anchor';
-import { TransactionCandidates } from './TransactionCandidates';
-import { selectLabelingDataForAccount } from 'src/reducers/suite/metadataReducer';
+import { Translation } from '@suite/intl';
+import { findAnchorTransactionPage, selectRouterAnchor } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
 import { getTxsPerPage } from '@suite-common/suite-utils';
-import { SkeletonStack } from '@trezor/components';
-import { selectLocalCurrency } from 'src/reducers/wallet/settingsReducer';
+import { advancedSearchTransactions } from '@suite-common/transaction-search';
+import { groupTransactionsByDate, isPending } from '@suite-common/wallet-utils';
+import { Column } from '@trezor/components';
 
-const StyledSection = styled(DashboardSection)`
-    margin-bottom: 20px;
-`;
+import { DashboardSection } from 'src/components/dashboard';
+import { Pagination } from 'src/components/wallet';
+import { useSelector } from 'src/hooks/suite';
+import { selectAccountLabelsForSearch } from 'src/selectors/suite/selectAccountLabelsForSearch';
+import { type Account, type WalletAccountTransaction } from 'src/types/wallet';
 
-const PaginationWrapper = styled.div`
-    margin-top: 20px;
-`;
+import { NoSearchResults } from './NoSearchResults';
+import { SkeletonTransactionItem } from './SkeletonTransactionItem';
+import { TransactionGroupedList } from './TransactionGroupedList';
+import { TransactionListActions } from './TransactionListActions/TransactionListActions';
+import { PendingGroupHeader } from './TransactionsGroup/PendingGroupHeader';
+import { useFetchTransactions } from './useFetchTransactions';
 
 interface TransactionListProps {
+    allTransactions: WalletAccountTransaction[];
+    areAllTransactionsLoaded: boolean;
     transactions: WalletAccountTransaction[];
     symbol: WalletAccountTransaction['symbol'];
     isLoading?: boolean;
     account: Account;
     customTotalItems?: number;
+    customNoTransactions?: ReactNode;
+    customHeading?: ReactElement;
     isExportable?: boolean;
+    isTxFilteringEnabled?: boolean;
+    customPageFetching?: boolean;
+    onPageRequested?: (page: number) => void;
 }
 
 export const TransactionList = ({
+    allTransactions,
+    areAllTransactionsLoaded,
     transactions,
     isLoading,
     account,
     symbol,
+    customNoTransactions,
+    customHeading,
     customTotalItems,
+    onPageRequested,
     isExportable = true,
+    isTxFilteringEnabled = true,
+    customPageFetching,
 }: TransactionListProps) => {
-    const localCurrency = useSelector(selectLocalCurrency);
-    const anchor = useSelector(state => state.router.anchor);
-    const dispatch = useDispatch();
-    const accountMetadata = useSelector(state => selectLabelingDataForAccount(state, account.key));
-    const network = getAccountNetwork(account);
+    const anchor = useSelector(selectRouterAnchor);
+    const { dispatch } = useServices(injectDispatch);
+    const searchLabels = useSelector(state => selectAccountLabelsForSearch(state, account));
+
+    const { fetchPage, fetchedAll, fetchAll } = useFetchTransactions(account, allTransactions);
 
     // Search
     const [searchQuery, setSearchQuery] = useState('');
     const [searchedTransactions, setSearchedTransactions] = useState(transactions);
-    const [hasFetchedAll, setHasFetchedAll] = useState(false);
 
     const sectionRef = useRef<HTMLDivElement>(null);
 
     useDebounce(
         () => {
-            const results = advancedSearchTransactions(transactions, accountMetadata, searchQuery);
+            const results = advancedSearchTransactions(transactions, searchLabels, searchQuery);
             setSearchedTransactions(results);
         },
         200,
-        [transactions, account.metadata, searchQuery, accountMetadata],
+        [transactions, searchQuery, searchLabels],
     );
 
     useEffect(() => {
-        if (anchor && !hasFetchedAll) {
-            dispatch(
-                fetchTransactionsThunk({
-                    accountKey: account.key,
-                    page: 2,
-                    perPage: getTxsPerPage(account.networkType),
-                    noLoading: true,
-                    recursive: true,
-                }),
-            );
-            setHasFetchedAll(true);
+        if (anchor && !fetchedAll) {
+            fetchAll();
         }
-    }, [anchor, account, dispatch, hasFetchedAll]);
+    }, [anchor, account, dispatch, fetchedAll, fetchAll]);
 
     // Pagination
     const perPage = getTxsPerPage(account.networkType);
-    const startPage = findAnchorTransactionPage(transactions, perPage, anchor);
-    const [currentPage, setSelectedPage] = useState(startPage);
+    // NOTE: if there is no anchor, we can keep the page 1
+    const startPage = useMemo(
+        () => (anchor ? findAnchorTransactionPage(transactions, perPage, anchor) : null),
+        [anchor, perPage, transactions],
+    );
+    const [currentPage, setSelectedPage] = useState(startPage ?? 1);
 
     useEffect(() => {
         // reset page on account change
+        if (startPage === null) return;
         setSelectedPage(startPage);
-    }, [account.descriptor, account.symbol, startPage]);
+        onPageRequested?.(startPage);
+    }, [account.descriptor, account.symbol, onPageRequested, startPage]);
+
+    // Pending txs are not part of the paginated history yet and keep their own chronological order, so
+    // they are rendered above the list on every page.
+    const pendingTxs = useMemo(
+        () => searchedTransactions.filter(isPending),
+        [searchedTransactions],
+    );
 
     const isSearching = searchQuery.trim() !== '';
     const defaultTotalItems = customTotalItems ?? account.history.total;
-    const totalItems = isSearching ? searchedTransactions.length : defaultTotalItems;
+    // account.history.total counts confirmed txs only, but pending txs occupy slots in the sliced
+    // array, so include them in the page count to keep the last confirmed tx reachable.
+    const totalItems = isSearching
+        ? searchedTransactions.length
+        : defaultTotalItems + pendingTxs.length;
 
     const onPageSelected = (page: number) => {
         setSelectedPage(page);
+        onPageRequested?.(page);
 
-        if (!isSearching) {
-            dispatch(fetchTransactionsThunk({ accountKey: account.key, page, perPage }));
+        if (!isSearching && !customPageFetching) {
+            fetchPage(page);
         }
 
         if (sectionRef.current) {
@@ -118,107 +128,104 @@ export const TransactionList = ({
     const startIndex = (currentPage - 1) * perPage;
     const stopIndex = startIndex + perPage;
 
+    // searchedTransactions is a sparse array - not-yet-fetched pages are holes - so it has to be sliced
+    // by index before filtering. Filtering first would drop the holes and shift the page offsets.
     const slicedTransactions = useMemo(
         () => searchedTransactions.slice(startIndex, stopIndex),
         [searchedTransactions, startIndex, stopIndex],
     );
 
-    const transactionsByDate = useMemo(
-        () => groupTransactionsByDate(slicedTransactions),
+    // Only confirmed txs are paginated; pending txs are rendered above the list on every page.
+    const confirmedTxs = useMemo(
+        () => slicedTransactions.filter(tx => !isPending(tx)),
         [slicedTransactions],
     );
 
-    const listItems = useMemo(
-        () =>
-            Object.entries(transactionsByDate).map(([dateKey, value], groupIndex) => {
-                const isPending = dateKey === 'pending';
-
-                return (
-                    <TransactionsGroup
-                        key={dateKey}
-                        dateKey={dateKey}
-                        symbol={symbol}
-                        transactions={value}
-                        localCurrency={localCurrency}
-                        index={groupIndex}
-                    >
-                        {groupJointTransactions(value).map((item, index) =>
-                            item.type === 'joint-batch' ? (
-                                <CoinjoinBatchItem
-                                    key={item.rounds[0].txid}
-                                    transactions={item.rounds}
-                                    isPending={isPending}
-                                    localCurrency={localCurrency}
-                                />
-                            ) : (
-                                <TransactionItem
-                                    key={item.tx.txid}
-                                    transaction={item.tx}
-                                    isPending={isPending}
-                                    accountMetadata={accountMetadata}
-                                    accountKey={account.key}
-                                    network={network!}
-                                    index={index}
-                                />
-                            ),
-                        )}
-                    </TransactionsGroup>
-                );
-            }),
-        [transactionsByDate, account.key, localCurrency, symbol, network, accountMetadata],
+    const pendingTxsByDate = useMemo(
+        () => groupTransactionsByDate(pendingTxs, 'day'),
+        [pendingTxs],
+    );
+    const confirmedTxsByDate = useMemo(
+        () => groupTransactionsByDate(confirmedTxs, 'day'),
+        [confirmedTxs],
     );
 
-    // if total pages cannot be determined check current page and number of txs (XRP)
-    // Edge case: if there is exactly 25 Ripple txs, pagination will be displayed
-    const isRipple = account.networkType === 'ripple';
-    const isLastRipplePage = isRipple && slicedTransactions.length < perPage;
-    const showRipplePagination = !(isLastRipplePage && currentPage === 1);
-    const showPagination = isRipple ? showRipplePagination : totalItems > perPage;
+    // if total pages cannot be determined check current page and number of txs (XRP/XLM)
+    // Edge case: if there is exactly 25 Ripple/Stellar txs, pagination will be displayed
+    const isRippleOrStellar = account.networkType === 'ripple' || account.networkType === 'stellar';
+    const isLastRippleOrStellarPage = isRippleOrStellar && slicedTransactions.length < perPage;
+    const showRippleOrStellarPagination = !(isLastRippleOrStellarPage && currentPage === 1);
+    const showPagination = isRippleOrStellar ? showRippleOrStellarPagination : totalItems > perPage;
+
     const areTransactionsAvailable = transactions.length > 0 && searchedTransactions.length === 0;
 
     return (
-        <StyledSection
+        <DashboardSection
             ref={sectionRef}
-            heading={<Translation id="TR_ALL_TRANSACTIONS" />}
+            heading={customHeading ?? <Translation id="TR_ALL_TRANSACTIONS" />}
             actions={
                 <TransactionListActions
                     account={account}
                     searchQuery={searchQuery}
                     setSearch={setSearchQuery}
                     setSelectedPage={setSelectedPage}
-                    accountMetadata={accountMetadata}
                     isExportable={isExportable}
+                    isTxFilteringEnabled={isTxFilteringEnabled}
                 />
             }
-            data-test="@wallet/accounts/transaction-list"
+            data-testid="@wallet/accounts/transaction-list"
         >
-            {account.accountType === 'coinjoin' && !isSearching && (
-                <TransactionCandidates accountKey={account.key} />
-            )}
+            <Column gap={32} padding={{ top: 16 }}>
+                {/* TODO: show this skeleton also while searching in txs */}
+                {isLoading ||
+                (!areAllTransactionsLoaded && searchQuery && searchedTransactions.length === 0) ? (
+                    <Column gap={16}>
+                        <SkeletonTransactionItem />
+                        <SkeletonTransactionItem />
+                        <SkeletonTransactionItem />
+                    </Column>
+                ) : (
+                    <Column gap={40}>
+                        {areTransactionsAvailable && <NoSearchResults />}
+                        {!areTransactionsAvailable &&
+                            (customNoTransactions &&
+                            confirmedTxs.length === 0 &&
+                            pendingTxs.length === 0 ? (
+                                customNoTransactions
+                            ) : (
+                                <>
+                                    {pendingTxs.length > 0 && (
+                                        <PendingGroupHeader txsCount={pendingTxs.length} />
+                                    )}
+                                    <TransactionGroupedList
+                                        transactionGroups={pendingTxsByDate}
+                                        symbol={symbol}
+                                        account={account}
+                                        isPending={true}
+                                    />
+                                    <TransactionGroupedList
+                                        transactionGroups={confirmedTxsByDate}
+                                        symbol={symbol}
+                                        account={account}
+                                        isPending={false}
+                                    />
+                                </>
+                            ))}
+                    </Column>
+                )}
 
-            {/* TODO: show this skeleton also while searching in txs */}
-            {isLoading ? (
-                <SkeletonStack $col $childMargin="0px 0px 16px 0px">
-                    <SkeletonTransactionItem />
-                    <SkeletonTransactionItem />
-                    <SkeletonTransactionItem />
-                </SkeletonStack>
-            ) : (
-                <>{areTransactionsAvailable ? <NoSearchResults /> : listItems}</>
-            )}
-
-            {showPagination && (
-                <PaginationWrapper>
+                {showPagination && (
                     <Pagination
-                        hasPages={!isRipple}
+                        hasPages={!isRippleOrStellar}
                         currentPage={currentPage}
-                        isLastPage={isLastRipplePage}
+                        isLastPage={isLastRippleOrStellarPage}
                         perPage={perPage}
                         totalItems={totalItems}
                         onPageSelected={onPageSelected}
+                        explicitNavigation
                     />
-                </PaginationWrapper>
-            )}
-        </StyledSection>
+                )}
+            </Column>
+        </DashboardSection>
     );
 };

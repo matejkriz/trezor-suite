@@ -1,0 +1,63 @@
+import { type DeviceModelInternal } from './deviceModelInternal';
+
+type ModelColor = string;
+type ModelFrontColor = string;
+
+type ModelConfig = {
+    name: string;
+    colors: Record<ModelColor, string>;
+    frontColors?: Record<ModelColor, ModelFrontColor>;
+};
+
+const safe3Model: ModelConfig = {
+    name: 'Trezor Safe 3',
+    colors: {
+        '1': 'Cosmic Black',
+        '2': 'Stellar Silver',
+        '3': 'Solar Gold',
+        '4': 'Galactic Rose',
+        '5': 'Bitcoin Orange',
+    },
+};
+
+export const models: Record<DeviceModelInternal, ModelConfig> = {
+    UNKNOWN: {
+        name: 'Unknown',
+        colors: safe3Model.colors, // just in case
+    },
+    T1B1: {
+        name: 'Trezor Model One',
+        colors: {},
+    },
+    T2T1: {
+        name: 'Trezor Model T',
+        colors: {},
+    },
+    T2B1: safe3Model,
+    T3B1: safe3Model,
+    T3T1: {
+        name: 'Trezor Safe 5',
+        colors: {
+            '1': 'Black Graphite',
+            '2': 'Violet Ore',
+            '3': 'Green Beryl',
+            '4': 'Bitcoin Orange',
+            '5': 'Freedom Edition',
+        },
+    },
+    T3W1: {
+        name: 'Trezor Safe 7',
+        colors: {
+            '1': 'Charcoal Black',
+            '2': 'Obsidian Green',
+            '3': 'Bitcoin Orange',
+            '4': 'Limited Edition',
+        },
+        frontColors: {
+            '1': '1',
+            '2': '2',
+            '3': '1',
+            '4': '1',
+        },
+    },
+};

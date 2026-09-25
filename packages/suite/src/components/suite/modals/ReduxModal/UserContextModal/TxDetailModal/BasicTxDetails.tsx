@@ -1,173 +1,98 @@
-import styled, { useTheme } from 'styled-components';
-import { Icon, variables, CoinLogo, H3, useElevation } from '@trezor/components';
-import { Translation, FormattedDateWithBullet } from 'src/components/suite';
-import { WalletAccountTransaction, Network } from 'src/types/wallet';
+import styled from 'styled-components';
+
+import { useExternalLink } from '@suite/external-links';
+import { Translation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { notificationsActions } from '@suite-common/toast-notifications';
+import { type Network } from '@suite-common/wallet-config';
 import {
-    isTxFinal,
-    getTxIcon,
-    isPending,
-    getFeeUnits,
+    type PendingEvmNonceStatus,
+    fromWei,
+    getEffectiveGasPrice,
     getFeeRate,
+    isEip1559,
+    isPending,
 } from '@suite-common/wallet-utils';
-import { TransactionHeader } from 'src/components/wallet/TransactionItem/TransactionHeader';
-import { fromWei } from 'web3-utils';
-import { IOAddress } from './IOAddress';
 import {
-    Elevation,
-    borders,
-    mapElevationToBackground,
-    mapElevationToBorder,
-    spacingsPx,
-    typography,
-} from '@trezor/theme';
+    Card,
+    Divider,
+    Grid,
+    H3,
+    Icon,
+    IconButton,
+    InfoItem,
+    type InfoItemProps,
+    InfoSegments,
+    Link,
+    Row,
+    Text,
+    Tooltip,
+} from '@trezor/components';
+import { copyToClipboard } from '@trezor/dom-utils';
+import {
+    CalendarIcon,
+    CopyIcon,
+    FingerprintIcon,
+    GasPumpIcon,
+    PencilIcon,
+    ReceiptIcon,
+    TagIcon,
+    WarningIcon,
+} from '@trezor/icons';
+import { TokenIcon } from '@trezor/product-components';
+import { BigNumber } from '@trezor/utils';
 
-const Wrapper = styled.div<{ $elevation: Elevation }>`
-    background: ${mapElevationToBackground};
-    padding: ${spacingsPx.lg};
-    border-radius: ${borders.radii.xs};
-`;
+import { FormattedDateWithBullet } from 'src/components/suite/FormattedDateWithBullet';
+import { FeeRate } from 'src/components/wallet/Fees/FeeRate';
+import { TransactionHeader } from 'src/components/wallet/TransactionItem/TransactionHeader';
+import { useLayoutSize } from 'src/hooks/suite/useLayoutSize';
+import { type WalletAccountTransaction } from 'src/types/wallet';
+import { getTransactionIcon } from 'src/utils/wallet/transactionIconUtils';
+import { BlurUrls } from 'src/views/wallet/tokens/common/BlurUrls';
 
-const Confirmations = styled.div`
+const IconWrapper = styled.div`
     display: flex;
-    color: ${({ theme }) => theme.textSubdued};
-    ${typography.hint}
-`;
-
-const StatusWrapper = styled.div`
-    display: flex;
-    height: ${spacingsPx.lg};
-    align-items: center;
-`;
-
-const HeaderFirstRow = styled.div<{ $elevation: Elevation }>`
-    display: grid;
-    grid-gap: ${spacingsPx.sm};
-    grid-template-columns: minmax(55px, 70px) auto auto;
-    align-items: center;
-    padding-bottom: ${spacingsPx.xl};
-    padding-right: ${spacingsPx.xs};
-    border-bottom: 1px solid ${mapElevationToBorder};
-    color: ${({ theme }) => theme.TYPE_DARK_GREY};
-
-    ${variables.SCREEN_QUERY.MOBILE} {
-        grid-template-columns: 55px 1fr fit-content(15px);
-    }
-`;
-
-const Grid = styled.div<{ $showRbfCols?: boolean }>`
-    display: grid;
-    border-top: 1px solid ${({ theme }) => theme.STROKE_GREY};
-    grid-gap: ${spacingsPx.sm};
-    grid-template-columns: 105px minmax(0, 2.5fr) 90px minmax(0, 2.5fr); /* title value title value */
-    ${typography.hint}
-    padding: ${spacingsPx.xxl} ${spacingsPx.xs} ${spacingsPx.sm};
-    text-align: left;
-    align-items: center;
-
-    ${variables.SCREEN_QUERY.BELOW_TABLET} {
-        grid-template-columns: 110px minmax(0, 1fr);
-    }
-`;
-
-const Title = styled.div`
-    display: inline-flex;
-    text-align: left;
-    ${typography.label}
-    color: ${({ theme }) => theme.textSubdued};
-    align-items: center;
-`;
-
-const Value = styled.div`
-    display: inline-flex;
-    color: ${({ theme }) => theme.textDefault};
-    ${typography.label}
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-variant-numeric: tabular-nums;
-`;
-
-const TxidValue = styled.div`
-    color: ${({ theme }) => theme.textDefault};
-    ${typography.label}
-`;
-
-const IconWrapper = styled.div<{ $elevation: Elevation }>`
-    background-color: ${mapElevationToBorder};
-    border-radius: ${borders.radii.full};
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    > svg {
-        margin: 0 auto;
-        display: block;
-    }
-`;
-
-const MainIconWrapper = styled(IconWrapper)`
-    width: 54px;
-    height: 54px;
     position: relative;
+    border: 4px solid ${({ theme }) => theme.elementBorderNeutralSofter};
+    border-radius: calc(infinity * 1px);
 `;
 
-const NestedIconWrapper = styled(IconWrapper)`
-    width: 18px;
-    height: 18px;
+const NestedIconWrapper = styled.div`
     position: absolute;
-    top: 0;
-    right: 0;
-    box-shadow: ${({ theme }) => theme.boxShadowElevated};
+    top: -4px;
+    right: -4px;
+    background: ${({ theme }) => theme.elementFillElevated};
+    border-radius: calc(infinity * 1px);
+    padding: 2px;
 `;
 
-const TxStatus = styled.div`
-    text-align: left;
-    overflow: hidden;
-`;
+const Item = ({ label, icon, children }: Partial<InfoItemProps>) => (
+    <InfoItem
+        label={label}
+        icon={icon}
+        labelWidth={135}
+        typographyStyle="body-xs"
+        direction="row"
+        verticalAlignment="start"
+        ellipsisLineCount={2}
+    >
+        <Text as="div" typographyStyle="body-xs">
+            {children}
+        </Text>
+    </InfoItem>
+);
 
-const ConfirmationStatusWrapper = styled.div`
-    align-items: center;
-    display: inline-grid;
-    justify-content: flex-end;
-`;
-
-const TxSentStatus = styled(H3)`
-    overflow: hidden;
-    text-overflow: ellipsis;
-    color: ${({ theme }) => theme.textDefault};
-`;
-
-const ConfirmationStatus = styled.div<{ $confirmed: boolean; $tiny?: boolean }>`
-    color: ${({ $confirmed, theme }) =>
-        $confirmed ? theme.textPrimaryDefault : theme.textAlertYellow};
-    ${({ $tiny }) => ($tiny ? typography.label : typography.callout)}
-`;
-
-const Circle = styled.div`
-    margin-left: ${spacingsPx.xxs};
-    margin-right: ${spacingsPx.xxs};
-    color: ${({ theme }) => theme.textSubdued};
-`;
-
-const Timestamp = styled.span`
-    white-space: nowrap;
-`;
-
-const StyledIcon = styled(Icon)`
-    margin-right: ${spacingsPx.xs};
-`;
-
-const IconPlaceholder = styled.span`
-    min-width: 10px;
-    margin-right: ${spacingsPx.xs};
-`;
-
-interface BasicTxDetailsProps {
+type BasicTxDetailsProps = {
     tx: WalletAccountTransaction;
     network: Network;
     confirmations: number;
     explorerUrl: string;
-    explorerUrlQueryString: string;
-}
+    explorerUrlQueryString?: string;
+    // Whether this tx's own nonce is stuck (gapped or already superseded) — see useEvmNonceInfo.
+    nonceStatus?: PendingEvmNonceStatus;
+    nextNonce?: number;
+};
 
 export const BasicTxDetails = ({
     tx,
@@ -175,169 +100,286 @@ export const BasicTxDetails = ({
     network,
     explorerUrl,
     explorerUrlQueryString,
+    nonceStatus,
+    nextNonce,
 }: BasicTxDetailsProps) => {
-    const theme = useTheme();
+    const { dispatch } = useServices(injectDispatch);
+
+    const { isBelowTablet } = useLayoutSize();
+    const explorerLink = useExternalLink(`${explorerUrl}${tx.txid}${explorerUrlQueryString ?? ''}`);
     // all solana txs which are fetched are already confirmed
     const isConfirmed = confirmations > 0 || tx.solanaSpecific?.status === 'confirmed';
-    const isFinal = isTxFinal(tx, confirmations);
 
-    const { elevation } = useElevation();
+    const onTxIdCopy = () => {
+        copyToClipboard(tx.txid);
+        dispatch(notificationsActions.addToast({ type: 'copy-to-clipboard' }));
+    };
 
     return (
-        <Wrapper $elevation={elevation}>
-            <HeaderFirstRow $elevation={elevation}>
-                <MainIconWrapper $elevation={elevation}>
-                    <CoinLogo symbol={tx.symbol} size={48} />
-
-                    <NestedIconWrapper $elevation={elevation}>
+        <Card>
+            <Row gap={12}>
+                <IconWrapper>
+                    <TokenIcon symbol={tx.symbol} size={48} showNetworkIcon />
+                    <NestedIconWrapper>
                         <Icon
                             size={14}
-                            color={tx.type === 'failed' ? theme.iconAlertRed : theme.iconDefault}
-                            icon={getTxIcon(tx.type)}
+                            intent={tx.type === 'failed' ? 'critical' : 'neutral'}
+                            as={getTransactionIcon(tx, false)}
                         />
                     </NestedIconWrapper>
-                </MainIconWrapper>
+                </IconWrapper>
 
-                <TxStatus>
-                    <TxSentStatus>
-                        <TransactionHeader transaction={tx} isPending={isPending(tx)} />
-                    </TxSentStatus>
-                </TxStatus>
+                <H3 ellipsisLineCount={1}>
+                    <TransactionHeader transaction={tx} isPending={isPending(tx)} />
+                </H3>
 
-                <ConfirmationStatusWrapper>
+                <Row gap={4} margin={{ left: 'auto' }}>
                     {isConfirmed ? (
-                        <StatusWrapper>
-                            <ConfirmationStatus $confirmed>
+                        <InfoSegments
+                            typographyStyle="body-sm"
+                            intent="neutral"
+                            priority="secondary"
+                        >
+                            <Text
+                                typographyStyle="body-sm-strong"
+                                intent="brand"
+                                data-testid="@modal/tx-details/confirmed"
+                            >
                                 <Translation id="TR_CONFIRMED_TX" />
-                            </ConfirmationStatus>
-
-                            {confirmations > 0 && (
-                                <>
-                                    <Circle>&bull;</Circle>
-                                    <Confirmations>
-                                        <Translation
-                                            id="TR_TX_CONFIRMATIONS"
-                                            values={{ confirmationsCount: confirmations }}
-                                        />
-                                    </Confirmations>
-                                </>
-                            )}
-                        </StatusWrapper>
+                            </Text>
+                            {confirmations > 0 ? (
+                                <Translation
+                                    id="TR_TX_CONFIRMATIONS"
+                                    values={{ confirmationsCount: confirmations }}
+                                />
+                            ) : undefined}
+                        </InfoSegments>
                     ) : (
-                        <ConfirmationStatus $confirmed={false}>
+                        <Text
+                            typographyStyle="body-sm-strong"
+                            intent="warning"
+                            data-testid="@modal/tx-details/unconfirmed"
+                        >
                             <Translation id="TR_UNCONFIRMED_TX" />
-                        </ConfirmationStatus>
+                        </Text>
                     )}
-                </ConfirmationStatusWrapper>
-            </HeaderFirstRow>
+                </Row>
+            </Row>
 
-            <Grid>
+            <Divider />
+
+            <Grid columns={isBelowTablet ? 1 : 2} columnGap={32} rowGap={12} forceEqualColumns>
                 {/* MINED TIME */}
-                <Title>
-                    <StyledIcon icon="CALENDAR" size={10} />
-                    {isConfirmed ? (
-                        <Translation id="TR_MINED_TIME" />
-                    ) : (
-                        <Translation id="TR_FIRST_SEEN" />
-                    )}
-                </Title>
-
-                <Value>
+                <Item
+                    label={
+                        isConfirmed ? (
+                            <Translation id="TR_MINED_TIME" />
+                        ) : (
+                            <Translation id="TR_FIRST_SEEN" />
+                        )
+                    }
+                    icon={CalendarIcon}
+                >
                     {tx.blockTime ? (
-                        <Timestamp>
-                            <FormattedDateWithBullet
-                                value={new Date(tx.blockTime * 1000)}
-                                timeLightColor
-                            />
-                        </Timestamp>
+                        <FormattedDateWithBullet value={new Date(tx.blockTime * 1000)} />
                     ) : (
                         <Translation id="TR_UNKNOWN_CONFIRMATION_TIME" />
                     )}
-                </Value>
+                </Item>
 
-                {/* TX ID */}
-                <Title>
-                    <StyledIcon icon="FINGERPRINT" size={10} />
-                    <Translation id="TR_TXID" />
-                </Title>
-
-                <TxidValue>
-                    <IOAddress
-                        txAddress={tx.txid}
-                        explorerUrl={explorerUrl}
-                        explorerUrlQueryString={explorerUrlQueryString}
-                    />
-                </TxidValue>
-
+                {/* Fee level */}
                 {network.networkType === 'bitcoin' && (
-                    <>
-                        {/* Fee level */}
-                        <Title>
-                            <StyledIcon icon="GAS" size={10} />
-                            <Translation id="TR_FEE_RATE" />
-                        </Title>
-
-                        <Value>
-                            {/* tx.feeRate was added in @trezor/blockchain-link 2.1.5 meaning that users
+                    <Item label={<Translation id="TR_FEE_RATE" />} icon={ReceiptIcon}>
+                        {/* tx.feeRate was added in @trezor/blockchain-link 2.1.5 meaning that users
                             might have locally saved old transactions without this field. since we
                             cant reliably migrate this data, we are keeping old way of displaying feeRate in place */}
-                            {`${tx?.feeRate ? tx.feeRate : getFeeRate(tx)} ${getFeeUnits(
-                                'bitcoin',
-                            )}`}
-                        </Value>
-
-                        {/* RBF Status */}
-                        <Title>
-                            <Translation id="TR_RBF_STATUS" />
-                        </Title>
-
-                        <Value>
-                            <ConfirmationStatus $confirmed={isFinal} $tiny>
-                                <Translation
-                                    id={isFinal ? 'TR_RBF_STATUS_FINAL' : 'TR_RBF_STATUS_NOT_FINAL'}
-                                />
-                            </ConfirmationStatus>
-                        </Value>
-                    </>
+                        <FeeRate
+                            feeRate={tx?.feeRate ? tx.feeRate : getFeeRate(tx)}
+                            networkType="bitcoin"
+                        />
+                    </Item>
                 )}
 
                 {/* Ethereum */}
-                {tx.ethereumSpecific && (
+                {network.networkType === 'ethereum' && tx.ethereumSpecific && (
                     <>
-                        <Title>
-                            <StyledIcon icon="GAS" size={10} />
-                            <Translation id="TR_GAS_LIMIT" />
-                        </Title>
-                        <Value>{tx.ethereumSpecific.gasLimit}</Value>
+                        <Item label={<Translation id="TR_NONCE" />} icon={ReceiptIcon}>
+                            <Row gap={4}>
+                                {tx.ethereumSpecific?.nonce}
+                                {nonceStatus && nonceStatus !== 'ok' && (
+                                    <Tooltip
+                                        content={
+                                            nonceStatus === 'superseded' ? (
+                                                <Translation
+                                                    id="TR_PENDING_NONCE_SUPERSEDED_WARNING"
+                                                    values={{ nonce: nextNonce }}
+                                                />
+                                            ) : (
+                                                <Translation
+                                                    id="TR_BUMP_FEE_NONCE_GAP_WARNING"
+                                                    values={{ nonce: nextNonce }}
+                                                />
+                                            )
+                                        }
+                                    >
+                                        <Icon as={WarningIcon} size={16} intent="warning" />
+                                    </Tooltip>
+                                )}
+                            </Row>
+                        </Item>
 
-                        <Title>
-                            <StyledIcon icon="GAS" size={10} />
-                            <Translation id="TR_GAS_USED" />
-                        </Title>
-                        <Value>
-                            {tx.ethereumSpecific.gasUsed ? (
-                                tx.ethereumSpecific.gasUsed
-                            ) : (
-                                <Translation id="TR_BUY_STATUS_PENDING" />
+                        <Item
+                            label={
+                                <Translation
+                                    id={
+                                        tx.ethereumSpecific.gasUsed
+                                            ? 'TR_GAS_LIMIT_AND_USAGE'
+                                            : 'TR_GAS_LIMIT'
+                                    }
+                                />
+                            }
+                            icon={GasPumpIcon}
+                        >
+                            {tx.ethereumSpecific.gasLimit}
+                            {tx.ethereumSpecific.gasUsed && tx.ethereumSpecific.gasLimit && (
+                                <>
+                                    {' / '}
+                                    {tx.ethereumSpecific.gasUsed} (
+                                    {new BigNumber(tx.ethereumSpecific.gasUsed)
+                                        .div(tx.ethereumSpecific.gasLimit)
+                                        .multipliedBy(100)
+                                        .toFixed(2)}
+                                    %)
+                                </>
                             )}
-                        </Value>
+                        </Item>
 
-                        <Title>
-                            <StyledIcon icon="GAS" size={10} />
-                            <Translation id="TR_GAS_PRICE" />
-                        </Title>
-                        <Value>{`${fromWei(tx.ethereumSpecific?.gasPrice ?? '0', 'gwei')} ${getFeeUnits(
-                            'ethereum',
-                        )}`}</Value>
+                        <Item label={<Translation id="TR_GAS_PRICE" />} icon={GasPumpIcon}>
+                            {isConfirmed || !isEip1559(tx.ethereumSpecific) ? (
+                                <FeeRate
+                                    feeRate={fromWei(
+                                        getEffectiveGasPrice(tx.ethereumSpecific),
+                                    ).toGwei()}
+                                    networkType="ethereum"
+                                    preserveDecimals
+                                />
+                            ) : (
+                                <Translation id="TR_UNCONFIRMED_TX" />
+                            )}
+                        </Item>
 
-                        <Title>
-                            <IconPlaceholder>#</IconPlaceholder>
-                            <Translation id="TR_NONCE" />
-                        </Title>
-                        <Value>{tx.ethereumSpecific.nonce}</Value>
+                        {tx.ethereumSpecific.maxFeePerGas && (
+                            <>
+                                <Item
+                                    label={<Translation id="TR_MAX_FEE_PER_GAS" />}
+                                    icon={GasPumpIcon}
+                                >
+                                    <FeeRate
+                                        feeRate={fromWei(
+                                            tx.ethereumSpecific?.maxFeePerGas ?? '0',
+                                        ).toGwei()}
+                                        networkType="ethereum"
+                                        preserveDecimals
+                                    />
+                                </Item>
+
+                                <Item
+                                    label={<Translation id="TR_BLOCK_BASE_FEE" />}
+                                    icon={GasPumpIcon}
+                                >
+                                    {isConfirmed ? (
+                                        <FeeRate
+                                            feeRate={fromWei(
+                                                tx.ethereumSpecific.baseFeePerGas || '0',
+                                            ).toGwei()}
+                                            networkType="ethereum"
+                                            preserveDecimals
+                                        />
+                                    ) : (
+                                        <Translation id="TR_UNCONFIRMED_TX" />
+                                    )}
+                                </Item>
+
+                                <Item
+                                    label={<Translation id="TR_MAX_PRIORITY_FEE_PER_GAS" />}
+                                    icon={GasPumpIcon}
+                                >
+                                    <FeeRate
+                                        feeRate={fromWei(
+                                            tx.ethereumSpecific?.maxPriorityFeePerGas ?? '0',
+                                        ).toGwei()}
+                                        networkType="ethereum"
+                                        preserveDecimals
+                                    />
+                                </Item>
+                            </>
+                        )}
                     </>
                 )}
+
+                {tx.rippleSpecific && (
+                    <Item label={<Translation id="DESTINATION_TAG_SHORT" />} icon={TagIcon}>
+                        {tx.rippleSpecific.destinationTag ?? '-'}
+                    </Item>
+                )}
+
+                {tx.stellarSpecific?.memo && (
+                    <Item label={<Translation id="DESTINATION_TAG_SHORT" />} icon={TagIcon}>
+                        <BlurUrls text={tx.stellarSpecific.memo} />
+                    </Item>
+                )}
+
+                {tx.solanaSpecific?.memo && (
+                    <Item label={<Translation id="MEMO" />} icon={TagIcon}>
+                        <BlurUrls text={tx.solanaSpecific.memo} />
+                    </Item>
+                )}
+
+                {/* TX ID */}
+                <Item label={<Translation id="TR_TXID" />} icon={FingerprintIcon}>
+                    <Tooltip
+                        content={
+                            <Row gap={8}>
+                                {tx.txid}
+                                <IconButton
+                                    icon={CopyIcon}
+                                    size="small"
+                                    intent="neutral"
+                                    priority="secondary"
+                                    onClick={onTxIdCopy}
+                                    tooltip={{ isActive: false }}
+                                />
+                            </Row>
+                        }
+                    >
+                        <Link
+                            href={explorerLink}
+                            data-testid="@tx-detail/txid-value"
+                            overflowWrap="anywhere"
+                        >
+                            {tx.txid}
+                        </Link>
+                    </Tooltip>
+                </Item>
+
+                {tx.tronSpecific?.energyUsage && (
+                    <Item label={<Translation id="TR_TRON_ENERGY" />} icon={GasPumpIcon}>
+                        {tx.tronSpecific.energyUsage}
+                    </Item>
+                )}
+
+                {tx.tronSpecific?.bandwidthUsage && (
+                    <Item label={<Translation id="TR_TRON_BANDWIDTH" />} icon={GasPumpIcon}>
+                        {tx.tronSpecific.bandwidthUsage}
+                    </Item>
+                )}
+
+                {tx.tronSpecific?.note && (
+                    <Item label={<Translation id="TR_TRON_NOTE" />} icon={PencilIcon}>
+                        {tx.tronSpecific.note}
+                    </Item>
+                )}
             </Grid>
-        </Wrapper>
+        </Card>
     );
 };

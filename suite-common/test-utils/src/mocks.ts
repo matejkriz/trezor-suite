@@ -1,94 +1,48 @@
 /* WARNING! This file should be imported ONLY in tests! */
 
+import { type LegacyNetworkSymbol } from '@suite-common/legacy-network-config';
+import { type Action, type GuideNode, type MessageSystem } from '@suite-common/suite-types';
+import { asNetworkSymbol, networksCollection } from '@suite-common/wallet-config';
 import {
-    TrezorConnect,
-    AccountUtxo,
-    Device,
-    Features,
-    DeviceModelInternal,
-    FirmwareType,
-} from '@trezor/connect';
-import {
-    TrezorDevice,
-    GuideNode,
-    GuideArticle,
-    GuideCategory,
-    MessageSystem,
-    Action,
-} from '@suite-common/suite-types';
-import {
-    Account,
-    FeeInfo,
-    WalletAccountTransaction,
-    BlockchainNetworks,
+    type BlockchainNetworks,
+    type FeeInfo,
+    type WalletAccountTransaction,
+    asAccountDescriptor,
 } from '@suite-common/wallet-types';
-import { networksCompatibility } from '@suite-common/wallet-config';
-
-// in-memory implementation of indexedDB
-import 'fake-indexeddb/auto';
-/**
- * Generate wallet account
- * @param {Partial<Account>} [account]
- * @returns {Features}
- */
-// @ts-expect-error - related to backendType and status
-const getWalletAccount = (account?: Partial<Account>): Account => ({
-    deviceState: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
-    index: 0,
-    path: "m/44'/60'/0'/0/1",
-    descriptor: '0xFA01a39f8Abaeb660c3137f14A310d0b414b2A15',
-    key: `${account?.descriptor ?? '0xFA01a39f8Abaeb660c3137f14A310d0b414b2A15'}-${
-        account?.symbol ?? 'eth'
-    }-${
-        account?.deviceState ?? '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f'
-    }`,
-    accountType: 'normal',
-    networkType: 'ethereum',
-    symbol: 'eth',
-    empty: false,
-    visible: true,
-    balance: '0',
-    availableBalance: '0',
-    formattedBalance: '0',
-    tokens: [],
-    history: { total: 13, tokens: 0, unconfirmed: 0 },
-    misc: { nonce: '6' },
-    page: { index: 1, size: 25, total: 1 },
-    utxo: undefined,
-    marker: undefined,
-    addresses: undefined,
-    metadata: { key: 'xpub' },
-    ...account,
-});
+import type { AccountUtxo, Device, Features, TrezorConnectPrivilegedAPI } from '@trezor/connect';
+import { DeviceModelInternal, FirmwareType } from '@trezor/device-utils';
 
 /**
- * device.firmwareRelease property
+ * device.firmwareReleaseConfigInfo property
  * note that values don't make much sense.
  */
-const getFirmwareRelease = (): NonNullable<Device['firmwareRelease']> => ({
+const getFirmwareReleaseConfigInfo = (): NonNullable<Device['firmwareReleaseConfigInfo']> => ({
     isRequired: false,
     isNewer: false,
-    changelog: [
-        {
-            required: false,
-            version: [2, 0, 0],
-            min_bridge_version: [2, 0, 25],
-            min_firmware_version: [2, 0, 0],
-            min_bootloader_version: [2, 0, 0],
-            url: 'data/firmware/t1b1/trezor-t1b1-1.8.1.bin',
-            fingerprint: '019e849c1eb285a03a92bbad6d18a328af3b4dc6999722ebb47677b403a4cd16',
-            changelog:
-                '* Fix fault when using the device with no PIN* Fix OMNI transactions parsing',
-        },
-    ],
+    firmwareType: FirmwareType.Universal,
+    isBitcoinOnlyAvailable: true,
+    intermediary: undefined,
+    releaseConditions: {
+        environment: { min_suite_version: '25.2.1', min_suite_native_version: '25.2.1' },
+        rollout_probability: 100,
+        shouldBeOffered: true,
+    },
     release: {
         required: false,
         version: [2, 0, 0],
-        min_bridge_version: [2, 0, 25],
         min_firmware_version: [2, 0, 0],
         min_bootloader_version: [2, 0, 0],
         url: 'data/firmware/t1b1/trezor-t1b1-1.8.1.bin',
         fingerprint: '019e849c1eb285a03a92bbad6d18a328af3b4dc6999722ebb47677b403a4cd16',
+        firmware_revision: 'fad9682201cf9289bba2adb66e6e07ed1cf78936',
+        translations: {
+            'cs-CZ': 'firmware/translations/t1b1/translation-T2T1-cs-CZ-2.7.2.bin',
+            'de-DE': 'firmware/translations/t1b1/translation-T2T1-de-DE-2.7.2.bin',
+            'es-ES': 'firmware/translations/t1b1/translation-T2T1-es-ES-2.7.2.bin',
+            'fr-FR': 'firmware/translations/t1b1/translation-T2T1-fr-FR-2.7.2.bin',
+            'it-IT': 'firmware/translations/t1b1/translation-T2T1-it-IT-2.7.2.bin',
+            'pt-BR': 'firmware/translations/t1b1/translation-T2T1-pt-BR-2.7.2.bin',
+        },
         changelog: '* Fix fault when using the device with no PIN* Fix OMNI transactions parsing',
     },
 });
@@ -98,118 +52,64 @@ const getFirmwareRelease = (): NonNullable<Device['firmwareRelease']> => ({
  * @param {Partial<Features>} [feat]
  * @returns {Features}
  */
-const getDeviceFeatures = (feat?: Partial<Features>): Features => ({
-    vendor: 'trezor.io',
-    major_version: 2,
-    minor_version: 1,
-    patch_version: 1,
-    bootloader_mode: null,
-    device_id: 'device-id',
-    pin_protection: false,
-    passphrase_protection: false,
-    language: 'en-US',
-    label: 'My Trezor',
-    initialized: true,
-    revision: 'df0963ec',
-    bootloader_hash: '7447a41717022e3eb32011b00b2a68ebb9c7f603cdc730e7307850a3f4d62a5c',
-    imported: null,
-    unlocked: true,
-    firmware_present: null,
-    needs_backup: false,
-    flags: 0,
-    model: 'T',
-    internal_model: DeviceModelInternal.T2T1,
-    fw_major: null,
-    fw_minor: null,
-    fw_patch: null,
-    fw_vendor: null,
-    unfinished_backup: false,
-    no_backup: false,
-    recovery_mode: false,
-    capabilities: [],
-    backup_type: 'Bip39',
-    sd_card_present: false,
-    sd_protection: false,
-    wipe_code_protection: false,
-    session_id: 'session-id',
-    passphrase_always_on_device: false,
-    safety_checks: 'Strict',
-    auto_lock_delay_ms: 60000,
-    display_rotation: 0,
-    experimental_features: false,
-    ...feat,
-});
-
-/**
- * simplified Device from '@trezor/connect'
- * @param {Partial<Device>} [dev]
- * @param {Partial<Features>} [feat]
- * @returns {Device}
- */
-const getConnectDevice = (dev?: Partial<Device>, feat?: Partial<Features>): Device => {
-    if (dev && typeof dev.type === 'string' && dev.type !== 'acquired') {
-        return {
-            type: dev.type,
-            path: dev && dev.path ? dev.path : '1',
-            label: dev && dev.label ? dev.label : 'My Trezor',
-            features: undefined,
-        } as Device;
-    }
-
-    const features = getDeviceFeatures(feat);
+const getDeviceFeatures = (feat?: Partial<Features>): Features => {
+    const isBootloader = feat?.bootloader_mode;
+    const major_version = feat?.major_version || 2;
+    const [_, minor_version, patch_version] = isBootloader ? [2, 0, 0] : [2, 1, 1];
+    const [fw_major, fw_minor, fw_patch] = isBootloader
+        ? [major_version, 1, 1]
+        : [null, null, null];
+    const firmware_present = isBootloader ? false : null;
 
     return {
-        id: features.device_id,
-        path: '',
+        vendor: 'trezor.io',
+        major_version,
+        minor_version,
+        patch_version,
+        bootloader_mode: null,
+        device_id: 'device-id',
+        pin_protection: false,
+        passphrase_protection: false,
+        language: 'en-US',
         label: 'My Trezor',
-        firmware: 'valid',
-        firmwareRelease: getFirmwareRelease(),
-        status: 'available',
-        mode: 'normal',
-        state: undefined,
-        features,
-        unavailableCapabilities: {},
-        firmwareType:
-            feat && feat.capabilities && !feat?.capabilities.includes('Capability_Bitcoin_like')
-                ? FirmwareType.BitcoinOnly
-                : FirmwareType.Regular,
-        ...dev,
-        type: 'acquired',
-    } as Device;
-};
-
-/**
- * Extended device from suite reducer
- * @param {Partial<TrezorDevice>} [dev]
- * @param {Partial<Features>} [feat]
- * @returns {TrezorDevice}
- */
-const getSuiteDevice = (dev?: Partial<TrezorDevice>, feat?: Partial<Features>): TrezorDevice => {
-    const device = getConnectDevice(dev, feat);
-    if (device.type === 'acquired') {
-        return {
-            useEmptyPassphrase: true,
-            remember: false,
-            connected: false,
-            available: false,
-            authConfirm: false,
-            instance: undefined,
-            ts: 0,
-            buttonRequests: [],
-            metadata: {},
-            ...dev,
-            ...device,
-        } as TrezorDevice;
-    }
-
-    return device as TrezorDevice;
+        initialized: true,
+        revision: 'df0963ec',
+        bootloader_hash: '7447a41717022e3eb32011b00b2a68ebb9c7f603cdc730e7307850a3f4d62a5c',
+        imported: null,
+        unlocked: true,
+        firmware_present,
+        backup_availability: 'NotAvailable',
+        flags: 0,
+        model: 'T',
+        internal_model: DeviceModelInternal.T2T1,
+        fw_major,
+        fw_minor,
+        fw_patch,
+        fw_vendor: null,
+        unfinished_backup: false,
+        no_backup: false,
+        recovery_status: 'Nothing',
+        capabilities: [],
+        backup_type: 'Bip39',
+        sd_card_present: false,
+        sd_protection: false,
+        wipe_code_protection: false,
+        session_id: 'session-id',
+        passphrase_always_on_device: false,
+        safety_checks: 'Strict',
+        auto_lock_delay_ms: 60000,
+        display_rotation: 'North',
+        experimental_features: false,
+        ...feat,
+    };
 };
 
 const getWalletTransaction = (t?: Partial<WalletAccountTransaction>): WalletAccountTransaction => ({
-    descriptor:
+    descriptor: asAccountDescriptor(
         'zpub6rszzdAK6RuafeRwyN8z1cgWcXCuKbLmjjfnrW4fWKtcoXQ8787214pNJjnBG5UATyghuNzjn6Lfp5k5xymrLFJnCy46bMYJPyZsbpFGagT',
-    deviceState: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
-    symbol: 'btc',
+    ),
+    deviceState: '1stTestnetAddress@device_id:0',
+    symbol: asNetworkSymbol('btc'),
     type: 'sent',
     txid: '7e58757f43015242c0efa29447bea4583336f2358fdff587b52bbe040ad8982a',
     blockTime: 1565797979,
@@ -261,19 +161,6 @@ const getWalletTransaction = (t?: Partial<WalletAccountTransaction>): WalletAcco
     },
     ...t,
 });
-
-// Mocked @trezor/suite-analytics package used in various tests
-const getAnalytics = () => {
-    const originalModule = jest.requireActual('@trezor/suite-analytics');
-
-    return {
-        __esModule: true, // this property makes it work
-        ...originalModule,
-        analytics: {
-            report: jest.fn(),
-        },
-    };
-};
 
 const getMessageSystemConfig = (
     root?: Partial<MessageSystem>,
@@ -329,7 +216,7 @@ const getMessageSystemConfig = (
                             firmware: '2.1.1',
                             bootloader: '*',
                             firmwareRevision: '*',
-                            variant: 'regular',
+                            variant: 'universal',
                             vendor: 'trezor.io',
                         },
                     ],
@@ -342,24 +229,36 @@ const getMessageSystemConfig = (
                 variant: 'warning',
                 category: 'banner',
                 content: {
-                    'en-GB': 'New Trezor firmware is available!',
                     en: 'New Trezor firmware is available!',
                     es: 'El nuevo firmware de Trezor está disponible!',
                     cs: 'Nová verze Trezor firmware je k dispozici',
                     ru: 'Доступна новая прошивка Trezor!',
                     ja: '新しいTrezorファームウェアが利用可能です！',
+                    hu: 'Új Trezor firmware érhető el!',
+                    uk: 'Доступний новий прошивка Trezor!',
+                    fr: 'Le nouveau firmware Trezor est disponible!',
+                    de: 'Neue Trezor-Firmware verfügbar!',
+                    pt: 'Nova firmware Trezor está disponível!',
+                    it: 'Il nuovo firmware Trezor è disponibile!',
+                    tr: "Yeni Trezor firmware'i mevcut!",
                 },
                 cta: {
                     action: 'internal-link',
                     link: 'settings-device',
                     anchor: '@device-settings/firmware-version',
                     label: {
-                        'en-GB': 'Update now',
                         en: 'Update now',
                         es: 'Actualizar ahora',
                         cs: 'Aktualizovat',
                         ru: 'Обновить сейчас',
                         ja: '今すぐアップデート',
+                        hu: 'Frissítés most',
+                        uk: 'Оновити зараз',
+                        fr: 'Mettre à jour maintenant',
+                        de: 'Jetzt aktualisieren',
+                        pt: 'Atualize agora',
+                        it: 'Aggiorna ora',
+                        tr: 'Şimdi güncelle',
                     },
                 },
             },
@@ -374,33 +273,51 @@ const getMessageSystemConfig = (
                 variant: 'info',
                 category: ['banner', 'context', 'modal'],
                 content: {
-                    'en-GB': 'New Trezor app is available!',
                     en: 'New Trezor app is available!',
                     es: 'La nueva aplicación Trezor está disponible!',
                     cs: 'Nová Trezor aplikace je k dispozici!',
                     ru: 'Доступно новое приложение Trezor!',
                     ja: '新しいTrezorアプリが利用可能になりました！',
+                    hu: 'Új Trezor alkalmazás érhető el!',
+                    uk: 'Доступний новий додаток Trezor!',
+                    fr: 'La nouvelle application Trezor est disponible!',
+                    de: 'Neue Trezor-App verfügbar!',
+                    pt: 'Nova aplicação Trezor está disponível!',
+                    it: 'La nuova app Trezor è disponibile!',
+                    tr: 'Yeni Trezor uygulaması mevcut!',
                 },
                 cta: {
                     action: 'external-link',
                     link: 'https://example.com/',
                     label: {
-                        'en-GB': 'Download now',
                         en: 'Download now',
                         es: 'Descargar ahora',
                         cs: 'Stáhnout nyní',
                         ru: 'Скачать сейчас',
                         ja: '今すぐダウンロードする',
+                        hu: 'Letöltés most',
+                        uk: 'Завантажити зараз',
+                        fr: 'Télécharger maintenant',
+                        de: 'Jetzt herunterladen',
+                        pt: 'Baixar agora',
+                        it: 'Scarica ora',
+                        tr: 'Şimdi indir',
                     },
                 },
                 modal: {
                     title: {
-                        'en-GB': 'Update now',
                         en: 'Update now',
                         es: 'Actualizar ahora',
                         cs: 'Aktualizovat',
                         ru: 'Обновить сейчас',
                         ja: '今すぐアップデートする',
+                        hu: 'Frissítés most',
+                        uk: 'Оновити зараз',
+                        fr: 'Mettre à jour maintenant',
+                        de: 'Jetzt aktualisieren',
+                        pt: 'Atualize agora',
+                        it: 'Aggiorna ora',
+                        tr: 'Şimdi güncelle',
                     },
                     image: 'https://example.com/example.png',
                 },
@@ -409,6 +326,40 @@ const getMessageSystemConfig = (
                 },
             },
             ...action2,
+        },
+    ],
+    experiments: [
+        {
+            conditions: [],
+            experiment: {
+                id: '3bed56a4-ecd8-4e0f-9e5f-014b484c2aff',
+                groups: [
+                    {
+                        variant: 'A',
+                        percentage: 25,
+                    },
+                    {
+                        variant: 'B',
+                        percentage: 10,
+                    },
+                ],
+            },
+        },
+        {
+            conditions: [],
+            experiment: {
+                id: '3bed56a4-ecd8-4e0f-9e5f-014b484c2afa',
+                groups: [
+                    {
+                        variant: 'A',
+                        percentage: 25,
+                    },
+                    {
+                        variant: 'B',
+                        percentage: 75,
+                    },
+                ],
+            },
         },
     ],
     ...root,
@@ -420,60 +371,60 @@ const getGuideNode = (type: string, id?: string): GuideNode => {
         result = {
             type: 'page',
             id: '/',
-            locales: ['en'],
+            locales: ['en-us'],
             title: {
-                en: 'Locktime',
+                'en-us': 'Locktime',
             },
-        } as GuideArticle;
+        };
     } else if (type === 'page' && id !== '/') {
         result = {
             type: 'page',
             id: '/suite-basics/send/locktime.md',
-            locales: ['en'],
+            locales: ['en-us'],
             title: {
-                en: 'Locktime',
+                'en-us': 'Locktime',
             },
-        } as GuideArticle;
+        };
     } else {
         result = {
             type: 'category',
             id: '/',
-            locales: ['en'],
+            locales: ['en-us'],
             title: {
-                en: 'test title',
+                'en-us': 'test title',
             },
             children: [
                 {
                     type: 'category',
                     id: '/privacy',
-                    locales: ['en'],
+                    locales: ['en-us'],
                     title: {
-                        en: 'Privacy',
+                        'en-us': 'Privacy',
                     },
                     children: [],
                 },
                 {
                     type: 'category',
                     id: '/security',
-                    locales: ['en'],
+                    locales: ['en-us'],
                     title: {
-                        en: 'Security',
+                        'en-us': 'Security',
                     },
                     children: [
                         {
                             type: 'category',
                             id: '/security/suite-basics',
-                            locales: ['en'],
+                            locales: ['en-us'],
                             title: {
-                                en: 'Suite basics',
+                                'en-us': 'Suite basics',
                             },
                             children: [
                                 {
                                     type: 'category',
                                     id: '/security/suite-basics/send',
-                                    locales: ['en'],
+                                    locales: ['en-us'],
                                     title: {
-                                        en: 'Send',
+                                        'en-us': 'Send',
                                     },
                                     children: [],
                                 },
@@ -482,7 +433,7 @@ const getGuideNode = (type: string, id?: string): GuideNode => {
                     ],
                 },
             ],
-        } as GuideCategory;
+        };
     }
 
     return result;
@@ -504,6 +455,7 @@ const fee: FeeInfo = {
     blockHeight: 590093,
     minFee: 1,
     maxFee: 100,
+    minPriorityFee: 0,
     levels: [{ label: 'normal', feePerUnit: '10', blocks: 1 }],
 };
 
@@ -511,11 +463,9 @@ const intlMock = {
     formatMessage: (s: any) => s.defaultMessage,
 };
 
-const mockedBlockchainNetworks = networksCompatibility.reduce((result, network) => {
-    if (network.accountType) return result;
-    result[network.symbol] = {
+const mockedBlockchainNetworks = networksCollection.reduce((result, network) => {
+    result[network.symbol as LegacyNetworkSymbol] = {
         connected: false,
-        explorer: network.explorer,
         blockHash: '0',
         blockHeight: 0,
         version: '0',
@@ -534,13 +484,12 @@ const mockedBlockchainNetworks = networksCompatibility.reduce((result, network) 
 }, {} as BlockchainNetworks);
 
 // use mock from @suite-common/test-utils/__mocks__
-type MockTrezorConnect = jest.Mocked<TrezorConnect> & {
+type MockTrezorConnect = jest.Mocked<TrezorConnectPrivilegedAPI> & {
     setTestFixtures: (...args: any[]) => void;
     emitTestEvent: (event: string, data: any) => void;
 };
 
 const getTrezorConnectMock = () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const pkg = require('@trezor/connect');
 
     return {
@@ -555,13 +504,9 @@ const setTrezorConnectFixtures = (f?: any) => {
 };
 
 export const testMocks = {
-    getWalletAccount,
-    getFirmwareRelease,
+    getFirmwareReleaseConfigInfo,
     getDeviceFeatures,
-    getConnectDevice,
-    getSuiteDevice,
     getWalletTransaction,
-    getAnalytics,
     getMessageSystemConfig,
     getGuideNode,
     getUtxo,

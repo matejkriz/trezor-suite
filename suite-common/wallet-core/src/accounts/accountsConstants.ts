@@ -1,19 +1,50 @@
-import { NetworkType } from '@suite-common/wallet-config';
-import { AccountType } from '@suite-common/wallet-types';
+import { type AccountType, type NetworkType } from '@suite-common/wallet-config';
 
 export const ACCOUNTS_MODULE_PREFIX = '@common/wallet-core/accounts';
 
-export const formattedAccountTypeMap: Partial<
-    Record<NetworkType, Partial<Record<AccountType, string>>>
-> = {
-    bitcoin: {
-        normal: 'SegWit',
-        taproot: 'Taproot',
-        segwit: 'Legacy SegWit',
-        legacy: 'Legacy',
-    },
-    cardano: {
-        legacy: 'Legacy',
-        ledger: 'Ledger',
-    },
+const bitcoinFormattedAccountTypeMap: Record<AccountType, string | null> = {
+    normal: null,
+    taproot: 'Taproot',
+    segwit: 'Legacy SegWit',
+    legacy: 'Legacy',
+    coinjoin: null,
+    ledger: null,
+    root: null,
+    imported: null,
+    placeholder: null,
 };
+
+const formattedAccountTypeMap: Record<AccountType, string | null> = {
+    normal: null,
+    legacy: 'Legacy',
+    ledger: 'Ledger',
+    coinjoin: null,
+    segwit: null,
+    taproot: null,
+    root: 'Root',
+    imported: null,
+    placeholder: null,
+};
+
+const formattedAccountTypeWithDefaultMap: Record<AccountType, string | null> = {
+    ...formattedAccountTypeMap,
+    normal: 'Default',
+};
+
+const bitcoinFormattedAccountTypeWithDefaultMap: Record<AccountType, string | null> = {
+    ...bitcoinFormattedAccountTypeMap,
+    normal: 'SegWit',
+};
+
+export const getFormattedAccountType = (networkType: NetworkType, accountType: AccountType) =>
+    (networkType === 'bitcoin' ? bitcoinFormattedAccountTypeMap : formattedAccountTypeMap)[
+        accountType
+    ];
+
+export const getFormattedAccountTypeWithDefault = (
+    networkType: NetworkType,
+    accountType: AccountType,
+) =>
+    (networkType === 'bitcoin'
+        ? bitcoinFormattedAccountTypeWithDefaultMap
+        : formattedAccountTypeWithDefaultMap)[accountType];

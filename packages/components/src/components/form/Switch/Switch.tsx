@@ -1,97 +1,87 @@
-import { ReactNode } from 'react';
-import styled, { css } from 'styled-components';
-import { borders, spacingsPx, typography } from '@trezor/theme';
-import { getWeakRandomId } from '@trezor/utils';
-import {
-    getInputColor,
-    getLabelColor,
-    getFocusShadowStyle,
-    focusStyleTransition,
-} from '../../../utils/utils';
-import { UIHorizontalAlignment } from '../../../config/types';
+import { type ReactNode, useId } from 'react';
 
-const Wrapper = styled.div<{
-    $isSmall?: boolean; // TODO: legacy prop
-    $labelPosition?: Extract<UIHorizontalAlignment, 'left' | 'right'>;
-}>`
-    display: flex;
-    align-items: center;
-    gap: ${({ $isSmall }) => ($isSmall ? spacingsPx.sm : spacingsPx.md)};
-    flex-direction: ${({ $labelPosition }) => ($labelPosition === 'left' ? 'row-reverse' : 'row')};
-`;
+import styled, { css } from 'styled-components';
+
+import { type SwitchLabelPosition, type SwitchSize } from './types';
+import { mapSizeToHandleSize, mapSizeToLabelContainerGap, mapSizeToLabelTypography } from './utils';
+import { type FrameProps, type FramePropsKeys } from '../../../utils/frameProps';
+import { commonFocusStyles, focusStyleTransition } from '../../../utils/utils';
+import { Box } from '../../Box/Box';
+import { Row } from '../../Flex/Flex';
+import { Text } from '../../typography/Text/Text';
+
+export const allowedSwitchFrameProps = ['margin'] as const satisfies FramePropsKeys[];
+type AllowedFrameProps = Pick<FrameProps, (typeof allowedSwitchFrameProps)[number]>;
+
+export type SwitchProps = AllowedFrameProps & {
+    isChecked: boolean;
+    label?: ReactNode;
+    onChange?: (isChecked: boolean) => void;
+    isDisabled?: boolean;
+    size?: SwitchSize;
+    'data-testid'?: string;
+    labelPosition?: SwitchLabelPosition;
+};
 
 const Container = styled.div<{
     $isChecked: boolean;
     $isDisabled?: boolean;
-    $isAlert?: boolean;
-    $isSmall?: boolean; // TODO: legacy prop
 }>`
-    display: flex;
-    align-items: center;
-    height: ${({ $isSmall }) => ($isSmall ? '18px' : '24px')};
-    width: ${({ $isSmall }) => ($isSmall ? '32px' : '44px')};
-    flex-shrink: 0;
-    margin: 0;
-    padding: 3px;
     position: relative;
-    background: ${({ $isChecked, $isDisabled, theme }) =>
-        getInputColor(theme, { checked: $isChecked, disabled: $isDisabled })};
-    border-radius: ${borders.radii.sm};
+    flex-shrink: 0;
+    border-radius: calc(infinity * 1px);
     transition:
         background 0.2s ease 0s,
         ${focusStyleTransition};
-    cursor: ${({ $isDisabled }) => !$isDisabled && 'pointer'};
-    box-sizing: border-box;
-    border: 1px solid
-        ${({ theme, $isAlert }) => `${$isAlert ? theme.borderAlertRed : 'transparent'}`};
-
-    button {
-        box-shadow: ${({ theme }) => theme.boxShadowBase};
-        opacity: ${({ $isDisabled }) => $isDisabled && 0.66};
-    }
+    cursor: ${({ $isDisabled }) => ($isDisabled ? 'not-allowed' : 'pointer')};
 
     ${({ $isDisabled, theme, $isChecked }) =>
-        !$isDisabled &&
-        css`
-            ${getFocusShadowStyle(':focus-within:has(:focus-visible)')}
+        $isDisabled
+            ? css`
+                  background: ${
+                      $isChecked
+                          ? theme.elementFillFieldSelectedDisabled
+                          : theme.elementFillBoldDisabled
+                  };
+              `
+            : css`
+                  background: ${
+                      $isChecked ? theme.elementFillFieldSelected : theme.elementFillNeutralBold
+                  };
 
-            :focus-within:has(:focus-visible) {
-                background: ${$isChecked
-                    ? theme.backgroundPrimaryDefault
-                    : theme.backgroundNeutralDisabled};
-            }
+                  :focus-within:has(:focus-visible),
+                  &:hover {
+                      background: ${
+                          $isChecked
+                              ? theme.elementFillFieldSelectedHovered
+                              : theme.elementFillNeutralBoldHovered
+                      };
+                  }
 
-            :hover {
-                background: ${$isChecked
-                    ? theme.backgroundPrimaryPressed
-                    : theme.backgroundNeutralSubdued};
-            }
-        `};
+                  &:focus-within:has(:focus-visible) {
+                      ${commonFocusStyles}
+                  }
+              `};
 `;
 
-const Handle = styled.button<{
-    $disabled?: boolean;
-    $isChecked: boolean;
-    $isSmall?: boolean; // TODO: legacy prop
-}>`
-    position: absolute;
-    display: inline-block;
-    height: ${({ $isSmall }) => ($isSmall ? '14px' : '20px')};
-    width: ${({ $isSmall }) => ($isSmall ? '14px' : '20px')};
+const Handle = styled.button<{ $isChecked: boolean }>`
+    display: block;
+    height: 100%;
+    aspect-ratio: 1;
     border: none;
-    left: 1px;
-    border-radius: ${borders.radii.full};
-    background: ${({ theme }) => theme.TYPE_WHITE};
-    transform: ${({ $isChecked, $isSmall }) =>
-        $isChecked && `translateX(${$isSmall ? '14px' : '20px'})`};
+    border-radius: calc(infinity * 1px);
+    background: ${({ theme }) => theme.contentPrimaryInverse};
+    transform: ${({ $isChecked }) => $isChecked && `translateX(100%)`};
     transition: transform 0.25s ease 0s;
-    cursor: ${({ $disabled }) => !$disabled && 'pointer'};
+    pointer-events: none;
+    box-shadow: ${({ theme }) => theme.elementShadowElevated};
 `;
 
 const CheckboxInput = styled.input`
     border: 0;
-    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
     height: 1px;
+    /* stylelint-disable-next-line trezor/dimension-token-values -- Visually hidden input convention. */
     margin: -1px;
     overflow: hidden;
     padding: 0;
@@ -99,66 +89,55 @@ const CheckboxInput = styled.input`
     width: 1px;
 `;
 
-const Label = styled.label<{
-    $isDisabled?: boolean;
-    $isAlert?: boolean;
-    $isSmall?: boolean; // TODO: legacy prop
-}>`
-    color: ${({ $isAlert, $isDisabled, theme }) =>
-        getLabelColor(theme, { alert: $isAlert, disabled: $isDisabled })};
-    ${({ $isSmall }) => ($isSmall ? typography.label : typography.body)}
-`;
-
-export interface SwitchProps {
-    isChecked: boolean;
-    label?: ReactNode;
-    onChange: (isChecked?: boolean) => void;
-    isDisabled?: boolean;
-    isAlert?: boolean;
-    isSmall?: boolean; // TODO: legacy prop
-    className?: string;
-    dataTest?: string;
-    labelPosition?: Extract<UIHorizontalAlignment, 'left' | 'right'>;
-}
-
 export const Switch = ({
     onChange,
-    isDisabled,
-    isAlert,
-    isSmall,
+    isDisabled = false,
+    size = 'medium',
     label,
-    dataTest,
+    'data-testid': dataTest,
     isChecked,
-    className,
-    labelPosition = 'right',
+    labelPosition = 'end',
+    margin,
 }: SwitchProps) => {
-    const id = getWeakRandomId(10);
+    const id = useId();
 
     const handleChange = () => {
         if (isDisabled) return;
-        onChange(!isChecked);
+        onChange?.(!isChecked);
+    };
+
+    const handleContainerClick = (e: React.MouseEvent<HTMLElement>) => {
+        // Prevent handling clicks that originate from the input or label
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'INPUT' || target.tagName === 'LABEL') return;
+
+        e.preventDefault();
+        handleChange();
     };
 
     return (
-        <Wrapper $labelPosition={labelPosition} className={className}>
+        <Row
+            gap={mapSizeToLabelContainerGap(size)}
+            isReversed={labelPosition === 'start'}
+            margin={margin}
+            data-component="Switch"
+            onClick={handleContainerClick}
+        >
             <Container
+                // @ts-expect-error - needed for playwright retry-ability
+                disabled={isDisabled}
                 $isChecked={isChecked}
                 $isDisabled={isDisabled}
-                $isAlert={isAlert}
-                onClick={e => {
-                    e.preventDefault();
-                    handleChange();
-                }}
-                data-test={dataTest}
-                $isSmall={isSmall}
+                data-testid={dataTest}
             >
-                <Handle
-                    tabIndex={-1}
-                    $isChecked={isChecked}
-                    disabled={isDisabled}
-                    type="button"
-                    $isSmall={isSmall}
-                />
+                <Box
+                    height={mapSizeToHandleSize(size)}
+                    aspectRatio="2 / 1"
+                    margin={2}
+                    opacity={isDisabled ? 0.74 : 1}
+                >
+                    <Handle tabIndex={-1} $isChecked={isChecked} type="button" />
+                </Box>
                 <CheckboxInput
                     id={id}
                     type="checkbox"
@@ -169,12 +148,18 @@ export const Switch = ({
                     aria-checked={isChecked}
                 />
             </Container>
-
             {label && (
-                <Label $isDisabled={isDisabled} $isAlert={isAlert} $isSmall={isSmall} htmlFor={id}>
-                    {label}
-                </Label>
+                <label htmlFor={id}>
+                    <Text
+                        intent="neutral"
+                        isDisabled={isDisabled}
+                        typographyStyle={mapSizeToLabelTypography(size)}
+                        cursor={isDisabled ? undefined : 'pointer'}
+                    >
+                        {label}
+                    </Text>
+                </label>
             )}
-        </Wrapper>
+        </Row>
     );
 };

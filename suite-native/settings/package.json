@@ -1,0 +1,21 @@
+{
+    "name": "@suite-native/settings",
+    "version": "1.0.0",
+    "private": true,
+    "license": "See LICENSE.md in repo root",
+    "sideEffects": false,
+    "main": "src/index",
+    "scripts": {
+        "depcheck": "yarn g:depcheck",
+        "type-check": "yarn g:tsc --build",
+        "test:unit": "yarn g:jest:native",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'"
+    },
+    "dependencies": {
+        "@reduxjs/toolkit": "2.12.0",
+        "@suite-common/earn-stablecoin-defs": "workspace:*",
+        "@suite-native/config": "workspace:*",
+        "@trezor/connect": "workspace:*",
+        "react": "19.2.3"
+    }
+}

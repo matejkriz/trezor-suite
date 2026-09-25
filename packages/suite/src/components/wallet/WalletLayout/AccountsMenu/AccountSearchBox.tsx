@@ -1,58 +1,47 @@
-import styled, { useTheme } from 'styled-components';
+import { useRef } from 'react';
 
+import { useTranslation } from '@suite/intl';
 import { Icon, Input } from '@trezor/components';
-import { selectDevice } from '@suite-common/wallet-core';
+import { MagnifyingGlassIcon } from '@trezor/icons';
 
-import { useSelector, useAccountSearch, useTranslation } from 'src/hooks/suite';
-import { borders } from '@trezor/theme';
-
-const InputWrapper = styled.div<{ $showCoinFilter: boolean }>`
-    flex: 1;
-`;
-
-const StyledInput = styled(Input)`
-    input {
-        /* to line up with the coin filter  */
-        padding-left: 46px;
-        min-height: 38px;
-        background-color: ${({ theme }) => theme.backgroundSurfaceElevationNegative};
-        border-radius: ${borders.radii.full};
-        border-color: ${({ theme }) => theme.backgroundSurfaceElevationNegative};
-    }
-`;
+import { useAccountSearch } from 'src/hooks/suite';
 
 export const AccountSearchBox = () => {
-    const theme = useTheme();
+    const inputRef = useRef<HTMLInputElement | null>(null);
     const { translationString } = useTranslation();
     const { setCoinFilter, searchString, setSearchString } = useAccountSearch();
-    const enabledNetworks = useSelector(state => state.wallet.settings.enabledNetworks);
-    const device = useSelector(selectDevice);
-
-    const unavailableCapabilities = device?.unavailableCapabilities ?? {};
-    const supportedNetworks = enabledNetworks.filter(symbol => !unavailableCapabilities[symbol]);
-
-    const showCoinFilter = supportedNetworks.length > 1;
 
     const onClear = () => {
         setSearchString(undefined);
-        setCoinFilter(undefined);
+        setCoinFilter([]);
     };
 
     return (
-        <InputWrapper $showCoinFilter={showCoinFilter}>
-            <StyledInput
-                value={searchString ?? ''}
-                onChange={e => {
-                    setSearchString(e.target.value);
-                }}
-                innerAddon={<Icon icon="SEARCH" size={16} color={theme.iconDefault} />}
-                innerAddonAlign="left"
-                size="small"
-                placeholder={translationString('TR_SEARCH')}
-                showClearButton="always"
-                onClear={onClear}
-                data-test="@account-menu/search-input"
-            />
-        </InputWrapper>
+        <Input
+            value={searchString ?? ''}
+            isClean
+            onChange={e => {
+                setSearchString(e.target.value);
+            }}
+            leftContent={
+                <Icon
+                    as={MagnifyingGlassIcon}
+                    margin={{ left: 12, right: 20 }}
+                    size={16}
+                    intent="neutral"
+                    onClick={() => {
+                        inputRef?.current?.select();
+                    }}
+                    cursor="pointer"
+                />
+            }
+            size="small"
+            placeholder={translationString('TR_WALLET')}
+            showClearButton={true}
+            onClear={onClear}
+            data-testid="@account-menu/search-input"
+            innerRef={inputRef}
+            width="100%"
+        />
     );
 };

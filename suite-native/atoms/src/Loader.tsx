@@ -1,20 +1,21 @@
-import { ActivityIndicator, ActivityIndicatorProps } from 'react-native';
+import { type ReactNode } from 'react';
+import { ActivityIndicator, type ActivityIndicatorProps } from 'react-native';
 
-import { useNativeStyles } from '@trezor/styles';
-import { Color } from '@trezor/theme';
+import { useNativeStyles } from '@trezor/styles-native';
+import { type Color } from '@trezor/theme';
 
 import { Box } from './Box';
 import { Text } from './Text';
 
-type LoaderProps = {
+export type LoaderProps = {
     size?: ActivityIndicatorProps['size'];
-    title?: string;
+    title?: ReactNode;
     color?: Color;
 };
 
 // TODO: modify component to fit Figma design.
 // issue: https://github.com/trezor/trezor-suite/issues/7538
-export const Loader = ({ size, title, color = 'backgroundPrimaryDefault' }: LoaderProps) => {
+export const Loader = ({ size, title, color = 'contentBrand' }: LoaderProps) => {
     const {
         utils: { colors },
     } = useNativeStyles();
@@ -23,7 +24,7 @@ export const Loader = ({ size, title, color = 'backgroundPrimaryDefault' }: Load
         <Box>
             <ActivityIndicator size={size} color={colors[color]} />
             {title && (
-                <Text variant="label" color="textSubdued" textAlign="center">
+                <Text variant="body-xs" color="contentSecondary" textAlign="center">
                     {title}
                 </Text>
             )}

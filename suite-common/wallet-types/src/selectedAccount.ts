@@ -1,11 +1,10 @@
-import { Network } from '@suite-common/wallet-config';
+import { type Network } from '@suite-common/wallet-config';
 
-import { Discovery } from './discovery';
-import { Account, WalletParams } from './account';
+import { type Account, type WalletParams } from './account';
 
 // 100% view
 // // Account loaders
-export interface SelectedAccountLoading {
+interface SelectedAccountLoading {
     status: 'loading';
     loader:
         | 'waiting-for-device' // No selectedDevice
@@ -13,7 +12,6 @@ export interface SelectedAccountLoading {
         | 'account-loading'; // Waiting for account
     account?: Account;
     network?: Network;
-    discovery?: Discovery;
     params?: WalletParams;
 }
 
@@ -22,10 +20,7 @@ export interface SelectedAccountLoaded {
     loader?: undefined;
     account: Account;
     network: Network;
-    discovery: Discovery;
     params: WalletParams;
-    // blockchain?: any; // TODO:
-    // transactions?: any; // TODO:
 }
 
 // 100% view
@@ -33,35 +28,42 @@ export interface SelectedAccountLoaded {
 export type SelectedAccountException =
     | {
           status: 'exception';
-          loader: 'auth-failed' | 'discovery-error' | 'discovery-empty'; // No network enabled in settings
-          account?: undefined;
+          loader: 'discovery-error'; // Account discovery failed
+          account?: Account;
           network?: Network;
-          discovery?: Discovery;
           params?: WalletParams;
       }
     | {
           status: 'exception';
+          loader: 'discovery-empty'; // No network enabled in settings
+          account?: undefined;
+          network?: Network;
+          params?: WalletParams;
+      }
+    | {
+          status: 'exception';
+          loader: 'account-not-loaded'; // Account discovery failed
+          account: Account;
+          network: Network;
+          params: WalletParams;
+      }
+    | {
+          status: 'exception';
           loader:
-              | 'account-not-loaded' // Account discovery failed
               | 'account-not-enabled' // Requested account network is not enabled in settings
-              | 'account-not-exists'; // Requested account network is not listed in NETWORKS
+              | 'account-not-exists'; // Requested account network is not listed in `networks` (@suite-common/wallet-config)
           account?: undefined;
           network: Network;
-          discovery: Discovery;
           params: WalletParams;
       };
 
-export type SelectedAccountNone = {
+type SelectedAccountNone = {
     status: 'none';
     loader?: undefined;
     account?: undefined;
     network?: undefined;
-    discovery?: undefined;
     params?: undefined;
 };
 
 export type SelectedAccountStatus =
-    | SelectedAccountLoaded
-    | SelectedAccountLoading
-    | SelectedAccountException
-    | SelectedAccountNone;
+    SelectedAccountLoaded | SelectedAccountLoading | SelectedAccountException | SelectedAccountNone;

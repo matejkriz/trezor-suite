@@ -1,68 +1,53 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle } from 'react';
+import { forwardRef, useImperativeHandle } from 'react';
 import { useSelector } from 'react-redux';
 
-import { useSetAtom } from 'jotai';
-
-import { useGraphForAllDeviceAccounts, Graph, TimeSwitch } from '@suite-native/graph';
-import { selectFiatCurrency } from '@suite-native/module-settings';
+import { asNetworkSymbol } from '@suite-common/wallet-config';
+import { selectHasRunningDiscovery } from '@suite-common/wallet-core';
 import { VStack } from '@suite-native/atoms';
-import { useIsDiscoveryDurationTooLong } from '@suite-native/discovery';
-
 import {
-    PortfolioGraphHeader,
-    referencePointAtom,
-    selectedPointAtom,
-} from './PortfolioGraphHeader';
+    type RefetchGraphParams,
+    getPortfolioGraphInstanceId,
+    selectPortfolioGraphAccountItemsIfDiscoveryIsNotRunning,
+    selectPortfolioGraphTimeframe,
+    useGraphData,
+} from '@suite-native/graph';
+
+import { IgnoredNetworksBanner } from './IgnoredNetworksBanner';
+import { PortfolioGraphTimeSwitch } from './PortfolioGraphTimeSwitch';
+import { PortfolioHeader } from './PortfolioHeader';
+import { PortfolioLineGraph } from './PortfolioLineGraph';
 
 export type PortfolioGraphRef = {
-    refetch: () => Promise<void>;
+    refetchGraph: (params?: RefetchGraphParams) => void;
 };
 
 export const PortfolioGraph = forwardRef<PortfolioGraphRef>((_props, ref) => {
-    const fiatCurrency = useSelector(selectFiatCurrency);
+    const isDiscoveryRunning = useSelector(selectHasRunningDiscovery);
+    const accounts = useSelector(selectPortfolioGraphAccountItemsIfDiscoveryIsNotRunning);
+    const timeframeHours = useSelector(selectPortfolioGraphTimeframe);
 
-    const loadingTakesLongerThanExpected = useIsDiscoveryDurationTooLong();
-
-    const { graphPoints, error, isLoading, refetch, onSelectTimeFrame, timeframe } =
-        useGraphForAllDeviceAccounts({
-            fiatCurrency: fiatCurrency.label,
-        });
-    const setSelectedPoint = useSetAtom(selectedPointAtom);
-    const setReferencePoint = useSetAtom(referencePointAtom);
-
-    const lastPoint = graphPoints[graphPoints.length - 1];
-    const firstPoint = graphPoints[0];
-
-    const setInitialSelectedPoints = useCallback(() => {
-        if (lastPoint && firstPoint) {
-            setSelectedPoint(lastPoint);
-            setReferencePoint(firstPoint);
-        }
-    }, [lastPoint, firstPoint, setSelectedPoint, setReferencePoint]);
-
-    useEffect(setInitialSelectedPoints, [setInitialSelectedPoints]);
+    const { refetchGraph } = useGraphData({
+        instanceId: getPortfolioGraphInstanceId(),
+        accounts,
+        isDiscoveryRunning,
+        timeframeHours,
+        backendSymbol: asNetworkSymbol('btc'),
+    });
 
     useImperativeHandle(
         ref,
         () => ({
-            refetch,
+            refetchGraph,
         }),
-        [refetch],
+        [refetchGraph],
     );
 
     return (
-        <VStack spacing="large">
-            <PortfolioGraphHeader />
-            <Graph
-                points={graphPoints}
-                loading={isLoading}
-                loadingTakesLongerThanExpected={loadingTakesLongerThanExpected}
-                onPointSelected={setSelectedPoint}
-                onGestureEnd={setInitialSelectedPoints}
-                onTryAgain={refetch}
-                error={error}
-            />
-            <TimeSwitch selectedTimeFrame={timeframe} onSelectTimeFrame={onSelectTimeFrame} />
+        <VStack spacing="sp24" testID="@home/portfolio/graph">
+            <PortfolioHeader />
+            <PortfolioLineGraph refetchGraph={refetchGraph} />
+            <IgnoredNetworksBanner />
+            <PortfolioGraphTimeSwitch />
         </VStack>
     );
 });

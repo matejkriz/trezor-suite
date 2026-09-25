@@ -1,134 +1,276 @@
 # Storage changelog
 
-## 44
+## 26.10.0
 
--   remove goerli accounts, txs and settings
+- add `earnOnboarding` store (confirmed earn opportunities per account key)
+
+## 26.9.0
+
+- replace `walletSettings.hideSuspiciousTransactions` (per-network boolean) with `walletSettings.suspiciousTransactionsFilter` (per-network filter value)
+
+## 26.8.0.2
+
+- convert `walletSettings.hideSuspiciousTransactions` from a single boolean to a per-network record
+
+## 26.8.0
+
+- remove inaccurate historic ERC4626 fiat rates from storage
+- rename receive `revealedAddresses` to `touchedAddresses`
+- remove `isVerified` flag from receive address entries
+- remove receive data belonging to devices that are not remembered
+
+## 26.6.0
+
+- purge desktop trading form draft keys (`trading-buy/*`, `trading-sell/`, `trading-exchange/`) from `formDrafts`
+
+## 26.5.0
+
+- reset Ethereum account nonces to `-1` in order to force account refresh for DeFi tokens
+- backfill `manualCheckResult` to all `persistentDeviceData` entries (all previously known devices assumed confirmed)
+
+## 26.4.0.2
+
+- rename `experimentalFeedback` object store to `featureFeedback`
+
+## 26.4.0.1
+
+- ensure `descriptor.apiType` is set to `usb` for remembered devices from old Suite versions
+
+## 26.4.0
+
+- create `phishing` object store for persisting user "marked as not scam" transaction IDs per account
+
+## 26.3.0.1
+
+- create `experimentalFeedback` object store
+
+## 26.3.0
+
+- create `suiteSyncOwners` object store
+
+## 26.2.0
+
+- remove saved transactions to force refetch with correct token symbol casing
+
+## 26.1.0
+
+- remove TADA network
+- move THP `staticKey` to `credentials.host_static_key`
+
+## 25.11.3
+
+- remove Cardano graph data
+
+## 25.11.0
+
+- move `autoEject` from `suite.settings` to `wallet.walletSettings`
+
+## 25.10.0
+
+- create `persistentDeviceData` object store
+- migrate data from `security` to `persistentDeviceData` object store
+- remove `security` object store
+- remove `thol` network
+
+## 25.9.2
+
+- clear `security.devicesWithFailedEntropyCheck` because of false positives in 25.8
+
+## 25.8.0
+
+- make `device.authenticityChecks` non-nullable
+- migrated locale codes from 2 letter format to full code
+
+## 25.7.0
+
+- introduce new object store `bioAuth`
+- remove `discovery` object store
+
+## 56 (25.6.3)
+
+- renamed from _coinmarketTrades_ to _tradingTrades_
+- drop formDrafts instead of migration from prefix _coinmarket_ to _trading_
+- changed `tradingTrades` - add `sendAccountKey`, `receiveAccountKey`, `selectedAccountKey` to each buy, sell, and exchange trade
+- added `explorer` store for custom explorer configuration
+- created `thp` and `bluetooth` object store
+- remove saved solana txs to force refetch
+- remove saved evm txs to force refetch due to bug in migration v52
+
+## 55
+
+- migration was merged into 56 migration (2 migration versions within 1 Suite version)
+
+## 54
+
+- create `connect` object for Connect Popup related data
+
+## 53
+
+- remove `walletSettings.lastUsedFeeLevel` - we don't remember last selected fee in send form anymore
+
+## 52
+
+- Deprecated Vertcoin (VTC), Bitcoin Gold (BTG), Namecoin (NMC), DigiByte (DGB), and Dash (DASH) networks. Removed related transactions, accounts, and settings.
+- saved ripple network type txs are removed to be fetched again
+- added `security.devicesWithFailedEntropyCheck`
+
+## 51
+
+- Changed `metadata.key` on non-eth EVM networks accounts to be `descriptor-chainId`
+
+## 49
+
+- networks now have same order everywhere
+- solana tx amount is always positive
+
+## 48
+
+- device state to new object format (`device._state` -> `device.state`)
+
+## 47
+
+- migrate matic to pol
+
+## 46
+
+- added `tokenManagement`
+- added `device.passwords`
+- migrate Cardano accounts to a new structure
+
+## 45
+
+- added `historicRates`
+- remove rates for all transactions since we are using selectors to get rates
+
+## 44
+
+- remove goerli accounts, txs and settings
 
 ## 43
 
--   fixes bug cannot set properties of undefined (setting 'passwords') introduced by migration 41
+- fixes bug cannot set properties of undefined (setting 'passwords') introduced by migration 41
 
 ## 42
 
--   remove fiatRates table
+- remove fiatRates table
 
 ## 41
 
--   adds `metadata.selectedProvider.passwords` key
+- adds `metadata.selectedProvider.passwords` key
 
 ## 40
 
--   `device.metadata.status` does not exist anymore. this information is derivable from `device.metadata[key]` and `metadata.error[deviceState]`
+- `device.metadata.status` does not exist anymore. this information is derivable from `device.metadata[key]` and `metadata.error[deviceState]`
 
 ## 39
 
--   `metadata.provider` replaced with array of `metadata.providers`
--   `metadata.selectedProvider` field added to select from `metadata.providers`
--   labeling data are no longer stored with labelable entities (devices, accounts) but are to be found under `metadata.providers[].data`
--   labeling data (that were previously stored withing accounts/devices object) are not migrated
-    but since data are fetched from providers (which are migrated) it should affect only users that update their suite and use it offline at the same time
+- `metadata.provider` replaced with array of `metadata.providers`
+- `metadata.selectedProvider` field added to select from `metadata.providers`
+- labeling data are no longer stored with labelable entities (devices, accounts) but are to be found under `metadata.providers[].data`
+- labeling data (that were previously stored withing accounts/devices object) are not migrated
+  but since data are fetched from providers (which are migrated) it should affect only users that update their suite and use it offline at the same time
 
 ## 38
 
--   add internal model to saved devices
+- add internal model to saved devices
 
 ## 37
 
--   remove persisted coinjoin sessions
+- remove persisted coinjoin sessions
 
-## 36
+## 36
 
--   token `address` to `contract`
--   remove ropsten accounts, txs and settings
+- token `address` to `contract`
+- remove ropsten accounts, txs and settings
 
-## 35
+## 35
 
--   saved ethereum network type txs are removed to be fetched again and obtain internal transfers and token transfer contract and standard
+- saved ethereum network type txs are removed to be fetched again and obtain internal transfers and token transfer contract and standard
 
 ## 34
 
--   added `coinjoinDebugSettings`
+- added `coinjoinDebugSettings`
 
 ## 33
 
--   added `messageSystem.dismissedMessages[id].feature`
+- added `messageSystem.dismissedMessages[id].feature`
 
 ## 32
 
--   added `coinjoinAccounts`
+- added `coinjoinAccounts`
 
 ## 31
 
--   txs are now stored unconverted (mostly `sat` units instead of `BTC`), therefore migration was needed
--   added `firmwareType` field to objects in`devices`
+- txs are now stored unconverted (mostly `sat` units instead of `BTC`), therefore migration was needed
+- added `firmwareType` field to objects in`devices`
 
 ## 30
 
--   added the `bitcoinAmountUnit` field to `walletSettings`
+- added the `bitcoinAmountUnit` field to `walletSettings`
 
 ## 29
 
--   split to `token` property for storing OAuth tokens into `tokens.accessToken` and `tokens.refreshToken`
--   added `firmware`
+- split to `token` property for storing OAuth tokens into `tokens.accessToken` and `tokens.refreshToken`
+- added `firmware`
 
 ## 28
 
--   with advent of connect v9, device.state field has changed. migrated all affected data.
+- with advent of connect v9, device.state field has changed. migrated all affected data.
 
 ## 27
 
--   removed walletSettings.backends
--   added wallet.blockchain[coin].backends
--   backend address remembering is now supported
+- removed walletSettings.backends
+- added wallet.blockchain[coin].backends
+- backend address remembering is now supported
 
 ## 26
 
--   added VTC bech32 accounts
+- added VTC bech32 accounts
 
 ## 25
 
--   added walletSettings.backends
--   removed walletSettings.blockbookUrls
+- added walletSettings.backends
+- removed walletSettings.blockbookUrls
 
 ## 24
 
--   added form drafts
+- added form drafts
 
 ## 23
 
--   added message system
+- added message system
 
 ## 22
 
--   added LTC bech32 accounts
+- added LTC bech32 accounts
 
 ## 21
 
--   fix tx.amount for btc sent txs (subtract tx.fee from it), add tx.totalSpent field
+- fix tx.amount for btc sent txs (subtract tx.fee from it), add tx.totalSpent field
 
 ## 20
 
--   format tx.details
+- format tx.details
 
 ## 19
 
--   removed keyPath from fiatRates definition
+- removed keyPath from fiatRates definition
 
 ## 18
 
--   added device.walletNumber
+- added device.walletNumber
 
 ## 17
 
--   added coinmarketTrades
+- added coinmarketTrades
 
 ## 16
 
--   removed sendForm
--   added sendFormDrafts
+- removed sendForm
+- added sendFormDrafts
 
 ## 15
 
--   added metadata object store
--   added device.metadata
--   added account.metadata
+- added metadata object store
+- added device.metadata
+- added account.metadata

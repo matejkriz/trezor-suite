@@ -9,7 +9,17 @@ export type LogWriter = {
     add: (message: LogMessage) => void;
 };
 
-export class Log {
+// Defines the minimal logger contract shared across the codebase.
+// Consumers can use an app-specific logger adapter instead of the concrete `Log` class.
+export interface Logger {
+    info(...args: unknown[]): void;
+    debug(...args: unknown[]): void;
+    log(...args: unknown[]): void;
+    warn(...args: unknown[]): void;
+    error(...args: unknown[]): void;
+}
+
+export class Log implements Logger {
     prefix: string;
     enabled: boolean;
     css: string = '';
@@ -27,7 +37,10 @@ export class Log {
     }
 
     setColors(colors: Record<string, string>) {
-        this.css = typeof window !== 'undefined' && colors[this.prefix] ? colors[this.prefix] : '';
+        const { prefix } = this;
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const prefixColor: string = colors[prefix];
+        this.css = typeof window !== 'undefined' && prefixColor ? prefixColor : '';
     }
 
     addMessage(
@@ -65,6 +78,7 @@ export class Log {
     log(...args: any[]) {
         this.addMessage({ level: 'log', prefix: this.prefix }, ...args);
         if (this.enabled) {
+            // eslint-disable-next-line no-console
             console.log(`%c${this.prefix}`, this.css, ...args);
         }
     }
@@ -79,6 +93,7 @@ export class Log {
     info(...args: any[]) {
         this.addMessage({ level: 'info', prefix: this.prefix }, ...args);
         if (this.enabled) {
+            // eslint-disable-next-line no-console
             console.info(`%c${this.prefix}`, this.css, ...args);
         }
     }
@@ -94,8 +109,10 @@ export class Log {
         this.addMessage({ level: 'debug', prefix: this.prefix }, ...args);
         if (this.enabled) {
             if (this.css) {
+                // eslint-disable-next-line no-console
                 console.log(`%c${this.prefix}`, this.css, ...args);
             } else {
+                // eslint-disable-next-line no-console
                 console.log(this.prefix, ...args);
             }
         }

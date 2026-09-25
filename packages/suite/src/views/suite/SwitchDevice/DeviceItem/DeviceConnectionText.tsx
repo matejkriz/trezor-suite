@@ -1,11 +1,18 @@
-import { Icon, IconType, Text, TextVariant } from '@trezor/components';
-import { spacingsPx, typography } from '@trezor/theme';
+import { type MouseEventHandler, type ReactNode } from 'react';
+
 import styled, { css } from 'styled-components';
-import { ReactNode } from 'react';
 
+import {
+    Icon,
+    type IconComponent,
+    type IconProps,
+    Row,
+    Spinner,
+    Text,
+    type TextProps,
+} from '@trezor/components';
 const Container = styled.span<{ $isAction?: boolean }>`
-    ${typography.label}
-
+    width: stretch;
     ${({ $isAction }) =>
         $isAction &&
         css`
@@ -14,33 +21,55 @@ const Container = styled.span<{ $isAction?: boolean }>`
             }
         `}
 `;
-const TextRow = styled.div`
-    display: flex;
-    align-items: center;
-    gap: ${spacingsPx.xxs};
-`;
 
 type DeviceConnectionTextProps = {
-    onClick?: () => void;
-    variant: TextVariant;
-    'data-test'?: string;
-    icon: IconType;
+    onClick?: MouseEventHandler;
+    intent?: IconProps['intent'];
+    priority?: IconProps['priority'];
+    isDisabled?: IconProps['isDisabled'];
+    'data-testid'?: string;
+    'data-testid-alt'?: string;
+    icon: IconComponent;
     children: ReactNode;
     isAction?: boolean;
+    isLoading?: boolean;
 };
 
 export const DeviceConnectionText = ({
     onClick,
-    variant,
-    'data-test': dataTest,
+    intent = 'neutral',
+    priority,
+    isDisabled = false,
+    'data-testid': dataTest,
+    'data-testid-alt': dataTestAlt,
     children,
     icon,
     isAction,
-}: DeviceConnectionTextProps) => (
-    <Container $isAction={isAction} onClick={onClick} data-test={dataTest}>
-        <TextRow>
-            <Icon icon={icon} size={12} variant={variant} />
-            <Text variant={variant}>{children} </Text>
-        </TextRow>
-    </Container>
-);
+    isLoading,
+}: DeviceConnectionTextProps) => {
+    const colorProps: Pick<TextProps, 'intent' | 'priority' | 'isDisabled'> = {
+        intent,
+        priority,
+        isDisabled,
+    };
+
+    return (
+        <Container
+            $isAction={isAction}
+            onClick={onClick}
+            data-testid={dataTest}
+            data-testid-alt={dataTestAlt}
+        >
+            <Row gap={4}>
+                {isLoading ? (
+                    <Spinner size={16} isDisabled={true} />
+                ) : (
+                    <Icon as={icon} size={12} {...colorProps} />
+                )}
+                <Text ellipsisLineCount={1} typographyStyle="body-xs" {...colorProps}>
+                    {children}
+                </Text>
+            </Row>
+        </Container>
+    );
+};

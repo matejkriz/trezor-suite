@@ -1,25 +1,24 @@
-import { bufferutils, Transaction, Network } from '@trezor/utxo-lib';
-import { getRandomNumberInRange } from '@trezor/utils';
+import { clamp, getWeakRandomNumberInRange } from '@trezor/utils';
+import { type Network, Transaction, bufferutils } from '@trezor/utxo-lib';
 
 import {
     COORDINATOR_FEE_RATE_FALLBACK,
     MAX_ALLOWED_AMOUNT_FALLBACK,
     MIN_ALLOWED_AMOUNT_FALLBACK,
     PLEBS_DONT_PAY_THRESHOLD_FALLBACK,
-    ROUND_REGISTRATION_END_OFFSET,
     ROUND_MAXIMUM_REQUEST_DELAY,
+    ROUND_REGISTRATION_END_OFFSET,
 } from '../constants';
 import { RoundPhase } from '../enums';
-import { CoinjoinTransactionData } from '../types';
+import type { CoinjoinRoundShape, CoinjoinTransactionData } from '../types';
 import {
-    Round,
-    CoinjoinStateEvent,
-    CoinjoinRoundParameters,
-    CoinjoinAffiliateRequest,
-    CoinjoinStatus,
-    CoinjoinState,
+    type CoinjoinRoundParameters,
+    type CoinjoinState,
+    type CoinjoinStateEvent,
+    type CoinjoinStatus,
+    type Round,
 } from '../types/coordinator';
-import { Credentials } from '../types/middleware';
+import { type Credentials } from '../types/middleware';
 
 export const getRoundEvents = <T extends CoinjoinStateEvent['Type']>(
     type: T,
@@ -30,9 +29,10 @@ export const getRoundParameters = (round: Round) => {
     const events = getRoundEvents('RoundCreated', round.CoinjoinState.Events);
     if (events.length < 1) return;
 
-    const [{ RoundParameters }] = events;
+    // @ts-expect-error: indexing with noUncheckedIndexedAccess
+    const firstEvent: (typeof events)[number] = events[0];
 
-    return RoundParameters;
+    return firstEvent.RoundParameters;
 };
 
 // round commitmentData used in request for input ownershipProof
@@ -46,11 +46,14 @@ export const getCommitmentData = (identifier: string, roundId: string) => {
 
 // transform '0d 0h 1m 0s' (WabiSabi TimeSpan) to milliseconds
 export const readTimeSpan = (ts: string) => {
-    const span = ts.split(' ').map(v => parseInt(v, 10));
+    const parts = ts.split(' ').map(v => parseInt(v, 10));
+    const days = parts[0] ?? 0;
+    const hours = parts[1] ?? 0;
+    const minutes = parts[2] ?? 0;
+    const seconds = parts[3] ?? 0;
 
     const date = new Date();
     const now = date.getTime();
-    const [days, hours, minutes, seconds] = span;
 
     if (days > 0) {
         date.setDate(date.getDate() + days);
@@ -71,29 +74,24 @@ export const readTimeSpan = (ts: string) => {
     return date.getTime() - now;
 };
 
-const clamp = (value: number, min = Number.NEGATIVE_INFINITY, max = Number.POSITIVE_INFINITY) =>
-    Math.min(Math.max(value, min), max);
-
 export const scheduleDelay = (
     deadline: number,
     minimumDelay = 0,
     maximumDelay = ROUND_MAXIMUM_REQUEST_DELAY,
 ) => {
-    // reduce deadline to have absolute minimum time to make the actual request (10 seconds),
-    // but it must be at least 1 sec
-    const deadlineOffset = clamp(deadline - ROUND_MAXIMUM_REQUEST_DELAY, 1000);
-    // clamp the given maximum delay so it's at least 1 sec (so there's always room for randomness)
+    // reduce deadline to have absolute minimum time to make the actual request (10 seconds), if possible
+    const deadlineOffset = clamp(deadline - ROUND_MAXIMUM_REQUEST_DELAY, 0);
+    // clamp the given maximum delay so it's at least immediate
     // and at most the calculated offset (so we meet the deadline)
-    const max = clamp(maximumDelay, 1000, deadlineOffset);
-    // clamp the given minimum delay so it's at least immediate (no negative delays)
-    // and at most 1 sec before the calculated max (so there's room for randomness)
-    const min = clamp(minimumDelay, 0, max - 1000);
+    const max = clamp(maximumDelay, 0, deadlineOffset);
+    // Keep up to one second of randomness without exceeding the available budget.
+    const min = clamp(minimumDelay, 0, Math.max(0, max - 1000));
 
-    return getRandomNumberInRange(min, max);
+    return getWeakRandomNumberInRange(min, max);
 };
 
 // NOTE: deadlines are not accurate. phase may change earlier
-// accept CoinjoinRound or modified coordinator Round (see estimatePhaseDeadline below)
+// accept CoinjoinRound or modified coordinator Round
 type PartialCoinjoinRound = {
     Phase: RoundPhase;
     InputRegistrationEnd: string;
@@ -154,29 +152,20 @@ export const getCoinjoinRoundDeadlines = (round: PartialCoinjoinRound) => {
     }
 };
 
-export const estimatePhaseDeadline = (round: Round) => {
-    const roundParameters = getRoundParameters(round);
-    if (!roundParameters) return 0;
-
-    const { phaseDeadline } = getCoinjoinRoundDeadlines({
-        ...round,
-        RoundParameters: roundParameters,
-    });
-
-    return phaseDeadline;
-};
-
-export const findNearestDeadline = (rounds: Round[]) => {
-    const now = Date.now();
-    const deadlines = rounds.map(r => {
-        const phaseDeadline = estimatePhaseDeadline(r);
-        const timeLeft = phaseDeadline ? new Date(phaseDeadline).getTime() - now : 0;
-
-        return timeLeft > 0 ? timeLeft : now;
-    });
-
-    return Math.min(...deadlines);
-};
+// Get conservative deadline for signing phase: Use either
+// - phaseDeadline received from coordinator, or
+// - phaseStartLowerBound (= the soonest when signing phase could've started,
+//   based on polling mechanism) plus duration of the signing phase,
+// whichever is sooner
+export const getSigningSendDeadline = ({
+    phaseStartLowerBound = Number.MAX_SAFE_INTEGER,
+    phaseDeadline,
+    roundParameters,
+}: Pick<CoinjoinRoundShape, 'phaseStartLowerBound' | 'phaseDeadline' | 'roundParameters'>) =>
+    Math.min(
+        phaseStartLowerBound + readTimeSpan(roundParameters.TransactionSigningTimeout),
+        phaseDeadline,
+    );
 
 // get relevant round data from the most recent round
 const getDataFromRounds = (rounds: Round[]) => {
@@ -209,7 +198,9 @@ export const transformStatus = ({
     const { allowedInputAmounts, coordinationFeeRate } = getDataFromRounds(rounds);
     // coinJoinFeeRateMedians include an array of medians per day, week and month - we take the first (day) median as the recommended fee rate base.
     // The value is converted from kvBytes (kilo virtual bytes) to vBytes (how the value is displayed in UI).
-    const feeRateMedian = Math.round(CoinJoinFeeRateMedians[0].MedianFeeRate / 1000);
+    // @ts-expect-error: indexing with noUncheckedIndexedAccess
+    const firstMedian: (typeof CoinJoinFeeRateMedians)[number] = CoinJoinFeeRateMedians[0];
+    const feeRateMedian = Math.round(firstMedian.MedianFeeRate / 1000);
 
     return {
         rounds,
@@ -225,10 +216,7 @@ export const compareOutpoint = (a: string, b: string) =>
 // sum input Credentials
 export const sumCredentials = (c: Credentials[]) => c.reduce((sum, cre) => sum + cre.Value, 0);
 
-export const getAffiliateRequest = (
-    roundParameters: CoinjoinRoundParameters,
-    base64data?: string,
-): CoinjoinAffiliateRequest => {
+export const getAffiliateRequest = (base64data?: string) => {
     if (!base64data) {
         throw new Error('Missing affiliate request data');
     }
@@ -245,14 +233,17 @@ export const getAffiliateRequest = (
     }
 
     return {
-        fee_rate: roundParameters.CoordinationFeeRate.Rate * 10 ** 8,
-        no_fee_threshold: roundParameters.CoordinationFeeRate.PlebsDontPayThreshold,
-        min_registrable_amount: roundParameters.AllowedInputAmounts.Min,
         mask_public_key: mask.toString('hex'),
         signature: signature.toString('hex'),
         coinjoin_flags_array: flags,
     };
 };
+
+export const getRoundParams = (roundParameters: CoinjoinRoundParameters) => ({
+    fee_rate: roundParameters.CoordinationFeeRate.Rate * 10 ** 8,
+    no_fee_threshold: roundParameters.CoordinationFeeRate.PlebsDontPayThreshold,
+    min_registrable_amount: roundParameters.AllowedInputAmounts.Min,
+});
 
 export const getBroadcastedTxDetails = ({
     coinjoinState: { IsFullySigned, Witnesses },
@@ -274,12 +265,14 @@ export const getBroadcastedTxDetails = ({
     const sequence = 4294967295;
 
     transactionData.inputs.forEach((input, index) => {
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const witnessHex: string = Witnesses[index];
         tx.ins.push({
             hash: reverseBuffer(Buffer.from(input.hash, 'hex')),
             index: input.index,
             script: Buffer.allocUnsafe(0), // script is not used in calculation
             sequence,
-            witness: new BufferReader(Buffer.from(Witnesses[index], 'hex')).readVector(),
+            witness: new BufferReader(Buffer.from(witnessHex, 'hex')).readVector(),
         });
     });
 
@@ -295,7 +288,7 @@ export const getBroadcastedTxDetails = ({
         hex: tx.toHex(),
         hash: tx.getHash().toString('hex'),
         txid: tx.getId(),
-        size: tx.weight(),
+        size: tx.byteLength(),
         vsize: tx.virtualSize(),
     };
 };

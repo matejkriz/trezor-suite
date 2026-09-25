@@ -1,0 +1,39 @@
+import { type Meta, type StoryObj } from '@storybook/react';
+import styled from 'styled-components';
+
+import { StoryColumn } from '@trezor/components';
+
+import { TrezorLogo } from './TrezorLogo';
+
+const LogoWrapper = styled.div`
+    display: flex;
+    min-height: 100px;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+`;
+
+const meta: Meta<typeof TrezorLogo> = {
+    title: 'TrezorLogo',
+};
+export default meta;
+
+export const All: StoryObj<typeof meta> = {
+    render: () => (
+        <StoryColumn minWidth={400}>
+            <LogoWrapper>
+                <TrezorLogo
+                    type="horizontal"
+                    width="200px"
+                    data-testid="trezor-logo-horizontal-black"
+                />
+                <TrezorLogo
+                    type="vertical"
+                    width="120px"
+                    data-testid="trezor-logo-vertical-black"
+                />
+                <TrezorLogo type="symbol" width="50px" data-testid="trezor-logo-symbol-black" />
+            </LogoWrapper>
+        </StoryColumn>
+    ),
+};

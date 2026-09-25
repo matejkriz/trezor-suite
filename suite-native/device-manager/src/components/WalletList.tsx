@@ -1,0 +1,80 @@
+import { useSelector } from 'react-redux';
+
+import { A } from '@mobily/ts-belt';
+
+import { useServices } from '@suite-common/dependency-injection';
+import {
+    selectDeviceInstances,
+    selectIsPortfolioTrackerDevice,
+    selectSelectedDevice,
+} from '@suite-common/device';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { type TrezorDevice } from '@suite-common/suite-types';
+import { startDiscoveryThunk } from '@suite-common/wallet-core';
+import { VStack } from '@suite-native/atoms';
+import { selectHasNoDeviceWithEmptyPassphrase } from '@suite-native/device';
+
+import { WalletItem } from './WalletItem';
+import { WalletItemBase } from './WalletItemBase';
+import { useDeviceManager } from '../hooks/useDeviceManager';
+
+type WalletListProps = {
+    onSelectDevice: (device: TrezorDevice) => void;
+};
+
+export const WalletList = ({ onSelectDevice }: WalletListProps) => {
+    const { dispatch } = useServices(injectDispatch);
+    const devices = useSelector(selectDeviceInstances);
+    const selectedDevice = useSelector(selectSelectedDevice);
+    const hasNoDeviceWithEmptyPassphrase = useSelector(selectHasNoDeviceWithEmptyPassphrase);
+    const isPortfolioTrackerDevice = useSelector(selectIsPortfolioTrackerDevice);
+    const isSelectable = devices.length > 1 || hasNoDeviceWithEmptyPassphrase;
+    const { setIsDeviceManagerVisible } = useDeviceManager();
+
+    // we want to show placeholder in case there are only passphrase wallets without standard and not portfolio
+    const showPlaceholder =
+        hasNoDeviceWithEmptyPassphrase &&
+        A.isNotEmpty(devices) &&
+        !isPortfolioTrackerDevice &&
+        selectedDevice?.connected;
+
+    // on tap of placeholder we actually create device with empty passphrase and select it
+    const handlePlaceholderPress = () => {
+        if (selectedDevice === undefined) return;
+        setIsDeviceManagerVisible(false);
+        dispatch(
+            startDiscoveryThunk({
+                device: selectedDevice,
+                isAddingHiddenWallet: false,
+                isAddingExistingWallet: false,
+            }),
+        );
+    };
+
+    return (
+        <VStack spacing="sp12" paddingHorizontal="sp16">
+            {showPlaceholder && (
+                <WalletItemBase
+                    variant="standard"
+                    onPress={handlePlaceholderPress}
+                    isSelectable
+                    isSelected={false}
+                />
+            )}
+            {devices.map(device => {
+                if (!device.state) {
+                    return null;
+                }
+
+                return (
+                    <WalletItem
+                        key={`${device.path}-${device.state.staticSessionId}`}
+                        device={device}
+                        isSelectable={isSelectable}
+                        onPress={() => onSelectDevice(device)}
+                    />
+                );
+            })}
+        </VStack>
+    );
+};

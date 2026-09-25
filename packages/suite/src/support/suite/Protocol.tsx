@@ -1,26 +1,38 @@
-import { useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
-import { desktopApi } from '@trezor/suite-desktop-api';
+import { useCallback, useEffect } from 'react';
 
-import { isWeb, isDesktop } from '@trezor/env-utils';
-import { useActions } from 'src/hooks/suite';
+import { injectDesktopApi } from '@suite/desktop-app-api';
+import { selectURLSearchParams } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { isDesktop, isWeb } from '@trezor/env-utils';
+
 import * as protocolActions from 'src/actions/suite/protocolActions';
+import { useSelector } from 'src/hooks/suite';
 
 const Protocol = () => {
-    const { handleProtocolRequest } = useActions({
-        handleProtocolRequest: protocolActions.handleProtocolRequest,
-    });
+    const { desktopApi, dispatch } = useServices(injectDispatch, injectDesktopApi);
 
-    const { search } = useLocation();
-    useEffect(() => {
-        if (search) {
-            const query = new URLSearchParams(search);
-            const uri = query.get('uri');
+    const handleProtocolRequestThunk = useCallback(
+        (uri: string) => {
+            dispatch(protocolActions.handleProtocolRequestThunk(uri));
+        },
+        [dispatch],
+    );
+
+    const searchParams = useSelector(selectURLSearchParams);
+
+    const processSearch = useCallback(() => {
+        if (searchParams) {
+            const uri = searchParams.get('uri');
             if (uri) {
-                handleProtocolRequest(uri);
+                handleProtocolRequestThunk(uri);
             }
         }
-    }, [search, handleProtocolRequest]);
+    }, [handleProtocolRequestThunk, searchParams]);
+
+    useEffect(() => {
+        processSearch();
+    }, [processSearch, searchParams]);
 
     useEffect(() => {
         if (isWeb() && navigator.registerProtocolHandler) {
@@ -34,9 +46,11 @@ const Protocol = () => {
         }
 
         if (isDesktop()) {
-            desktopApi.on('protocol/open', handleProtocolRequest);
+            desktopApi.on('protocol/open', handleProtocolRequestThunk);
+
+            return () => desktopApi.removeAllListeners('protocol/open');
         }
-    }, [handleProtocolRequest]);
+    }, [desktopApi, handleProtocolRequestThunk]);
 
     return null;
 };

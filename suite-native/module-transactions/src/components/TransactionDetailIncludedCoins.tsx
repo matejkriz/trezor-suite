@@ -1,0 +1,120 @@
+import { type AccountKey } from '@suite-common/wallet-types';
+import {
+    BottomSheetModal,
+    Box,
+    Card,
+    IconCircle,
+    PressableOpacity,
+    Text,
+    useBottomSheetModal,
+} from '@suite-native/atoms';
+import { Icon } from '@suite-native/icons';
+import { type TypedTokenTransfer, type WalletAccountTransaction } from '@suite-native/tokens';
+import { useNativeStyles } from '@trezor/styles-native';
+
+import { TransactionDetailListItem } from './TransactionDetailListItem';
+import { cardStyle } from './TransactionOverview';
+
+type TransactionDetailIncludedCoinsProps = {
+    accountKey: AccountKey;
+    transaction: WalletAccountTransaction;
+    tokenTransfer?: TypedTokenTransfer;
+    isPhishingTransaction: boolean;
+};
+
+const isSameTokenTransfer = (
+    tokenTransferA: TypedTokenTransfer,
+    tokenTransferB: TypedTokenTransfer,
+) =>
+    tokenTransferA.from === tokenTransferB.from &&
+    tokenTransferA.to === tokenTransferB.to &&
+    tokenTransferA.symbol === tokenTransferB.symbol;
+
+const isZeroAmountTransaction = (transaction: WalletAccountTransaction) =>
+    transaction.amount.length === 0 || transaction.amount === '0';
+
+const IncludedCoinsSheetTrigger = ({ title, onPress }: { title: string; onPress: () => void }) => {
+    const { applyStyle } = useNativeStyles();
+
+    return (
+        <Card borderColor="borderNeutral" style={applyStyle(cardStyle)}>
+            <PressableOpacity onPress={onPress}>
+                <Box flexDirection="row" alignItems="center" justifyContent="space-between">
+                    <Box flexDirection="row" alignItems="center">
+                        <Box marginRight="sp16">
+                            <IconCircle name="treeStructure" />
+                        </Box>
+                        <Text>{title}</Text>
+                    </Box>
+                    <Icon name="caretCircleRight" color="contentBrand" />
+                </Box>
+            </PressableOpacity>
+        </Card>
+    );
+};
+
+export const TransactionDetailIncludedCoins = ({
+    accountKey,
+    transaction,
+    tokenTransfer,
+    isPhishingTransaction,
+}: TransactionDetailIncludedCoinsProps) => {
+    const { bottomSheetRef, openModal, closeModal } = useBottomSheetModal();
+
+    const isTokenTransactionDetail = !!tokenTransfer;
+
+    const transactionTokensCount = transaction.tokens.length;
+    const coinsIncludedCount = isTokenTransactionDetail
+        ? transactionTokensCount - 1
+        : transactionTokensCount;
+
+    const sheetTitle = `${coinsIncludedCount} coin${coinsIncludedCount > 1 ? 's' : ''} included`;
+    const sheetSubtitle = `Transaction #${transaction.txid}`;
+
+    const includedTokens = isTokenTransactionDetail
+        ? transaction.tokens.filter(
+              transactionToken => !isSameTokenTransfer(transactionToken, tokenTransfer),
+          )
+        : transaction.tokens;
+
+    const isEthereumCoinDisplayed =
+        isTokenTransactionDetail && !isZeroAmountTransaction(transaction);
+
+    return (
+        <>
+            {coinsIncludedCount > 0 && (
+                <IncludedCoinsSheetTrigger title={sheetTitle} onPress={openModal} />
+            )}
+
+            <BottomSheetModal
+                ref={bottomSheetRef}
+                title={sheetTitle}
+                subtitle={sheetSubtitle}
+                isCloseDisplayed
+            >
+                {isEthereumCoinDisplayed && (
+                    <TransactionDetailListItem
+                        onPress={closeModal}
+                        accountKey={accountKey}
+                        transaction={transaction}
+                        isPhishingTransaction={isPhishingTransaction}
+                        isFirst
+                    />
+                )}
+
+                {includedTokens.map((token, index) => (
+                    <TransactionDetailListItem
+                        onPress={closeModal}
+                        key={token.contract}
+                        accountKey={accountKey}
+                        transaction={transaction}
+                        tokenTransfer={token}
+                        isPhishingTransaction={isPhishingTransaction}
+                        isFirst={!isEthereumCoinDisplayed && index === 0}
+                        isLast={index === includedTokens.length - 1}
+                    />
+                ))}
+            </BottomSheetModal>
+        </>
+    );
+};

@@ -1,29 +1,17 @@
-import styled from 'styled-components';
+import { injectDesktopApi } from '@suite/desktop-app-api';
+import { openEarlyAccessSetup, selectDesktopUpdate } from '@suite/desktop-update';
+import { Translation } from '@suite/intl';
+import { Anchor, SettingsAnchor } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { Row } from '@trezor/components';
+import { ActionButton, ActionColumn, SectionItem, TextColumn } from '@trezor/product-components';
 
-import { desktopApi } from '@trezor/suite-desktop-api';
-import {
-    ActionButton,
-    ActionColumn,
-    SectionItem,
-    TextColumn,
-    Translation,
-} from 'src/components/suite';
-import { useDispatch, useSelector } from 'src/hooks/suite';
-import { openEarlyAccessSetup } from 'src/actions/suite/desktopUpdateActions';
-import { useAnchor } from 'src/hooks/suite/useAnchor';
-import { SettingsAnchor } from 'src/constants/suite/anchors';
-
-const Version = styled.div`
-    span {
-        display: flex;
-        align-items: center;
-    }
-`;
+import { useSelector } from 'src/hooks/suite';
 
 export const EarlyAccess = () => {
-    const desktopUpdate = useSelector(state => state.desktopUpdate);
-    const dispatch = useDispatch();
-    const { anchorRef, shouldHighlight } = useAnchor(SettingsAnchor.EarlyAccess);
+    const desktopUpdate = useSelector(selectDesktopUpdate);
+    const { desktopApi, dispatch } = useServices(injectDispatch, injectDesktopApi);
 
     const setupEarlyAccess = () => {
         dispatch(openEarlyAccessSetup(desktopUpdate.allowPrerelease));
@@ -31,48 +19,52 @@ export const EarlyAccess = () => {
     };
 
     return (
-        <SectionItem
-            data-test="@settings/early-access"
-            ref={anchorRef}
-            shouldHighlight={shouldHighlight}
-        >
-            <TextColumn
-                title={
-                    <Translation
-                        id={
-                            desktopUpdate.allowPrerelease
-                                ? 'TR_EARLY_ACCESS_ENABLED'
-                                : 'TR_EARLY_ACCESS'
-                        }
-                    />
-                }
-                description={
-                    <Version>
-                        <Translation
-                            id={
-                                desktopUpdate.allowPrerelease
-                                    ? 'TR_EARLY_ACCESS_DESCRIPTION_ENABLED'
-                                    : 'TR_EARLY_ACCESS_DESCRIPTION'
-                            }
-                        />
-                    </Version>
-                }
-            />
-            <ActionColumn>
-                <ActionButton
-                    onClick={setupEarlyAccess}
-                    variant="secondary"
-                    data-test="@settings/early-access-join-button"
+        <Anchor anchorId={SettingsAnchor.EarlyAccess}>
+            {({ anchorId, anchorRef, shouldHighlight }) => (
+                <SectionItem
+                    data-testid={anchorId}
+                    ref={anchorRef}
+                    shouldHighlight={shouldHighlight}
                 >
-                    <Translation
-                        id={
-                            desktopUpdate.allowPrerelease
-                                ? 'TR_EARLY_ACCESS_DISABLE'
-                                : 'TR_EARLY_ACCESS_ENABLE'
+                    <TextColumn
+                        title={
+                            <Translation
+                                id={
+                                    desktopUpdate.allowPrerelease
+                                        ? 'TR_EARLY_ACCESS_ENABLED'
+                                        : 'TR_EARLY_ACCESS'
+                                }
+                            />
+                        }
+                        description={
+                            <Row alignItems="center">
+                                <Translation
+                                    id={
+                                        desktopUpdate.allowPrerelease
+                                            ? 'TR_EARLY_ACCESS_DESCRIPTION_ENABLED'
+                                            : 'TR_EARLY_ACCESS_DESCRIPTION'
+                                    }
+                                />
+                            </Row>
                         }
                     />
-                </ActionButton>
-            </ActionColumn>
-        </SectionItem>
+                    <ActionColumn>
+                        <ActionButton
+                            onClick={setupEarlyAccess}
+                            intent="brand"
+                            data-testid="@settings/early-access-join-button"
+                        >
+                            <Translation
+                                id={
+                                    desktopUpdate.allowPrerelease
+                                        ? 'TR_EARLY_ACCESS_DISABLE'
+                                        : 'TR_EARLY_ACCESS_ENABLE'
+                                }
+                            />
+                        </ActionButton>
+                    </ActionColumn>
+                </SectionItem>
+            )}
+        </Anchor>
     );
 };

@@ -1,7 +1,10 @@
-import { H2, Paragraph } from '@trezor/components';
-import { Account } from 'src/types/wallet';
 import styled from 'styled-components';
-import { Translation } from 'src/components/suite';
+
+import { Translation } from '@suite/intl';
+import { getNetworkDisplaySymbol } from '@suite-common/wallet-config';
+import { H2, Paragraph } from '@trezor/components';
+
+import { type Account } from 'src/types/wallet';
 
 const Content = styled.div`
     margin: 0 0 24px;
@@ -13,7 +16,10 @@ interface HeaderProps {
 
 export const Header = ({ account }: HeaderProps) => {
     const title = (
-        <Translation id="RECEIVE_TITLE" values={{ symbol: account.symbol.toUpperCase() }} />
+        <Translation
+            id="RECEIVE_TITLE"
+            values={{ networkDisplaySymbol: getNetworkDisplaySymbol(account.symbol) }}
+        />
     );
     if (account.networkType === 'bitcoin') {
         return (
@@ -30,7 +36,7 @@ export const Header = ({ account }: HeaderProps) => {
         return (
             <Content>
                 <H2>{title}</H2>
-                <Paragraph typographyStyle="label">
+                <Paragraph typographyStyle="body-xs">
                     <Translation id="RECEIVE_DESC_ETHEREUM" />
                 </Paragraph>
             </Content>

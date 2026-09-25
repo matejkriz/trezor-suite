@@ -1,0 +1,100 @@
+import { useSetAtom } from 'jotai';
+
+import { Box, Button, Card, CenteredTitleHeader, TextDivider, VStack } from '@suite-native/atoms';
+import { EmptyWalletSvg } from '@suite-native/device';
+import { Translation } from '@suite-native/intl';
+import {
+    type DeviceOnboardingStackParamList,
+    DeviceOnboardingStackRoutes,
+    type StackProps,
+} from '@suite-native/navigation';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
+
+import { updateOnboardingAnalyticsAtom } from '../../atoms';
+import { DeviceOnboardingScreenWithExitButton } from '../components/DeviceOnboardingScreenWithExitButton';
+
+const cardStyle = prepareNativeStyle(utils => ({
+    flex: 1,
+    borderWidth: utils.borders.widths.small,
+    borderColor: utils.colors.borderNeutral,
+}));
+
+export const CreateOrRecoverCrossroadsScreen = ({
+    navigation,
+}: StackProps<
+    DeviceOnboardingStackParamList,
+    DeviceOnboardingStackRoutes.CreateOrRecoverCrossroads
+>) => {
+    const { applyStyle } = useNativeStyles();
+    const updateOnboardingAnalytics = useSetAtom(updateOnboardingAnalyticsAtom);
+
+    const handleCreateButtonPress = () => {
+        updateOnboardingAnalytics({
+            seed: 'create',
+        });
+        navigation.navigate(DeviceOnboardingStackRoutes.CreateWalletLoading);
+    };
+
+    const handleRecoverButtonPress = () => {
+        updateOnboardingAnalytics({
+            seed: 'recovery',
+        });
+
+        navigation.navigate(DeviceOnboardingStackRoutes.RecoveryInstructions);
+    };
+
+    return (
+        <DeviceOnboardingScreenWithExitButton>
+            <VStack spacing="sp24" flex={1} justifyContent="space-between" marginBottom="sp16">
+                <Card style={applyStyle(cardStyle)}>
+                    <Box flex={1} justifyContent="space-between" alignItems="center">
+                        <Box flex={1} justifyContent="center" paddingVertical="sp12">
+                            <EmptyWalletSvg />
+                        </Box>
+                        <VStack spacing="sp16">
+                            <CenteredTitleHeader
+                                titleVariant="body-md-strong"
+                                titleSpacing="sp4"
+                                title={
+                                    <Translation id="moduleDeviceOnboarding.createOrRecoverCrossroadsScreen.create.title" />
+                                }
+                                subtitle={
+                                    <Translation id="moduleDeviceOnboarding.createOrRecoverCrossroadsScreen.create.subtitle" />
+                                }
+                            />
+                            <Button
+                                testID="@deviceOnboarding/CreateOrRecoverCrossroadsScreen/createWalletBtn"
+                                onPress={handleCreateButtonPress}
+                            >
+                                <Translation id="moduleDeviceOnboarding.createOrRecoverCrossroadsScreen.create.button" />
+                            </Button>
+                        </VStack>
+                    </Box>
+                </Card>
+                <VStack spacing="sp24" flexShrink={1}>
+                    <TextDivider />
+                    <VStack spacing="sp16" paddingHorizontal="sp16">
+                        <CenteredTitleHeader
+                            titleVariant="body-md-strong"
+                            titleSpacing="sp4"
+                            title={
+                                <Translation id="moduleDeviceOnboarding.createOrRecoverCrossroadsScreen.recover.title" />
+                            }
+                            subtitle={
+                                <Translation id="moduleDeviceOnboarding.createOrRecoverCrossroadsScreen.recover.subtitle" />
+                            }
+                        />
+                        <Button
+                            onPress={handleRecoverButtonPress}
+                            testID="@deviceOnboarding/CreateOrRecoverCrossroadsScreen/recoverWalletBtn"
+                            intent="neutral"
+                            priority="secondary"
+                        >
+                            <Translation id="moduleDeviceOnboarding.createOrRecoverCrossroadsScreen.recover.button" />
+                        </Button>
+                    </VStack>
+                </VStack>
+            </VStack>
+        </DeviceOnboardingScreenWithExitButton>
+    );
+};

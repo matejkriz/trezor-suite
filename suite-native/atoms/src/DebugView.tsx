@@ -1,5 +1,5 @@
-import { useRef } from 'react';
-import { View, ViewProps } from 'react-native';
+import { forwardRef, useLayoutEffect, useRef } from 'react';
+import { View, type ViewProps } from 'react-native';
 import Animated, {
     interpolateColor,
     useAnimatedStyle,
@@ -8,20 +8,21 @@ import Animated, {
     withTiming,
 } from 'react-native-reanimated';
 
-import { atom, useAtom } from 'jotai';
 import { A, G } from '@mobily/ts-belt';
+import { atom, useAtom } from 'jotai';
 
-import { useNativeStyles } from '@trezor/styles';
+import { useNativeStyles } from '@trezor/styles-native';
 
 import { Text } from './Text';
 
 const FLASH_DURATION = 300;
-// set these to true if you are debugging rerenders locally
-const FLASH_ON_RERENDER = false;
-const RERENDER_COUNT_ENABLED = false;
 
-const isFlashOnRerenderEnabledAtom = atom(FLASH_ON_RERENDER);
-const isRerenderCountEnabledAtom = atom(RERENDER_COUNT_ENABLED);
+const isFlashOnRerenderEnabledAtom = atom(
+    process.env.EXPO_PUBLIC_IS_FLASH_ON_RERENDER_ENABLED === 'true',
+);
+const isRerenderCountEnabledAtom = atom(
+    process.env.EXPO_PUBLIC_IS_RERENDER_COUNT_ENABLED === 'true',
+);
 
 export const useDebugView = () => {
     const [isFlashOnRerenderEnabled, setIsFlashOnRerenderEnabled] = useAtom(
@@ -34,13 +35,13 @@ export const useDebugView = () => {
 
     return {
         isFlashOnRerenderEnabled,
-        toggleRerenderCount,
-        isRerenderCountEnabled,
         toggleFlashOnRerender,
+        isRerenderCountEnabled,
+        toggleRerenderCount,
     };
 };
 
-export const DebugView = ({ style, children, ...props }: ViewProps) => {
+export const DebugView = forwardRef<View, ViewProps>(({ style, children, ...props }, ref) => {
     const { utils } = useNativeStyles();
     const { isRerenderCountEnabled } = useDebugView();
     const rerenderCount = useRef(0);
@@ -62,13 +63,15 @@ export const DebugView = ({ style, children, ...props }: ViewProps) => {
         }),
     );
 
-    flashState.value = flashState.value === 0 ? 1 : 0;
+    useLayoutEffect(() => {
+        flashState.value = flashState.value === 0 ? 1 : 0;
+    });
 
     const rStyle = useAnimatedStyle(() => {
         const backgroundColor = interpolateColor(
             progress.value,
             [0, 1],
-            [originalBackgroundColor, utils.colors.backgroundAlertRedBold],
+            [originalBackgroundColor, utils.colors.elementFillCriticalBold],
         );
 
         return {
@@ -77,7 +80,7 @@ export const DebugView = ({ style, children, ...props }: ViewProps) => {
     });
 
     return (
-        <Animated.View style={[style, rStyle]} {...props}>
+        <Animated.View ref={ref} style={[style, rStyle]} {...props}>
             {children}
             {isRerenderCountEnabled && (
                 <View
@@ -89,9 +92,11 @@ export const DebugView = ({ style, children, ...props }: ViewProps) => {
                         borderWidth: 1,
                     }}
                 >
-                    <Text variant="hint">{++rerenderCount.current}</Text>
+                    <Text variant="body-sm">{++rerenderCount.current}</Text>
                 </View>
             )}
         </Animated.View>
     );
-};
+});
+
+DebugView.displayName = 'DebugView';

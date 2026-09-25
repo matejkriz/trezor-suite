@@ -1,0 +1,160 @@
+import {
+    AbstractApi,
+    type AbstractApiArgs,
+    type AbstractApiConstructorParams,
+    DEVICE_TYPE,
+    TRANSPORT_ERROR as ERRORS,
+    type PathInternal,
+    error,
+    getBLEDescriptorModel,
+    readMessageBuffer,
+    success,
+} from '@trezor/transport-common';
+
+import { TrezorBluetooth } from './trezor-bluetooth';
+import {
+    type BluetoothAdapterState,
+    type BluetoothDevice,
+    type TrezorBluetoothSettings,
+} from './types';
+
+// implementation of @trezor/transport/src/api/abstract
+
+type BluetoothApiParams = Omit<AbstractApiConstructorParams, 'type'> & TrezorBluetoothSettings;
+
+export class BluetoothApi extends AbstractApi {
+    chunkSize = 244;
+    api: TrezorBluetooth;
+
+    private adapterState?: BluetoothAdapterState;
+    private readBuffer = readMessageBuffer();
+    private readSubscription: Record<string, boolean> = {}; // [device.id]: true
+
+    constructor(options: BluetoothApiParams) {
+        super({ ...options, type: 'bluetooth' });
+
+        this.api = new TrezorBluetooth(options);
+    }
+
+    private devicesToDescriptors(devices: BluetoothDevice[]) {
+        return devices
+            .filter(device => device.connected && device.paired)
+            .map(device => ({
+                path: device.id as PathInternal,
+                type: DEVICE_TYPE.TypeBluetooth,
+                id: device.id,
+                apiType: this.type,
+                model: getBLEDescriptorModel(device.data[2]),
+            }));
+    }
+
+    async init() {
+        const { api } = this;
+        try {
+            await api.connect();
+        } catch (err) {
+            return error({ code: ERRORS.UNEXPECTED_ERROR, message: err.message });
+        }
+
+        return success(true);
+    }
+
+    enumerate() {
+        return this.api
+            .send('enumerate')
+            .then(({ devices }) => success(this.devicesToDescriptors(devices)))
+            .catch(() => success([]));
+    }
+
+    listen() {
+        const { api } = this;
+
+        const transportApiEvent = ({ devices }: { devices: BluetoothDevice[] }) => {
+            this.emit('transport-interface-change', this.devicesToDescriptors(devices));
+        };
+        api.on('device_connected', event => {
+            transportApiEvent(event);
+        });
+        api.on('device_disconnected', event => {
+            this.readBuffer.cancelRead(event.id);
+            delete this.readSubscription[event.id];
+            transportApiEvent(event);
+        });
+        api.on('device_read', ({ id, data, characteristic }) => {
+            if (characteristic === 'trezor-push-notification') {
+                this.emit('trezor-push-notification', { id, data });
+            } else if (characteristic === 'battery-level') {
+                this.emit('battery-level', { id, data });
+            } else {
+                this.readBuffer.onMessage(id, Buffer.from(data));
+            }
+        });
+        api.on('adapter_state_changed', ({ state }) => {
+            if (this.adapterState === state) return;
+            if (state !== 'enabled') {
+                transportApiEvent({ devices: [] });
+            }
+            this.adapterState = state;
+        });
+        api.on('disconnected', () => {
+            this.emit('transport-interface-error', { error: ERRORS.API_DISCONNECTED });
+        });
+    }
+
+    dispose() {
+        this.api.removeAllListeners();
+
+        return this.api.disconnect();
+    }
+
+    read(...[path, options]: AbstractApiArgs<'read'>) {
+        return this.readBuffer.read(path, options?.signal);
+    }
+
+    write(...[path, buffer]: AbstractApiArgs<'write'>) {
+        const chunk = Buffer.alloc(this.chunkSize);
+        buffer.copy(chunk);
+
+        return this.api
+            .send('write', { id: path, data: Array.from(chunk) })
+            .then(() => success(undefined))
+            .catch(e => error({ code: ERRORS.INTERFACE_DATA_TRANSFER, message: e.message }));
+    }
+
+    openDevice(...[path, options]: AbstractApiArgs<'openDevice'>) {
+        const isReadChannel = !options?.channel || options.channel === 'read';
+        if (isReadChannel) {
+            this.readBuffer.cancelRead(path);
+            if (this.readSubscription[path]) {
+                // already subscribed to TX (read) characteristics
+                return Promise.resolve(success(undefined));
+            } else {
+                this.readSubscription[path] = true;
+            }
+        }
+
+        return this.api
+            .send('open_device', { id: path, characteristic: options?.channel })
+            .then(() => success(undefined))
+            .catch(e =>
+                error({ code: ERRORS.INTERFACE_UNABLE_TO_OPEN_DEVICE, message: e.message }),
+            );
+    }
+
+    closeDevice(...[path, options]: AbstractApiArgs<'closeDevice'>) {
+        const isReadChannel = !options?.channel || options.channel === 'read';
+        if (isReadChannel) {
+            // do not close subscriptions to TX (read) characteristics
+            this.readBuffer.cancelRead(path);
+
+            return Promise.resolve(success(undefined));
+        }
+
+        return this.api
+            .send('close_device', { id: path, characteristic: options?.channel })
+            .then(() => success(undefined))
+            .catch(e =>
+                error({ code: ERRORS.INTERFACE_UNABLE_TO_CLOSE_DEVICE, message: e.message }),
+            );
+    }
+}

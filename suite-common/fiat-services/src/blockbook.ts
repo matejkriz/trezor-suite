@@ -1,9 +1,10 @@
-import type { LastWeekRates, TimestampedRates } from '@suite-common/wallet-types';
+import type { HistoricRates, TimestampedRates } from '@suite-common/wallet-types';
+import { getWeakRandomInt } from '@trezor/utils';
 
-import { RateLimiter } from './limiter';
 import { fetchUrl } from './fetch';
+import { RateLimiter } from './limiter';
 
-// TODO: generate from @trezor/connect-common/files/coins.json
+// TODO: generate from @trezor/connect-data/files/coins.json
 const ENDPOINTS = {
     btc: ['btc1', 'btc2', 'btc3', 'btc4', 'btc5'],
 };
@@ -11,7 +12,7 @@ const ENDPOINTS = {
 type Ticker = keyof typeof ENDPOINTS;
 
 const randomEndpoint = (ticker: Ticker) =>
-    ENDPOINTS[ticker][Math.floor(Math.random() * ENDPOINTS[ticker].length)];
+    ENDPOINTS[ticker][getWeakRandomInt(0, ENDPOINTS[ticker].length)];
 
 const getQuery = (query?: { currency?: string; timestamp?: number | string }) =>
     Object.entries(query || {})
@@ -50,7 +51,7 @@ const getMultiTickers = async (
     ticker: Ticker,
     timestamps: number[],
     currency?: string,
-): Promise<LastWeekRates | null> => {
+): Promise<HistoricRates | null> => {
     const url = `${getApiUrl(ticker)}/multi-tickers/?${getQuery({
         timestamp: timestamps.join(','),
         currency,
@@ -62,7 +63,12 @@ const getMultiTickers = async (
         rates && {
             ts: new Date().getTime(),
             symbol: ticker,
-            tickers: rates.map((rate, i) => ({ ...rate, ts: timestamps[i] })),
+            tickers: rates.map((rate, i) => {
+                // @ts-expect-error: indexing with noUncheckedIndexedAccess
+                const ts: (typeof timestamps)[number] = timestamps[i];
+
+                return { ...rate, ts };
+            }),
         }
     );
 };

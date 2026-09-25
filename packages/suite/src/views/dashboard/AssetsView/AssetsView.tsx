@@ -1,0 +1,303 @@
+import styled from 'styled-components';
+
+import { events, injectDesktopAnalytics } from '@suite/analytics';
+import { selectFlags, setFlag } from '@suite/flags';
+import { Translation } from '@suite/intl';
+import { openModal } from '@suite/modal';
+import { type AssetFiatBalance } from '@suite-common/assets';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import {
+    type NetworkSymbol,
+    getNetwork,
+    getNetworkFeatures,
+    isNetworkSymbol,
+} from '@suite-common/wallet-config';
+import {
+    isSupportedEthStakingNetworkSymbol,
+    isSupportedSolStakingNetworkSymbol,
+    isSupportedTronStakingNetworkSymbol,
+    selectAllAccountsToList,
+    selectBaseCurrency,
+    selectCurrentFiatRates,
+    selectEnabledNetworks,
+} from '@suite-common/wallet-core';
+import { type RatesByKey } from '@suite-common/wallet-types';
+import {
+    AMOUNT_UNIT_ZERO,
+    BASE_CURRENCY_ZERO,
+    asAmountUnit,
+    getFiatRateKey,
+    toFiatCurrency,
+} from '@suite-common/wallet-utils';
+import type { BaseCurrencyCode, TokenInfo } from '@trezor/blockchain-link-types';
+import {
+    Button,
+    ButtonGroup,
+    Card,
+    Icon,
+    IconButton,
+    LoadingContent,
+    Row,
+    TOOLTIP_DELAY_LONG,
+} from '@trezor/components';
+import { GridNineFilledIcon, PlusIcon, RowsFilledIcon, WarningIcon } from '@trezor/icons';
+import { typography } from '@trezor/theme';
+import { type PartialRecord } from '@trezor/type-utils';
+import { BigNumber, typedObjectKeys } from '@trezor/utils';
+
+import { DashboardSection } from 'src/components/dashboard';
+import { useNetworkSupport } from 'src/hooks/settings/useNetworkSupport';
+import { useDiscovery, useLayoutSize, useSelector } from 'src/hooks/suite';
+import { type Account } from 'src/types/wallet';
+import { selectDiscoveryOverallStatus } from 'src/utils/wallet/selectDiscoveryOverallStatus';
+
+import { AssetCard, AssetCardSkeleton } from './AssetCard/AssetCard';
+import { type AssetData } from './AssetData';
+import { AssetTable } from './AssetTable/AssetTable';
+
+const InfoMessage = styled.div`
+    padding: 16px 24px;
+    align-items: center;
+    display: flex;
+    color: ${({ theme }) => theme.contentCritical};
+    ${typography['body-xs']}
+`;
+
+const GridWrapper = styled.div`
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(285px, 1fr));
+`;
+
+const useAssetsFiatBalances = (
+    assetsData: AssetData[],
+    accounts: Partial<Record<NetworkSymbol, Account[]>>,
+    localCurrency: BaseCurrencyCode,
+    currentFiatRates?: RatesByKey,
+) =>
+    assetsData.reduce<AssetFiatBalance[]>((acc, asset) => {
+        if (!asset) return acc;
+
+        const fiatRateKey = getFiatRateKey(asset.network.symbol, localCurrency);
+        const fiatRate = currentFiatRates?.[fiatRateKey];
+        const amount = (accounts[asset.network.symbol] ?? [])
+            .reduce((balance, account) => balance + Number(account.formattedBalance), 0)
+            .toString();
+
+        const fiatBalance = toFiatCurrency({ amount, rate: fiatRate?.rate }) ?? BASE_CURRENCY_ZERO;
+
+        return [...acc, { fiatBalance, symbol: asset.network.symbol }];
+    }, []);
+
+export const AssetsView = () => {
+    const { dashboardAssetsGridMode } = useSelector(selectFlags);
+    const enabledNetworks = useSelector(selectEnabledNetworks);
+
+    const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
+    const { isDiscoveryRunning } = useDiscovery();
+    const discoveryStatus = useSelector(selectDiscoveryOverallStatus);
+    const accounts = useSelector(selectAllAccountsToList);
+    const { supportedMainnets } = useNetworkSupport();
+    const { isBelowTablet } = useLayoutSize();
+
+    const baseCurrencyCode = useSelector(selectBaseCurrency);
+    const currentFiatRates = useSelector(selectCurrentFiatRates);
+    const hasMainnetNetworksToEnable = supportedMainnets.some(
+        network => !enabledNetworks.includes(network.symbol),
+    );
+
+    const assets: PartialRecord<NetworkSymbol, Account[]> = {};
+
+    accounts.forEach(account => {
+        let symbolAssets = assets[account.symbol];
+
+        if (!symbolAssets) {
+            symbolAssets = [];
+        }
+
+        symbolAssets.push(account);
+
+        assets[account.symbol] = symbolAssets;
+    });
+
+    const assetSymbols = typedObjectKeys(assets).filter(symbol => isNetworkSymbol(symbol));
+
+    const assetsData: AssetData[] = assetSymbols.map((symbol): AssetData => {
+        const network = getNetwork(symbol);
+
+        const assetNativeCryptoBalance =
+            assets[symbol] !== undefined
+                ? asAmountUnit(
+                      assets[symbol].reduce(
+                          (total, account) => total.plus(account.formattedBalance),
+                          new BigNumber(0),
+                      ),
+                  )
+                : undefined;
+
+        const assetTokens = assets[symbol]?.reduce((allTokens: TokenInfo[], account) => {
+            if (account.tokens) {
+                allTokens.push(...account.tokens);
+            }
+
+            return allTokens;
+        }, []);
+
+        const assetFailed = accounts.find(f => f.symbol === network.symbol && f.failed);
+
+        return {
+            network,
+            failed: !!assetFailed,
+            assetNativeCryptoBalance: assetNativeCryptoBalance
+                ? assetNativeCryptoBalance
+                : AMOUNT_UNIT_ZERO,
+            assetTokens: assetTokens?.length ? assetTokens : [],
+            stakingAccounts: accounts.filter(
+                account =>
+                    isSupportedEthStakingNetworkSymbol(account.symbol) ||
+                    isSupportedSolStakingNetworkSymbol(account.symbol) ||
+                    isSupportedTronStakingNetworkSymbol(account.symbol),
+            ),
+            accounts,
+            isStakeNetwork: getNetworkFeatures(symbol).includes('staking'),
+        };
+    });
+
+    const assetsFiatBalances = useAssetsFiatBalances(
+        assetsData,
+        assets,
+        baseCurrencyCode,
+        currentFiatRates,
+    );
+
+    const discoveryInProgress = discoveryStatus?.status === 'loading';
+    const isError = discoveryStatus?.status === 'exception' && !assetSymbols.length;
+
+    const openActivateAssetsModal = () => {
+        analytics.report({
+            type: events.dashboardActivateAssetsModalEvent.name,
+            payload: { source: 'my-assets' },
+        });
+        dispatch(openModal({ type: 'activate-assets' }));
+    };
+    const setTable = () => dispatch(setFlag({ key: 'dashboardAssetsGridMode', value: false }));
+    const setGrid = () => dispatch(setFlag({ key: 'dashboardAssetsGridMode', value: true }));
+    const isDiscoveryEmpty = discoveryStatus?.type === 'discovery-empty';
+    const showCards = isBelowTablet || dashboardAssetsGridMode;
+
+    if (isDiscoveryEmpty) {
+        return null;
+    }
+
+    return (
+        <DashboardSection
+            data-testid="@dashboard/assets"
+            heading={
+                <LoadingContent isLoading={isDiscoveryRunning}>
+                    <Translation id="TR_MY_ASSETS" />
+                </LoadingContent>
+            }
+            actions={
+                isBelowTablet ? (
+                    <></>
+                ) : (
+                    <Row justifyContent="space-around" gap={12}>
+                        {hasMainnetNetworksToEnable && (
+                            <Button
+                                intent="neutral"
+                                priority="secondary"
+                                iconLeft={PlusIcon}
+                                onClick={openActivateAssetsModal}
+                                data-testid="@dashboard/assets/enable-more-coins"
+                            >
+                                <Translation id="TR_ENABLE_MORE_COINS" />
+                            </Button>
+                        )}
+                        <ButtonGroup intent="neutral" priority="secondary">
+                            <IconButton
+                                icon={RowsFilledIcon}
+                                data-testid="@dashboard/assets/table-icon"
+                                onClick={setTable}
+                                intent={dashboardAssetsGridMode ? 'neutral' : 'brand'}
+                                tooltip={{
+                                    content: <Translation id="TR_MY_ASSETS_CHANGE_VIEW" />,
+                                    delayShow: TOOLTIP_DELAY_LONG,
+                                }}
+                            />
+                            <IconButton
+                                icon={GridNineFilledIcon}
+                                data-testid="@dashboard/assets/grid-icon"
+                                onClick={setGrid}
+                                intent={dashboardAssetsGridMode ? 'brand' : 'neutral'}
+                                tooltip={{
+                                    content: <Translation id="TR_MY_ASSETS_CHANGE_VIEW" />,
+                                    delayShow: TOOLTIP_DELAY_LONG,
+                                }}
+                            />
+                        </ButtonGroup>
+                    </Row>
+                )
+            }
+        >
+            {showCards ? (
+                <>
+                    <GridWrapper>
+                        {assetsData.map((asset, index) => (
+                            <AssetCard
+                                index={index}
+                                key={asset.network.symbol}
+                                network={asset.network}
+                                failed={asset.failed}
+                                cryptoValue={asset.assetNativeCryptoBalance}
+                                assetsFiatBalances={assetsFiatBalances}
+                                stakingAccounts={asset.stakingAccounts}
+                                assetTokens={asset.assetTokens}
+                                localCurrency={baseCurrencyCode}
+                                currentFiatRates={currentFiatRates}
+                                accounts={asset.accounts}
+                                isStakeNetwork={asset.isStakeNetwork}
+                            />
+                        ))}
+                        {discoveryInProgress && <AssetCardSkeleton />}
+                    </GridWrapper>
+                    {isError && (
+                        <Card width="100%">
+                            <InfoMessage>
+                                <Icon
+                                    as={WarningIcon}
+                                    intent="critical"
+                                    size={14}
+                                    margin={{ right: 4 }}
+                                />
+                                <Translation id="TR_DASHBOARD_ASSETS_ERROR" />
+                            </InfoMessage>
+                        </Card>
+                    )}
+                </>
+            ) : (
+                <Card paddingType="none">
+                    <AssetTable
+                        assetsData={assetsData}
+                        discoveryInProgress={discoveryInProgress}
+                        assetsFiatBalances={assetsFiatBalances}
+                        baseCurrencyCode={baseCurrencyCode}
+                        currentFiatRates={currentFiatRates}
+                    />
+
+                    {isError && (
+                        <InfoMessage>
+                            <Icon
+                                as={WarningIcon}
+                                intent="critical"
+                                size={14}
+                                margin={{ right: 4 }}
+                            />
+                            <Translation id="TR_DASHBOARD_ASSETS_ERROR" />
+                        </InfoMessage>
+                    )}
+                </Card>
+            )}
+        </DashboardSection>
+    );
+};

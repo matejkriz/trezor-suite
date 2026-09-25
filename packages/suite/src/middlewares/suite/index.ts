@@ -1,28 +1,43 @@
-import { logsMiddleware } from '@suite-common/logger';
+import type { MiddlewareAPI } from 'redux';
 
-import log from './logsMiddleware';
-import suite from './suiteMiddleware';
-import redirect from './redirectMiddleware';
-import analytics from './analyticsMiddleware';
+import { prepareBluetoothMiddleware } from '@suite/bluetooth';
+import { metadataMiddleware } from '@suite/metadata';
+import { routerMiddleware } from '@suite/router';
+import { tradingMiddleware } from '@suite/trading';
+import { logsMiddleware } from '@suite-common/logger';
+import { preparePushNotificationMiddleware } from '@suite-common/wallet-core';
+
+import {
+    type PrepareAnalyticsMiddlewareDeps,
+    prepareAnalyticsMiddleware,
+} from './analyticsMiddleware';
 import buttonRequest from './buttonRequestMiddleware';
 import events from './eventsMiddleware';
-import metadata from './metadataMiddleware';
+import log from './logsMiddleware';
 import messageSystem from './messageSystemMiddleware';
 import protocol from './protocolMiddleware';
-import router from './routerMiddleware';
+import redirect from './redirectMiddleware';
 import sentry from './sentryMiddleware';
+import { type PrepareSuiteMiddlewareDeps, prepareSuiteMiddleware } from './suiteMiddleware';
 
-export default [
+export type GetSuiteMiddlewareDeps = PrepareSuiteMiddlewareDeps & PrepareAnalyticsMiddlewareDeps;
+
+export const getSuiteMiddleware = (
+    getExtra: () => GetSuiteMiddlewareDeps | null,
+): ((api: MiddlewareAPI<any>) => any)[] => [
     log,
     logsMiddleware, // Common logs shared between desktop and mobile app
     redirect,
-    suite,
-    analytics,
+    prepareSuiteMiddleware(getExtra),
+    prepareAnalyticsMiddleware(getExtra),
     buttonRequest,
+    prepareBluetoothMiddleware(getExtra),
     events,
-    metadata,
+    preparePushNotificationMiddleware(getExtra),
+    metadataMiddleware,
     messageSystem,
     protocol,
-    router,
+    routerMiddleware(getExtra),
+    tradingMiddleware(getExtra),
     sentry,
 ];

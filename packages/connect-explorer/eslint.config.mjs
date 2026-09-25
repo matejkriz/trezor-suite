@@ -1,0 +1,44 @@
+import * as mdx from 'eslint-plugin-mdx';
+
+import { allowDevDependenciesIn, eslint } from '@trezor/eslint';
+
+export default [
+    ...eslint,
+    {
+        ignores: ['.next/**/*', 'next-env.d.ts'],
+    },
+
+    // Mdx
+    {
+        ...mdx.flat,
+        rules: {
+            'jsx-a11y/click-events-have-key-events': 'off',
+            'jsx-a11y/no-static-element-interactions': 'off',
+            'import/no-default-export': 'off',
+            'no-console': 'off',
+            'no-restricted-syntax': 'off',
+        },
+    },
+    {
+        files: ['**/*.mdx'],
+        rules: {
+            'react/no-unescaped-entities': 'off',
+            'local-rules/no-override-ds-component': 'off',
+        },
+    },
+    {
+        rules: {
+            'no-console': 'off',
+            'import/no-default-export': 'off', // Todo: shall be fixed
+            '@typescript-eslint/no-restricted-imports': 'off',
+            '@typescript-eslint/no-shadow': 'off', // Todo: shall be fixed
+            'react/jsx-filename-extension': [
+                'error',
+                {
+                    extensions: ['.tsx', '.mdx'],
+                },
+            ],
+        },
+    },
+    allowDevDependenciesIn(['**/webpack/**']),
+];

@@ -1,6 +1,9 @@
-import { ReactNode } from 'react';
+import { type ReactNode } from 'react';
+
 import styled from 'styled-components';
+
 import { Icon } from '@trezor/components';
+import { PlusIcon } from '@trezor/icons';
 
 import type { FieldWithBundle } from '../../types';
 
@@ -14,6 +17,8 @@ const AddBatchButton = styled.div`
     display: flex;
     flex-direction: row;
     align-items: center;
+    gap: 8px;
+    align-self: flex-start;
 `;
 
 const AddButton = ({ field, onAdd, label }: AddButtonProps) => {
@@ -23,7 +28,7 @@ const AddButton = ({ field, onAdd, label }: AddButtonProps) => {
 
     return (
         <AddBatchButton title="Add batch" onClick={onAdd}>
-            <Icon icon="PLUS" onClick={() => {}} /> {label}
+            <Icon as={PlusIcon} onClick={onAdd} /> {label}
         </AddBatchButton>
     );
 };

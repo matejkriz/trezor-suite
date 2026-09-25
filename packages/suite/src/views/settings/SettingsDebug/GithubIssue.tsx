@@ -1,29 +1,24 @@
-import { ActionButton, ActionColumn, SectionItem, TextColumn } from 'src/components/suite';
-import { useDevice, useSelector } from 'src/hooks/suite';
-import { openGithubIssue } from 'src/services/github';
-import { useAnchor } from 'src/hooks/suite/useAnchor';
-import { SettingsAnchor } from 'src/constants/suite/anchors';
+import { useDevice } from '@suite/device';
+import { openGithubIssue } from '@suite/github';
+import { ActionButton, ActionColumn, SectionItem, TextColumn } from '@trezor/product-components';
+
+import { useSelector } from 'src/hooks/suite';
+import { selectActiveTransports } from 'src/selectors/suite/suiteSelectors';
 
 export const GithubIssue = () => {
-    const transport = useSelector(state => state.suite.transport);
+    const transports = useSelector(selectActiveTransports);
     const { device } = useDevice();
-    const { anchorRef, shouldHighlight } = useAnchor(SettingsAnchor.GithubIssue);
+
+    const handleClick = () => openGithubIssue({ device, transports });
 
     return (
-        <SectionItem
-            data-test="@settings/debug/github"
-            ref={anchorRef}
-            shouldHighlight={shouldHighlight}
-        >
+        <SectionItem>
             <TextColumn
                 title="Open issue on Github"
                 description="Open issue on Github with pre-filled details. Do not use with sensitive data!"
             />
             <ActionColumn>
-                <ActionButton
-                    variant="secondary"
-                    onClick={() => openGithubIssue({ device, transport })}
-                >
+                <ActionButton intent="brand" onClick={handleClick}>
                     Open issue
                 </ActionButton>
             </ActionColumn>

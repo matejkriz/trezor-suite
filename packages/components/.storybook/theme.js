@@ -1,7 +1,16 @@
-import { create } from '@storybook/theming/create';
+import { create } from 'storybook/theming/create';
 
-export default create({
-    base: 'light',
+const common = {
     fontBase: 'TT Satoshi',
-    brandTitle: 'Trezor Components',
+    brandTitle: 'Design System',
+};
+
+export const lightTheme = create({
+    ...common,
+    base: 'light',
+});
+
+export const darkTheme = create({
+    ...common,
+    base: 'dark',
 });

@@ -1,50 +1,62 @@
-import produce from 'immer';
-import { Action } from 'src/types/suite';
-import { GUIDE } from 'src/actions/suite/constants';
-import type { ActiveView, GuideCategory, GuideNode } from '@suite-common/suite-types';
-import * as indexNodeJSON from '@trezor/suite-data/files/guide/index.json';
+import type { UnknownAction } from '@reduxjs/toolkit';
 
-export interface State {
+import * as indexNodeJSON from '@suite/app-assets/files/guide/index.json';
+import type { ActiveView, GuideCategory, GuideNode } from '@suite-common/suite-types';
+import { variables } from '@trezor/components';
+
+import {
+    close,
+    open,
+    openGuideNode,
+    setGuideView,
+    setIndexNode,
+    setWidth,
+    unsetNode,
+} from 'src/actions/suite/guideActions';
+
+export interface GuideState {
     open: boolean;
     view: ActiveView;
     indexNode: GuideCategory | null;
     currentNode: GuideNode | null;
+    width: number;
 }
 
 const indexNode = indexNodeJSON as GuideCategory;
 
-export const initialState: State = {
+export const initialState: GuideState = {
     open: false,
     view: 'GUIDE_DEFAULT',
     indexNode,
     currentNode: null,
+    width: variables.LAYOUT_SIZE.GUIDE_PANEL_DEFAULT_WIDTH,
 };
 
-const guideReducer = (state: State = initialState, action: Action): State =>
-    produce(state, draft => {
-        switch (action.type) {
-            case GUIDE.OPEN:
-                draft.open = true;
-                break;
-            case GUIDE.CLOSE:
-                draft.open = false;
-                draft.view = 'GUIDE_DEFAULT';
-                break;
-            case GUIDE.SET_VIEW:
-                draft.view = action.payload;
-                break;
-            case GUIDE.SET_INDEX_NODE:
-                draft.indexNode = action.payload;
-                break;
-            case GUIDE.UNSET_NODE:
-                draft.currentNode = null;
-                break;
-            case GUIDE.OPEN_NODE:
-                draft.currentNode = action.payload;
-                break;
-            default:
-                return state;
-        }
-    });
+// NOTE: we cannot use immer in this reducer, because GuideCategory mimics the react node and immer uses Object.freeze()
+const guideReducer = (state: GuideState = initialState, action: UnknownAction): GuideState => {
+    if (open.match(action)) {
+        return { ...state, open: true };
+    }
+    if (close.match(action)) {
+        return { ...state, open: false, view: 'GUIDE_DEFAULT' };
+    }
+    if (setGuideView.match(action)) {
+        return { ...state, view: action.payload };
+    }
+    if (setIndexNode.match(action)) {
+        return { ...state, indexNode: action.payload };
+    }
+    if (unsetNode.match(action)) {
+        return { ...state, currentNode: null };
+    }
+    if (openGuideNode.match(action)) {
+        return { ...state, currentNode: action.payload };
+    }
+    if (setWidth.match(action)) {
+        return { ...state, width: action.payload };
+    }
+
+    return state;
+};
 
 export default guideReducer;

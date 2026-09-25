@@ -1,132 +1,126 @@
-import styled from 'styled-components';
-import { differenceInMinutes } from 'date-fns';
-import { FormattedRelativeTime } from 'react-intl';
+import { useDevice } from '@suite/device';
+import { Translation } from '@suite/intl';
+import { getNetworkDisplaySymbol, getNetworkDisplaySymbolName } from '@suite-common/wallet-config';
+import { useDisplayBaseCurrency } from '@suite-common/wallet-core';
+import { Card, Flex, InfoItem, Row, Text } from '@trezor/components';
+import { hasBitcoinOnlyFirmware } from '@trezor/device-utils';
+import { TokenIcon } from '@trezor/product-components';
 
-import { getMainnets } from '@suite-common/wallet-config';
-import { selectFiatRatesByFiatRateKey } from '@suite-common/wallet-core';
-import { spacingsPx, typography } from '@trezor/theme';
-import { useSelector } from 'src/hooks/suite';
-import { Account } from 'src/types/wallet';
-import { Translation } from 'src/components/suite';
-import { Card, CoinLogo, variables } from '@trezor/components';
-import { TradeBoxMenu } from './TradeBoxMenu';
-import { TradeBoxPrices } from './TradeBoxPrices';
-import { getFiatRateKey } from '@suite-common/wallet-utils';
-import { selectLocalCurrency } from 'src/reducers/wallet/settingsReducer';
+import { DashboardSection } from 'src/components/dashboard';
+import { YieldBadge } from 'src/components/earn/YieldBadge/YieldBadge';
+import { PriceTicker, TrendTicker } from 'src/components/suite';
+import { useLayoutSize } from 'src/hooks/suite';
+import { type Account } from 'src/types/wallet';
 
-const StyledCard = styled(Card)`
-    flex-flow: row wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: ${spacingsPx.lg};
+import { TradeBoxActionButton } from './TradeBoxActionButton';
+import { WrapNativeTokenButton } from './WrapNativeTokenButton';
+import { useTradeBoxEarnOptions } from './hooks/useTradeBoxEarnOptions';
 
-    ${variables.SCREEN_QUERY.BELOW_TABLET} {
-        flex-direction: column;
-        align-items: normal;
-    }
-`;
-
-const Title = styled.div`
-    ${typography.titleSmall}
-    margin-bottom: ${spacingsPx.md};
-`;
-
-const Left = styled.div`
-    display: flex;
-    gap: ${spacingsPx.lg};
-
-    ${variables.SCREEN_QUERY.MOBILE} {
-        flex-direction: column;
-        align-items: normal;
-    }
-`;
-
-const Right = styled.div`
-    display: flex;
-`;
-
-const CoinWrapper = styled.div`
-    display: flex;
-    flex-direction: column;
-    gap: ${spacingsPx.xxxs};
-`;
-
-const Coin = styled.div`
-    display: flex;
-    align-items: center;
-`;
-
-const CoinName = styled.div`
-    ${typography.highlight}
-    margin-left: 6px;
-`;
-
-const CoinSymbol = styled.div`
-    ${typography.hint}
-    color: ${({ theme }) => theme.textSubdued};
-    margin-left: 8px;
-`;
-
-const UpdatedAt = styled.div`
-    ${typography.hint}
-    color: ${({ theme }) => theme.textSubdued};
-`;
-
-interface TradeBoxProps {
+type TradeBoxProps = {
     account: Account;
-}
+};
 
 export const TradeBox = ({ account }: TradeBoxProps) => {
-    const network = getMainnets().find(n => n.symbol === account.symbol);
-    const localCurrency = useSelector(selectLocalCurrency);
-    const fiatRateKey = getFiatRateKey(account.symbol, localCurrency);
-    const fiatRates = useSelector(state => selectFiatRatesByFiatRateKey(state, fiatRateKey));
-
-    if (!network) {
-        return null;
-    }
-
-    const currentRateTimestamp = fiatRates?.lastTickerTimestamp;
-    const getRateAge = (timestamp: number) => differenceInMinutes(new Date(timestamp), new Date());
+    const { isBelowTablet, isBelowMobile } = useLayoutSize();
+    const { device } = useDevice();
+    const { shallDisplayBaseCurrency } = useDisplayBaseCurrency(account.symbol);
+    const { hasEarnOption, yieldBadge } = useTradeBoxEarnOptions(account);
 
     return (
-        <div>
-            <Title>
-                <Translation id="TR_NAV_TRADE" />
-            </Title>
-
-            <StyledCard>
-                <Left>
-                    <CoinWrapper>
-                        <Coin>
-                            <CoinLogo size={20} symbol={network.symbol} />
-                            <CoinName>{network.name}</CoinName>
-                            <CoinSymbol>{network.symbol.toUpperCase()}</CoinSymbol>
-                        </Coin>
-
-                        <UpdatedAt>
-                            <Translation
-                                id="TR_LAST_UPDATE"
-                                values={{
-                                    value: (
-                                        <FormattedRelativeTime
-                                            value={getRateAge(currentRateTimestamp ?? 0) * 60}
-                                            numeric="auto"
-                                            updateIntervalInSeconds={10}
-                                        />
-                                    ),
-                                }}
-                            />
-                        </UpdatedAt>
-                    </CoinWrapper>
-
-                    <TradeBoxPrices account={account} />
-                </Left>
-
-                <Right>
-                    <TradeBoxMenu account={account} />
-                </Right>
-            </StyledCard>
-        </div>
+        <DashboardSection>
+            <Card>
+                <Flex
+                    direction={isBelowTablet ? 'column' : 'row'}
+                    flexWrap="wrap"
+                    justifyContent={isBelowTablet ? 'flex-start' : 'space-between'}
+                    gap={20}
+                >
+                    <Flex
+                        direction={isBelowMobile ? 'column' : 'row'}
+                        gap={isBelowMobile ? 16 : 40}
+                    >
+                        <Row gap={12}>
+                            <TokenIcon size={40} symbol={account.symbol} showNetworkIcon />
+                            <InfoItem
+                                label={getNetworkDisplaySymbolName(account.symbol)}
+                                typographyStyle="body-md-strong"
+                                intent="neutral"
+                                priority="primary"
+                                gap={0}
+                                width="fit-content"
+                            >
+                                <Text
+                                    intent="neutral"
+                                    priority="secondary"
+                                    typographyStyle="body-sm"
+                                >
+                                    {getNetworkDisplaySymbol(account.symbol)}
+                                </Text>
+                            </InfoItem>
+                        </Row>
+                        {shallDisplayBaseCurrency ? (
+                            <>
+                                <InfoItem
+                                    label={<Translation id="TR_EXCHANGE_RATE" />}
+                                    width="fit-content"
+                                >
+                                    <PriceTicker
+                                        symbol={account.symbol}
+                                        showLoadingSkeleton={true}
+                                    />
+                                </InfoItem>
+                                <InfoItem
+                                    label={<Translation id="TR_7D_CHANGE" />}
+                                    width="fit-content"
+                                >
+                                    <TrendTicker
+                                        symbol={account.symbol}
+                                        showLoadingSkeleton={true}
+                                    />
+                                </InfoItem>
+                            </>
+                        ) : null}
+                        {yieldBadge && (
+                            <Row alignItems="center">
+                                <YieldBadge
+                                    apy={yieldBadge.apy}
+                                    variant="promo"
+                                    account={account}
+                                    vaultId={yieldBadge.vaultId}
+                                    analyticsFrom="account-tradebox"
+                                />
+                            </Row>
+                        )}
+                    </Flex>
+                    <Row gap={12}>
+                        {hasEarnOption && (
+                            <TradeBoxActionButton account={account} type="earn">
+                                <Translation id="TR_EARN" />
+                            </TradeBoxActionButton>
+                        )}
+                        <TradeBoxActionButton account={account} type="buy">
+                            <Translation id="TR_NAV_BUY" />
+                        </TradeBoxActionButton>
+                        <TradeBoxActionButton
+                            account={account}
+                            type="sell"
+                            isDisabled={account.empty}
+                        >
+                            <Translation id="TR_NAV_SELL" />
+                        </TradeBoxActionButton>
+                        {!hasBitcoinOnlyFirmware(device) && (
+                            <TradeBoxActionButton
+                                account={account}
+                                type="exchange"
+                                isDisabled={account.empty}
+                            >
+                                <Translation id="TR_TRADING_SWAP" />
+                            </TradeBoxActionButton>
+                        )}
+                        <WrapNativeTokenButton account={account} />
+                    </Row>
+                </Flex>
+            </Card>
+        </DashboardSection>
     );
 };

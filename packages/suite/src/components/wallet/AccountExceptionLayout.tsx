@@ -1,77 +1,62 @@
-import { ReactText } from 'react';
-import styled from 'styled-components';
-import { variables, H2, Button, Card, ButtonProps, Image, ImageProps } from '@trezor/components';
+import { type ReactNode } from 'react';
 
-const StyledCard = styled(Card)`
-    width: 100%;
-    align-items: center;
-`;
-
-const Title = styled(H2)`
-    text-align: center;
-    font-weight: 600;
-    margin-bottom: 16px;
-`;
-
-const Description = styled.span`
-    font-size: ${variables.FONT_SIZE.NORMAL};
-    font-weight: 500;
-    text-align: center;
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-`;
-
-const StyledImage = styled(Image)`
-    width: auto;
-    height: 80px;
-    margin-top: 60px;
-    margin-bottom: 28px;
-`;
-
-const Actions = styled.div`
-    display: flex;
-    justify-content: center;
-    width: 100%;
-    margin-bottom: 20px;
-`;
-
-const ActionButton = styled(Button)`
-    min-width: 160px;
-
-    & + & {
-        margin-left: 20px;
-    }
-`;
-
-const Divider = styled.div`
-    width: 100%;
-    height: 1px;
-    background: ${({ theme }) => theme.STROKE_GREY};
-    margin: 30px 0 36px;
-`;
+import {
+    Button,
+    type ButtonProps,
+    Card,
+    Column,
+    H2,
+    IconCircle,
+    type IconCircleIntent,
+    type IconComponent,
+    Paragraph,
+    Row,
+} from '@trezor/components';
 
 interface AccountExceptionLayoutProps {
-    title: JSX.Element | string;
-    description?: JSX.Element | string;
-    image?: Extract<ImageProps, { image: any }>['image'];
-    imageComponent?: JSX.Element;
-    actions?: ({ key: ReactText } & ButtonProps)[];
-    actionComponent?: JSX.Element;
+    title: ReactNode;
+    description?: ReactNode;
+    icon?: IconComponent;
+    iconVariant?: IconCircleIntent;
+    actions?: ({ key: string } & ButtonProps)[];
+    'data-testid'?: string;
 }
 
 export const AccountExceptionLayout = (props: AccountExceptionLayoutProps) => (
-    <StyledCard>
-        {props.image && <StyledImage image={props.image} />}
-        {props.imageComponent && props.imageComponent}
-        <Title>{props.title}</Title>
-        <Description>{props.description}</Description>
-        {(props.actionComponent || (props.actions && props.actions.length > 0)) && (
-            <>
-                <Divider />
-                <Actions>
-                    {props.actions?.map(action => <ActionButton {...action} key={action.key} />)}
-                    {props.actionComponent && props.actionComponent}
-                </Actions>
-            </>
-        )}
-    </StyledCard>
+    <Card data-testid={props['data-testid']}>
+        <Column gap={4} alignItems="center" margin={{ bottom: 24 }}>
+            {props.icon && props.iconVariant && (
+                <IconCircle
+                    icon={props.icon}
+                    intent={props.iconVariant}
+                    size={96}
+                    margin={{ top: 32, bottom: 24 }}
+                />
+            )}
+            <H2 align="center">{props.title}</H2>
+            <Paragraph
+                intent="neutral"
+                priority="secondary"
+                typographyStyle="body-md"
+                margin={{ top: 8 }}
+                align="center"
+            >
+                {props.description}
+            </Paragraph>
+            {props.actions && (
+                <>
+                    <Row justifyContent="center" gap={16} margin={{ top: 16 }}>
+                        {props.actions?.map(action => (
+                            <Button
+                                size="large"
+                                {...action}
+                                key={action.key}
+                                data-testid={action['data-testid']}
+                            />
+                        ))}
+                    </Row>
+                </>
+            )}
+        </Column>
+    </Card>
 );

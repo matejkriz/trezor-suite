@@ -1,96 +1,198 @@
-import { isDesktop, isWeb } from '@trezor/env-utils';
+import { type ReactNode } from 'react';
 
-import { SettingsLayout, SettingsSection } from 'src/components/settings';
-import { Translation } from 'src/components/suite';
-import { useLayoutSize, useSelector } from 'src/hooks/suite';
+import { selectDesktopUpdate } from '@suite/desktop-update';
+import { selectIsSettingsDesktopAppPromoBannerShown } from '@suite/flags';
+import { Translation } from '@suite/intl';
+import { LabelingSettings } from '@suite/labeling';
+import { ContextMessage } from '@suite/message-system';
+import { selectIsLegacyLabelingVisible, selectSelectedProviderForLabels } from '@suite/metadata';
+import { selectHasExperimentalFeature } from '@suite/settings';
+import { Context } from '@suite-common/message-system';
+import { selectIsMevProtectionSettingsVisible } from '@suite-common/mev';
+import { getNetwork } from '@suite-common/wallet-config';
 import {
-    selectIsSettingsDesktopAppPromoBannerShown,
-    selectTorState,
-} from 'src/reducers/suite/suiteReducer';
-import { selectEnabledNetworks } from 'src/reducers/wallet/settingsReducer';
-import { NETWORKS } from 'src/config/wallet';
-import { selectSelectedProviderForLabels } from 'src/reducers/suite/metadataReducer';
+    selectEnabledNetworks,
+    selectIsNetworkReserveSettingsVisible,
+} from '@suite-common/wallet-core';
+import { isDesktop, isLinux, isWeb } from '@trezor/env-utils';
+import {
+    AppWindowIcon,
+    AtomIcon,
+    FlagIcon,
+    LockIcon,
+    PlugsIcon,
+    ShieldIcon,
+    ShieldWarningIcon,
+    TagIcon,
+} from '@trezor/icons';
+import { SettingsSection } from '@trezor/product-components';
+import { breakpoints } from '@trezor/theme';
 
-import { Language } from './Language';
-import { Fiat } from './Fiat';
-import { Labeling } from './Labeling';
-import { DisconnectLabelingProvider } from './DisconnectLabelingProvider';
-import { ConnectLabelingProvider } from './ConnectLabelingProvider';
-import { Tor } from './Tor';
-import { TorOnionLinks } from './TorOnionLinks';
-import { Theme } from './Theme';
-import { Analytics } from './Analytics';
-import { ShowApplicationLog } from './ShowApplicationLog';
-import { ClearStorage } from './ClearStorage';
-import { VersionWithUpdate } from './VersionWithUpdate';
-import { EarlyAccess } from './EarlyAccess';
-import { BitcoinAmountUnit } from './BitcoinAmountUnit';
-import { DesktopSuiteBanner } from './DesktopSuiteBanner';
+import { SettingsLayout } from 'src/components/settings/SettingsLayout';
+import { useSelector } from 'src/hooks/suite';
+import { useIsContentBelowBreakpoint } from 'src/support/suite/ContentFlex';
+
 import { AddressDisplay } from './AddressDisplay';
+import { Analytics } from './Analytics';
+import { AutoEject } from './AutoEject';
+import { AutoStart } from './AutoStart';
+import { AutomaticUpdate } from './AutomaticUpdate';
+import { BaseCurrency } from './BaseCurrency';
+import { BioAuthSettings } from './BioAuthSettings';
+import { BitcoinAmountUnit } from './BitcoinAmountUnit';
+import { ClearStorage } from './ClearStorage';
+import { ConnectLabelingProvider } from './ConnectLabelingProvider';
+import { DesktopSuiteBanner } from './DesktopSuiteBanner';
+import { DisconnectLabelingProvider } from './DisconnectLabelingProvider';
+import { DustPhishing } from './DustPhishing';
+import { EarlyAccess } from './EarlyAccess';
+import { Experimental } from './Experimental';
+import { Language } from './Language';
+import { LegacyLabelingMigration } from './LegacyLabelingMigration';
+import { McpServer } from './McpServer';
+import { MevProtection } from './MevProtection';
+import { NetworkReserve } from './NetworkReserve';
+import { NftSection } from './NftSection';
+import { ShowApplicationLog } from './ShowApplicationLog';
+import { ShowOnTray } from './ShowOnTray';
+import { TestnetNetworks } from './TestnetNetworks';
+import { Theme } from './Theme';
+import { TorOnionLinks } from './TorOnionLinks';
+import { VersionWithUpdate } from './VersionWithUpdate';
 
-export const SettingsGeneral = () => {
+type SettingsGeneralProps = {
+    torSettings?: ReactNode;
+};
+
+export const SettingsGeneral = ({ torSettings }: SettingsGeneralProps) => {
     const shouldShowSettingsDesktopAppPromoBanner = useSelector(
         selectIsSettingsDesktopAppPromoBannerShown,
     );
 
-    const { isTorEnabled } = useSelector(selectTorState);
     const enabledNetworks = useSelector(selectEnabledNetworks);
-    const desktopUpdate = useSelector(state => state.desktopUpdate);
-    const metadata = useSelector(state => state.metadata);
-    const { isMobileLayout } = useLayoutSize();
+    const desktopUpdate = useSelector(selectDesktopUpdate);
+    const isLegacyLabelingVisible = useSelector(selectIsLegacyLabelingVisible);
+    const hasContentBelowTabletWidth = useIsContentBelowBreakpoint(breakpoints.tablet);
+    const hasContentBelowMobileWidth = useIsContentBelowBreakpoint(breakpoints.mobile);
 
-    const hasBitcoinNetworks = NETWORKS.some(
-        ({ symbol, features }) =>
-            enabledNetworks.includes(symbol) && features?.includes('amount-unit'),
-    );
+    const hasBitcoinNetworks = enabledNetworks.some(symbol => {
+        const networkFeatures = getNetwork(symbol).features;
 
-    const isMetadataEnabled = metadata.enabled && !metadata.initiating;
+        return networkFeatures.includes('amount-unit');
+    });
+
+    const mcpServerEnabled = useSelector(selectHasExperimentalFeature('mcp-server'));
+
     const isProviderConnected = useSelector(selectSelectedProviderForLabels);
+    const isMevProtectionSettingsVisible = useSelector(selectIsMevProtectionSettingsVisible);
+    const isNetworkReserveSettingsVisible = useSelector(selectIsNetworkReserveSettingsVisible);
 
     return (
-        <SettingsLayout data-test="@settings/index">
-            {isWeb() && !isMobileLayout && shouldShowSettingsDesktopAppPromoBanner && (
-                <DesktopSuiteBanner />
-            )}
+        <SettingsLayout data-testid="@settings/index">
+            <ContextMessage context={Context.getSettings('general')} />
 
-            <SettingsSection title={<Translation id="TR_LOCALIZATION" />} icon="FLAG">
+            <div>
+                {isWeb() &&
+                    !hasContentBelowMobileWidth &&
+                    shouldShowSettingsDesktopAppPromoBanner && <DesktopSuiteBanner />}
+
+                <SettingsSection
+                    hasVerticalLayout={hasContentBelowTabletWidth}
+                    title={<Translation id="TR_PRIVACY" />}
+                    icon={LockIcon}
+                >
+                    <AutoEject />
+                    {isDesktop() && !isLinux() && <BioAuthSettings />}
+                    {torSettings}
+                    <TorOnionLinks />
+                </SettingsSection>
+            </div>
+
+            <SettingsSection
+                hasVerticalLayout={hasContentBelowTabletWidth}
+                title={<Translation id="TR_LOCALIZATION" />}
+                icon={FlagIcon}
+            >
                 <Language />
-                <Fiat />
+                <BaseCurrency />
                 {hasBitcoinNetworks && <BitcoinAmountUnit />}
             </SettingsSection>
 
-            <SettingsSection title={<Translation id="TR_LABELING" />} icon="TAG_MINIMAL">
-                <Labeling />
-                {isMetadataEnabled &&
+            <SettingsSection
+                hasVerticalLayout={hasContentBelowTabletWidth}
+                title={<Translation id="TR_LABELING" />}
+                icon={TagIcon}
+            >
+                <LabelingSettings />
+                {isLegacyLabelingVisible &&
                     (isProviderConnected ? (
                         <DisconnectLabelingProvider />
                     ) : (
                         <ConnectLabelingProvider />
                     ))}
+                <LegacyLabelingMigration />
             </SettingsSection>
 
-            {(isDesktop() || (isWeb() && isTorEnabled)) && (
-                <SettingsSection title={<Translation id="TR_TOR" />} icon="TOR_MINIMAL">
-                    {isDesktop() && <Tor />}
-                    {isTorEnabled && <TorOnionLinks />}
-                </SettingsSection>
-            )}
-
-            <SettingsSection title={<Translation id="TR_APPLICATION" />} icon="APP">
+            <SettingsSection
+                hasVerticalLayout={hasContentBelowTabletWidth}
+                title={<Translation id="TR_APPLICATION" />}
+                icon={AppWindowIcon}
+            >
                 <Theme />
-                <AddressDisplay />
                 <Analytics />
                 <ShowApplicationLog />
                 <ClearStorage />
+                <AutomaticUpdate />
                 <VersionWithUpdate />
             </SettingsSection>
 
-            {desktopUpdate.enabled && (
+            <SettingsSection
+                title={<Translation id="TR_SECURITY" />}
+                icon={ShieldIcon}
+                hasVerticalLayout={hasContentBelowTabletWidth}
+            >
+                {isMevProtectionSettingsVisible && <MevProtection />}
+                <DustPhishing />
+            </SettingsSection>
+
+            <SettingsSection
+                hasVerticalLayout={hasContentBelowTabletWidth}
+                title={<Translation id="TR_SETTINGS_ADVANCED" />}
+                icon={ShieldWarningIcon}
+            >
+                {desktopUpdate.enabled && <EarlyAccess />}
+                <AddressDisplay />
+                {isNetworkReserveSettingsVisible && <NetworkReserve />}
+                <TestnetNetworks />
+                <NftSection />
+            </SettingsSection>
+
+            {isDesktop() && (
                 <SettingsSection
-                    title={<Translation id="TR_EXPERIMENTAL_FEATURES" />}
-                    icon="EXPERIMENTAL"
+                    hasVerticalLayout={hasContentBelowTabletWidth}
+                    title={<Translation id="TR_TREZOR_CONNECT" />}
+                    icon={PlugsIcon}
                 >
-                    <EarlyAccess />
+                    <AutoStart />
+                    <ShowOnTray />
+                </SettingsSection>
+            )}
+
+            <SettingsSection
+                hasVerticalLayout={hasContentBelowTabletWidth}
+                title={<Translation id="TR_EXPERIMENTAL_FEATURES" />}
+                icon={AtomIcon}
+            >
+                <Experimental />
+            </SettingsSection>
+
+            {mcpServerEnabled && isDesktop() && (
+                <SettingsSection
+                    hasVerticalLayout={hasContentBelowTabletWidth}
+                    title={<Translation id="TR_EXPERIMENTAL_MCP_SERVER" />}
+                    icon={PlugsIcon}
+                >
+                    <McpServer />
                 </SettingsSection>
             )}
         </SettingsLayout>

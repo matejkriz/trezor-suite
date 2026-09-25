@@ -3,10 +3,7 @@
     "compilerOptions": { "outDir": "libDev" },
     "references": [
         { "path": "../fiat-services" },
-        { "path": "../suite-config" },
-        { "path": "../suite-utils" },
-        { "path": "../test-utils" },
-        { "path": "../transaction-cache-engine" },
+        { "path": "../redux-utils" },
         { "path": "../wallet-config" },
         { "path": "../wallet-core" },
         { "path": "../wallet-types" },
@@ -14,6 +11,13 @@
         {
             "path": "../../packages/blockchain-link"
         },
-        { "path": "../../packages/connect" }
+        {
+            "path": "../../packages/blockchain-link-types"
+        },
+        { "path": "../../packages/connect" },
+        {
+            "path": "../../packages/connect-common"
+        },
+        { "path": "../../packages/utils" }
     ]
 }

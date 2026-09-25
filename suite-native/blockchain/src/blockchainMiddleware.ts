@@ -1,11 +1,15 @@
 import { createMiddleware } from '@suite-common/redux-utils';
+import { isNetworkSymbol } from '@suite-common/wallet-config';
 import {
-    TransactionsRootState,
+    blockchainActions,
     onBlockchainDisconnectThunk,
-    selectAllPendingTransactions,
+    selectNetworksWithPendingTxs,
+    setCustomBackendThunk,
 } from '@suite-common/wallet-core';
-import { BlockchainEvent, BLOCKCHAIN as TREZOR_CONNECT_BLOCKCHAIN_ACTIONS } from '@trezor/connect';
-import { NetworkSymbol } from '@suite-common/wallet-config';
+import {
+    BLOCKCHAIN as TREZOR_CONNECT_BLOCKCHAIN_ACTIONS,
+    isBlockchainEventOfType,
+} from '@trezor/connect';
 
 import {
     onBlockchainConnectThunk,
@@ -13,42 +17,28 @@ import {
     syncAccountsWithBlockchainThunk,
 } from './blockchainThunks';
 
-export const selectNetworksWithPendingTransactions = (state: TransactionsRootState) => {
-    const pendingTransactions = selectAllPendingTransactions(state);
-
-    return Object.keys(pendingTransactions)
-        .filter(accountKey => pendingTransactions[accountKey].length > 0)
-        .map(accountKey => pendingTransactions[accountKey][0].symbol);
-};
-
 // Be very careful when adding new stuff here, it could affect performance a lot on mobile
-export const blockchainMiddleware = createMiddleware(
-    (action: BlockchainEvent, { dispatch, next, getState }) => {
-        switch (action.type) {
-            case TREZOR_CONNECT_BLOCKCHAIN_ACTIONS.CONNECT:
-                dispatch(onBlockchainConnectThunk({ symbol: action.payload.coin.shortcut }));
+export const blockchainMiddleware = createMiddleware((action, { dispatch, next, getState }) => {
+    if (isBlockchainEventOfType(action, TREZOR_CONNECT_BLOCKCHAIN_ACTIONS.CONNECT)) {
+        dispatch(onBlockchainConnectThunk({ symbol: action.payload.coin.shortcut }));
+    } else if (isBlockchainEventOfType(action, TREZOR_CONNECT_BLOCKCHAIN_ACTIONS.BLOCK)) {
+        const networksWithPendingTransactions = selectNetworksWithPendingTxs(getState());
+        const symbol = action.payload.coin.shortcut.toLowerCase();
 
-                break;
-            case TREZOR_CONNECT_BLOCKCHAIN_ACTIONS.BLOCK:
-                const networksWithPendingTransactions =
-                    selectNetworksWithPendingTransactions(getState());
-                const symbol = action.payload.coin.shortcut.toLowerCase() as NetworkSymbol;
-
-                if (networksWithPendingTransactions.includes(symbol)) {
-                    dispatch(syncAccountsWithBlockchainThunk({ symbol }));
-                }
-
-                break;
-            case TREZOR_CONNECT_BLOCKCHAIN_ACTIONS.NOTIFICATION:
-                dispatch(onBlockchainNotificationThunk(action.payload));
-                break;
-            case TREZOR_CONNECT_BLOCKCHAIN_ACTIONS.ERROR:
-                dispatch(onBlockchainDisconnectThunk(action.payload));
-                break;
-            default:
-                break;
+        if (isNetworkSymbol(symbol) && networksWithPendingTransactions.has(symbol)) {
+            dispatch(syncAccountsWithBlockchainThunk({ symbol }));
         }
+    } else if (isBlockchainEventOfType(action, TREZOR_CONNECT_BLOCKCHAIN_ACTIONS.NOTIFICATION)) {
+        dispatch(onBlockchainNotificationThunk(action.payload));
+    } else if (isBlockchainEventOfType(action, TREZOR_CONNECT_BLOCKCHAIN_ACTIONS.ERROR)) {
+        dispatch(onBlockchainDisconnectThunk(action.payload));
+    }
 
-        return next(action);
-    },
-);
+    next(action);
+
+    if (blockchainActions.setBackend.match(action)) {
+        dispatch(setCustomBackendThunk(action.payload.symbol));
+    }
+
+    return action;
+});

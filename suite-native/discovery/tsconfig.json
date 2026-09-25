@@ -2,6 +2,8 @@
     "extends": "../../tsconfig.base.json",
     "compilerOptions": { "outDir": "libDev" },
     "references": [
+        { "path": "../../suite-common/device" },
+        { "path": "../../suite-common/networks" },
         {
             "path": "../../suite-common/redux-utils"
         },
@@ -9,26 +11,30 @@
             "path": "../../suite-common/suite-types"
         },
         {
-            "path": "../../suite-common/wallet-config"
+            "path": "../../suite-common/suite-utils"
         },
         {
-            "path": "../../suite-common/wallet-constants"
+            "path": "../../suite-common/token-definitions"
+        },
+        {
+            "path": "../../suite-common/wallet-config"
         },
         {
             "path": "../../suite-common/wallet-core"
         },
-        {
-            "path": "../../suite-common/wallet-types"
-        },
-        {
-            "path": "../../suite-common/wallet-utils"
-        },
-        { "path": "../accounts" },
-        { "path": "../analytics" },
+        { "path": "../atoms" },
         { "path": "../config" },
         { "path": "../device" },
-        { "path": "../device-mutex" },
+        { "path": "../feature-flags" },
+        { "path": "../icons" },
+        { "path": "../intl" },
+        { "path": "../passphrase" },
+        { "path": "../settings" },
+        { "path": "../tokens" },
         { "path": "../../packages/connect" },
-        { "path": "../../packages/device-utils" }
+        { "path": "../../packages/device-utils" },
+        { "path": "../../packages/type-utils" },
+        { "path": "../../packages/utils" },
+        { "path": "../test-utils-store" }
     ]
 }

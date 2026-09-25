@@ -1,15 +1,17 @@
-import { useState, useEffect } from 'react';
-import type { GuideNode } from '@suite-common/suite-types';
-import type { Locale } from 'src/config/suite/languages';
+import { useEffect, useState } from 'react';
 
-export const loadPageMarkdownFile = async (id: string, language = 'en'): Promise<string> => {
-    const file = await import(`@trezor/suite-data/files/guide/${language}${id}`);
+import type { GuideNode, Locale } from '@suite-common/suite-types';
+
+export const loadPageMarkdownFile = async (id: string, language = 'en-US'): Promise<string> => {
+    const file = await import(
+        /* @vite-ignore */ /* webpackChunkName: "guide/[request]" */ `@suite/app-assets/files/guide/${language.toLowerCase()}${id}`
+    );
     const md = await file.default;
 
     return md;
 };
 
-export const useGuideLoadArticle = (currentNode: GuideNode | null, language: Locale = 'en') => {
+export const useGuideLoadArticle = (currentNode: GuideNode | null, language: Locale = 'en-US') => {
     const [markdown, setMarkdown] = useState<string>();
     const [hasError, setHasError] = useState<boolean>(false);
 

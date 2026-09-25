@@ -1,3 +1,5 @@
+import { type TimerId } from '@trezor/type-utils';
+
 export type ScheduledAction<T> = (signal?: AbortSignal) => Promise<T>;
 
 type AttemptParams = {
@@ -12,71 +14,95 @@ export type ScheduleActionParams = {
         | number // How many attempts before failure (default = one, or infinite when deadline is set)
         | readonly AttemptParams[]; // Array of timeouts and gaps for every attempt (length = attempt count)
     signal?: AbortSignal;
+    graceful?: boolean; // Abort signalling will not throw immediately but let the action handle it instead (default = false)
+    attemptFailureHandler?: (error: Error) => Error | void; // break attemptLoop if `Error` is set
 } & AttemptParams; // Ignored when attempts is AttemptParams[]
+
+export const SCHEDULE_ACTION_ABORTED_ERROR_MESSAGE = 'Aborted by signal' as const;
+export class RejectWhenAbortedError extends Error {
+    constructor() {
+        super(SCHEDULE_ACTION_ABORTED_ERROR_MESSAGE);
+    }
+}
 
 const isArray = (
     attempts: ScheduleActionParams['attempts'],
 ): attempts is readonly AttemptParams[] => Array.isArray(attempts);
 
-const abortedBySignal = () => new Error('Aborted by signal');
-const abortedByDeadline = () => new Error('Aborted by deadline');
-const abortedByTimeout = () => new Error('Aborted by timeout');
-
 const resolveAfterMs = (ms: number | undefined, clear: AbortSignal) =>
     new Promise<void>((resolve, reject) => {
-        if (clear.aborted) return reject();
+        const errorSignal = new RejectWhenAbortedError();
+        if (clear.aborted) return reject(errorSignal);
         if (ms === undefined) return resolve();
-        const timeout = setTimeout(resolve, ms);
+        // eslint-disable-next-line prefer-const
+        let timeout: TimerId;
         const onClear = () => {
             clearTimeout(timeout);
             clear.removeEventListener('abort', onClear);
-            reject();
+            reject(errorSignal);
         };
+        timeout = setTimeout(() => {
+            clear.removeEventListener('abort', onClear);
+            resolve();
+        }, ms);
         clear.addEventListener('abort', onClear);
     });
 
-const rejectAfterMs = (ms: number | undefined, reason: () => Error, clear: AbortSignal) =>
+const rejectAfterMs = (ms: number, reason: Error, clear: AbortSignal) =>
     new Promise<never>((_, reject) => {
-        if (clear.aborted) return reject();
-        const timeout = ms !== undefined ? setTimeout(() => reject(reason()), ms) : undefined;
+        const errorSignal = new RejectWhenAbortedError();
+        if (clear.aborted) return reject(errorSignal);
+        // eslint-disable-next-line prefer-const
+        let timeout: TimerId | undefined;
         const onClear = () => {
             clearTimeout(timeout);
             clear.removeEventListener('abort', onClear);
-            reject();
+            reject(errorSignal);
         };
+        timeout = setTimeout(() => {
+            clear.removeEventListener('abort', onClear);
+            reject(reason);
+        }, ms);
         clear.addEventListener('abort', onClear);
     });
+
+const maybeRejectAfterMs = (ms: number | undefined, reason: Error, clear: AbortSignal) =>
+    ms === undefined ? [] : [rejectAfterMs(ms, reason, clear)];
 
 const rejectWhenAborted = (signal: AbortSignal | undefined, clear: AbortSignal) =>
     new Promise<never>((_, reject) => {
-        if (clear.aborted) return reject();
-        if (signal?.aborted) return reject(abortedBySignal());
-        const onAbort = () => reject(abortedBySignal());
+        const errorSignal = new RejectWhenAbortedError();
+        if (clear.aborted) return reject(errorSignal);
+        if (signal?.aborted) return reject(errorSignal);
+        const onAbort = () => reject(errorSignal);
         signal?.addEventListener('abort', onAbort);
         const onClear = () => {
             signal?.removeEventListener('abort', onAbort);
             clear.removeEventListener('abort', onClear);
-            reject();
+            reject(errorSignal);
         };
         clear.addEventListener('abort', onClear);
     });
 
 const resolveAction = async <T>(action: ScheduledAction<T>, clear: AbortSignal) => {
     const aborter = new AbortController();
-    const onClear = () => aborter.abort();
-    if (clear.aborted) onClear();
+    if (clear.aborted) aborter.abort();
+    const onClear = () => {
+        clear.removeEventListener('abort', onClear);
+        aborter.abort();
+    };
     clear.addEventListener('abort', onClear);
     try {
         return await new Promise<T>(resolve => resolve(action(aborter.signal)));
     } finally {
-        clear.removeEventListener('abort', onClear);
+        if (!clear.aborted) clear.removeEventListener('abort', onClear);
     }
 };
 
 const attemptLoop = async <T>(
     attempts: number,
     attempt: (attempt: number, signal: AbortSignal) => Promise<T>,
-    failure: (attempt: number) => Promise<void>,
+    failure: (attempt: number, error: Error) => Promise<Error | void>,
     clear: AbortSignal,
 ) => {
     // Tries only (attempts - 1) times, because the last attempt throws its error
@@ -87,47 +113,94 @@ const attemptLoop = async <T>(
         clear.addEventListener('abort', onClear);
         try {
             return await attempt(a, aborter.signal);
-        } catch {
+        } catch (error) {
             onClear();
 
-            await failure(a);
+            await failure(a, error);
         } finally {
             clear.removeEventListener('abort', onClear);
         }
     }
 
-    return clear.aborted ? Promise.reject() : attempt(attempts - 1, clear);
+    return clear.aborted
+        ? Promise.reject(new RejectWhenAbortedError())
+        : attempt(attempts - 1, clear);
 };
+
+export const SCHEDULE_ACTION_TIMEOUT_ERROR_MESSAGE = 'Aborted by timeout' as const;
+
+export class ScheduleActionTimeoutError extends Error {
+    constructor() {
+        super(SCHEDULE_ACTION_TIMEOUT_ERROR_MESSAGE);
+    }
+}
+
+export const SCHEDULE_ACTION_DEADLINE_ERROR_MESSAGE = 'Aborted by deadline' as const;
+
+export class ScheduleActionDeadlineError extends Error {
+    constructor() {
+        super(SCHEDULE_ACTION_DEADLINE_ERROR_MESSAGE);
+    }
+}
 
 export const scheduleAction = async <T>(
     action: ScheduledAction<T>,
     params: ScheduleActionParams,
 ) => {
-    const { signal, delay, attempts, timeout, deadline, gap } = params;
+    const { signal, delay, attempts, timeout, deadline, gap, attemptFailureHandler } = params;
     const deadlineMs = deadline && deadline - Date.now();
     const attemptCount = isArray(attempts)
         ? attempts.length
-        : attempts ?? (deadline ? Infinity : 1);
+        : (attempts ?? (deadline ? Infinity : 1));
     const clearAborter = new AbortController();
     const clear = clearAborter.signal;
     const getParams = isArray(attempts)
-        ? (attempt: number) => attempts[attempt]
+        ? (attempt: number) => {
+              // @ts-expect-error: indexing with noUncheckedIndexedAccess
+              const attemptParams: (typeof attempts)[number] = attempts[attempt];
+
+              return attemptParams;
+          }
         : () => ({ timeout, gap });
+    const errorDeadline = new ScheduleActionDeadlineError();
+    const errorTimeout = new ScheduleActionTimeoutError();
+
+    const graceful = params.graceful && signal;
+    const actionAborter = new AbortController();
+    if (graceful) {
+        if (signal.aborted) {
+            actionAborter.abort();
+        } else {
+            const onAbort = () => {
+                signal.removeEventListener('abort', onAbort);
+                clear.removeEventListener('abort', onAbort);
+                actionAborter.abort();
+            };
+            signal.addEventListener('abort', onAbort);
+            clear.addEventListener('abort', onAbort);
+        }
+    }
 
     try {
         return await Promise.race([
-            rejectWhenAborted(signal, clear),
-            rejectAfterMs(deadlineMs, abortedByDeadline, clear),
+            ...(graceful ? [] : [rejectWhenAborted(signal, clear)]),
+            ...maybeRejectAfterMs(deadlineMs, errorDeadline, clear),
             resolveAfterMs(delay, clear).then(() =>
                 attemptLoop(
                     attemptCount,
                     (attempt, abort) =>
                         Promise.race([
-                            rejectAfterMs(getParams(attempt).timeout, abortedByTimeout, clear),
+                            ...maybeRejectAfterMs(getParams(attempt).timeout, errorTimeout, clear),
                             resolveAction(action, abort),
                         ]),
-                    attempt => resolveAfterMs(getParams(attempt).gap ?? 0, clear),
-                    clear,
+                    (attempt, error) => {
+                        const errorHandlerResult = attemptFailureHandler?.(error);
+
+                        return errorHandlerResult
+                            ? Promise.reject(errorHandlerResult)
+                            : resolveAfterMs(getParams(attempt).gap ?? 0, clear);
+                    },
+                    graceful ? actionAborter.signal : clear,
                 ),
             ),
         ]);

@@ -1,31 +1,65 @@
-import { BottomTabBarProps, createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSelector } from 'react-redux';
 
-import { ReceiveStackNavigator } from '@suite-native/module-receive';
-import { HomeStackNavigator } from '@suite-native/module-home';
+import { type BottomTabBarProps, createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+
+import { useServices } from '@suite-common/dependency-injection';
+import { selectHasBitcoinOnlyFirmware } from '@suite-common/device';
+import { events, injectNativeAnalytics } from '@suite-native/analytics';
 import { AccountsStackNavigator } from '@suite-native/module-accounts-management';
-import { SettingsStackNavigator } from '@suite-native/module-settings';
-import { AppTabsParamList, AppTabsRoutes, TabBar } from '@suite-native/navigation';
+import { EarnStackNavigator } from '@suite-native/module-earn';
+import { HomeStackNavigator } from '@suite-native/module-home';
+import { SettingsScreen } from '@suite-native/module-settings';
+import { TradingStackNavigator } from '@suite-native/module-trading';
+import { type AppTabsParamList, AppTabsRoutes, TabBar } from '@suite-native/navigation';
+import { selectIsTradingEnabled } from '@suite-native/trading-state';
 
-import { rootTabsOptions } from './routes';
+import { rootTabsOptions, rootTabsOptionsWithoutEarn } from './routes';
 
 const Tab = createBottomTabNavigator<AppTabsParamList>();
 
-export const AppTabNavigator = () => (
-    <>
+export const AppTabNavigator = () => {
+    const { analytics } = useServices(injectNativeAnalytics);
+    const isTradingEnabled = useSelector(selectIsTradingEnabled);
+    const isBitcoinOnlyFirmware = useSelector(selectHasBitcoinOnlyFirmware);
+
+    const tabItemOptions = isBitcoinOnlyFirmware ? rootTabsOptionsWithoutEarn : rootTabsOptions;
+
+    const handleTradeTabPress = () => {
+        // Buy is the default tab when navigating to the Trading stack
+        analytics.report({
+            type: events.tradingNavigateEvent.name,
+            payload: {
+                action: 'navigate',
+                type: 'buy',
+                from: 'trade',
+            },
+        });
+    };
+
+    return (
         <Tab.Navigator
             initialRouteName={AppTabsRoutes.HomeStack}
             screenOptions={{
                 headerShown: false,
-                unmountOnBlur: true,
+                popToTopOnBlur: true,
             }}
             tabBar={(props: BottomTabBarProps) => (
-                <TabBar tabItemOptions={rootTabsOptions} {...props} />
+                <TabBar tabItemOptions={tabItemOptions} {...props} />
             )}
         >
             <Tab.Screen name={AppTabsRoutes.HomeStack} component={HomeStackNavigator} />
             <Tab.Screen name={AppTabsRoutes.AccountsStack} component={AccountsStackNavigator} />
-            <Tab.Screen name={AppTabsRoutes.ReceiveStack} component={ReceiveStackNavigator} />
-            <Tab.Screen name={AppTabsRoutes.SettingsStack} component={SettingsStackNavigator} />
+            {isTradingEnabled && (
+                <Tab.Screen
+                    name={AppTabsRoutes.TradeStack}
+                    component={TradingStackNavigator}
+                    listeners={{
+                        tabPress: handleTradeTabPress,
+                    }}
+                />
+            )}
+            <Tab.Screen name={AppTabsRoutes.EarnStack} component={EarnStackNavigator} />
+            <Tab.Screen name={AppTabsRoutes.Settings} component={SettingsScreen} />
         </Tab.Navigator>
-    </>
-);
+    );
+};

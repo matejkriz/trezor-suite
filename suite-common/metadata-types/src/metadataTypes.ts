@@ -1,3 +1,12 @@
+import { type SuiteCompatibleThunk } from '@suite-common/redux-utils';
+import type { StaticSessionId, WalletDescriptor } from '@trezor/device-utils';
+
+export type FetchAndSaveMetadataThunk = SuiteCompatibleThunk<StaticSessionId>;
+
+export type FetchAndSaveMetadataDep = {
+    fetchAndSaveMetadata: FetchAndSaveMetadataThunk;
+};
+
 export interface LabelableEntityKeys {
     fileName: string; // file name in data provider
     aesKey: string; // symmetric key for file encryption
@@ -15,20 +24,24 @@ export type AccountEntityKeys = {
 
 export type LabelableEntityKeysByVersion = DeviceEntityKeys | AccountEntityKeys;
 
-export type MetadataAddPayload =
+export type MetadataAddPayload = { skipSave?: boolean } & (
     | {
           type: 'outputLabel';
           entityKey: string;
           txid: string;
-          outputIndex: number;
-          defaultValue: string;
+          outputIndex: string; // not just index, for tokens/internals it can be different stuff
+          defaultValue?: string;
           value?: string;
+          networkSymbol: string;
+          accountDescriptor: string;
       }
     | {
           type: 'addressLabel';
           entityKey: string;
           defaultValue: string;
           value?: string;
+          networkSymbol: string;
+          accountDescriptor: string;
       }
     | {
           type: 'accountLabel';
@@ -39,9 +52,10 @@ export type MetadataAddPayload =
     | {
           type: 'walletLabel';
           entityKey: string;
-          defaultValue: string;
+          defaultValue?: string;
           value?: string;
-      };
+      }
+);
 
 // TODO version 2.0.0
 // export interface MetadataItem {
@@ -60,6 +74,7 @@ export type Tokens = {
 /**
  * What caused the error. Use this to handle error in metadataActions
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 enum ProviderErrorReason {
     NOT_FOUND_ERROR,
     // authentication, typically expired token
@@ -91,10 +106,18 @@ export type Error = {
     success: false;
     code: keyof typeof ProviderErrorReason;
     error: string;
+    retryAfterMs?: number;
 };
 export type Result<T> = Promise<Success<T> | Error>;
 
 export abstract class AbstractMetadataProvider {
+    private apiRequestQueue: Promise<unknown> = Promise.resolve();
+
+    /**
+     * Prevent queued requests from bypassing Retry-After when the rate-limited request exhausts its retries.
+     */
+    private apiRequestCooldownUntil = 0;
+
     /* isCloud means that this provider is not local and allows multi client sync. These providers are suitable for backing up data. */
     abstract isCloud: boolean;
 
@@ -118,7 +141,7 @@ export abstract class AbstractMetadataProvider {
     /**
      * Upload metadata content in cloud provider for given filename and content
      */
-    abstract setFileContent(file: string, content: any): Result<void>;
+    abstract setFileContent(file: string, content: Buffer): Result<void>;
     /**
      * Get a list of metadata file names if any
      */
@@ -140,34 +163,57 @@ export abstract class AbstractMetadataProvider {
         return { success } as const;
     }
 
-    error(code: keyof typeof ProviderErrorReason, reason: string) {
+    error(code: keyof typeof ProviderErrorReason, reason: string, retryAfterMs?: number) {
         const success = false as const;
 
         return {
             success,
             code,
             error: reason,
+            ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
         } as const;
     }
 
-    scheduleApiRequest<T extends () => ReturnType<R>, R extends (...args: any) => Result<any>>(
+    private async waitForApiRequestCooldown() {
+        const delay = this.apiRequestCooldownUntil - Date.now();
+
+        if (delay > 0) {
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+
+    private runApiRequest<T extends () => ReturnType<R>, R extends (...args: any) => Result<any>>(
         fn: T,
-        options: { retries: number; delay: number } = { retries: 3, delay: 1000 },
+        options: { retries: number; delay: number },
     ) {
         let retried = 0;
 
         return new Promise<Awaited<ReturnType<R>>>(resolve => {
             const { retries, delay } = options;
             const run = async () => {
+                await this.waitForApiRequestCooldown();
+
                 const res = await fn();
 
                 if (res.success) {
                     return resolve(res);
                 }
 
+                const retryDelay =
+                    res.code === 'RATE_LIMIT_ERROR' && res.retryAfterMs !== undefined
+                        ? res.retryAfterMs
+                        : delay;
+
+                if (res.code === 'RATE_LIMIT_ERROR' && res.retryAfterMs !== undefined) {
+                    this.apiRequestCooldownUntil = Math.max(
+                        this.apiRequestCooldownUntil,
+                        Date.now() + retryDelay,
+                    );
+                }
+
                 if (retries > 0 && retried < retries) {
                     retried++;
-                    setTimeout(run, delay);
+                    setTimeout(run, retryDelay);
                 } else {
                     // reached retries limit, return error
                     resolve(res);
@@ -176,16 +222,32 @@ export abstract class AbstractMetadataProvider {
             run();
         });
     }
+
+    scheduleApiRequest<T extends () => ReturnType<R>, R extends (...args: any) => Result<any>>(
+        fn: T,
+        options: { retries: number; delay: number } = { retries: 3, delay: 1000 },
+    ) {
+        const request = this.apiRequestQueue.then(() => this.runApiRequest<T, R>(fn, options));
+        this.apiRequestQueue = request;
+
+        return request;
+    }
 }
 
 export type AccountOutputLabels = { [index: string]: MetadataItem };
 
+/**
+ * @deprecated Legacy Labeling
+ */
 export interface AccountLabels {
     accountLabel?: MetadataItem;
-    outputLabels: { [txid: string]: AccountOutputLabels };
-    addressLabels: { [address: string]: MetadataItem };
+    outputLabels: Record<string, AccountOutputLabels>;
+    addressLabels: Record<string, MetadataItem>;
 }
 
+/**
+ * @deprecated Legacy Labeling
+ */
 export interface WalletLabels {
     walletLabel?: string;
 }
@@ -224,6 +286,7 @@ export type MetadataProvider = {
 export interface MetadataState {
     enabled: boolean; // global for all devices
     providers: MetadataProvider[];
+    hasLegacyLabelsMigrated: Partial<Record<WalletDescriptor, true>>;
     // being selected means:
     // - see data from this provider
     // - save data to this provider when making changes
@@ -244,21 +307,30 @@ export interface MetadataState {
 export type OAuthServerEnvironment = 'production' | 'staging' | 'localhost';
 export type MetadataEncryptionVersion = 1 | 2;
 
-type Password = {
-    type: 'Buffer';
-    data: Buffer;
-};
+type Password = Buffer;
 
 export type PasswordEntry = {
-    export: boolean;
-    key_value: string;
     nonce: string;
     note?: string;
     password: Password;
     safe_note?: Password;
-    success: boolean;
     title: string;
     username: string;
+    tags: number[];
+    // legacy (old TPM) value, not used
+    export?: boolean;
+    // legacy (old TPM) value, not used
+    key_value?: string;
+    // legacy (old TPM) value, not used
+    success?: boolean;
+};
+
+export type PasswordEntryDecoded = {
+    title: string;
+    username: string;
+    password: string;
+    note: string;
+    safe_note: string;
     tags: number[];
 };
 
@@ -269,6 +341,8 @@ export type PasswordManagerState = {
         orderType: string;
     };
     entries: Record<number, PasswordEntry>;
-    extVersion: string;
+    version: string;
+    // legacy value, not used
+    extVersion?: string;
     tags: Record<number, PasswordTag>;
 };

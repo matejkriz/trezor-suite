@@ -1,26 +1,123 @@
-import { selectAccountStakeTransactions } from '@suite-common/wallet-core';
-import { SelectedAccountLoaded } from '@suite-common/wallet-types';
-import { WalletLayout } from 'src/components/wallet';
-import { useSelector } from 'src/hooks/suite';
-import { EmptyStakingCard } from './components/EmptyStakingCard';
-import { StakingDashboard } from './components/StakingDashboard';
-import { EverstakeFooter } from './components/EverstakeFooter';
+import { useEffect, useMemo } from 'react';
+
+import { useServices } from '@suite-common/dependency-injection';
+import { useEthereumValidatorsQueue } from '@suite-common/earn-staking-api/src/staking';
+import { injectDispatch } from '@suite-common/redux-utils';
+import {
+    fetchAllTransactionsForAccountThunk,
+    getDaysToAddToPool,
+    getDaysToUnstake,
+    getStakingDataForNetwork,
+    hasStakeInPendingDepositedState,
+    selectAccountIsStakingActive,
+    selectAccountStakeTransactions,
+    selectAccountUnstakeTransactions,
+    selectEthereumNextRewardPayout,
+    selectHasRunningDiscovery,
+    selectPoolStatsApy,
+} from '@suite-common/wallet-core';
+import { type SelectedAccountLoaded } from '@suite-common/wallet-types';
+import { Column, Flex, Grid } from '@trezor/components';
+
+import { DashboardSection } from 'src/components/dashboard';
+import { useLayoutSize, useSelector } from 'src/hooks/suite';
+
+import { InstantStakeBanner } from './InstantStakeBanner';
+import { StakingDashboard } from '../StakingDashboard/StakingDashboard';
+import { ApyCard } from '../StakingDashboard/components/ApyCard';
+import { ClaimCard } from '../StakingDashboard/components/ClaimCard';
+import { DiscoveryWarning } from '../StakingDashboard/components/DiscoveryWarning';
+import { EmptyStakingCard } from '../StakingDashboard/components/EmptyStakingCard/EmptyStakingCard';
+import { PayoutCardNextRewards } from '../StakingDashboard/components/PayoutCardNextRewards';
+import { StakingCard } from '../StakingDashboard/components/StakingCard';
+import { Transactions } from '../StakingDashboard/components/Transactions';
 
 interface EthStakingDashboardProps {
     selectedAccount: SelectedAccountLoaded;
 }
 
 export const EthStakingDashboard = ({ selectedAccount }: EthStakingDashboardProps) => {
-    const stakeTxs = useSelector(state =>
-        selectAccountStakeTransactions(state, selectedAccount.account?.key || ''),
-    );
-    const hasStaked = stakeTxs.length > 0;
+    const { account } = selectedAccount;
+
+    const accountKey = account.key;
+    const { isBelowLaptop } = useLayoutSize();
+    const isDiscoveryRunning = useSelector(selectHasRunningDiscovery);
+
+    const apy = useSelector(state => selectPoolStatsApy(state, { account }));
+    const nextRewardPayout = useSelector(selectEthereumNextRewardPayout);
+
+    const stakeTxs = useSelector(state => selectAccountStakeTransactions(state, accountKey));
+    const unstakeTxs = useSelector(state => selectAccountUnstakeTransactions(state, accountKey));
+
+    const { dispatch } = useServices(injectDispatch);
+
+    const lastTxBlockTime = stakeTxs[0]?.blockTime;
+    const timestamp = hasStakeInPendingDepositedState(account) ? lastTxBlockTime : undefined;
+
+    const { data: validatorQueueData, isLoading: isValidatorQueueLoading } =
+        useEthereumValidatorsQueue({ account, timestamp });
+
+    useEffect(() => {
+        if (accountKey) {
+            dispatch(
+                fetchAllTransactionsForAccountThunk({
+                    accountKey,
+                    noLoading: true,
+                }),
+            );
+        }
+    }, [accountKey, dispatch]);
+
+    const txs = useMemo(() => [...stakeTxs, ...unstakeTxs], [stakeTxs, unstakeTxs]);
+
+    const daysToAddToPool = getDaysToAddToPool(stakeTxs, validatorQueueData);
+    const daysToUnstake = getDaysToUnstake(unstakeTxs, validatorQueueData);
+
+    const { canClaim = false } = getStakingDataForNetwork(account) ?? {};
+
+    const isStakingActive = useSelector(state => selectAccountIsStakingActive(state, account.key));
 
     return (
-        <WalletLayout title="TR_STAKE_ETH" account={selectedAccount}>
-            {hasStaked ? <StakingDashboard /> : <EmptyStakingCard />}
+        <StakingDashboard
+            selectedAccount={selectedAccount}
+            dashboard={
+                <Column gap={48}>
+                    {isStakingActive ? (
+                        <DashboardSection>
+                            <Column gap={12}>
+                                {isDiscoveryRunning && <DiscoveryWarning />}
 
-            <EverstakeFooter />
-        </WalletLayout>
+                                <InstantStakeBanner
+                                    txs={txs}
+                                    daysToAddToPool={daysToAddToPool}
+                                    daysToUnstake={daysToUnstake}
+                                />
+                                <Grid columns={isBelowLaptop || !canClaim ? 1 : 2} gap={12}>
+                                    <ClaimCard />
+                                    <Flex direction={canClaim ? 'column' : 'row'} gap={12}>
+                                        <ApyCard apy={apy} />
+                                        <PayoutCardNextRewards
+                                            nextRewardPayout={nextRewardPayout}
+                                            daysToAddToPool={daysToAddToPool}
+                                            validatorWithdrawTime={validatorQueueData?.withdrawTime}
+                                        />
+                                    </Flex>
+                                </Grid>
+                                <StakingCard
+                                    account={account}
+                                    isValidatorsQueueLoading={isValidatorQueueLoading}
+                                    daysToAddToPool={daysToAddToPool}
+                                    daysToUnstake={daysToUnstake}
+                                />
+                            </Column>
+                        </DashboardSection>
+                    ) : (
+                        <EmptyStakingCard />
+                    )}
+
+                    <Transactions />
+                </Column>
+            }
+        />
     );
 };

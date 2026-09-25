@@ -1,0 +1,101 @@
+import { RequestLoginSchema } from '@trezor/connect-common/src/types/api/device/requestLogin';
+
+import { ApiPlayground } from '../../../components/ApiPlayground';
+import { CommonParamsLink } from '../../../components/CommonParamsLink';
+import { ParamsTable } from '../../../components/ParamsTable';
+import login from '../../../data/methods/other/login.ts';
+
+<ApiPlayground
+    options={[
+        { title: 'Synchronous', legacyConfig: login[0] },
+        { title: 'Advanced schema', method: 'requestLogin', schema: RequestLoginSchema },
+    ]}
+/>
+
+export const paramDescriptions = {
+    challengeHidden: 'hexadecimal value',
+    challengeVisual: 'text displayed on Trezor',
+    origin: 'domain requesting the login, do not fill manually under normal circumstances',
+    asyncChallenge: 'deprecated',
+    callback: 'deprecated',
+};
+
+## Request login
+
+Challenge-response authentication via Trezor. To protect against replay attacks
+you should use a server-side generated and randomized `challengeHidden` for every
+attempt. You can also provide a visual challenge that will be shown on the
+device.
+
+Service backend needs to check whether the signature matches the generated
+`challengeHidden`, provided `challengeVisual` and stored `publicKey` fields.
+If that is the case, the backend either creates an account (if the `publicKey`
+identity is seen for the first time) or signs in the user (if the `publicKey`
+identity is already a known user).
+
+To understand the full mechanics, please consult the Challenge-Response chapter
+of
+[SLIP-0013: Authentication using deterministic hierarchy](https://github.com/satoshilabs/slips/blob/master/slip-0013.md).
+
+**Note:** `callback` and `asyncChallenge` parameters are now deprecated. Simply fetch the data first and pass it to the method.
+
+```javascript
+const result = await TrezorConnect.requestLogin(params);
+```
+
+### Params
+
+<CommonParamsLink />
+
+#### RequestLoginSchema
+
+<ParamsTable schema={RequestLoginSchema} descriptions={paramDescriptions} />
+
+### Example
+
+###### Login without async challenge
+
+```javascript
+TrezorConnect.requestLogin({
+    challengeHidden: '0123456789abcdef',
+    challengeVisual: 'Login to',
+});
+```
+
+### Result
+
+[Login type](https://github.com/trezor/trezor-suite/blob/develop/packages/connect-common/src/types/api/device/requestLogin.ts)
+
+```javascript
+{
+    success: true,
+    payload: {
+        address: string,
+        publicKey: string,
+        signature: string,
+    }
+}
+```
+
+Error
+
+```javascript
+{
+    success: false,
+    error: {
+        message: string // error message
+    }
+}
+```
+
+### Server side examples
+
+Here is the reference implementation of the server-side signature verification
+written in various languages:
+
+- [**C#**](https://github.com/trezor/trezor-suite/tree/develop/docs/packages/connect/methods/server/server.cs)
+- [**Javascript**](https://github.com/trezor/trezor-suite/tree/develop/docs/packages/connect/methods/server/server.js)
+- [**PHP**](https://github.com/trezor/trezor-suite/tree/develop/docs/packages/connect/methods/server/server.php)
+- [**Python**](https://github.com/trezor/trezor-suite/tree/develop/docs/packages/connect/methods/server/server.py)
+- [**Ruby**](https://github.com/trezor/trezor-suite/tree/develop/docs/packages/connect/methods/server/server.rb)
+- [**Go**](https://github.com/trezor/trezor-suite/tree/develop/docs/packages/connect/methods/server/server.go)

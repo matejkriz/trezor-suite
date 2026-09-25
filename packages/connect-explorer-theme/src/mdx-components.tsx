@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
-import type { ComponentProps, ReactElement, ReactNode } from 'react';
+import type { ComponentProps, HTMLProps, PropsWithChildren, ReactElement, ReactNode } from 'react';
 import { Children, cloneElement, useEffect, useRef, useState } from 'react';
 
 import cn from 'clsx';
+import type { FrontMatter } from 'nextra';
 import { Code, Pre, Table, Td, Th, Tr } from 'nextra/components';
 import type { Components } from 'nextra/mdx';
 
@@ -10,9 +11,9 @@ import { Card } from '@trezor/components';
 
 import { Anchor, Collapse } from './components';
 import type { AnchorProps } from './components/anchor';
-import type { DocsThemeConfig } from './constants';
-import { DetailsProvider, useDetails, useSetActiveAnchor } from './contexts';
-import { useIntersectionObserver, useSlugs } from './contexts/active-anchor';
+import { useIntersectionObserver, useSetActiveAnchor, useSlugs } from './contexts/active-anchor';
+import { DetailsProvider, useDetails } from './contexts/details';
+import type { DocsThemeConfig } from './schema';
 
 // Anchor links
 function HeadingLink({
@@ -31,6 +32,7 @@ function HeadingLink({
     const observer = useIntersectionObserver();
     const obRef = useRef<HTMLAnchorElement>(null);
 
+    /* eslint-disable react-hooks/immutability */
     useEffect(() => {
         if (!id) return;
         const heading = obRef.current;
@@ -49,6 +51,7 @@ function HeadingLink({
             });
         };
     }, [id, context, slugs, observer, setActiveAnchor]);
+    /* eslint-enable react-hooks/immutability */
 
     return (
         <Tag
@@ -57,13 +60,13 @@ function HeadingLink({
                 className === 'sr-only'
                     ? 'nx-sr-only'
                     : cn(
-                          'nx-font-semibold nx-tracking-tight nx-text-slate-900 dark:nx-text-slate-100 nx-mb-2',
+                          'nx-font-semibold nx-tracking-tight nx-text-slate-900 dark:nx-text-slate-100 first:nx-mt-0 nx-mb-[-4]',
                           {
-                              h2: 'nx-mt-10 nx-pb-1 nx-text-3xl',
-                              h3: 'nx-mt-8 nx-text-2xl',
-                              h4: 'nx-mt-8 nx-text-xl',
-                              h5: 'nx-mt-8 nx-text-lg',
-                              h6: 'nx-mt-8 nx-text-base',
+                              h2: 'nx-mt-8 nx-text-3xl',
+                              h3: 'nx-mt-6 nx-text-2xl',
+                              h4: 'nx-mt-6 nx-text-xl',
+                              h5: 'nx-mt-6 nx-text-lg',
+                              h6: 'nx-mt-6 nx-text-base',
                           }[Tag],
                       )
             }
@@ -103,13 +106,13 @@ const findSummary = (children: ReactNode) => {
             'props' in child &&
             child.props
         ) {
-            const result = findSummary(child.props.children);
+            const result = findSummary((child.props as PropsWithChildren).children);
             summary = result[0];
             c = cloneElement(child, {
                 ...child.props,
                 children: result[1]?.length ? result[1] : undefined,
                 key: index,
-            });
+            } as HTMLProps<Element>);
         }
         restChildren.push(c);
     });
@@ -180,9 +183,11 @@ export const Link = ({ href = '', className, ...props }: AnchorProps) => (
 );
 
 export const getComponents = ({
+    frontMatter,
     isRawLayout,
     components,
 }: {
+    frontMatter: FrontMatter;
     isRawLayout?: boolean;
     components?: DocsThemeConfig['components'];
 }): Components => {
@@ -194,18 +199,27 @@ export const getComponents = ({
             if (
                 !isRawLayout &&
                 props.className === 'heading' &&
-                props['data-heading-rank'] <= maxRank
+                frontMatter.auto_sections !== false
             ) {
                 const children = props?.children as ReactNode[];
+                if (!children || !Array.isArray(children) || props['data-heading-rank'] > maxRank)
+                    return children;
+
                 const showInCard = (el: ReactNode) =>
                     !(el as ReactElement).props?.['data-heading-rank'] ||
                     (el as ReactElement).props?.['data-heading-rank'] > maxRank;
+                const shownInCard = children?.slice(1)?.filter(el => showInCard(el));
+                // Check if it has any children that are not empty when trimmed
+                const shownInCardIsNotEmpty = shownInCard.some(
+                    el => typeof el !== 'string' || el.trim() !== '',
+                );
+                const otherChildren = children?.slice(1)?.filter(el => !showInCard(el));
 
                 return (
                     <>
                         {children?.[0]}
-                        <Card>{children?.slice(1)?.filter(el => showInCard(el))}</Card>
-                        {children?.slice(1)?.filter(el => !showInCard(el))}
+                        {shownInCardIsNotEmpty && <Card>{shownInCard}</Card>}
+                        {otherChildren}
                     </>
                 );
             }
@@ -213,6 +227,7 @@ export const getComponents = ({
             return <section {...props} />;
         },
         h1: props => (
+            // eslint-disable-next-line jsx-a11y/heading-has-content
             <h1
                 className="nx-mt-2 nx-mb-2 nx-text-4xl nx-font-bold nx-tracking-tight nx-text-slate-900 dark:nx-text-slate-100"
                 {...props}
@@ -250,9 +265,9 @@ export const getComponents = ({
         ),
         a: Link,
         table: props => (
-            <Table className="nextra-scrollbar nx-mt-6 nx-p-0 first:nx-mt-0" {...props} />
+            <Table className={cn('nextra-scrollbar nx-mt-6 nx-p-0 first:nx-mt-0')} {...props} />
         ),
-        p: props => <p className="nx-mt-6 nx-leading-7 first:nx-mt-0" {...props} />,
+        p: props => <p className="nx-mt-4 nx-leading-7 first:nx-mt-0" {...props} />,
         tr: Tr,
         th: Th,
         td: Td,

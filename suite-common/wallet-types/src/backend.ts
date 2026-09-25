@@ -1,5 +1,6 @@
-import { networksCompatibility, NetworkSymbol } from '@suite-common/wallet-config';
-import { Timeout } from '@trezor/type-utils';
+import { type LegacyNetworkSymbol } from '@suite-common/legacy-network-config';
+import { type BackendType, type NetworkSymbol } from '@suite-common/wallet-config';
+import { type TimerId } from '@trezor/type-utils';
 
 /**
  * @deprecated
@@ -10,10 +11,8 @@ export type BlockbookUrl = {
     tor?: boolean; // Added by TOR
 };
 
-export type BackendType = 'blockbook' | 'electrum' | 'ripple' | 'blockfrost' | 'solana';
-
 export type CustomBackend = {
-    coin: (typeof networksCompatibility)[number]['symbol'];
+    symbol: NetworkSymbol;
     type: BackendType;
     urls: string[];
 };
@@ -23,30 +22,25 @@ export type BackendSettings = Partial<{
     urls: Partial<{
         [type in BackendType]: string[];
     }>;
+    gapLimit: number;
 }>;
 
-interface BlockchainReconnection {
-    time: number; // timestamp when it will be resolved
+export interface ConnectionStatus {
+    connected: boolean;
+    error?: string;
+    reconnectionTime?: number; // timestamp when it will be resolved
 }
 
-export interface Blockchain {
+export interface Blockchain extends ConnectionStatus {
     url?: string;
-    explorer: {
-        tx: string;
-        account: string;
-        queryString: string;
-    };
-    connected: boolean;
-    subscribed?: boolean;
-    error?: string;
     blockHash: string;
     blockHeight: number;
     version: string;
-    reconnection?: BlockchainReconnection;
-    syncTimeout?: Timeout;
+    syncTimeout?: TimerId;
     backends: BackendSettings;
+    identityConnections?: {
+        [identity: string]: ConnectionStatus;
+    };
 }
 
-export type BlockchainNetworks = {
-    [key in NetworkSymbol]: Blockchain;
-};
+export type BlockchainNetworks = Record<LegacyNetworkSymbol, Blockchain>;

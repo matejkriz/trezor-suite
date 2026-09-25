@@ -1,207 +1,238 @@
-import { notificationsActions, ToastPayload } from '@suite-common/toast-notifications';
+import { useMemo } from 'react';
+
+import { useTranslation } from '@suite/intl';
+import { Labeling } from '@suite/labeling';
 import {
-    getTxOperation,
-    getTargetAmount,
-    isTestnet,
-    formatAmount,
+    selectIsLegacyLabelingVisible,
+    selectLabelingDataForAccount,
+    selectLabelingValueBeingEdited,
+} from '@suite/metadata';
+import { returnStableArrayIfEmpty } from '@suite-common/redux-utils';
+import { selectIsSuiteSyncEnabled, selectSuiteSyncOutputLabels } from '@suite-common/suite-sync';
+import { type SuiteSyncOutput } from '@suite-common/suite-sync-storage';
+import {
+    type Target,
+    selectBaseCurrency,
+    selectHistoricFiatRatesByTimestamp,
+    selectIsSuspiciousTransactionsBlurringEnabled,
+    useDisplayBaseCurrency,
+} from '@suite-common/wallet-core';
+import { type AccountKey, type Timestamp, type TokenAddress } from '@suite-common/wallet-types';
+import {
+    convertAmountSubunitsToUnits,
     formatNetworkAmount,
+    getFiatRateKey,
+    getTargetAmount,
+    getTxOperation,
     isNftTokenTransfer,
 } from '@suite-common/wallet-utils';
-import { copyToClipboard } from '@trezor/dom-utils';
-import { ArrayElement } from '@trezor/type-utils';
-import { FiatValue, Translation, MetadataLabeling, AddressLabeling } from 'src/components/suite';
-import { WalletAccountTransaction } from 'src/types/wallet';
-import { useDispatch } from 'src/hooks/suite';
-import { TokenTransferAddressLabel } from './TokenTransferAddressLabel';
+import { Icon } from '@trezor/components';
+import { TagFilledIcon } from '@trezor/icons';
+import { exhaustive } from '@trezor/type-utils';
+
+import { BaseCurrencyValue, FormattedCryptoAmount, Sign } from 'src/components/suite';
+import { AccountLabelForOwnAddress } from 'src/components/suite/labeling/AccountLabelForOwnAddress';
+import { useSelector } from 'src/hooks/suite';
+import { type WalletAccountTransaction } from 'src/types/wallet';
+
 import { TargetAddressLabel } from './TargetAddressLabel';
-import { AccountLabels } from 'src/types/suite/metadata';
+import { TokenTransferAddressLabel } from './TokenTransferAddressLabel';
+import { AmountComponent } from '../../AmountComponent';
 import { TransactionTargetLayout } from '../TransactionTargetLayout';
-import { StyledFormattedCryptoAmount, StyledFormattedNftAmount } from '../CommonComponents';
 
-interface BaseTransfer {
-    singleRowLayout?: boolean;
-    useAnimation?: boolean;
-    isFirst?: boolean;
-    isLast?: boolean;
-}
-
-interface TokenTransferProps extends BaseTransfer {
-    transfer: ArrayElement<WalletAccountTransaction['tokens']>;
+type TransactionTargetProps = Target & {
     transaction: WalletAccountTransaction;
-    isPhishingTransaction: boolean;
-}
-
-export const TokenTransfer = ({
-    transfer,
-    transaction,
-    isPhishingTransaction,
-    ...baseLayoutProps
-}: TokenTransferProps) => {
-    const operation = getTxOperation(transfer.type);
-    const isNft = isNftTokenTransfer(transfer);
-
-    return (
-        <TransactionTargetLayout
-            {...baseLayoutProps}
-            addressLabel={
-                <TokenTransferAddressLabel
-                    networkSymbol={transaction.symbol}
-                    isPhishingTransaction={isPhishingTransaction}
-                    transfer={transfer}
-                    type={transaction.type}
-                />
-            }
-            amount={
-                isNft ? (
-                    <StyledFormattedNftAmount transfer={transfer} signValue={operation} />
-                ) : (
-                    <StyledFormattedCryptoAmount
-                        value={formatAmount(transfer.amount, transfer.decimals)}
-                        symbol={transfer.symbol}
-                        signValue={operation}
-                    />
-                )
-            }
-        />
-    );
+    accountKey: AccountKey;
+    isActionDisabled?: boolean;
+    isPhishingTransaction?: boolean;
 };
 
-interface InternalTransferProps extends BaseTransfer {
-    transfer: ArrayElement<WalletAccountTransaction['internalTransfers']>;
-    transaction: WalletAccountTransaction;
-}
-
-export const InternalTransfer = ({
-    transfer,
+export const TransactionTarget = ({
+    type,
+    payload,
     transaction,
+    accountKey,
+    isActionDisabled,
+    isPhishingTransaction,
+    targetId,
     ...baseLayoutProps
-}: InternalTransferProps) => {
-    const amount = transfer.amount && formatNetworkAmount(transfer.amount, transaction.symbol);
-    const operation = getTxOperation(transfer.type);
+}: TransactionTargetProps) => {
+    const { translationString } = useTranslation();
 
-    return (
-        <TransactionTargetLayout
-            {...baseLayoutProps}
-            addressLabel={
-                <AddressLabeling address={transfer.to} networkSymbol={transaction.symbol} />
-            }
-            amount={
-                !baseLayoutProps.singleRowLayout && (
-                    <StyledFormattedCryptoAmount
+    const accountMetadata = useSelector(state => selectLabelingDataForAccount(state, accountKey));
+    const isSuiteSyncEnabled = useSelector(selectIsSuiteSyncEnabled);
+    const isLegacyLabelingVisible = useSelector(selectIsLegacyLabelingVisible);
+
+    const baseCurrencyCode = useSelector(selectBaseCurrency);
+    const fiatRateKey = getFiatRateKey(
+        transaction.symbol,
+        baseCurrencyCode,
+        type === 'token' ? (payload.contract as TokenAddress) : undefined,
+    );
+
+    const { shallDisplayBaseCurrency } = useDisplayBaseCurrency(transaction.symbol);
+
+    const historicRate = useSelector(state =>
+        selectHistoricFiatRatesByTimestamp(state, fiatRateKey, transaction.blockTime as Timestamp),
+    );
+    const labelingValueBeingEdited = useSelector(selectLabelingValueBeingEdited);
+    const isBlurringEnabled = useSelector(state =>
+        selectIsSuspiciousTransactionsBlurringEnabled(state, transaction.symbol),
+    );
+
+    const suiteSyncOutputLabels = useSelector(state =>
+        isSuiteSyncEnabled
+            ? selectSuiteSyncOutputLabels(state, transaction.deviceState)
+            : returnStableArrayIfEmpty<SuiteSyncOutput>(),
+    );
+
+    const isSolanaUnstakeTx = transaction?.solanaSpecific?.stakeOperation?.type === 'unstake';
+
+    const amount = useMemo(() => {
+        // hide amount for solana unstake transactions
+        if (isSolanaUnstakeTx) return null;
+
+        switch (type) {
+            case 'target':
+                return getTargetAmount(payload, transaction);
+            case 'internal':
+                return payload.amount && formatNetworkAmount(payload.amount, transaction.symbol);
+            case 'token':
+                return convertAmountSubunitsToUnits(payload.amount, payload.decimals);
+            default:
+                return exhaustive(type);
+        }
+    }, [type, payload, transaction, isSolanaUnstakeTx]);
+
+    const operation = getTxOperation(type === 'target' ? transaction.type : payload.type);
+
+    const amountComponent = useMemo(() => {
+        switch (type) {
+            case 'target':
+            case 'internal':
+                return amount && transaction.type !== 'self' ? (
+                    <FormattedCryptoAmount
                         value={amount}
                         symbol={transaction.symbol}
                         signValue={operation}
                     />
-                )
-            }
-            fiatAmount={
-                !isTestnet(transaction.symbol) && amount ? (
-                    <FiatValue
+                ) : undefined;
+            case 'token':
+                return (
+                    <AmountComponent
+                        transfer={payload}
+                        networkSymbol={transaction.symbol}
+                        withLink={false}
+                        withSign
+                        alignMultitoken="flex-end"
+                    />
+                );
+            default:
+                return exhaustive(type);
+        }
+    }, [amount, operation, transaction.symbol, type, payload, transaction.type]);
+
+    const isNft = type === 'token' && isNftTokenTransfer(payload);
+
+    const fiatAmountComponent = useMemo(
+        () =>
+            shallDisplayBaseCurrency &&
+            amount &&
+            historicRate &&
+            transaction.type !== 'self' &&
+            !isPhishingTransaction &&
+            !isNft ? (
+                <>
+                    {operation && <Sign value={operation} grayscale />}
+                    <BaseCurrencyValue
                         amount={amount}
                         symbol={transaction.symbol}
-                        source={transaction.rates}
-                        useCustomSource
+                        historicRate={historicRate}
+                        useHistoricRate
                     />
-                ) : undefined
-            }
-        />
+                </>
+            ) : undefined,
+        [
+            shallDisplayBaseCurrency,
+            amount,
+            transaction.type,
+            transaction.symbol,
+            historicRate,
+            isPhishingTransaction,
+            operation,
+            isNft,
+        ],
     );
-};
 
-interface TransactionTargetProps extends BaseTransfer {
-    target: ArrayElement<WalletAccountTransaction['targets']>;
-    transaction: WalletAccountTransaction;
-    accountKey: string;
-    accountMetadata?: AccountLabels;
-    isActionDisabled?: boolean;
-    isPhishingTransaction: boolean;
-}
+    const targetMetadata = accountMetadata?.outputLabels?.[transaction.txid]?.[`${targetId}`];
 
-export const TransactionTarget = ({
-    target,
-    transaction,
-    accountMetadata,
-    accountKey,
-    isActionDisabled,
-    isPhishingTransaction,
-    ...baseLayoutProps
-}: TransactionTargetProps) => {
-    const dispatch = useDispatch();
+    const defaultMetadataValue = `${transaction.txid}-${targetId}`;
+    const isBeingEdited = defaultMetadataValue === labelingValueBeingEdited;
 
-    const targetAmount = getTargetAmount(target, transaction);
-    const operation = getTxOperation(transaction.type);
-    const targetMetadata = accountMetadata?.outputLabels?.[transaction.txid]?.[target.n];
-
-    const copyAddress = () => {
-        let payload: ToastPayload = { type: 'copy-to-clipboard' };
-        if (!target?.addresses) {
-            // probably should not happen?
-            payload = {
-                type: 'error',
-                error: 'There is nothing to copy',
-            };
-        } else {
-            const result = copyToClipboard(target.addresses.join());
-            if (typeof result === 'string') {
-                payload = {
-                    type: 'error',
-                    error: result,
-                };
-            }
+    const label = useMemo(() => {
+        switch (type) {
+            case 'target':
+                return (
+                    <TargetAddressLabel
+                        transaction={transaction}
+                        accountKey={accountKey}
+                        target={payload}
+                    />
+                );
+            case 'token':
+                return <TokenTransferAddressLabel symbol={transaction.symbol} transfer={payload} />;
+            case 'internal':
+                return (
+                    <AccountLabelForOwnAddress
+                        address={payload.to || payload.from}
+                        symbol={transaction.symbol}
+                    />
+                );
+            default:
+                return exhaustive(type);
         }
-        dispatch(notificationsActions.addToast(payload));
-    };
+    }, [accountKey, type, transaction, payload]);
+
+    const outputLabel =
+        suiteSyncOutputLabels.find(it => it.txId === transaction.txid && it.txTargetId === targetId)
+            ?.label ?? (isLegacyLabelingVisible ? targetMetadata : undefined);
 
     return (
         <TransactionTargetLayout
             {...baseLayoutProps}
+            useHiddenPlaceholder={!isBeingEdited}
+            isBlurred={(isPhishingTransaction ?? false) && isBlurringEnabled}
             addressLabel={
-                <MetadataLabeling
-                    isDisabled={isActionDisabled}
-                    defaultVisibleValue={
-                        <TargetAddressLabel
-                            networkSymbol={transaction.symbol}
-                            accountMetadata={accountMetadata}
-                            target={target}
-                            type={transaction.type}
-                        />
-                    }
-                    dropdownOptions={[
-                        {
-                            onClick: copyAddress,
-                            label: <Translation id="TR_ADDRESS_MODAL_CLIPBOARD" />,
-                            key: 'copy-address',
-                        },
-                    ]}
+                <Labeling
+                    deviceStaticSessionId={transaction.deviceState}
+                    isDisabled={isActionDisabled || isPhishingTransaction}
+                    displayValue={label}
+                    placeholder={translationString('TR_LABELING_OUTPUT_LABEL')}
                     payload={{
                         type: 'outputLabel',
                         entityKey: accountKey,
                         txid: transaction.txid,
-                        outputIndex: target.n,
-                        defaultValue: `${transaction.txid}-${target.n}`,
-                        value: targetMetadata,
+                        outputIndex: `${targetId}`,
+                        defaultValue: defaultMetadataValue,
+                        networkSymbol: transaction.symbol,
+                        accountDescriptor: transaction.descriptor,
                     }}
-                />
+                    leftAddon={
+                        outputLabel ? (
+                            <Icon
+                                as={TagFilledIcon}
+                                size={14}
+                                intent="neutral"
+                                priority="secondary"
+                            />
+                        ) : undefined
+                    }
+                >
+                    {outputLabel}
+                </Labeling>
             }
-            amount={
-                targetAmount && !baseLayoutProps.singleRowLayout ? (
-                    <StyledFormattedCryptoAmount
-                        value={targetAmount}
-                        symbol={transaction.symbol}
-                        signValue={operation}
-                    />
-                ) : undefined
-            }
-            fiatAmount={
-                !isTestnet(transaction.symbol) && targetAmount ? (
-                    <FiatValue
-                        amount={targetAmount}
-                        symbol={transaction.symbol}
-                        source={transaction.rates}
-                        useCustomSource
-                    />
-                ) : undefined
-            }
+            amount={amountComponent}
+            fiatAmount={fiatAmountComponent}
         />
     );
 };

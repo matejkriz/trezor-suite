@@ -1,0 +1,185 @@
+import { Address } from '@suite/address';
+import { HiddenPlaceholder } from '@suite/discreet-mode';
+import { Translation, type TranslationKey } from '@suite/intl';
+import { type NetworkSymbol } from '@suite-common/wallet-config';
+import { type Account, type FormState } from '@suite-common/wallet-types';
+import { formatNetworkAmount } from '@suite-common/wallet-utils';
+import {
+    Banner,
+    Card,
+    Column,
+    Divider,
+    Icon,
+    RadioCard,
+    Row,
+    Text,
+    TextButton,
+} from '@trezor/components';
+import { ArrowRightIcon, WarningIcon } from '@trezor/icons';
+import { HELP_CENTER_REPLACE_BY_FEE_BITCOIN } from '@trezor/urls';
+
+import { FormattedCryptoAmount } from 'src/components/suite/FormattedCryptoAmount';
+import { type RbfContextValues, useRbfContext } from 'src/hooks/wallet/useRbfForm';
+
+type AmountRowProps = {
+    labelTranslationKey: TranslationKey;
+    shouldSendInSats: boolean | undefined;
+    amount: string;
+    symbol: NetworkSymbol;
+};
+
+const AmountItem = ({ labelTranslationKey, shouldSendInSats, amount, symbol }: AmountRowProps) => {
+    const value = shouldSendInSats ? formatNetworkAmount(amount, symbol) : amount;
+
+    return (
+        <Column>
+            <Text intent="neutral" priority="secondary" typographyStyle="body-xs">
+                <Translation id={labelTranslationKey} />
+            </Text>
+            <FormattedCryptoAmount value={value} symbol={symbol} />
+        </Column>
+    );
+};
+
+type ReducedAmount = {
+    composedLevels: RbfContextValues['composedLevels'];
+    setMaxOutputId: number;
+    account: Account;
+    selectedFee: FormState['selectedFee'];
+};
+
+const ReducedAmount = ({ composedLevels, setMaxOutputId, account, selectedFee }: ReducedAmount) => {
+    if (!composedLevels) {
+        return null;
+    }
+
+    const precomposedTx = composedLevels[selectedFee || 'normal'];
+
+    if (precomposedTx?.type !== 'final') {
+        return null;
+    }
+
+    return (
+        <>
+            <Icon as={ArrowRightIcon} />
+            <AmountItem
+                labelTranslationKey="TR_RBF_NEW_AMOUNT"
+                amount={precomposedTx.outputs[setMaxOutputId]?.amount.toString() ?? '0'}
+                symbol={account.symbol}
+                shouldSendInSats={true} // precomposedTx.outputs is always in Sats
+            />
+        </>
+    );
+};
+
+export const DecreasedOutputs = () => {
+    const {
+        showDecreasedOutputs,
+        formValues,
+        account,
+        coinjoinRegisteredUtxos,
+        getValues,
+        setValue,
+        composedLevels,
+        composeRequest,
+        shouldSendInSats,
+    } = useRbfContext();
+    const { selectedFee, setMaxOutputId } = getValues();
+
+    // no set-max means that no output was decreased
+    if (!showDecreasedOutputs || typeof setMaxOutputId !== 'number') return null;
+
+    // find all outputs possible to reduce
+    const useRadio = formValues.outputs.filter(o => typeof o.address === 'string').length > 1;
+
+    const getDecreaseWarring = (): TranslationKey => {
+        if (account.accountType === 'coinjoin') {
+            if (coinjoinRegisteredUtxos.length > 0) {
+                return 'TR_UTXO_REGISTERED_IN_COINJOIN_RBF_WARNING';
+            } else {
+                return 'TR_NOT_ENOUGH_ANONYMIZED_FUNDS_RBF_WARNING';
+            }
+        }
+
+        return 'TR_DECREASE_TX';
+    };
+
+    return (
+        <Card type="contrast" paddingType="none">
+            <Row justifyContent="space-between" alignItems="center" padding={16}>
+                <Text typographyStyle="body-md">
+                    <Translation id="TR_AMOUNT_REDUCED_TXS" />
+                </Text>
+                <TextButton href={HELP_CENTER_REPLACE_BY_FEE_BITCOIN} size="small" isUnderlined>
+                    <Translation id="TR_LEARN_MORE" />
+                </TextButton>
+            </Row>
+
+            <Divider margin={0} />
+            <Column margin={16} gap={16}>
+                <Banner
+                    intent="warning"
+                    data-testid="@send/decreased-outputs"
+                    icon={WarningIcon}
+                    description={<Translation id={getDecreaseWarring()} />}
+                />
+                {useRadio && (
+                    <Text>
+                        <Translation id="TR_DECREASED_AMOUNT_SELECTION_EXPLANATION" />
+                    </Text>
+                )}
+                <Column gap={16} alignItems="center">
+                    {formValues.outputs.flatMap((output, i) => {
+                        if (typeof output.address !== 'string') return null;
+                        const isChecked = setMaxOutputId === i;
+
+                        return (
+                            // it's safe to use array index as key since outputs do not change
+                            <RadioCard
+                                key={i}
+                                onClick={
+                                    useRadio
+                                        ? () => {
+                                              setValue('setMaxOutputId', i);
+                                              composeRequest();
+                                          }
+                                        : undefined
+                                }
+                                isSelected={useRadio && isChecked}
+                            >
+                                <Row gap={12}>
+                                    <AmountItem
+                                        labelTranslationKey="TR_RBF_ORIGINAL_AMOUNT"
+                                        amount={output.amount}
+                                        symbol={account.symbol}
+                                        shouldSendInSats={shouldSendInSats}
+                                    />
+                                    {isChecked && (
+                                        <ReducedAmount
+                                            account={account}
+                                            selectedFee={selectedFee}
+                                            composedLevels={composedLevels}
+                                            setMaxOutputId={setMaxOutputId}
+                                        />
+                                    )}
+                                    <Column margin={{ left: 'auto' }}>
+                                        <Text
+                                            intent="neutral"
+                                            priority="secondary"
+                                            typographyStyle="body-xs"
+                                        >
+                                            <Translation id="TR_RECIPIENT_ADDRESS" />
+                                        </Text>
+                                        <HiddenPlaceholder>
+                                            <Address value={output.address} isTruncated />
+                                        </HiddenPlaceholder>
+                                    </Column>
+                                </Row>
+                            </RadioCard>
+                        );
+                    })}
+                </Column>
+            </Column>
+        </Card>
+    );
+};

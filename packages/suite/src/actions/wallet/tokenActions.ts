@@ -1,15 +1,15 @@
-import { TokenInfo } from '@trezor/connect';
-import { Account } from 'src/types/wallet';
-import { Dispatch } from 'src/types/suite';
-import * as accountUtils from '@suite-common/wallet-utils';
+import { type Dispatch, type UnknownAction } from '@reduxjs/toolkit';
+
 import { notificationsActions } from '@suite-common/toast-notifications';
-import { accountsActions, updateFiatRatesThunk } from '@suite-common/wallet-core';
-import { Timestamp, TokenAddress } from '@suite-common/wallet-types';
-import { FiatCurrencyCode } from '@suite-common/suite-config';
+import { accountsActions } from '@suite-common/wallet-core';
+import * as accountUtils from '@suite-common/wallet-utils';
+import { type TokenInfo } from '@trezor/connect';
+
+import { type Account } from 'src/types/wallet';
 
 export const addToken =
-    (account: Account, tokenInfo: TokenInfo[], localCurrency: FiatCurrencyCode) =>
-    (dispatch: Dispatch) => {
+    (account: Account, tokenInfo: TokenInfo[], options?: { showSuccessToast?: boolean }) =>
+    (dispatch: Dispatch<UnknownAction>) => {
         dispatch(
             accountsActions.updateAccount({
                 ...account,
@@ -17,22 +17,13 @@ export const addToken =
             }),
         );
 
-        dispatch(
-            updateFiatRatesThunk({
-                ticker: {
-                    symbol: account.symbol,
-                    tokenAddress: tokenInfo[0].contract as TokenAddress,
-                },
-                localCurrency,
-                rateType: 'current',
-                fetchAttemptTimestamp: Date.now() as Timestamp,
-                forceFetchToken: true,
-            }),
-        );
-
-        dispatch(
-            notificationsActions.addToast({
-                type: 'add-token-success',
-            }),
-        );
+        // Auto-tracking flows (e.g. wrapping a native token) add a token as a side effect and show
+        // their own toast, so the generic success toast can be suppressed to avoid double toasts.
+        if (options?.showSuccessToast ?? true) {
+            dispatch(
+                notificationsActions.addToast({
+                    type: 'add-token-success',
+                }),
+            );
+        }
     };

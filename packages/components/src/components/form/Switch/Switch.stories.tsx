@@ -1,45 +1,61 @@
-import { useArgs } from '@storybook/client-api';
-import { Meta, StoryObj } from '@storybook/react';
+import { type Meta, type StoryObj } from '@storybook/react';
+import { useArgs } from 'storybook/preview-api';
 
-import { Switch as SwitchComponent, SwitchProps } from './Switch';
+import { Switch as SwitchComponent, allowedSwitchFrameProps } from './Switch';
+import { switchLabelPositions, switchSizes } from './types';
+import { getFramePropsStory } from '../../../utils/frameProps';
 
-const meta: Meta = {
-    title: 'Form/Switch',
-} as Meta;
+const meta: Meta<typeof SwitchComponent> = {
+    title: '✏️ Form',
+};
 export default meta;
 
-export const Switch: StoryObj<SwitchProps> = {
-    render: ({ ...args }) => {
+export const Switch: StoryObj<typeof meta> = {
+    render: () => {
         // eslint-disable-next-line
-        const [{ isChecked }, updateArgs] = useArgs();
+        const [{ isChecked, ...rest }, updateArgs] = useArgs();
         const handleIsChecked = () => updateArgs({ isChecked: !isChecked });
 
-        return (
-            <SwitchComponent
-                onChange={handleIsChecked}
-                isChecked={isChecked}
-                isSmall={args.isSmall}
-                isDisabled={args.isDisabled}
-                label={args.label}
-                labelPosition={args.labelPosition}
-                isAlert={args.isAlert}
-            />
-        );
+        return <SwitchComponent onChange={handleIsChecked} isChecked={isChecked} {...rest} />;
     },
     args: {
-        isSmall: false,
-        isDisabled: false,
         isChecked: false,
+        isDisabled: false,
+        size: 'medium',
         label: 'Headline',
-        labelPosition: 'right',
-        isAlert: false,
+        labelPosition: 'end',
+        ...getFramePropsStory(allowedSwitchFrameProps).args,
     },
     argTypes: {
+        isChecked: {
+            control: {
+                type: 'boolean',
+            },
+        },
+        isDisabled: {
+            control: {
+                type: 'boolean',
+            },
+        },
+        size: {
+            control: {
+                type: 'radio',
+            },
+            options: switchSizes,
+        },
+        label: {
+            table: {
+                type: {
+                    summary: 'ReactNode',
+                },
+            },
+        },
         labelPosition: {
-            options: ['left', 'right'],
+            options: switchLabelPositions,
             control: {
                 type: 'radio',
             },
         },
+        ...getFramePropsStory(allowedSwitchFrameProps).argTypes,
     },
 };

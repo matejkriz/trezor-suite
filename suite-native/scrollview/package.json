@@ -1,0 +1,19 @@
+{
+    "name": "@suite-native/scrollview",
+    "version": "1.0.0",
+    "private": true,
+    "license": "See LICENSE.md in repo root",
+    "sideEffects": false,
+    "main": "src/index",
+    "scripts": {
+        "depcheck": "yarn g:depcheck",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
+        "type-check": "yarn g:tsc --build"
+    },
+    "dependencies": {
+        "@trezor/styles-native": "workspace:*",
+        "react": "19.2.3",
+        "react-native": "0.86.0",
+        "react-native-reanimated": "4.5.0"
+    }
+}

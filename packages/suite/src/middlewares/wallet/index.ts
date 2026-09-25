@@ -1,29 +1,54 @@
+import type { MiddlewareAPI } from 'redux';
+
+import { coinjoinMiddleware } from '@suite/coinjoin';
+import { prepareDiscoveryMiddleware } from '@suite/discovery';
+import { prepareConnectPopupMiddleware } from '@suite-common/connect-popup';
+import { prepareSuiteSyncMiddleware } from '@suite-common/suite-sync';
+import { type SuiteSyncDep } from '@suite-common/suite-sync-types';
 import {
-    prepareFiatRatesMiddleware,
-    prepareBlockchainMiddleware,
+    type TokenDefinitionsMiddlewareDeps,
     prepareTokenDefinitionsMiddleware,
+} from '@suite-common/token-definitions';
+import {
+    prepareAccountsMiddleware,
+    prepareBlockchainMiddleware,
+    prepareFiatRatesMiddleware,
+    prepareStakeMiddleware,
 } from '@suite-common/wallet-core';
+import {
+    type WalletConnectMiddlewareDeps,
+    prepareWalletConnectMiddleware,
+} from '@suite-common/walletconnect';
 
-import { prepareDiscoveryMiddleware } from './discoveryMiddleware';
-import storageMiddleware from './storageMiddleware';
-import walletMiddleware from './walletMiddleware';
+import { type DbDep } from 'src/storage/createDb';
+
 import graphMiddleware from './graphMiddleware';
-import coinmarketMiddleware from './coinmarketMiddleware';
-import coinmarketSavingsMiddleware from './coinmarketSavingsMiddleware';
-import pollingMiddleware from './pollingMiddleware';
-import { coinjoinMiddleware } from './coinjoinMiddleware';
-import { extraDependencies } from 'src/support/extraDependencies';
+import { replaceByFeeErrorMiddleware } from './replaceByFeeErrorMiddleware';
+import { prepareStorageMiddleware } from './storageMiddleware';
+import { tradingMiddleware } from './tradingMiddleware';
+import walletMiddleware from './walletMiddleware';
 
-export default [
-    prepareBlockchainMiddleware(extraDependencies),
+export type GetWalletMiddlewaresDeps = WalletConnectMiddlewareDeps &
+    TokenDefinitionsMiddlewareDeps & {
+        services: SuiteSyncDep & DbDep;
+    };
+
+export const getWalletMiddlewares = (
+    getExtra: () => GetWalletMiddlewaresDeps | null,
+): ((api: MiddlewareAPI) => any)[] => [
+    prepareBlockchainMiddleware(getExtra),
+    prepareAccountsMiddleware(getExtra),
     walletMiddleware,
-    prepareDiscoveryMiddleware(extraDependencies),
-    prepareFiatRatesMiddleware(extraDependencies),
-    prepareTokenDefinitionsMiddleware(extraDependencies),
-    storageMiddleware,
+    prepareDiscoveryMiddleware(getExtra),
+    prepareFiatRatesMiddleware(getExtra),
+    prepareTokenDefinitionsMiddleware(getExtra),
+    prepareStakeMiddleware(getExtra),
+    prepareStorageMiddleware(getExtra),
     graphMiddleware,
-    coinmarketMiddleware,
-    coinmarketSavingsMiddleware,
-    pollingMiddleware,
+    tradingMiddleware,
     coinjoinMiddleware,
+    replaceByFeeErrorMiddleware,
+    prepareConnectPopupMiddleware(getExtra),
+    prepareWalletConnectMiddleware(getExtra),
+    prepareSuiteSyncMiddleware(getExtra),
 ];

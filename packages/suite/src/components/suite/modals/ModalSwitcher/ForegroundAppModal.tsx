@@ -1,41 +1,44 @@
-import { Firmware } from 'src/views/firmware';
+import { type FunctionComponent } from 'react';
+
+import { CreateWalletBackupModal } from '@suite/backup';
+import { closeModalAppThunk } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+
+import type { ForegroundAppRoute } from 'src/types/suite';
+import { Backup } from 'src/views/backup/Backup';
 import { FirmwareCustom } from 'src/views/firmware/FirmwareCustom';
+import { FirmwareUpdate } from 'src/views/firmware/FirmwareUpdate';
 import { Recovery } from 'src/views/recovery';
-import { Backup } from 'src/views/backup';
-import { useDispatch } from 'src/hooks/suite';
-import { closeModalApp } from 'src/actions/suite/routerActions';
-import { InstallBridge } from 'src/views/suite/bridge';
+import { BridgeUnavailable } from 'src/views/suite/bridge';
+import { BridgeDeprecated } from 'src/views/suite/bridge-deprecated';
+import { BridgeRequested } from 'src/views/suite/bridge-requested';
 import { UdevRules } from 'src/views/suite/udev';
 import { Version } from 'src/views/suite/version';
-import { SwitchDevice } from 'src/views/suite/SwitchDevice/SwitchDevice';
-import type { ForegroundAppRoute } from 'src/types/suite';
+
+import { MultiShareBackupModal } from '../ReduxModal/UserContextModal/MultiShareBackupModal/MultiShareBackupModal';
 
 // would not work if defined directly in the switch
-const FirmwareType = () => <Firmware shouldSwitchFirmwareType />;
+const FirmwareType = () => <FirmwareUpdate />;
 
 const getForegroundApp = (app: ForegroundAppRoute['app']) => {
-    switch (app) {
-        case 'firmware':
-            return Firmware;
-        case 'firmware-type':
-            return FirmwareType;
-        case 'firmware-custom':
-            return FirmwareCustom;
-        case 'bridge':
-            return InstallBridge;
-        case 'udev':
-            return UdevRules;
-        case 'version':
-            return Version;
-        case 'switch-device':
-            return SwitchDevice;
-        case 'recovery':
-            return Recovery;
-        case 'backup':
-            return Backup;
-        default:
-            return null;
-    }
+    const map: Record<ForegroundAppRoute['app'], FunctionComponent<any> | null> = {
+        firmware: FirmwareUpdate,
+        'firmware-type': FirmwareType,
+        'firmware-custom': FirmwareCustom,
+        version: Version,
+        bridge: BridgeUnavailable,
+        'bridge-requested': BridgeRequested,
+        'bridge-deprecated': BridgeDeprecated,
+        udev: UdevRules,
+        'switch-device': null, // extracted to SwitchDeviceLayer.tsx
+        recovery: Recovery,
+        backup: Backup,
+        'create-multi-share-backup': MultiShareBackupModal,
+        'create-wallet-backup': CreateWalletBackupModal,
+    };
+
+    return map[app];
 };
 
 type ForegroundAppModalProps = {
@@ -45,9 +48,9 @@ type ForegroundAppModalProps = {
 
 /** Modals (foreground applications) initiated by redux state.router.route */
 export const ForegroundAppModal = ({ app, cancelable }: ForegroundAppModalProps) => {
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
 
-    const onCancel = () => dispatch(closeModalApp());
+    const onCancel = () => dispatch(closeModalAppThunk());
 
     // check if current route is a "foreground application" marked as isForegroundApp in router config
     // display it above requested physical route (route in url) or as fullscreen app

@@ -1,15 +1,13 @@
-import BN from 'bn.js';
 import {
-    CoinSelectPaymentType,
-    CoinSelectAlgorithm,
-    CoinSelectOptions,
-    CoinSelectInput,
-    CoinSelectOutput,
-    CoinSelectOutputFinal,
+    type CoinSelectAlgorithm,
+    type CoinSelectInput,
+    type CoinSelectOptions,
+    type CoinSelectOutput,
+    type CoinSelectOutputFinal,
+    type CoinSelectPaymentType,
 } from '../types';
-import { Network, isNetworkType } from '../networks';
 
-export const ZERO = new BN(0);
+export const ZERO = 0n;
 
 // TODO: p2ms, external, p2wsh. currently not used in suite/connect.
 export const INPUT_SCRIPT_LENGTH: Record<CoinSelectPaymentType, number> = {
@@ -37,6 +35,9 @@ const TX_BASE = 32; // 4 * (4 + 4)
 const INPUT_SIZE = 160; // 4 * (32 + 4 + 4)
 
 const DUST_RELAY_FEE_RATE = 3; // 3000 sat/kB https://github.com/bitcoin/bitcoin/blob/be443328037162f265cc85d05b1a7665b5f104d2/src/policy/policy.h#L55
+
+/** Coinbase transaction must have at least 100 confirmations to be spendable.*/
+export const MINIMAL_COINBASE_CONFIRMATIONS = 100;
 
 type Vin = { type: CoinSelectInput['type']; script: { length: number }; weight?: number };
 type VinVout = { script: { length: number }; weight?: number };
@@ -110,7 +111,11 @@ export function transactionBytes(inputs: Vin[], outputs: VinVout[]) {
 // - calculated from inputSize multiplied by dustRelayFeeRate
 export function getDustAmount(
     feeRate: number,
-    { txType, longTermFeeRate, dustThreshold }: CoinSelectOptions,
+    {
+        txType,
+        longTermFeeRate,
+        dustThreshold,
+    }: Pick<CoinSelectOptions, 'txType' | 'longTermFeeRate' | 'dustThreshold'>,
 ) {
     const inputSize = inputBytes({
         type: txType,
@@ -127,63 +132,52 @@ export function getDustAmount(
     return Math.max(dustThreshold || 0, getFeeForBytes(dustRelayFeeRate, inputSize));
 }
 
-export function bignumberOrNaN(v?: BN | string): BN | undefined;
-export function bignumberOrNaN<F extends boolean>(
-    v?: BN | string,
+export function parseBigInt(v?: bigint | string): bigint | undefined;
+export function parseBigInt<F extends boolean>(
+    v?: bigint | string,
     forgiving?: F,
-): F extends true ? BN : BN | undefined;
-export function bignumberOrNaN(v?: BN | string, forgiving = false) {
-    if (BN.isBN(v)) return v;
+): F extends true ? bigint : bigint | undefined;
+export function parseBigInt(v?: bigint | string, forgiving = false) {
+    if (typeof v === 'bigint') return v;
     const defaultValue = forgiving ? ZERO : undefined;
     if (!v || typeof v !== 'string' || !/^\d+$/.test(v)) return defaultValue;
 
     try {
-        return new BN(v);
-    } catch (error) {
+        return BigInt(v);
+    } catch {
         return defaultValue;
     }
 }
 
-export function sumOrNaN(range: { value?: BN }[]): BN | undefined;
+export function sumOrNaN(range: { value?: bigint }[]): bigint | undefined;
 export function sumOrNaN<F extends boolean>(
-    range: { value?: BN }[],
+    range: { value?: bigint }[],
     forgiving: F,
-): F extends true ? BN : BN | undefined;
-export function sumOrNaN(range: { value?: BN }[], forgiving = false) {
-    return range.reduce((a: BN | undefined, x) => {
-        if (!a) return a;
-        const value = bignumberOrNaN(x.value);
-        if (!value) return forgiving ? ZERO.add(a) : undefined;
+): F extends true ? bigint : bigint | undefined;
+export function sumOrNaN(range: { value?: bigint }[], forgiving = false) {
+    return range.reduce((a: bigint | undefined, x) => {
+        if (a === undefined) return a;
+        const value = parseBigInt(x.value);
+        if (value === undefined) return forgiving ? a : undefined;
 
-        return value.add(a);
+        return value + a;
     }, ZERO);
-}
-
-export function getFeePolicy(network?: Network) {
-    if (isNetworkType('doge', network)) return 'doge';
-    if (isNetworkType('zcash', network)) return 'zcash';
-
-    return 'bitcoin';
 }
 
 function getBitcoinFee(
     inputs: CoinSelectInput[],
     outputs: CoinSelectOutput[],
     feeRate: number,
-    { baseFee = 0, floorBaseFee }: Partial<CoinSelectOptions>,
+    { baseFee = 0 }: Partial<CoinSelectOptions>,
 ) {
     const bytes = transactionBytes(inputs, outputs);
     const defaultFee = getFeeForBytes(feeRate, bytes);
 
-    return baseFee && floorBaseFee
-        ? // increase baseFee for every started kb
-          baseFee * (1 + Math.floor(defaultFee / baseFee))
-        : // simple increase baseFee
-          baseFee + defaultFee;
+    return baseFee + defaultFee;
 }
 
 // DOGE fee policy https://github.com/dogecoin/dogecoin/blob/3a29ba6d497cd1d0a32ecb039da0d35ea43c9c85/doc/fee-recommendation.md
-// 0.01 DOGE per every started kb + 0.01 DOGE for every output below 0.01 DOGE (dust limit)
+// 0.01 DOGE per every started kilobyte + 0.01 DOGE for every output below 0.01 DOGE (dust limit)
 function getDogeFee(
     inputs: CoinSelectInput[],
     outputs: CoinSelectOutput[],
@@ -193,8 +187,10 @@ function getDogeFee(
     const fee = getBitcoinFee(inputs, outputs, feeRate, options);
 
     // find all outputs below dust limit
-    const limit = new BN(dustThreshold);
-    const dustOutputsCount = outputs.filter(({ value }) => value && value.lt(limit)).length;
+    const limit = BigInt(dustThreshold);
+    const dustOutputsCount = outputs.filter(
+        ({ value }) => value !== undefined && value < limit,
+    ).length;
 
     // increase for every output below dustThreshold
     return fee + dustOutputsCount * dustThreshold;
@@ -259,18 +255,22 @@ export function finalize(
     // if sum inputs/outputs is NaN
     // or `fee` is greater than sum of inputs reduced by sum of outputs (use case: baseFee)
     // no further calculation required (not enough funds)
-    if (!sumInputs || !sumOutputs || sumInputs.sub(sumOutputs).lt(new BN(fee))) {
+    if (
+        sumInputs === undefined ||
+        sumOutputs === undefined ||
+        sumInputs - sumOutputs < BigInt(fee)
+    ) {
         return { fee };
     }
 
-    const remainderAfterExtraOutput = sumInputs.sub(sumOutputs.add(new BN(feeAfterExtraOutput)));
+    const remainderAfterExtraOutput = sumInputs - (sumOutputs + BigInt(feeAfterExtraOutput));
     const dustAmount = getDustAmount(feeRate, options);
 
     // it's verified that output have value (sumOutputs)
     const finalOutputs = [...(outputs as CoinSelectOutputFinal[])];
 
     // is it worth a change output?
-    if (remainderAfterExtraOutput.gte(new BN(dustAmount))) {
+    if (remainderAfterExtraOutput >= BigInt(dustAmount)) {
         finalOutputs.push({
             ...changeOutput,
             value: remainderAfterExtraOutput,
@@ -280,7 +280,7 @@ export function finalize(
     return {
         inputs,
         outputs: finalOutputs,
-        fee: sumInputs.sub(sumOrNaN(finalOutputs, true)).toNumber(),
+        fee: Number(sumInputs - sumOrNaN(finalOutputs, true)),
     };
 }
 
@@ -289,7 +289,8 @@ export function anyOf(algorithms: CoinSelectAlgorithm[]): CoinSelectAlgorithm {
         let result: ReturnType<CoinSelectAlgorithm> = { fee: 0 };
 
         for (let i = 0; i < algorithms.length; i++) {
-            const algorithm = algorithms[i];
+            // @ts-expect-error: indexing with noUncheckedIndexedAccess
+            const algorithm: (typeof algorithms)[number] = algorithms[i];
             result = algorithm(utxos, outputs, feeRate, options);
             if (result.inputs) {
                 return result;
@@ -301,17 +302,17 @@ export function anyOf(algorithms: CoinSelectAlgorithm[]): CoinSelectAlgorithm {
 }
 
 export function utxoScore(x: CoinSelectInput, feeRate: number) {
-    return x.value.sub(new BN(getFeeForBytes(feeRate, inputBytes(x))));
+    return x.value - BigInt(getFeeForBytes(feeRate, inputBytes(x)));
 }
 
 export function sortByScore(feeRate: number) {
     return (a: CoinSelectInput, b: CoinSelectInput) => {
-        const difference = utxoScore(a, feeRate).sub(utxoScore(b, feeRate));
-        if (difference.eq(ZERO)) {
+        const difference = utxoScore(a, feeRate) - utxoScore(b, feeRate);
+        if (difference === ZERO) {
             return a.i - b.i;
         }
 
-        return difference.isNeg() ? 1 : -1;
+        return difference < ZERO ? 1 : -1;
     };
 }
 

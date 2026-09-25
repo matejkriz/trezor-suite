@@ -16,6 +16,7 @@ node_modules
 *.sublime-workspace
 .vscode/**/*
 !.vscode/*.code-snippets
+/tags*
 
 # Logs
 logs
@@ -44,14 +45,21 @@ __pycache__/
 # test outputs
 screenshots
 test-results
+playwright-report
+packages/e2e-utils/src/llmTestFixer/reports/
+packages/e2e-utils/src/llmExploratoryTester/reports/
+suite-native/app/.metadata/
+suite-native/app/artifacts/
 
 # build outputs
 lib
 libDev
 dist
 public
+!packages/analytics-docs/public/
 coverage
 tmp
+*.tgz
 
 
 ## React Native section ##
@@ -86,38 +94,16 @@ local.properties
 *.keystore
 !debug.keystore
 
-# fastlane
-#
-# It is recommended to not store the screenshots in the git repo. Instead, use fastlane to re-generate the
-# screenshots whenever they are needed.
-# For more information about the recommended setup visit:
-# https://docs.fastlane.tools/best-practices/source-control/
-
-**/android/fastlane/report.xml
-**/android/fastlane/Preview.html
-**/android/fastlane/screenshots
-**/android/fastlane/test_output
-**/ios/fastlane/report.xml
-**/ios/fastlane/Preview.html
-**/ios/fastlane/screenshots
-**/ios/fastlane/test_output
-**/fastlane/report.xml
-**/fastlane/Preview.html
-**/fastlane/screenshots
-**/fastlane/test_output
-
-*.cer
-*.certSigningRequest
-*.p12
-*.mobileprovision
-
 # scan temporary files
 **/android/fastlane/test_output
 
 !**/suite-native/app/.env.debug
 !**/suite-native/app/.env.develop
+!**/suite-native/app/.env.preview
 !**/suite-native/app/.env.production
 !**/suite-native/app/.env.staging
+
+.env.local
 
 # ios
 **/ios/*.xcarchive
@@ -147,14 +133,36 @@ local.properties
 !.yarn/sdks
 !.yarn/versions
 
-# @trezor/suite-data
-packages/suite-data/files/browser-detection
-packages/suite-data/files/guide
-packages/suite-data/files/translations/master.json
+# @suite/app-assets
+suite/app-assets/files/browser-detection
+suite/app-assets/files/guide
+suite/app-assets/files/translations/master.json
 
 # @trezor/connect-explorer
 **/build-webextension/**
 
-# cypress download folder
+# python
+.venv/
 
-packages/suite-web/e2e/downloads
+#direnv
+.direnv/
+.zed/*
+.cursorrules
+
+# currents coverage files
+.nyc_output/
+
+# local config for Claude
+.claude/
+.mcp.json
+
+# playwright trace CLI extraction dir
+.playwright-cli/
+
+# AI agent plans
+/plans
+
+# coverage map and test analysis files
+coverage-map/
+
+suite-common/icons/files/cryptoicons

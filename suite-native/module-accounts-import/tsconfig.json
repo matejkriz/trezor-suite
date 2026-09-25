@@ -3,11 +3,15 @@
     "compilerOptions": { "outDir": "libDev" },
     "references": [
         {
-            "path": "../../suite-common/formatters"
+            "path": "../../suite-common/dependency-injection"
         },
-        { "path": "../../suite-common/icons" },
+        { "path": "../../suite-common/device" },
+        { "path": "../../suite-common/networks" },
         {
             "path": "../../suite-common/redux-utils"
+        },
+        {
+            "path": "../../suite-common/token-definitions"
         },
         {
             "path": "../../suite-common/validators"
@@ -29,24 +33,31 @@
         { "path": "../analytics" },
         { "path": "../atoms" },
         { "path": "../config" },
-        { "path": "../device-manager" },
-        { "path": "../ethereum-tokens" },
+        { "path": "../discovery" },
         { "path": "../formatters" },
         { "path": "../forms" },
+        { "path": "../icons" },
         { "path": "../intl" },
-        { "path": "../module-settings" },
         { "path": "../navigation" },
         { "path": "../qr-code" },
+        { "path": "../settings" },
+        { "path": "../tokens" },
         { "path": "../video-assets" },
-        {
-            "path": "../../packages/blockchain-link"
-        },
         {
             "path": "../../packages/blockchain-link-types"
         },
         { "path": "../../packages/connect" },
-        { "path": "../../packages/styles" },
-        { "path": "../../packages/utxo-lib" }
+        {
+            "path": "../../packages/connect-common"
+        },
+        { "path": "../../packages/crypto-utils" },
+        {
+            "path": "../../packages/styles-native"
+        },
+        { "path": "../../packages/utils" },
+        { "path": "../../packages/utxo-lib" },
+        { "path": "../test-utils-store" },
+        { "path": "../../packages/requirements" }
     ],
     "include": [".", "**/*.json"]
 }

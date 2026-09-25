@@ -1,65 +1,77 @@
-import styled, { useTheme } from 'styled-components';
-import { spacingsPx, typography } from '@trezor/theme';
-import { Icon } from '@trezor/components';
-import { getFiatRateKey, localizePercentage } from '@suite-common/wallet-utils';
-import { selectFiatRatesByFiatRateKey } from '@suite-common/wallet-core';
-import { FiatValue } from 'src/components/suite';
+import styled from 'styled-components';
+
+import { selectShouldAnimateLoadingSkeleton } from '@suite/ui-animations';
+import { type NetworkSymbol } from '@suite-common/wallet-config';
+import { selectBaseCurrency, selectFiatRatesByFiatRateKey } from '@suite-common/wallet-core';
+import { type TokenAddress } from '@suite-common/wallet-types';
+import { getFiatRateKey } from '@suite-common/wallet-utils';
+import { Skeleton } from '@trezor/components';
+import { typography } from '@trezor/theme';
+
+import { BaseCurrencyValue } from 'src/components/suite/BaseCurrencyValue';
 import { useSelector } from 'src/hooks/suite';
+
 import { NoRatesTooltip } from './NoRatesTooltip';
-import { NetworkSymbol } from '@suite-common/wallet-config';
-import { selectLocalCurrency } from 'src/reducers/wallet/settingsReducer';
+import { TrendBadge, calculatePercentageDifference } from './TrendBadge';
 
-const PercentageWrapper = styled.div<{ $isRateGoingUp: boolean }>`
-    ${typography.hint}
-    gap: ${spacingsPx.xxs};
-    display: flex;
-    align-items: center;
-    color: ${({ theme, $isRateGoingUp }) =>
-        $isRateGoingUp ? theme.textPrimaryDefault : theme.textAlertRed};
+const Empty = styled.div`
+    ${typography['body-sm-strong']}
+    color: ${({ theme }) => theme.contentSecondary};
 `;
-
-const calculatePercentageDifference = (a: number, b: number) => (a - b) / b;
 
 interface TickerProps {
     symbol: NetworkSymbol;
-    compact?: boolean;
+    contractAddress?: TokenAddress;
+    noEmptyStateTooltip?: boolean;
+    showLoadingSkeleton?: boolean;
 }
-export const TrendTicker = ({ symbol, compact = false }: TickerProps) => {
-    const locale = useSelector(state => state.suite.settings.language);
-    const localCurrency = useSelector(selectLocalCurrency);
-    const fiatRateKey = getFiatRateKey(symbol, localCurrency);
+
+export const TrendTicker = ({
+    symbol,
+    contractAddress,
+    noEmptyStateTooltip,
+    showLoadingSkeleton = true,
+}: TickerProps) => {
+    const shouldAnimate = useSelector(selectShouldAnimateLoadingSkeleton);
+    const baseCurrencyCode = useSelector(selectBaseCurrency);
+    const fiatRateKey = getFiatRateKey(symbol, baseCurrencyCode, contractAddress);
     const lastWeekRate = useSelector(state =>
         selectFiatRatesByFiatRateKey(state, fiatRateKey, 'lastWeek'),
     );
     const currentRate = useSelector(state => selectFiatRatesByFiatRateKey(state, fiatRateKey));
 
-    const theme = useTheme();
+    const hasRateError =
+        !!currentRate?.error ||
+        !!lastWeekRate?.error ||
+        // temp fix to avoid showing 0% 7d change
+        currentRate?.lastTickerTimestamp === lastWeekRate?.lastTickerTimestamp;
 
+    // lastTickerTimestamp is set even on failed attempts, so check the rate values and error state.
     const isSuccessfullyFetched =
-        lastWeekRate?.lastTickerTimestamp && currentRate?.lastTickerTimestamp;
+        currentRate?.rate != null && lastWeekRate?.rate != null && !hasRateError;
+    // Show the skeleton only while a rate is actually being fetched; an unavailable rate falls through
+    // to the empty state instead. Rendered here (not via BaseCurrencyValue, whose skeleton is gated by
+    // isTokenKnown and never shows for native coins).
+    const isFetching = !!currentRate?.isLoading || !!lastWeekRate?.isLoading;
+    if (showLoadingSkeleton && isFetching) {
+        return <Skeleton animate={shouldAnimate} />;
+    }
 
-    // TODO: create selectIsRateGoingUp selector when wallet.settings is moved to suite-common
-    const isRateGoingUp = isSuccessfullyFetched ? currentRate.rate! >= lastWeekRate.rate! : false;
     const percentageChange = isSuccessfullyFetched
         ? calculatePercentageDifference(currentRate.rate!, lastWeekRate.rate!)
         : 0;
 
+    const emptyStateComponent = noEmptyStateTooltip ? <Empty>—</Empty> : <NoRatesTooltip />;
+
     return (
-        <FiatValue amount="1" symbol={symbol}>
+        <BaseCurrencyValue amount="1" symbol={symbol} showLoadingSkeleton={false}>
             {({ rate, timestamp }) =>
-                rate && timestamp && percentageChange ? (
-                    <PercentageWrapper $isRateGoingUp={isRateGoingUp}>
-                        <Icon
-                            icon={isRateGoingUp ? 'TREND_UP' : 'TREND_DOWN'}
-                            color={isRateGoingUp ? theme.iconPrimaryDefault : theme.iconAlertRed}
-                            size={16}
-                        />
-                        {localizePercentage({ valueInFraction: percentageChange, locale })}
-                    </PercentageWrapper>
+                rate && timestamp && isSuccessfullyFetched ? (
+                    <TrendBadge valueInFraction={percentageChange} />
                 ) : (
-                    <NoRatesTooltip iconOnly={compact} />
+                    emptyStateComponent
                 )
             }
-        </FiatValue>
+        </BaseCurrencyValue>
     );
 };

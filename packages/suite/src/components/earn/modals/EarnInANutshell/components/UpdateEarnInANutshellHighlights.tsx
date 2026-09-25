@@ -1,0 +1,70 @@
+import { Translation } from '@suite/intl';
+import {
+    type NetworkSymbol,
+    type StakingNetworkType,
+    getNetworkDisplaySymbol,
+} from '@suite-common/wallet-config';
+import { HandCoinsIcon, PiggyBankIcon, WalletIcon } from '@trezor/icons';
+import { exhaustive } from '@trezor/type-utils';
+
+import { formatApyValue } from 'src/components/earn/utils/earnApyUtils';
+
+import {
+    type EarnInANutshellHighlight,
+    EarnInANutshellHighlights,
+} from './EarnInANutshellHighlights';
+
+interface UpdateEarnInANutshellHighlightsProps {
+    networkType: StakingNetworkType;
+    networkSymbol: NetworkSymbol;
+    apy: number | null;
+}
+
+export const UpdateEarnInANutshellHighlights = ({
+    networkType,
+    networkSymbol,
+    apy,
+}: UpdateEarnInANutshellHighlightsProps) => {
+    const networkDisplaySymbol = getNetworkDisplaySymbol(networkSymbol);
+
+    const highlights: EarnInANutshellHighlight[] = [
+        {
+            icon: PiggyBankIcon,
+            content: (
+                <Translation
+                    id="TR_EARN_APY_WITH_EVERSTAKE"
+                    values={{ apy: formatApyValue(apy), networkDisplaySymbol }}
+                />
+            ),
+        },
+        {
+            icon: WalletIcon,
+            content: (
+                <Translation
+                    id="TR_EARN_YOUR_FUNDS_STAY_ACCESSIBLE"
+                    values={{ networkDisplaySymbol }}
+                />
+            ),
+        },
+        {
+            icon: HandCoinsIcon,
+            content: (
+                <Translation
+                    id="TR_EARN_STAKE_ALL_YOUR_FUNDS_IS_STAKED"
+                    values={{ networkDisplaySymbol }}
+                />
+            ),
+        },
+    ];
+
+    switch (networkType) {
+        case 'ethereum':
+        case 'cardano':
+        case 'solana':
+            return <EarnInANutshellHighlights items={highlights} />;
+        case 'tron':
+            return null;
+        default:
+            return exhaustive(networkType);
+    }
+};

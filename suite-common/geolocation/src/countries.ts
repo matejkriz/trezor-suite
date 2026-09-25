@@ -1,0 +1,668 @@
+type Country = Readonly<{
+    code: CountryCode;
+    codeAlpha3: string;
+    flag: string;
+    name: string;
+}>;
+
+// Keep the catalogue keys explicit so additions and removals remain exhaustively type-checked
+// without TypeScript serializing every country implementation literal into public declarations.
+type CountryCatalogue = {
+    readonly AD: Country;
+    readonly AE: Country;
+    readonly AF: Country;
+    readonly AG: Country;
+    readonly AI: Country;
+    readonly AL: Country;
+    readonly AM: Country;
+    readonly AO: Country;
+    readonly AQ: Country;
+    readonly AR: Country;
+    readonly AS: Country;
+    readonly AT: Country;
+    readonly AU: Country;
+    readonly AW: Country;
+    readonly AX: Country;
+    readonly AZ: Country;
+    readonly BA: Country;
+    readonly BB: Country;
+    readonly BD: Country;
+    readonly BE: Country;
+    readonly BF: Country;
+    readonly BG: Country;
+    readonly BH: Country;
+    readonly BI: Country;
+    readonly BJ: Country;
+    readonly BL: Country;
+    readonly BM: Country;
+    readonly BN: Country;
+    readonly BO: Country;
+    readonly BQ: Country;
+    readonly BR: Country;
+    readonly BS: Country;
+    readonly BT: Country;
+    readonly BV: Country;
+    readonly BW: Country;
+    readonly BY: Country;
+    readonly BZ: Country;
+    readonly CA: Country;
+    readonly CC: Country;
+    readonly CD: Country;
+    readonly CF: Country;
+    readonly CG: Country;
+    readonly CH: Country;
+    readonly CI: Country;
+    readonly CK: Country;
+    readonly CL: Country;
+    readonly CM: Country;
+    readonly CN: Country;
+    readonly CO: Country;
+    readonly CR: Country;
+    readonly CU: Country;
+    readonly CV: Country;
+    readonly CW: Country;
+    readonly CX: Country;
+    readonly CY: Country;
+    readonly CZ: Country;
+    readonly DE: Country;
+    readonly DJ: Country;
+    readonly DK: Country;
+    readonly DM: Country;
+    readonly DO: Country;
+    readonly DZ: Country;
+    readonly EC: Country;
+    readonly EE: Country;
+    readonly EG: Country;
+    readonly EH: Country;
+    readonly ER: Country;
+    readonly ES: Country;
+    readonly ET: Country;
+    readonly FI: Country;
+    readonly FJ: Country;
+    readonly FK: Country;
+    readonly FM: Country;
+    readonly FO: Country;
+    readonly FR: Country;
+    readonly GA: Country;
+    readonly GB: Country;
+    readonly GD: Country;
+    readonly GE: Country;
+    readonly GF: Country;
+    readonly GG: Country;
+    readonly GH: Country;
+    readonly GI: Country;
+    readonly GL: Country;
+    readonly GM: Country;
+    readonly GN: Country;
+    readonly GP: Country;
+    readonly GQ: Country;
+    readonly GR: Country;
+    readonly GS: Country;
+    readonly GT: Country;
+    readonly GU: Country;
+    readonly GW: Country;
+    readonly GY: Country;
+    readonly HK: Country;
+    readonly HM: Country;
+    readonly HN: Country;
+    readonly HR: Country;
+    readonly HT: Country;
+    readonly HU: Country;
+    readonly ID: Country;
+    readonly IE: Country;
+    readonly IL: Country;
+    readonly IM: Country;
+    readonly IN: Country;
+    readonly IO: Country;
+    readonly IQ: Country;
+    readonly IR: Country;
+    readonly IS: Country;
+    readonly IT: Country;
+    readonly JE: Country;
+    readonly JM: Country;
+    readonly JO: Country;
+    readonly JP: Country;
+    readonly KE: Country;
+    readonly KG: Country;
+    readonly KH: Country;
+    readonly KI: Country;
+    readonly KM: Country;
+    readonly KN: Country;
+    readonly KP: Country;
+    readonly KR: Country;
+    readonly KW: Country;
+    readonly KY: Country;
+    readonly KZ: Country;
+    readonly LA: Country;
+    readonly LB: Country;
+    readonly LC: Country;
+    readonly LI: Country;
+    readonly LK: Country;
+    readonly LR: Country;
+    readonly LS: Country;
+    readonly LT: Country;
+    readonly LU: Country;
+    readonly LV: Country;
+    readonly LY: Country;
+    readonly MA: Country;
+    readonly MC: Country;
+    readonly MD: Country;
+    readonly ME: Country;
+    readonly MF: Country;
+    readonly MG: Country;
+    readonly MH: Country;
+    readonly MK: Country;
+    readonly ML: Country;
+    readonly MM: Country;
+    readonly MN: Country;
+    readonly MO: Country;
+    readonly MP: Country;
+    readonly MQ: Country;
+    readonly MR: Country;
+    readonly MS: Country;
+    readonly MT: Country;
+    readonly MU: Country;
+    readonly MV: Country;
+    readonly MW: Country;
+    readonly MX: Country;
+    readonly MY: Country;
+    readonly MZ: Country;
+    readonly NA: Country;
+    readonly NC: Country;
+    readonly NE: Country;
+    readonly NF: Country;
+    readonly NG: Country;
+    readonly NI: Country;
+    readonly NL: Country;
+    readonly NO: Country;
+    readonly NP: Country;
+    readonly NR: Country;
+    readonly NU: Country;
+    readonly NZ: Country;
+    readonly OM: Country;
+    readonly PA: Country;
+    readonly PE: Country;
+    readonly PF: Country;
+    readonly PG: Country;
+    readonly PH: Country;
+    readonly PK: Country;
+    readonly PL: Country;
+    readonly PM: Country;
+    readonly PN: Country;
+    readonly PR: Country;
+    readonly PS: Country;
+    readonly PT: Country;
+    readonly PW: Country;
+    readonly PY: Country;
+    readonly QA: Country;
+    readonly RE: Country;
+    readonly RO: Country;
+    readonly RS: Country;
+    readonly RU: Country;
+    readonly RW: Country;
+    readonly SA: Country;
+    readonly SB: Country;
+    readonly SC: Country;
+    readonly SD: Country;
+    readonly SE: Country;
+    readonly SG: Country;
+    readonly SH: Country;
+    readonly SI: Country;
+    readonly SJ: Country;
+    readonly SK: Country;
+    readonly SL: Country;
+    readonly SM: Country;
+    readonly SN: Country;
+    readonly SO: Country;
+    readonly SR: Country;
+    readonly SS: Country;
+    readonly ST: Country;
+    readonly SV: Country;
+    readonly SX: Country;
+    readonly SY: Country;
+    readonly SZ: Country;
+    readonly TC: Country;
+    readonly TD: Country;
+    readonly TF: Country;
+    readonly TG: Country;
+    readonly TH: Country;
+    readonly TJ: Country;
+    readonly TK: Country;
+    readonly TL: Country;
+    readonly TM: Country;
+    readonly TN: Country;
+    readonly TO: Country;
+    readonly TR: Country;
+    readonly TT: Country;
+    readonly TV: Country;
+    readonly TW: Country;
+    readonly TZ: Country;
+    readonly UA: Country;
+    readonly UG: Country;
+    readonly UM: Country;
+    readonly US: Country;
+    readonly UY: Country;
+    readonly UZ: Country;
+    readonly VA: Country;
+    readonly VC: Country;
+    readonly VE: Country;
+    readonly VG: Country;
+    readonly VI: Country;
+    readonly VN: Country;
+    readonly VU: Country;
+    readonly WF: Country;
+    readonly WS: Country;
+    readonly XK: Country;
+    readonly YE: Country;
+    readonly YT: Country;
+    readonly ZA: Country;
+    readonly ZM: Country;
+    readonly ZW: Country;
+};
+
+// Add Cloudflare-specific codes "XX" (no country data) and "T1" (Tor network).
+// See: https://developers.cloudflare.com/fundamentals/reference/http-headers/#cf-ipcountry
+export type CountryCode = keyof CountryCatalogue | 'XX' | 'T1';
+
+export type CountrySubdivision = {
+    code: string;
+    name: string;
+};
+
+export const countries: CountryCatalogue = {
+    AD: { code: 'AD', codeAlpha3: 'AND', flag: '🇦🇩', name: 'Andorra' },
+    AE: { code: 'AE', codeAlpha3: 'ARE', flag: '🇦🇪', name: 'United Arab Emirates' },
+    AF: { code: 'AF', codeAlpha3: 'AFG', flag: '🇦🇫', name: 'Afghanistan' },
+    AG: { code: 'AG', codeAlpha3: 'ATG', flag: '🇦🇬', name: 'Antigua and Barbuda' },
+    AI: { code: 'AI', codeAlpha3: 'AIA', flag: '🇦🇮', name: 'Anguilla' },
+    AL: { code: 'AL', codeAlpha3: 'ALB', flag: '🇦🇱', name: 'Albania' },
+    AM: { code: 'AM', codeAlpha3: 'ARM', flag: '🇦🇲', name: 'Armenia' },
+    AO: { code: 'AO', codeAlpha3: 'AGO', flag: '🇦🇴', name: 'Angola' },
+    AQ: { code: 'AQ', codeAlpha3: 'ATA', flag: '🇦🇶', name: 'Antarctica' },
+    AR: { code: 'AR', codeAlpha3: 'ARG', flag: '🇦🇷', name: 'Argentina' },
+    AS: { code: 'AS', codeAlpha3: 'ASM', flag: '🇦🇸', name: 'American Samoa' },
+    AT: { code: 'AT', codeAlpha3: 'AUT', flag: '🇦🇹', name: 'Austria' },
+    AU: { code: 'AU', codeAlpha3: 'AUS', flag: '🇦🇺', name: 'Australia' },
+    AW: { code: 'AW', codeAlpha3: 'ABW', flag: '🇦🇼', name: 'Aruba' },
+    AX: { code: 'AX', codeAlpha3: 'ALA', flag: '🇦🇽', name: 'Åland Islands' },
+    AZ: { code: 'AZ', codeAlpha3: 'AZE', flag: '🇦🇿', name: 'Azerbaijan' },
+    BA: { code: 'BA', codeAlpha3: 'BIH', flag: '🇧🇦', name: 'Bosnia and Herzegovina' },
+    BB: { code: 'BB', codeAlpha3: 'BRB', flag: '🇧🇧', name: 'Barbados' },
+    BD: { code: 'BD', codeAlpha3: 'BGD', flag: '🇧🇩', name: 'Bangladesh' },
+    BE: { code: 'BE', codeAlpha3: 'BEL', flag: '🇧🇪', name: 'Belgium' },
+    BF: { code: 'BF', codeAlpha3: 'BFA', flag: '🇧🇫', name: 'Burkina Faso' },
+    BG: { code: 'BG', codeAlpha3: 'BGR', flag: '🇧🇬', name: 'Bulgaria' },
+    BH: { code: 'BH', codeAlpha3: 'BHR', flag: '🇧🇭', name: 'Bahrain' },
+    BI: { code: 'BI', codeAlpha3: 'BDI', flag: '🇧🇮', name: 'Burundi' },
+    BJ: { code: 'BJ', codeAlpha3: 'BEN', flag: '🇧🇯', name: 'Benin' },
+    BL: { code: 'BL', codeAlpha3: 'BLM', flag: '🇧🇱', name: 'Saint Barthélemy' },
+    BM: { code: 'BM', codeAlpha3: 'BMU', flag: '🇧🇲', name: 'Bermuda' },
+    BN: { code: 'BN', codeAlpha3: 'BRN', flag: '🇧🇳', name: 'Brunei Darussalam' },
+    BO: { code: 'BO', codeAlpha3: 'BOL', flag: '🇧🇴', name: 'Bolivia' },
+    BQ: { code: 'BQ', codeAlpha3: 'BES', flag: '🇧🇶', name: 'Bonaire, Sint Eustatius and Saba' },
+    BR: { code: 'BR', codeAlpha3: 'BRA', flag: '🇧🇷', name: 'Brazil' },
+    BS: { code: 'BS', codeAlpha3: 'BHS', flag: '🇧🇸', name: 'Bahamas' },
+    BT: { code: 'BT', codeAlpha3: 'BTN', flag: '🇧🇹', name: 'Bhutan' },
+    BV: { code: 'BV', codeAlpha3: 'BVT', flag: '🇧🇻', name: 'Bouvet Island' },
+    BW: { code: 'BW', codeAlpha3: 'BWA', flag: '🇧🇼', name: 'Botswana' },
+    BY: { code: 'BY', codeAlpha3: 'BLR', flag: '🇧🇾', name: 'Belarus' },
+    BZ: { code: 'BZ', codeAlpha3: 'BLZ', flag: '🇧🇿', name: 'Belize' },
+    CA: { code: 'CA', codeAlpha3: 'CAN', flag: '🇨🇦', name: 'Canada' },
+    CC: { code: 'CC', codeAlpha3: 'CCK', flag: '🇨🇨', name: 'Cocos (Keeling) Islands' },
+    CD: { code: 'CD', codeAlpha3: 'COD', flag: '🇨🇩', name: 'Democratic Republic of the Congo' },
+    CF: { code: 'CF', codeAlpha3: 'CAF', flag: '🇨🇫', name: 'Central African Republic' },
+    CG: { code: 'CG', codeAlpha3: 'COG', flag: '🇨🇬', name: 'Republic of the Congo' },
+    CH: { code: 'CH', codeAlpha3: 'CHE', flag: '🇨🇭', name: 'Switzerland' },
+    CI: { code: 'CI', codeAlpha3: 'CIV', flag: '🇨🇮', name: "Côte d'Ivoire" },
+    CK: { code: 'CK', codeAlpha3: 'COK', flag: '🇨🇰', name: 'Cook Islands' },
+    CL: { code: 'CL', codeAlpha3: 'CHL', flag: '🇨🇱', name: 'Chile' },
+    CM: { code: 'CM', codeAlpha3: 'CMR', flag: '🇨🇲', name: 'Cameroon' },
+    CN: { code: 'CN', codeAlpha3: 'CHN', flag: '🇨🇳', name: 'China' },
+    CO: { code: 'CO', codeAlpha3: 'COL', flag: '🇨🇴', name: 'Colombia' },
+    CR: { code: 'CR', codeAlpha3: 'CRI', flag: '🇨🇷', name: 'Costa Rica' },
+    CU: { code: 'CU', codeAlpha3: 'CUB', flag: '🇨🇺', name: 'Cuba' },
+    CV: { code: 'CV', codeAlpha3: 'CPV', flag: '🇨🇻', name: 'Cabo Verde' },
+    CW: { code: 'CW', codeAlpha3: 'CUW', flag: '🇨🇼', name: 'Curaçao' },
+    CX: { code: 'CX', codeAlpha3: 'CXR', flag: '🇨🇽', name: 'Christmas Island' },
+    CY: { code: 'CY', codeAlpha3: 'CYP', flag: '🇨🇾', name: 'Cyprus' },
+    CZ: { code: 'CZ', codeAlpha3: 'CZE', flag: '🇨🇿', name: 'Czechia' },
+    DE: { code: 'DE', codeAlpha3: 'DEU', flag: '🇩🇪', name: 'Germany' },
+    DJ: { code: 'DJ', codeAlpha3: 'DJI', flag: '🇩🇯', name: 'Djibouti' },
+    DK: { code: 'DK', codeAlpha3: 'DNK', flag: '🇩🇰', name: 'Denmark' },
+    DM: { code: 'DM', codeAlpha3: 'DMA', flag: '🇩🇲', name: 'Dominica' },
+    DO: { code: 'DO', codeAlpha3: 'DOM', flag: '🇩🇴', name: 'Dominican Republic' },
+    DZ: { code: 'DZ', codeAlpha3: 'DZA', flag: '🇩🇿', name: 'Algeria' },
+    EC: { code: 'EC', codeAlpha3: 'ECU', flag: '🇪🇨', name: 'Ecuador' },
+    EE: { code: 'EE', codeAlpha3: 'EST', flag: '🇪🇪', name: 'Estonia' },
+    EG: { code: 'EG', codeAlpha3: 'EGY', flag: '🇪🇬', name: 'Egypt' },
+    EH: { code: 'EH', codeAlpha3: 'ESH', flag: '🇪🇭', name: 'Western Sahara' },
+    ER: { code: 'ER', codeAlpha3: 'ERI', flag: '🇪🇷', name: 'Eritrea' },
+    ES: { code: 'ES', codeAlpha3: 'ESP', flag: '🇪🇸', name: 'Spain' },
+    ET: { code: 'ET', codeAlpha3: 'ETH', flag: '🇪🇹', name: 'Ethiopia' },
+    FI: { code: 'FI', codeAlpha3: 'FIN', flag: '🇫🇮', name: 'Finland' },
+    FJ: { code: 'FJ', codeAlpha3: 'FJI', flag: '🇫🇯', name: 'Fiji' },
+    FK: { code: 'FK', codeAlpha3: 'FLK', flag: '🇫🇰', name: 'Falkland Islands (Malvinas)' },
+    FM: { code: 'FM', codeAlpha3: 'FSM', flag: '🇫🇲', name: 'Micronesia' },
+    FO: { code: 'FO', codeAlpha3: 'FRO', flag: '🇫🇴', name: 'Faroe Islands' },
+    FR: { code: 'FR', codeAlpha3: 'FRA', flag: '🇫🇷', name: 'France' },
+    GA: { code: 'GA', codeAlpha3: 'GAB', flag: '🇬🇦', name: 'Gabon' },
+    GB: {
+        code: 'GB',
+        codeAlpha3: 'GBR',
+        flag: '🇬🇧',
+        name: 'United Kingdom of Great Britain and Northern Ireland',
+    },
+    GD: { code: 'GD', codeAlpha3: 'GRD', flag: '🇬🇩', name: 'Grenada' },
+    GE: { code: 'GE', codeAlpha3: 'GEO', flag: '🇬🇪', name: 'Georgia' },
+    GF: { code: 'GF', codeAlpha3: 'GUF', flag: '🇬🇫', name: 'French Guiana' },
+    GG: { code: 'GG', codeAlpha3: 'GGY', flag: '🇬🇬', name: 'Guernsey' },
+    GH: { code: 'GH', codeAlpha3: 'GHA', flag: '🇬🇭', name: 'Ghana' },
+    GI: { code: 'GI', codeAlpha3: 'GIB', flag: '🇬🇮', name: 'Gibraltar' },
+    GL: { code: 'GL', codeAlpha3: 'GRL', flag: '🇬🇱', name: 'Greenland' },
+    GM: { code: 'GM', codeAlpha3: 'GMB', flag: '🇬🇲', name: 'Gambia' },
+    GN: { code: 'GN', codeAlpha3: 'GIN', flag: '🇬🇳', name: 'Guinea' },
+    GP: { code: 'GP', codeAlpha3: 'GLP', flag: '🇬🇵', name: 'Guadeloupe' },
+    GQ: { code: 'GQ', codeAlpha3: 'GNQ', flag: '🇬🇶', name: 'Equatorial Guinea' },
+    GR: { code: 'GR', codeAlpha3: 'GRC', flag: '🇬🇷', name: 'Greece' },
+    GS: {
+        code: 'GS',
+        codeAlpha3: 'SGS',
+        flag: '🇬🇸',
+        name: 'South Georgia and the South Sandwich Islands',
+    },
+    GT: { code: 'GT', codeAlpha3: 'GTM', flag: '🇬🇹', name: 'Guatemala' },
+    GU: { code: 'GU', codeAlpha3: 'GUM', flag: '🇬🇺', name: 'Guam' },
+    GW: { code: 'GW', codeAlpha3: 'GNB', flag: '🇬🇼', name: 'Guinea-Bissau' },
+    GY: { code: 'GY', codeAlpha3: 'GUY', flag: '🇬🇾', name: 'Guyana' },
+    HK: { code: 'HK', codeAlpha3: 'HKG', flag: '🇭🇰', name: 'Hong Kong' },
+    HM: { code: 'HM', codeAlpha3: 'HMD', flag: '🇭🇲', name: 'Heard Island and McDonald Islands' },
+    HN: { code: 'HN', codeAlpha3: 'HND', flag: '🇭🇳', name: 'Honduras' },
+    HR: { code: 'HR', codeAlpha3: 'HRV', flag: '🇭🇷', name: 'Croatia' },
+    HT: { code: 'HT', codeAlpha3: 'HTI', flag: '🇭🇹', name: 'Haiti' },
+    HU: { code: 'HU', codeAlpha3: 'HUN', flag: '🇭🇺', name: 'Hungary' },
+    ID: { code: 'ID', codeAlpha3: 'IDN', flag: '🇮🇩', name: 'Indonesia' },
+    IE: { code: 'IE', codeAlpha3: 'IRL', flag: '🇮🇪', name: 'Ireland' },
+    IL: { code: 'IL', codeAlpha3: 'ISR', flag: '🇮🇱', name: 'Israel' },
+    IM: { code: 'IM', codeAlpha3: 'IMN', flag: '🇮🇲', name: 'Isle of Man' },
+    IN: { code: 'IN', codeAlpha3: 'IND', flag: '🇮🇳', name: 'India' },
+    IO: { code: 'IO', codeAlpha3: 'IOT', flag: '🇮🇴', name: 'British Indian Ocean Territory' },
+    IQ: { code: 'IQ', codeAlpha3: 'IRQ', flag: '🇮🇶', name: 'Iraq' },
+    IR: { code: 'IR', codeAlpha3: 'IRN', flag: '🇮🇷', name: 'Iran' },
+    IS: { code: 'IS', codeAlpha3: 'ISL', flag: '🇮🇸', name: 'Iceland' },
+    IT: { code: 'IT', codeAlpha3: 'ITA', flag: '🇮🇹', name: 'Italy' },
+    JE: { code: 'JE', codeAlpha3: 'JEY', flag: '🇯🇪', name: 'Jersey' },
+    JM: { code: 'JM', codeAlpha3: 'JAM', flag: '🇯🇲', name: 'Jamaica' },
+    JO: { code: 'JO', codeAlpha3: 'JOR', flag: '🇯🇴', name: 'Jordan' },
+    JP: { code: 'JP', codeAlpha3: 'JPN', flag: '🇯🇵', name: 'Japan' },
+    KE: { code: 'KE', codeAlpha3: 'KEN', flag: '🇰🇪', name: 'Kenya' },
+    KG: { code: 'KG', codeAlpha3: 'KGZ', flag: '🇰🇬', name: 'Kyrgyzstan' },
+    KH: { code: 'KH', codeAlpha3: 'KHM', flag: '🇰🇭', name: 'Cambodia' },
+    KI: { code: 'KI', codeAlpha3: 'KIR', flag: '🇰🇮', name: 'Kiribati' },
+    KM: { code: 'KM', codeAlpha3: 'COM', flag: '🇰🇲', name: 'Comoros' },
+    KN: { code: 'KN', codeAlpha3: 'KNA', flag: '🇰🇳', name: 'Saint Kitts and Nevis' },
+    KP: { code: 'KP', codeAlpha3: 'PRK', flag: '🇰🇵', name: 'North Korea' },
+    KR: { code: 'KR', codeAlpha3: 'KOR', flag: '🇰🇷', name: 'South Korea' },
+    KW: { code: 'KW', codeAlpha3: 'KWT', flag: '🇰🇼', name: 'Kuwait' },
+    KY: { code: 'KY', codeAlpha3: 'CYM', flag: '🇰🇾', name: 'Cayman Islands' },
+    KZ: { code: 'KZ', codeAlpha3: 'KAZ', flag: '🇰🇿', name: 'Kazakhstan' },
+    LA: { code: 'LA', codeAlpha3: 'LAO', flag: '🇱🇦', name: "Lao People's Democratic Republic" },
+    LB: { code: 'LB', codeAlpha3: 'LBN', flag: '🇱🇧', name: 'Lebanon' },
+    LC: { code: 'LC', codeAlpha3: 'LCA', flag: '🇱🇨', name: 'Saint Lucia' },
+    LI: { code: 'LI', codeAlpha3: 'LIE', flag: '🇱🇮', name: 'Liechtenstein' },
+    LK: { code: 'LK', codeAlpha3: 'LKA', flag: '🇱🇰', name: 'Sri Lanka' },
+    LR: { code: 'LR', codeAlpha3: 'LBR', flag: '🇱🇷', name: 'Liberia' },
+    LS: { code: 'LS', codeAlpha3: 'LSO', flag: '🇱🇸', name: 'Lesotho' },
+    LT: { code: 'LT', codeAlpha3: 'LTU', flag: '🇱🇹', name: 'Lithuania' },
+    LU: { code: 'LU', codeAlpha3: 'LUX', flag: '🇱🇺', name: 'Luxembourg' },
+    LV: { code: 'LV', codeAlpha3: 'LVA', flag: '🇱🇻', name: 'Latvia' },
+    LY: { code: 'LY', codeAlpha3: 'LBY', flag: '🇱🇾', name: 'Libya' },
+    MA: { code: 'MA', codeAlpha3: 'MAR', flag: '🇲🇦', name: 'Morocco' },
+    MC: { code: 'MC', codeAlpha3: 'MCO', flag: '🇲🇨', name: 'Monaco' },
+    MD: { code: 'MD', codeAlpha3: 'MDA', flag: '🇲🇩', name: 'Moldova' },
+    ME: { code: 'ME', codeAlpha3: 'MNE', flag: '🇲🇪', name: 'Montenegro' },
+    MF: { code: 'MF', codeAlpha3: 'MAF', flag: '🇲🇫', name: 'Saint Martin (French Part)' },
+    MG: { code: 'MG', codeAlpha3: 'MDG', flag: '🇲🇬', name: 'Madagascar' },
+    MH: { code: 'MH', codeAlpha3: 'MHL', flag: '🇲🇭', name: 'Marshall Islands' },
+    MK: { code: 'MK', codeAlpha3: 'MKD', flag: '🇲🇰', name: 'Republic of North Macedonia' },
+    ML: { code: 'ML', codeAlpha3: 'MLI', flag: '🇲🇱', name: 'Mali' },
+    MM: { code: 'MM', codeAlpha3: 'MMR', flag: '🇲🇲', name: 'Myanmar' },
+    MN: { code: 'MN', codeAlpha3: 'MNG', flag: '🇲🇳', name: 'Mongolia' },
+    MO: { code: 'MO', codeAlpha3: 'MAC', flag: '🇲🇴', name: 'Macao' },
+    MP: { code: 'MP', codeAlpha3: 'MNP', flag: '🇲🇵', name: 'Northern Mariana Islands' },
+    MQ: { code: 'MQ', codeAlpha3: 'MTQ', flag: '🇲🇶', name: 'Martinique' },
+    MR: { code: 'MR', codeAlpha3: 'MRT', flag: '🇲🇷', name: 'Mauritania' },
+    MS: { code: 'MS', codeAlpha3: 'MSR', flag: '🇲🇸', name: 'Montserrat' },
+    MT: { code: 'MT', codeAlpha3: 'MLT', flag: '🇲🇹', name: 'Malta' },
+    MU: { code: 'MU', codeAlpha3: 'MUS', flag: '🇲🇺', name: 'Mauritius' },
+    MV: { code: 'MV', codeAlpha3: 'MDV', flag: '🇲🇻', name: 'Maldives' },
+    MW: { code: 'MW', codeAlpha3: 'MWI', flag: '🇲🇼', name: 'Malawi' },
+    MX: { code: 'MX', codeAlpha3: 'MEX', flag: '🇲🇽', name: 'Mexico' },
+    MY: { code: 'MY', codeAlpha3: 'MYS', flag: '🇲🇾', name: 'Malaysia' },
+    MZ: { code: 'MZ', codeAlpha3: 'MOZ', flag: '🇲🇿', name: 'Mozambique' },
+    NA: { code: 'NA', codeAlpha3: 'NAM', flag: '🇳🇦', name: 'Namibia' },
+    NC: { code: 'NC', codeAlpha3: 'NCL', flag: '🇳🇨', name: 'New Caledonia' },
+    NE: { code: 'NE', codeAlpha3: 'NER', flag: '🇳🇪', name: 'Niger' },
+    NF: { code: 'NF', codeAlpha3: 'NFK', flag: '🇳🇫', name: 'Norfolk Island' },
+    NG: { code: 'NG', codeAlpha3: 'NGA', flag: '🇳🇬', name: 'Nigeria' },
+    NI: { code: 'NI', codeAlpha3: 'NIC', flag: '🇳🇮', name: 'Nicaragua' },
+    NL: { code: 'NL', codeAlpha3: 'NLD', flag: '🇳🇱', name: 'Netherlands' },
+    NO: { code: 'NO', codeAlpha3: 'NOR', flag: '🇳🇴', name: 'Norway' },
+    NP: { code: 'NP', codeAlpha3: 'NPL', flag: '🇳🇵', name: 'Nepal' },
+    NR: { code: 'NR', codeAlpha3: 'NRU', flag: '🇳🇷', name: 'Nauru' },
+    NU: { code: 'NU', codeAlpha3: 'NIU', flag: '🇳🇺', name: 'Niue' },
+    NZ: { code: 'NZ', codeAlpha3: 'NZL', flag: '🇳🇿', name: 'New Zealand' },
+    OM: { code: 'OM', codeAlpha3: 'OMN', flag: '🇴🇲', name: 'Oman' },
+    PA: { code: 'PA', codeAlpha3: 'PAN', flag: '🇵🇦', name: 'Panama' },
+    PE: { code: 'PE', codeAlpha3: 'PER', flag: '🇵🇪', name: 'Peru' },
+    PF: { code: 'PF', codeAlpha3: 'PYF', flag: '🇵🇫', name: 'French Polynesia' },
+    PG: { code: 'PG', codeAlpha3: 'PNG', flag: '🇵🇬', name: 'Papua New Guinea' },
+    PH: { code: 'PH', codeAlpha3: 'PHL', flag: '🇵🇭', name: 'Philippines' },
+    PK: { code: 'PK', codeAlpha3: 'PAK', flag: '🇵🇰', name: 'Pakistan' },
+    PL: { code: 'PL', codeAlpha3: 'POL', flag: '🇵🇱', name: 'Poland' },
+    PM: { code: 'PM', codeAlpha3: 'SPM', flag: '🇵🇲', name: 'Saint Pierre and Miquelon' },
+    PN: { code: 'PN', codeAlpha3: 'PCN', flag: '🇵🇳', name: 'Pitcairn' },
+    PR: { code: 'PR', codeAlpha3: 'PRI', flag: '🇵🇷', name: 'Puerto Rico' },
+    PS: { code: 'PS', codeAlpha3: 'PSE', flag: '🇵🇸', name: 'Palestinian Territory' },
+    PT: { code: 'PT', codeAlpha3: 'PRT', flag: '🇵🇹', name: 'Portugal' },
+    PW: { code: 'PW', codeAlpha3: 'PLW', flag: '🇵🇼', name: 'Palau' },
+    PY: { code: 'PY', codeAlpha3: 'PRY', flag: '🇵🇾', name: 'Paraguay' },
+    QA: { code: 'QA', codeAlpha3: 'QAT', flag: '🇶🇦', name: 'Qatar' },
+    RE: { code: 'RE', codeAlpha3: 'REU', flag: '🇷🇪', name: 'Réunion' },
+    RO: { code: 'RO', codeAlpha3: 'ROU', flag: '🇷🇴', name: 'Romania' },
+    RS: { code: 'RS', codeAlpha3: 'SRB', flag: '🇷🇸', name: 'Serbia' },
+    RU: { code: 'RU', codeAlpha3: 'RUS', flag: '🇷🇺', name: 'Russian Federation' },
+    RW: { code: 'RW', codeAlpha3: 'RWA', flag: '🇷🇼', name: 'Rwanda' },
+    SA: { code: 'SA', codeAlpha3: 'SAU', flag: '🇸🇦', name: 'Saudi Arabia' },
+    SB: { code: 'SB', codeAlpha3: 'SLB', flag: '🇸🇧', name: 'Solomon Islands' },
+    SC: { code: 'SC', codeAlpha3: 'SYC', flag: '🇸🇨', name: 'Seychelles' },
+    SD: { code: 'SD', codeAlpha3: 'SDN', flag: '🇸🇩', name: 'Sudan' },
+    SE: { code: 'SE', codeAlpha3: 'SWE', flag: '🇸🇪', name: 'Sweden' },
+    SG: { code: 'SG', codeAlpha3: 'SGP', flag: '🇸🇬', name: 'Singapore' },
+    SH: {
+        code: 'SH',
+        codeAlpha3: 'SHN',
+        flag: '🇸🇭',
+        name: 'Saint Helena, Ascension and Tristan da Cunha',
+    },
+    SI: { code: 'SI', codeAlpha3: 'SVN', flag: '🇸🇮', name: 'Slovenia' },
+    SJ: { code: 'SJ', codeAlpha3: 'SJM', flag: '🇸🇯', name: 'Svalbard and Jan Mayen' },
+    SK: { code: 'SK', codeAlpha3: 'SVK', flag: '🇸🇰', name: 'Slovakia' },
+    SL: { code: 'SL', codeAlpha3: 'SLE', flag: '🇸🇱', name: 'Sierra Leone' },
+    SM: { code: 'SM', codeAlpha3: 'SMR', flag: '🇸🇲', name: 'San Marino' },
+    SN: { code: 'SN', codeAlpha3: 'SEN', flag: '🇸🇳', name: 'Senegal' },
+    SO: { code: 'SO', codeAlpha3: 'SOM', flag: '🇸🇴', name: 'Somalia' },
+    SR: { code: 'SR', codeAlpha3: 'SUR', flag: '🇸🇷', name: 'Suriname' },
+    SS: { code: 'SS', codeAlpha3: 'SSD', flag: '🇸🇸', name: 'South Sudan' },
+    ST: { code: 'ST', codeAlpha3: 'STP', flag: '🇸🇹', name: 'Sao Tome and Principe' },
+    SV: { code: 'SV', codeAlpha3: 'SLV', flag: '🇸🇻', name: 'El Salvador' },
+    SX: { code: 'SX', codeAlpha3: 'SXM', flag: '🇸🇽', name: 'Sint Maarten (Dutch Part)' },
+    SY: { code: 'SY', codeAlpha3: 'SYR', flag: '🇸🇾', name: 'Syrian Arab Republic' },
+    SZ: { code: 'SZ', codeAlpha3: 'SWZ', flag: '🇸🇿', name: 'Eswatini' },
+    TC: { code: 'TC', codeAlpha3: 'TCA', flag: '🇹🇨', name: 'Turks and Caicos Islands' },
+    TD: { code: 'TD', codeAlpha3: 'TCD', flag: '🇹🇩', name: 'Chad' },
+    TF: { code: 'TF', codeAlpha3: 'ATF', flag: '🇹🇫', name: 'French Southern Territories' },
+    TG: { code: 'TG', codeAlpha3: 'TGO', flag: '🇹🇬', name: 'Togo' },
+    TH: { code: 'TH', codeAlpha3: 'THA', flag: '🇹🇭', name: 'Thailand' },
+    TJ: { code: 'TJ', codeAlpha3: 'TJK', flag: '🇹🇯', name: 'Tajikistan' },
+    TK: { code: 'TK', codeAlpha3: 'TKL', flag: '🇹🇰', name: 'Tokelau' },
+    TL: { code: 'TL', codeAlpha3: 'TLS', flag: '🇹🇱', name: 'Timor-Leste' },
+    TM: { code: 'TM', codeAlpha3: 'TKM', flag: '🇹🇲', name: 'Turkmenistan' },
+    TN: { code: 'TN', codeAlpha3: 'TUN', flag: '🇹🇳', name: 'Tunisia' },
+    TO: { code: 'TO', codeAlpha3: 'TON', flag: '🇹🇴', name: 'Tonga' },
+    TR: { code: 'TR', codeAlpha3: 'TUR', flag: '🇹🇷', name: 'Turkey' },
+    TT: { code: 'TT', codeAlpha3: 'TTO', flag: '🇹🇹', name: 'Trinidad and Tobago' },
+    TV: { code: 'TV', codeAlpha3: 'TUV', flag: '🇹🇻', name: 'Tuvalu' },
+    TW: { code: 'TW', codeAlpha3: 'TWN', flag: '🇹🇼', name: 'Taiwan' },
+    TZ: { code: 'TZ', codeAlpha3: 'TZA', flag: '🇹🇿', name: 'Tanzania' },
+    UA: { code: 'UA', codeAlpha3: 'UKR', flag: '🇺🇦', name: 'Ukraine' },
+    UG: { code: 'UG', codeAlpha3: 'UGA', flag: '🇺🇬', name: 'Uganda' },
+    UM: { code: 'UM', codeAlpha3: 'UMI', flag: '🇺🇲', name: 'United States Minor Outlying Islands' },
+    US: { code: 'US', codeAlpha3: 'USA', flag: '🇺🇸', name: 'United States of America' },
+    UY: { code: 'UY', codeAlpha3: 'URY', flag: '🇺🇾', name: 'Uruguay' },
+    UZ: { code: 'UZ', codeAlpha3: 'UZB', flag: '🇺🇿', name: 'Uzbekistan' },
+    VA: { code: 'VA', codeAlpha3: 'VAT', flag: '🇻🇦', name: 'Vatican City' },
+    VC: { code: 'VC', codeAlpha3: 'VCT', flag: '🇻🇨', name: 'Saint Vincent and the Grenadines' },
+    VE: { code: 'VE', codeAlpha3: 'VEN', flag: '🇻🇪', name: 'Venezuela' },
+    VG: { code: 'VG', codeAlpha3: 'VGB', flag: '🇻🇬', name: 'Virgin Islands, British' },
+    VI: { code: 'VI', codeAlpha3: 'VIR', flag: '🇻🇮', name: 'Virgin Islands, U.S.' },
+    VN: { code: 'VN', codeAlpha3: 'VNM', flag: '🇻🇳', name: 'Viet Nam' },
+    VU: { code: 'VU', codeAlpha3: 'VUT', flag: '🇻🇺', name: 'Vanuatu' },
+    WF: { code: 'WF', codeAlpha3: 'WLF', flag: '🇼🇫', name: 'Wallis and Futuna' },
+    WS: { code: 'WS', codeAlpha3: 'WSM', flag: '🇼🇸', name: 'Samoa' },
+    XK: { code: 'XK', codeAlpha3: 'XKX', flag: '🇽🇰', name: 'Kosovo' },
+    YE: { code: 'YE', codeAlpha3: 'YEM', flag: '🇾🇪', name: 'Yemen' },
+    YT: { code: 'YT', codeAlpha3: 'MYT', flag: '🇾🇹', name: 'Mayotte' },
+    ZA: { code: 'ZA', codeAlpha3: 'ZAF', flag: '🇿🇦', name: 'South Africa' },
+    ZM: { code: 'ZM', codeAlpha3: 'ZMB', flag: '🇿🇲', name: 'Zambia' },
+    ZW: { code: 'ZW', codeAlpha3: 'ZWE', flag: '🇿🇼', name: 'Zimbabwe' },
+};
+
+export const usSubdivisions = [
+    { code: 'AK', name: 'Alaska' },
+    { code: 'AL', name: 'Alabama' },
+    { code: 'AR', name: 'Arkansas' },
+    { code: 'AS', name: 'American Samoa' },
+    { code: 'AZ', name: 'Arizona' },
+    { code: 'CA', name: 'California' },
+    { code: 'CO', name: 'Colorado' },
+    { code: 'CT', name: 'Connecticut' },
+    { code: 'DC', name: 'District of Columbia' },
+    { code: 'DE', name: 'Delaware' },
+    { code: 'FL', name: 'Florida' },
+    { code: 'GA', name: 'Georgia' },
+    { code: 'GU', name: 'Guam' },
+    { code: 'HI', name: 'Hawaii' },
+    { code: 'IA', name: 'Iowa' },
+    { code: 'ID', name: 'Idaho' },
+    { code: 'IL', name: 'Illinois' },
+    { code: 'IN', name: 'Indiana' },
+    { code: 'KS', name: 'Kansas' },
+    { code: 'KY', name: 'Kentucky' },
+    { code: 'LA', name: 'Louisiana' },
+    { code: 'MA', name: 'Massachusetts' },
+    { code: 'MD', name: 'Maryland' },
+    { code: 'ME', name: 'Maine' },
+    { code: 'MI', name: 'Michigan' },
+    { code: 'MN', name: 'Minnesota' },
+    { code: 'MO', name: 'Missouri' },
+    { code: 'MP', name: 'Northern Mariana Islands' },
+    { code: 'MS', name: 'Mississippi' },
+    { code: 'MT', name: 'Montana' },
+    { code: 'NC', name: 'North Carolina' },
+    { code: 'ND', name: 'North Dakota' },
+    { code: 'NE', name: 'Nebraska' },
+    { code: 'NH', name: 'New Hampshire' },
+    { code: 'NJ', name: 'New Jersey' },
+    { code: 'NM', name: 'New Mexico' },
+    { code: 'NV', name: 'Nevada' },
+    { code: 'NY', name: 'New York' },
+    { code: 'OH', name: 'Ohio' },
+    { code: 'OK', name: 'Oklahoma' },
+    { code: 'OR', name: 'Oregon' },
+    { code: 'PA', name: 'Pennsylvania' },
+    { code: 'PR', name: 'Puerto Rico' },
+    { code: 'RI', name: 'Rhode Island' },
+    { code: 'SC', name: 'South Carolina' },
+    { code: 'SD', name: 'South Dakota' },
+    { code: 'TN', name: 'Tennessee' },
+    { code: 'TX', name: 'Texas' },
+    { code: 'UM', name: 'United States Minor Outlying Islands' },
+    { code: 'UT', name: 'Utah' },
+    { code: 'VA', name: 'Virginia' },
+    { code: 'VI', name: 'U.S. Virgin Islands' },
+    { code: 'VT', name: 'Vermont' },
+    { code: 'WA', name: 'Washington' },
+    { code: 'WI', name: 'Wisconsin' },
+    { code: 'WV', name: 'West Virginia' },
+    { code: 'WY', name: 'Wyoming' },
+] as const satisfies ReadonlyArray<CountrySubdivision>;
+
+export const subdivisionsByCountry = {
+    US: usSubdivisions,
+} as const satisfies Partial<Record<keyof typeof countries, ReadonlyArray<CountrySubdivision>>>;
+
+export type CountryCodeWithSubdivisions = keyof typeof subdivisionsByCountry;
+
+// European Economic Area (EEA) - https://en.wikipedia.org/wiki/European_Economic_Area
+export const EEACountryCodes = [
+    'AT',
+    'BE',
+    'BG',
+    'CY',
+    'CZ',
+    'DE',
+    'DK',
+    'EE',
+    'ES',
+    'FI',
+    'FR',
+    'GR',
+    'HR',
+    'HU',
+    'IE',
+    'IS',
+    'IT',
+    'LI',
+    'LT',
+    'LU',
+    'LV',
+    'MT',
+    'NL',
+    'NO',
+    'PL',
+    'PT',
+    'RO',
+    'SE',
+    'SI',
+    'SK',
+] as const;
+
+export type EEACountryCodeType = (typeof EEACountryCodes)[number];
+
+// Sanctioned countries according to https://orpa.princeton.edu/export-controls/sanctioned-countries
+export const ComprehensivelySanctionedCountryCodes: Readonly<string[]> = [
+    'CU', // Cuba
+    'IR', // Iran
+    'KP', // North Korea
+    'RU', // Russia
+];
+
+export const OfacSanctionedCountryCodes: Readonly<string[]> = [
+    'AF', // Afghanistan
+    'BY', // Belarus
+    'MM', // Burma (Myanmar)
+    'CF', // Central African Republic
+    'CD', // Congo (Kinshasa)
+    'ET', // Ethiopia
+    'HK', // Hong Kong
+    'IQ', // Iraq
+    'LB', // Lebanon
+    'LY', // Libya
+    'ML', // Mali
+    'NI', // Nicaragua
+    'SO', // Somalia
+    'SS', // South Sudan
+    'SD', // Sudan
+    'VE', // Venezuela
+    'YE', // Yemen
+];

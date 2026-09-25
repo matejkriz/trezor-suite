@@ -1,193 +1,152 @@
-import { onCancel as onCancelAction } from 'src/actions/suite/modalActions';
-import { MODAL } from 'src/actions/suite/constants';
-import { useDispatch } from 'src/hooks/suite';
+import { MetadataProviderModal } from '@suite/metadata';
+import { type MODAL_CONTEXT_USER, closeModal as closeModalAction } from '@suite/modal';
+import { isOnionUrl } from '@suite/tor';
 import {
-    PinMismatchModal,
-    PassphraseDuplicateModal,
-    CoinmarketTermsModal,
-    CoinmarketLeaveSpendModal,
-    ConfirmAddressModal,
-    ConfirmXpubModal,
-    TransactionReviewModal,
-    ImportTransactionModal,
-    AddAccountModal,
-    QrScannerModal,
-    BackgroundGalleryModal,
-    TxDetailModal,
-    ApplicationLogModal,
-    WipeDeviceModal,
-    MetadataProviderModal,
-    AdvancedCoinSettingsModal,
-    AddTokenModal,
-    SafetyChecksModal,
     DisableTorModal,
     DisableTorStopCoinjoinModal,
     RequestEnableTorModal,
-    TorLoadingModal,
-    CancelCoinjoinModal,
-    CriticalCoinjoinPhaseModal,
-    CoinjoinSuccessModal,
-    MoreRoundsNeededModal,
-    ConfirmUnverifiedModal,
-    ConfirmUnverifiedAddressModal,
-    UnecoCoinjoinModal,
-    AuthenticateDeviceModal,
-    AuthenticateDeviceFailModal,
-    DeviceAuthenticityOptOutModal,
-    StakeEthInANutshellModal,
+} from '@suite/tor-desktop';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { blockchainActions, selectCustomBackends } from '@suite-common/wallet-core';
+import { type AccountKey } from '@suite-common/wallet-types';
+import { UI_EVENTS } from '@trezor/connect';
+import { exhaustive } from '@trezor/type-utils';
+
+import {
+    EarnClaimModal,
+    EarnInANutshellModal,
+    EarnProviderConsentModal,
     StakeModal,
+    TronStakeInANutshellModal,
+    TronVoteConsentModal,
     UnstakeModal,
-    ClaimModal,
-} from 'src/components/suite/modals';
-import type { AcquiredDevice } from 'src/types/suite';
-import { openXpubModal, showXpub } from 'src/actions/wallet/publicKeyActions';
-import type { ReduxModalProps } from '../ReduxModal';
-import { CryptoSymbol } from 'invity-api';
-import { EverstakeModal } from './UnstakeModal/EverstakeModal';
+} from 'src/components/earn';
+import { ConnectPopupTxSimulationModal } from 'src/components/tx-simulation/connect-popup';
+import { EarnYieldTxSimulationModal } from 'src/components/tx-simulation/earn-stablecoin';
+import { useSelector } from 'src/hooks/suite';
+
+import { ConfirmXpubModal } from '../ConfirmXpubModal';
+import { CopyAddressModal } from '../CopyAddressModal';
+import { ActivateAssetsModal } from './ActivateAssetsModal';
+import { AddAccountModal } from './AddAccountModal/AddAccountModal';
+import { AddTokenModal } from './AddTokenModal';
+import type { ReduxModalProps } from '../ReduxModalProps';
+import { AdvancedCoinSettingsModal } from './AdvancedCoinSettingsModal/AdvancedCoinSettingsModal';
+import { ApplicationLogModal } from './ApplicationLogModal';
+import { BackgroundGalleryModal } from './BackgroundGalleryModal';
+import { PinInvalidModal } from '../DeviceContextModal/PinInvalidModal';
+import { TransactionReviewModal } from '../TransactionReviewModal/TransactionReviewModal';
+import { UnhideTokenModal } from '../UnhideTokenModal';
+import { AutoStartBeforeQuitModal } from './AutoStartBeforeQuitModal';
+import { CancelCoinjoinModal } from './CancelCoinjoinModal';
+import { CoinjoinSuccessModal } from './CoinjoinSuccessModal';
+import { ConfirmUnverifiedProceedModal } from './ConfirmUnverifiedProceedModal';
+import { ConfirmUnverifiedXpubModal } from './ConfirmUnverifiedXpubModal';
+import { ConnectAddressConfirmation } from './ConnectAddressConfirmation';
+import { ConnectErrorModal } from './ConnectErrorModal';
+import { ConnectLoadingModal } from './ConnectLoadingModal';
+import { ConnectPermissionsModal } from './ConnectPermissionsModal';
+import { ConnectSelectAccount } from './ConnectSelectAccount/ConnectSelectAccount';
+import { CriticalCoinjoinPhaseModal } from './CriticalCoinjoinPhaseModal/CriticalCoinjoinPhaseModal';
+import { DeviceAuthenticityOptOutModal } from './DeviceAuthenticityOptOutModal';
+import { FirmwareRevisionOptOutModal } from './FirmwareRevisionOptOutModal';
+import { ImportTransactionModal } from './ImportTransactionModal/ImportTransactionModal';
+import { MoreRoundsNeededModal } from './MoreRoundsNeededModal';
+import { PinMismatchModal } from './PinMismatchModal';
+import { QrScannerModal } from './QrScannerModal/QrScannerModal';
+import { SafetyChecksModal } from './SafetyChecksModal';
+import { StakeChangeDelegateModal } from './StakeChangeDelegateModal/StakeChangeDelegateModal';
+import { TorLoadingModal } from './TorLoadingModal';
+import { TxDetailModal } from './TxDetailModal/TxDetailModal';
+import { UnecoCoinjoinModal } from './UnecoCoinjoinModal';
+import { WalletConnectProposalModal } from './WalletConnectProposalModal';
+import { WalletConnectSwitchAccountModal } from './WalletConnectSwitchAccountModal';
+import { WipeDeviceSuccessModal } from './WipeDeviceSuccessModal';
 
 /** Modals opened as a result of user action */
-export const UserContextModal = ({
-    payload,
-    renderer,
-}: ReduxModalProps<typeof MODAL.CONTEXT_USER>) => {
-    const dispatch = useDispatch();
+export const UserContextModal = ({ payload }: ReduxModalProps<typeof MODAL_CONTEXT_USER>) => {
+    const customBackends = useSelector(selectCustomBackends);
+    const { dispatch } = useServices(injectDispatch);
 
-    const onCancel = () => dispatch(onCancelAction());
+    const onCancel = () => dispatch(closeModalAction());
 
     switch (payload.type) {
         case 'add-account':
             return (
                 <AddAccountModal
-                    device={payload.device as AcquiredDevice}
+                    device={payload.device}
                     symbol={payload.symbol}
-                    noRedirect={payload.noRedirect}
-                    onCancel={onCancel}
-                />
-            );
-        case 'unverified-address':
-            return (
-                <ConfirmUnverifiedAddressModal
-                    addressPath={payload.addressPath}
-                    value={payload.value}
-                    onCancel={onCancel}
+                    isCoinjoinDisabled={payload.isCoinjoinDisabled}
+                    isBackClickDisabled={payload.isBackClickDisabled}
+                    onCancel={payload.onCancel ?? onCancel}
+                    onConfirm={payload.onConfirm}
                 />
             );
         case 'unverified-xpub':
-            return (
-                <ConfirmUnverifiedModal
-                    showUnverifiedButtonText="TR_SHOW_UNVERIFIED_XPUB"
-                    warningText="TR_XPUB_PHISHING_WARNING"
-                    verify={showXpub}
-                    showUnverified={openXpubModal}
-                />
-            );
-        case 'address':
-            return <ConfirmAddressModal {...payload} onCancel={onCancel} />;
+            return <ConfirmUnverifiedXpubModal />;
+        case 'unverified-address-proceed':
+            return <ConfirmUnverifiedProceedModal value={payload.value} />;
         case 'xpub':
             return <ConfirmXpubModal {...payload} onCancel={onCancel} />;
         case 'device-background-gallery':
             return <BackgroundGalleryModal onCancel={onCancel} />;
-        case 'wipe-device':
-            return <WipeDeviceModal onCancel={onCancel} />;
-        case 'device-authenticity-opt-out':
+        case 'device-authenticity-check-opt-out':
             return <DeviceAuthenticityOptOutModal onCancel={onCancel} />;
+        case 'firmware-authenticity-checks-opt-out':
+            return <FirmwareRevisionOptOutModal onCancel={onCancel} />;
         case 'qr-reader':
-            return (
-                <QrScannerModal
-                    decision={payload.decision}
-                    allowPaste={payload.allowPaste}
-                    onCancel={onCancel}
-                />
-            );
+            return <QrScannerModal decision={payload.decision} onCancel={onCancel} />;
         case 'transaction-detail':
             return <TxDetailModal {...payload} onCancel={onCancel} />;
-        case 'passphrase-duplicate':
-            return (
-                <PassphraseDuplicateModal device={payload.device} duplicate={payload.duplicate} />
-            );
         case 'review-transaction':
             return <TransactionReviewModal {...payload} />;
-        case 'coinmarket-leave-spend':
-            return <CoinmarketLeaveSpendModal {...payload} onCancel={onCancel} />;
-        case 'coinmarket-buy-terms': {
-            return (
-                <CoinmarketTermsModal
-                    onCancel={onCancel}
-                    type="BUY"
-                    decision={payload.decision}
-                    provider={payload.provider}
-                    cryptoCurrency={payload.cryptoCurrency as CryptoSymbol}
-                />
-            );
-        }
-        case 'coinmarket-sell-terms':
-            return (
-                <CoinmarketTermsModal
-                    onCancel={onCancel}
-                    type="SELL"
-                    decision={payload.decision}
-                    provider={payload.provider}
-                    cryptoCurrency={payload.cryptoCurrency as CryptoSymbol}
-                />
-            );
-
-        case 'coinmarket-exchange-terms':
-            return (
-                <CoinmarketTermsModal
-                    onCancel={onCancel}
-                    type="EXCHANGE"
-                    decision={payload.decision}
-                    provider={payload.provider}
-                    toCryptoCurrency={payload.toCryptoCurrency as CryptoSymbol}
-                    fromCryptoCurrency={payload.fromCryptoCurrency as CryptoSymbol}
-                />
-            );
-        case 'coinmarket-exchange-dex-terms':
-            return (
-                <CoinmarketTermsModal
-                    onCancel={onCancel}
-                    type="EXCHANGE_DEX"
-                    decision={payload.decision}
-                    provider={payload.provider}
-                    toCryptoCurrency={payload.toCryptoCurrency as CryptoSymbol}
-                    fromCryptoCurrency={payload.fromCryptoCurrency as CryptoSymbol}
-                />
-            );
-        case 'coinmarket-savings-terms':
-            return (
-                <CoinmarketTermsModal
-                    onCancel={onCancel}
-                    type="SAVINGS"
-                    decision={payload.decision}
-                    provider={payload.provider}
-                />
-            );
-        case 'coinmarket-p2p-terms':
-            return (
-                <CoinmarketTermsModal
-                    onCancel={onCancel}
-                    type="P2P"
-                    decision={payload.decision}
-                    provider={payload.provider}
-                    cryptoCurrency={payload.cryptoCurrency as CryptoSymbol}
-                />
-            );
+        case 'review-transaction-rbf-previous-transaction-mined-error':
+            return <TransactionReviewModal {...payload} />;
         case 'import-transaction':
             return <ImportTransactionModal {...payload} onCancel={onCancel} />;
         case 'pin-mismatch':
-            return <PinMismatchModal renderer={renderer} />;
+            return <PinMismatchModal />;
+        case UI_EVENTS.PIN_INVALID_ATTEMPTS_DEPLETED:
+            return <PinInvalidModal onCancel={onCancel} />;
         case 'application-log':
             return <ApplicationLogModal onCancel={onCancel} />;
         case 'metadata-provider':
             return <MetadataProviderModal onCancel={onCancel} decision={payload.decision} />;
         case 'advanced-coin-settings':
             return <AdvancedCoinSettingsModal {...payload} onCancel={onCancel} />;
+        case 'activate-assets':
+            return <ActivateAssetsModal onCancel={onCancel} />;
         case 'add-token':
             return <AddTokenModal {...payload} onCancel={onCancel} />;
         case 'safety-checks':
             return <SafetyChecksModal onCancel={onCancel} />;
-        case 'disable-tor':
-            return <DisableTorModal decision={payload.decision} onCancel={onCancel} />;
+        case 'disable-tor': {
+            const onionBackends = customBackends.filter(({ urls }) => urls.every(isOnionUrl));
+
+            return (
+                <DisableTorModal
+                    onionBackends={onionBackends}
+                    onDisableTor={() => {
+                        onionBackends.forEach(({ symbol, type, urls }) =>
+                            dispatch(
+                                blockchainActions.setBackend({
+                                    symbol,
+                                    type,
+                                    urls: urls.filter(url => !isOnionUrl(url)),
+                                }),
+                            ),
+                        );
+                        payload.decision.resolve(true);
+                        onCancel();
+                    }}
+                    onCancel={onCancel}
+                    renderCoinSettings={(symbol, onClose) => (
+                        <AdvancedCoinSettingsModal symbol={symbol} onCancel={onClose} />
+                    )}
+                />
+            );
+        }
         case 'request-enable-tor':
             return <RequestEnableTorModal decision={payload.decision} onCancel={onCancel} />;
         case 'disable-tor-stop-coinjoin':
@@ -197,28 +156,74 @@ export const UserContextModal = ({
         case 'cancel-coinjoin':
             return <CancelCoinjoinModal onClose={onCancel} />;
         case 'critical-coinjoin-phase':
-            return <CriticalCoinjoinPhaseModal relatedAccountKey={payload.relatedAccountKey} />;
+            return (
+                <CriticalCoinjoinPhaseModal
+                    relatedAccountKey={payload.relatedAccountKey as AccountKey}
+                />
+            );
         case 'coinjoin-success':
-            return <CoinjoinSuccessModal relatedAccountKey={payload.relatedAccountKey} />;
+            return (
+                <CoinjoinSuccessModal relatedAccountKey={payload.relatedAccountKey as AccountKey} />
+            );
         case 'more-rounds-needed':
             return <MoreRoundsNeededModal />;
         case 'uneco-coinjoin-warning':
             return <UnecoCoinjoinModal />;
-        case 'authenticate-device':
-            return <AuthenticateDeviceModal />;
-        case 'authenticate-device-fail':
-            return <AuthenticateDeviceFailModal />;
-        case 'stake-eth-in-a-nutshell':
-            return <StakeEthInANutshellModal onCancel={onCancel} />;
+        case 'earn-in-a-nutshell':
+            return <EarnInANutshellModal {...payload} onCancel={onCancel} />;
+        case 'tron-stake-in-a-nutshell':
+            return <TronStakeInANutshellModal {...payload} onCancel={onCancel} />;
+        case 'tron-vote-consent':
+            return <TronVoteConsentModal {...payload} onCancel={onCancel} />;
+        case 'earn-provider-consent':
+            return <EarnProviderConsentModal {...payload} onCancel={onCancel} />;
         case 'stake':
-            return <StakeModal onCancel={onCancel} />;
+            return <StakeModal {...payload} onCancel={onCancel} />;
         case 'unstake':
-            return <UnstakeModal onCancel={onCancel} />;
+            return <UnstakeModal onCancel={onCancel} account={payload.account} />;
         case 'claim':
-            return <ClaimModal onCancel={onCancel} />;
-        case 'everstake':
-            return <EverstakeModal onCancel={onCancel} />;
+            return <EarnClaimModal onCancel={onCancel} account={payload.account} />;
+        case 'change-delegate':
+            return <StakeChangeDelegateModal onCancel={onCancel} />;
+        case 'copy-address':
+            return (
+                <CopyAddressModal
+                    onCancel={onCancel}
+                    address={payload.address}
+                    addressType={payload.addressType}
+                />
+            );
+        case 'unhide-token':
+            return <UnhideTokenModal onCancel={onCancel} address={payload.address} />;
+        case 'connect-popup':
+            return <ConnectPermissionsModal />;
+        case 'walletconnect-proposal':
+            return <WalletConnectProposalModal eventId={payload.eventId} />;
+        case 'walletconnect-switch-account':
+            return <WalletConnectSwitchAccountModal sessionTopic={payload.sessionTopic} />;
+        case 'connect-address-confirmation':
+            return <ConnectAddressConfirmation />;
+        case 'connect-select-account':
+            return <ConnectSelectAccount />;
+        case 'connect-error':
+            return <ConnectErrorModal />;
+        case 'connect-loading':
+            return <ConnectLoadingModal />;
+        case 'auto-start-before-quit':
+            return <AutoStartBeforeQuitModal />;
+        case 'connect-popup-tx-simulation':
+            return <ConnectPopupTxSimulationModal />;
+        case 'earn-yield-tx-simulation':
+            return (
+                <EarnYieldTxSimulationModal
+                    decision={payload.decision}
+                    data={payload.data}
+                    closeModal={onCancel}
+                />
+            );
+        case 'wipe-device-success':
+            return <WipeDeviceSuccessModal />;
         default:
-            return null;
+            return exhaustive(payload);
     }
 };

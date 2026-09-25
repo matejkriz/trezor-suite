@@ -2,23 +2,45 @@
     "extends": "../../tsconfig.base.json",
     "compilerOptions": { "outDir": "libDev" },
     "references": [
-        { "path": "../../suite-common/icons" },
+        {
+            "path": "../../suite-common/dependency-injection"
+        },
+        { "path": "../../suite-common/device" },
+        {
+            "path": "../../suite-common/message-system"
+        },
+        {
+            "path": "../../suite-common/redux-utils"
+        },
+        {
+            "path": "../../suite-common/suite-sync"
+        },
         {
             "path": "../../suite-common/suite-types"
         },
         {
+            "path": "../../suite-common/suite-utils"
+        },
+        {
             "path": "../../suite-common/wallet-core"
         },
+        {
+            "path": "../../suite-common/wallet-types"
+        },
+        { "path": "../activity-center" },
         { "path": "../analytics" },
         { "path": "../atoms" },
-        { "path": "../feature-flags" },
+        { "path": "../device" },
+        { "path": "../formatters" },
+        { "path": "../icons" },
         { "path": "../intl" },
-        { "path": "../link" },
+        { "path": "../labeling" },
         { "path": "../navigation" },
-        { "path": "../passphrase" },
-        { "path": "../theme" },
-        { "path": "../../packages/connect" },
-        { "path": "../../packages/styles" },
+        { "path": "../wallet" },
+        { "path": "../../packages/device-utils" },
+        {
+            "path": "../../packages/styles-native"
+        },
         { "path": "../../packages/theme" }
     ]
 }

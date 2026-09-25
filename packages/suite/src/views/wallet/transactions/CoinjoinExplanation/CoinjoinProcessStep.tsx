@@ -1,9 +1,19 @@
-import { ReactNode } from 'react';
-import styled from 'styled-components';
-import { H3, Image, ImageType, Paragraph, variables } from '@trezor/components';
-import { Translation } from 'src/components/suite/Translation';
+import { type ReactNode } from 'react';
 
-const StyledImage = styled(Image)`
+import styled from 'styled-components';
+
+import { Translation } from '@suite/intl';
+import {
+    H3,
+    IconCircle,
+    type IconComponent,
+    Paragraph,
+    useMediaQuery,
+    variables,
+} from '@trezor/components';
+import { belowBreakpoint, breakpoints } from '@trezor/theme';
+
+const Image = styled.div`
     margin: -8px;
 
     ${variables.SCREEN_QUERY.BELOW_LAPTOP} {
@@ -13,31 +23,22 @@ const StyledImage = styled(Image)`
     }
 `;
 
-const StepNumber = styled(Paragraph)`
-    margin: 24px 0 6px;
-    color: ${({ theme }) => theme.textSubdued};
-
+const StepNumberSlot = styled.div`
     ${variables.SCREEN_QUERY.BELOW_LAPTOP} {
         grid-column: 2;
         grid-row: 1;
     }
 `;
 
-const StepTitle = styled(H3)`
-    margin-bottom: 20px;
-
+const StepTitleSlot = styled.div`
     ${variables.SCREEN_QUERY.BELOW_LAPTOP} {
         align-self: center;
-        font-size: ${variables.FONT_SIZE.BIG};
         grid-column: 2;
         grid-row: 1;
     }
 `;
 
-const StepDescription = styled(Paragraph)`
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-
+const StepDescriptionSlot = styled.div`
     ${variables.SCREEN_QUERY.BELOW_LAPTOP} {
         grid-column: 2;
         grid-row: 2;
@@ -49,7 +50,7 @@ const Container = styled.div`
     max-width: 220px;
 
     & + & {
-        margin-left: 15px;
+        margin-left: 16px;
 
         &::before {
             content: '';
@@ -58,12 +59,11 @@ const Container = styled.div`
             left: -15px;
             width: 1px;
             height: 130px;
-            background: ${({ theme }) => theme.STROKE_GREY};
         }
     }
 
     &:not(:last-child) {
-        margin-right: 15px;
+        margin-right: 16px;
     }
 
     ${variables.SCREEN_QUERY.BELOW_LAPTOP} {
@@ -74,7 +74,7 @@ const Container = styled.div`
 
         &:not(:last-child) {
             margin-right: 0;
-            margin-bottom: 26px;
+            margin-bottom: 24px;
         }
 
         & + & {
@@ -89,23 +89,47 @@ const Container = styled.div`
 
 export interface CoinjoinProcessStepProps {
     number: number;
-    image: ImageType;
+    iconName: IconComponent;
     title: ReactNode;
     description: ReactNode;
 }
 
 export const CoinjoinProcessStep = ({
     number,
-    image,
+    iconName,
     title,
     description,
-}: CoinjoinProcessStepProps) => (
-    <Container>
-        <StyledImage image={image} width={80} />
-        <StepNumber typographyStyle="hint">
-            <Translation id="TR_STEP" values={{ number }} />
-        </StepNumber>
-        <StepTitle>{title}</StepTitle>
-        <StepDescription>{description}</StepDescription>
-    </Container>
-);
+}: CoinjoinProcessStepProps) => {
+    const isBelowLaptop = useMediaQuery(belowBreakpoint(breakpoints.laptop));
+
+    return (
+        <Container>
+            <Image>
+                <IconCircle icon={iconName} size={96} />
+            </Image>
+            <StepNumberSlot>
+                <Paragraph
+                    typographyStyle="body-sm"
+                    intent="neutral"
+                    priority="secondary"
+                    margin={{ top: 24, bottom: 6 }}
+                >
+                    <Translation id="TR_STEP" values={{ number }} />
+                </Paragraph>
+            </StepNumberSlot>
+            <StepTitleSlot>
+                <H3
+                    typographyStyle={isBelowLaptop ? 'body-md-strong' : 'headline-sm'}
+                    margin={{ bottom: 20 }}
+                >
+                    {title}
+                </H3>
+            </StepTitleSlot>
+            <StepDescriptionSlot>
+                <Paragraph typographyStyle="body-md" intent="neutral" priority="secondary">
+                    {description}
+                </Paragraph>
+            </StepDescriptionSlot>
+        </Container>
+    );
+};

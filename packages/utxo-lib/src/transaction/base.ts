@@ -1,10 +1,10 @@
-import varuint from 'varuint-bitcoin';
-import { reverseBuffer, getChunkSize } from '../bufferutils';
-import * as bcrypto from '../crypto';
-import * as types from '../types';
-import * as bscript from '../script';
+import * as varuint from 'varuint-bitcoin';
 
-import { bitcoin as BITCOIN_NETWORK, Network, isNetworkType } from '../networks';
+import { getChunkSize, reverseBuffer } from '../bufferutils';
+import * as bcrypto from '../crypto';
+import { bitcoin as BITCOIN_NETWORK, type Network, isNetworkType } from '../networks';
+import * as bscript from '../script';
+import { Hash256bit, assertType } from '../types/validation';
 
 export function varSliceSize(someScript: Buffer) {
     const { length } = someScript;
@@ -20,7 +20,7 @@ export function vectorSize(someVector: Buffer[]) {
 }
 
 export function isCoinbaseHash(buffer: Buffer): boolean {
-    types.typeforce(types.Hash256bit, buffer);
+    assertType(Hash256bit, buffer);
     for (let i = 0; i < 32; ++i) {
         if (buffer[i] !== 0) return false;
     }
@@ -33,7 +33,6 @@ export const EMPTY_SCRIPT = Buffer.allocUnsafe(0);
 export interface TxOutput {
     script: Buffer;
     value: string;
-    decredVersion?: number;
 }
 
 export interface TxInput {
@@ -42,13 +41,6 @@ export interface TxInput {
     script: Buffer;
     sequence: number;
     witness: Buffer[];
-    decredTree?: number;
-    decredWitness?: {
-        value: string;
-        height: number;
-        blockIndex: number;
-        script: Buffer;
-    };
 }
 
 export type TransactionOptions = {
@@ -64,9 +56,9 @@ export class TransactionBase<S = undefined> {
     specific: S | undefined;
 
     network: Network;
-    type: number | undefined; // Dash, Decred, Zcash
-    timestamp: number | undefined; // Peercoin
-    expiry: number | undefined; // Decred, Zcash. Block height after which this transactions will expire, or 0 to disable expiry
+    type: number | undefined; // Zcash
+    timestamp: number | undefined; // Verge
+    expiry: number | undefined; // Zcash. Block height after which this transactions will expire, or 0 to disable expiry
 
     constructor(options: TransactionOptions & { txSpecific?: S }) {
         this.network = options.network || BITCOIN_NETWORK;
@@ -74,7 +66,11 @@ export class TransactionBase<S = undefined> {
     }
 
     isCoinbase(): boolean {
-        return this.ins.length === 1 && isCoinbaseHash(this.ins[0].hash);
+        const { ins } = this;
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const firstIn: (typeof ins)[number] = ins[0];
+
+        return this.ins.length === 1 && isCoinbaseHash(firstIn.hash);
     }
 
     hasWitnesses(): boolean {

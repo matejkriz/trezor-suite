@@ -1,27 +1,77 @@
+import { type FieldValues } from 'react-hook-form';
+
 import type { DBSchema } from 'idb';
-import { FieldValues } from 'react-hook-form';
 
-import type { SuiteState } from 'src/reducers/suite/suiteReducer';
-import type { FormState } from 'src/types/wallet/sendForm';
-import type { AcquiredDevice } from 'src/types/suite';
-import type { MetadataState } from 'src/types/suite/metadata';
-import type { Trade } from 'src/types/wallet/coinmarketCommonTypes';
+import { type DesktopBluetoothDevice } from '@suite/bluetooth';
+import { type CoinjoinAccount, type CoinjoinDebugSettings } from '@suite/coinjoin';
+import { type DebugState } from '@suite/debug';
+import type { FlagsState } from '@suite/flags';
+import type { SuiteSettingsState } from '@suite/settings';
+import { type DesktopSuiteSyncState } from '@suite/suite-sync';
+import { type AnalyticsState } from '@suite-common/analytics-redux';
+import { type AppRememberedPermission } from '@suite-common/connect-popup/src/connectPopupTypes';
+import type { DiscreetModeState } from '@suite-common/discreet-mode';
+import { type FeatureFeedbackState } from '@suite-common/feedback';
 import type { MessageState } from '@suite-common/message-system';
-import type { MessageSystem } from '@suite-common/suite-types';
-import type { Account, Discovery, Network, WalletAccountTransaction } from 'src/types/wallet';
-import type { CoinjoinAccount, CoinjoinDebugSettings } from 'src/types/wallet/coinjoin';
+import type { MetadataState } from '@suite-common/metadata-types';
+import { type EncryptedHex } from '@suite-common/platform-encryption';
+import type { ReceiveAccountState } from '@suite-common/receive';
+import type { SuiteSyncQuotaManagerState } from '@suite-common/suite-sync-quota-manager';
+import { type SuiteSyncOwnerSerialized } from '@suite-common/suite-sync-storage';
+import type {
+    DeviceWithEmptyPath,
+    MessageSystem,
+    PersistentDeviceData,
+    ThpSuiteCredentials,
+} from '@suite-common/suite-types';
+import { type SimpleTokenStructure } from '@suite-common/token-definitions';
+import type { TradingTransaction } from '@suite-common/trading';
+import { type Explorer, type NetworkSymbol } from '@suite-common/wallet-config';
+import { type PhishingState } from '@suite-common/wallet-core';
+import type {
+    AccountKey,
+    BackendSettings,
+    EarnOpportunityKey,
+    FormState,
+    RatesByTimestamps,
+    WalletSettings,
+} from '@suite-common/wallet-types';
+import { type StaticSessionId } from '@trezor/connect';
+import { type FirmwareChannel } from '@trezor/connect-common/src/types/firmware';
 
-import type { BackendSettings, WalletSettings } from '@suite-common/wallet-types';
-import type { StorageUpdateMessage } from '@trezor/suite-storage';
-import { AnalyticsState } from '@suite-common/analytics';
-import { GraphData } from '../types/wallet/graph';
+import type { BioAuthState } from 'src/reducers/bioAuth';
+import type { SuiteState } from 'src/reducers/suite/suiteReducer';
+import type { Account, WalletAccountTransaction } from 'src/types/wallet';
+
+import { type GraphData } from '../types/wallet/graph';
 
 export interface DBWalletAccountTransaction {
     tx: WalletAccountTransaction;
     order: number;
 }
 
+/**
+ * IDB Schema definition used in Suite Web & Desktop.
+ *
+ * Note that some stores are singletons – only one specific `key` is expected to hold the entire serialized payload,
+ * those must have `key` typed as a constant string, to ensure consistency in `preloadStore`, migrations, etc.
+ * Meanwhile, some stores contain a collection of keys, those have `key` as a broader type.
+ *
+ * Note that this is the latest schema, but actual app IDB may carry outdated values not removed in migrations.
+ */
 export interface SuiteDBSchema extends DBSchema {
+    bioAuth: {
+        key: 'bioAuth';
+        value: Pick<BioAuthState, 'bioAuthEnabled'>;
+    };
+    phishing: {
+        key: AccountKey;
+        value: string[];
+    };
+    phishingMetadata: {
+        key: 'phishingMetadata';
+        value: PhishingState;
+    };
     txs: {
         key: string;
         value: DBWalletAccountTransaction;
@@ -33,29 +83,58 @@ export interface SuiteDBSchema extends DBSchema {
             blockTime: number; // TODO: blockTime can be undefined
         };
     };
+    explorer: {
+        key: NetworkSymbol;
+        value: { symbol: NetworkSymbol; explorer: Explorer };
+    };
     sendFormDrafts: {
-        key: string; // accountKey
+        key: AccountKey;
         value: FormState;
     };
+    earnOnboarding: {
+        key: AccountKey;
+        value: EarnOpportunityKey[];
+    };
+    receive: {
+        key: AccountKey;
+        value: ReceiveAccountState;
+    };
     suiteSettings: {
-        key: string;
+        key: 'suite';
         value: {
-            settings: SuiteState['settings'];
-            flags: SuiteState['flags'];
+            settings: SuiteSettingsState;
+            flags: FlagsState;
             evmSettings: SuiteState['evmSettings'];
+            seenDisconnectNotificationForDeviceIds: SuiteState['seenDisconnectNotificationForDeviceIds'];
         };
     };
-    walletSettings: {
+    historicRates: {
         key: string;
+        value: RatesByTimestamps;
+    };
+    walletSettings: {
+        key: 'wallet';
         value: WalletSettings;
     };
     backendSettings: {
-        key: Network['symbol'];
+        key: NetworkSymbol;
         value: BackendSettings;
     };
     devices: {
         key: string;
-        value: AcquiredDevice;
+        value: DeviceWithEmptyPath;
+    };
+    thp: {
+        key: 'value';
+        value: {
+            credentials: ThpSuiteCredentials[];
+        };
+    };
+    bluetooth: {
+        key: 'value';
+        value: {
+            knownDevices: DesktopBluetoothDevice[];
+        };
     };
     accounts: {
         key: string[];
@@ -63,6 +142,10 @@ export interface SuiteDBSchema extends DBSchema {
         indexes: {
             deviceState: string;
         };
+    };
+    tokenManagement: {
+        key: string;
+        value: SimpleTokenStructure;
     };
     coinjoinAccounts: {
         key: string; // accountKey
@@ -72,12 +155,8 @@ export interface SuiteDBSchema extends DBSchema {
         key: 'debug';
         value: CoinjoinDebugSettings;
     };
-    discovery: {
-        key: string;
-        value: Discovery;
-    };
     analytics: {
-        key: string;
+        key: 'suite';
         value: AnalyticsState;
     };
     graph: {
@@ -88,16 +167,29 @@ export interface SuiteDBSchema extends DBSchema {
             deviceState: string;
         };
     };
-    coinmarketTrades: {
+    tradingTrades: {
         key: string;
-        value: Trade;
+        value: TradingTransaction;
     };
     metadata: {
         key: 'state';
         value: MetadataState;
     };
+    suiteSyncSettings: {
+        key: 'suiteSyncSettings';
+        value: DesktopSuiteSyncState['settings'] &
+            Pick<DesktopSuiteSyncState, 'isUnsupportedDeviceBannerDismissed'>;
+    };
+    suiteSyncOwners: {
+        key: StaticSessionId;
+        value: EncryptedHex<SuiteSyncOwnerSerialized>;
+    };
+    suiteSyncQuotaManager: {
+        key: 'suiteSyncQuotaManager';
+        value: SuiteSyncQuotaManagerState;
+    };
     messageSystem: {
-        key: string;
+        key: 'suite';
         value: {
             currentSequence: number;
             config: MessageSystem | null;
@@ -113,9 +205,29 @@ export interface SuiteDBSchema extends DBSchema {
     firmware: {
         key: 'firmware';
         value: {
-            firmwareHashInvalid: string[];
+            firmwareChannel: FirmwareChannel;
         };
     };
+    persistentDeviceData: {
+        key: 'persistentDeviceData';
+        value: PersistentDeviceData[];
+    };
+    connect: {
+        key: 'connect';
+        value: {
+            permissions: AppRememberedPermission[];
+        };
+    };
+    featureFeedback: {
+        key: 'featureFeedback';
+        value: FeatureFeedbackState;
+    };
+    discreetMode: {
+        key: 'discreetMode';
+        value: DiscreetModeState;
+    };
+    debug: {
+        key: 'debug';
+        value: DebugState;
+    };
 }
-
-export type SuiteStorageUpdateMessage = StorageUpdateMessage<SuiteDBSchema>;

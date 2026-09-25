@@ -1,46 +1,47 @@
-import {
-    ActionButton,
-    ActionColumn,
-    SectionItem,
-    TextColumn,
-    Translation,
-} from 'src/components/suite';
-import { useDispatch } from 'src/hooks/suite';
-import { openModal } from 'src/actions/suite/modalActions';
-import { useAnchor } from 'src/hooks/suite/useAnchor';
-import { SettingsAnchor } from 'src/constants/suite/anchors';
+import { Translation } from '@suite/intl';
+import { openModal } from '@suite/modal';
+import { Anchor, SettingsAnchor } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { ActionButton, ActionColumn, SectionItem, TextColumn } from '@trezor/product-components';
 
 interface SafetyChecksProps {
     isDeviceLocked: boolean;
 }
 
 export const SafetyChecks = ({ isDeviceLocked }: SafetyChecksProps) => {
-    const dispatch = useDispatch();
-
-    const { anchorRef, shouldHighlight } = useAnchor(SettingsAnchor.SafetyChecks);
+    const { dispatch } = useServices(injectDispatch);
 
     const handleClick = () => dispatch(openModal({ type: 'safety-checks' }));
 
     return (
-        <SectionItem
-            data-test="@settings/device/safety-checks"
-            ref={anchorRef}
-            shouldHighlight={shouldHighlight}
-        >
-            <TextColumn
-                title={<Translation id="TR_DEVICE_SETTINGS_SAFETY_CHECKS_TITLE" />}
-                description={<Translation id="TR_DEVICE_SETTINGS_SAFETY_CHECKS_DESC" />}
-            />
-            <ActionColumn>
-                <ActionButton
-                    variant="secondary"
-                    onClick={handleClick}
-                    data-test="@settings/device/safety-checks-button"
-                    isDisabled={isDeviceLocked}
+        <Anchor anchorId={SettingsAnchor.SafetyChecks}>
+            {({ anchorId, anchorRef, shouldHighlight }) => (
+                <SectionItem
+                    data-testid={anchorId}
+                    ref={anchorRef}
+                    shouldHighlight={shouldHighlight}
                 >
-                    <Translation id="TR_DEVICE_SETTINGS_SAFETY_CHECKS_BUTTON" />
-                </ActionButton>
-            </ActionColumn>
-        </SectionItem>
+                    <TextColumn
+                        title={<Translation id="TR_DEVICE_SETTINGS_SAFETY_CHECKS_TITLE" />}
+                        description={<Translation id="TR_DEVICE_SETTINGS_SAFETY_CHECKS_DESC" />}
+                    />
+                    <ActionColumn>
+                        <ActionButton
+                            intent="brand"
+                            onClick={handleClick}
+                            data-testid="@settings/device/safety-checks-button"
+                            isDisabled={isDeviceLocked}
+                            isTooltipActive={isDeviceLocked}
+                            tooltipContent={
+                                <Translation id="TR_SETTINGS_DEVICE_BANNER_TITLE_REMEMBERED" />
+                            }
+                        >
+                            <Translation id="TR_DEVICE_SETTINGS_SAFETY_CHECKS_BUTTON" />
+                        </ActionButton>
+                    </ActionColumn>
+                </SectionItem>
+            )}
+        </Anchor>
     );
 };

@@ -1,83 +1,103 @@
-import { ImgHTMLAttributes } from 'react';
+import { type ImgHTMLAttributes } from 'react';
+
 import styled from 'styled-components';
-import { PngImage, SvgImage, PNG_IMAGES, SVG_IMAGES } from './images';
-import { resolveStaticPath } from '../../utils/resolveStaticPath';
 
-export const PNG_PATH = 'images/png';
-export const SVG_PATH = 'images/svg';
+import { resolveStaticPath } from '@trezor/env-utils';
+import { isArrayMember, typedObjectEntries } from '@trezor/utils';
 
-const StyledImage = styled.img`
-    /* should not overflow it's container */
-    max-width: 100%;
-    filter: ${({ theme }) => theme.IMAGE_FILTER};
-`;
+import { IMAGES, type ImageType } from './images';
+import {
+    type FrameProps,
+    type FramePropsKeys,
+    pickAndPrepareFrameProps,
+    withFrameProps,
+} from '../../utils/frameProps';
+import { type TransientProps } from '../../utils/transientProps';
 
-const buildSrcSet = <
-    BasePath extends string,
-    ImageObject extends typeof PNG_IMAGES | typeof SVG_IMAGES,
-    ImageKey extends keyof ImageObject,
->(
-    basePath: BasePath,
-    imageObject: ImageObject,
-    imageKey: ImageKey,
-) => {
-    const imageFile1x = imageObject[imageKey];
-    const hiRes = `${String(imageKey)}_2x`;
-    const imageFile2x = hiRes in imageObject ? imageObject[hiRes as ImageKey] : undefined;
+export const allowedImageFrameProps = [
+    'margin',
+    'width',
+    'height',
+    'borderRadius',
+    'maxWidth',
+    'maxHeight',
+    'flex',
+    'objectFit',
+    'objectPosition',
+] as const satisfies FramePropsKeys[];
+type AllowedFrameProps = Pick<FrameProps, (typeof allowedImageFrameProps)[number]>;
+
+export const IMAGES_PATH = 'images/images';
+
+export type ImageKey = ImageType;
+
+const buildSrcSet = (imageKey: ImageType) => {
+    const imageFile1x = IMAGES[imageKey];
+    const imageFile2x = IMAGES[`${String(imageKey)}_2x` as ImageType];
 
     if (!imageFile2x) {
         return undefined;
     }
 
-    return `${resolveStaticPath(`${basePath}/${imageFile1x}`)} 1x, ${resolveStaticPath(
-        `${basePath}/${imageFile2x}`,
-    )} 2x`;
+    return `
+        ${resolveStaticPath(`${IMAGES_PATH}/${imageFile1x}`)} 1x,
+        ${resolveStaticPath(`${IMAGES_PATH}/${imageFile2x}`)} 2x
+    `;
 };
 
-export type ImageType = PngImage | SvgImage;
+const isPNGImageKey = (key: ImageKey): key is ImageType => key in IMAGES;
 
-export type ImageProps = ImgHTMLAttributes<Omit<HTMLImageElement, 'src'>> &
+const getSourceProps = (imageKey: ImageKey) => {
+    if (isPNGImageKey(imageKey)) {
+        return {
+            src: resolveStaticPath(`${IMAGES_PATH}/${IMAGES[imageKey]}`),
+            srcSet: buildSrcSet(imageKey),
+        };
+    }
+
+    return { src: resolveStaticPath(`${IMAGES_PATH}/${IMAGES[imageKey]}`) };
+};
+
+const StyledImage = styled.img<TransientProps<AllowedFrameProps>>`
+    display: block;
+    max-width: 100%;
+
+    ${withFrameProps}
+`;
+
+type ImageHTMLProps = ImgHTMLAttributes<Omit<HTMLImageElement, 'src' | 'width' | 'height'>>;
+
+export type ImageProps = AllowedFrameProps &
+    ImageHTMLProps &
     (
         | {
-              image: ImageType;
+              image: ImageKey;
+              imageSrc?: never;
           }
         | {
+              image?: never;
               imageSrc: string;
           }
     );
 
-const isPNG = (image: ImageType): image is PngImage => image in PNG_IMAGES;
-const isSVG = (image: ImageType): image is SvgImage => image in SVG_IMAGES;
+const getImageHTMLProps = (imageProps: Omit<ImageProps, 'image' | 'imageSrc'>): ImageHTMLProps =>
+    typedObjectEntries(imageProps).reduce<ImageHTMLProps>(
+        (imageHTMLProps, [propKey, propValue]) => {
+            if (!isArrayMember(propKey, allowedImageFrameProps)) {
+                imageHTMLProps[propKey] = propValue;
+            }
 
-export const Image = (props: ImageProps) => {
-    if ('image' in props) {
-        const { image, ...rest } = props;
-        if (isPNG(image)) {
-            return (
-                <StyledImage
-                    src={resolveStaticPath(`${PNG_PATH}/${PNG_IMAGES[image]}`)}
-                    srcSet={buildSrcSet(PNG_PATH, PNG_IMAGES, image)}
-                    {...rest}
-                />
-            );
-        }
+            return imageHTMLProps;
+        },
+        {},
+    );
 
-        if (isSVG(image)) {
-            return (
-                <StyledImage
-                    src={resolveStaticPath(`${SVG_PATH}/${SVG_IMAGES[image]}`)}
-                    srcSet={buildSrcSet(SVG_PATH, SVG_IMAGES, image)}
-                    {...rest}
-                />
-            );
-        }
-    }
+export const Image = ({ image, imageSrc, ...rest }: ImageProps) => {
+    const frameProps = pickAndPrepareFrameProps(rest, allowedImageFrameProps);
+    const imageHTMLProps = getImageHTMLProps(rest);
+    const sourceProps = image ? getSourceProps(image) : { src: imageSrc };
 
-    if ('imageSrc' in props) {
-        const { imageSrc, ...rest } = props;
-
-        return <StyledImage src={imageSrc} {...rest} />;
-    }
-
-    return null;
+    return (
+        <StyledImage {...sourceProps} {...imageHTMLProps} {...frameProps} data-component="Image" />
+    );
 };

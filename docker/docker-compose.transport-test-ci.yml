@@ -1,0 +1,12 @@
+services:
+  trezor-user-env-unix:
+    image: ghcr.io/trezor/trezor-user-env:0126ecbed6edc132a4210803707a66fd04add700
+    environment:
+      - SDL_VIDEODRIVER=dummy
+      - XDG_RUNTIME_DIR=/var/tmp
+    network_mode: host
+    # in case local developement on mac is needed, these ports will be useful
+    # ports:
+    #   - "9002:9002"
+    #   - "9001:9001"
+    #   - "21328:21328"

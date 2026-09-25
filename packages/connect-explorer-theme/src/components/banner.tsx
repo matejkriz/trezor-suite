@@ -3,8 +3,8 @@ import type { ReactElement } from 'react';
 import cn from 'clsx';
 import { XIcon } from 'nextra/icons';
 
-import { useConfig } from '../contexts';
-import { renderComponent } from '../utils';
+import { useConfig } from '../contexts/useConfig';
+import { renderComponent } from '../utils/render';
 
 export function Banner(): ReactElement | null {
     const { banner } = useConfig();

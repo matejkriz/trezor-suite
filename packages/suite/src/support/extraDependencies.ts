@@ -1,151 +1,256 @@
-import { saveAs } from 'file-saver';
-import { PayloadAction } from '@reduxjs/toolkit';
+import type { PayloadAction } from '@reduxjs/toolkit';
 
-import { resolveStaticPath } from '@suite-common/suite-utils';
-import { getAccountKey } from '@suite-common/wallet-utils';
+import { forgetBluetoothDeviceThunk } from '@suite/bluetooth';
+import { fixLoadedCoinjoinAccount } from '@suite/coinjoin';
+import type { FlagsState } from '@suite/flags';
+import { lockDevice } from '@suite/locks';
+import { metadataActions, metadataLabelingActions } from '@suite/metadata';
+import { closeModal, openModal } from '@suite/modal';
+import { type SuiteSettingsState } from '@suite/settings';
+import { type DeviceReducerState } from '@suite-common/device';
+import { type ExtraDependenciesStatic } from '@suite-common/extra-dependencies';
+import { type PersistentDeviceDataState } from '@suite-common/persistent-device-data';
+import { type ReceiveState } from '@suite-common/receive';
+import { type WithServices } from '@suite-common/redux-utils';
 import {
-    DeviceRootState,
-    selectIsPendingTransportEvent,
-    TransactionsState,
-    BlockchainState,
-    DiscoveryRootState,
-    selectDiscoveryByDeviceState,
-    deviceActions,
+    type TokenDefinitionsMiddlewareDeps,
+    type TokenDefinitionsState,
+    buildTokenDefinitionsFromStorage,
+} from '@suite-common/token-definitions';
+import { isNetworkSymbol } from '@suite-common/wallet-config';
+import {
+    type BlockchainState,
+    type EarnOnboardingState,
+    type ExplorerConfig,
+    type FiatRatesState,
+    type PhishingState,
+    type SendState,
+    type TransactionsState,
+    type WalletSettingsState,
+    changeNetworks,
 } from '@suite-common/wallet-core';
-import { NetworkSymbol } from '@suite-common/wallet-config';
-import { ExtraDependencies } from '@suite-common/redux-utils';
+import { createAccountKey } from '@suite-common/wallet-types';
+import { buildHistoricRatesFromStorage, sortByCoin } from '@suite-common/wallet-utils';
+import { type StaticSessionId } from '@trezor/connect';
 
-import { StorageLoadAction } from 'src/actions/suite/storageActions';
-import * as metadataLabelingActions from 'src/actions/suite/metadataLabelingActions';
-import * as metadataActions from 'src/actions/suite/metadataActions';
-import * as cardanoStakingActions from 'src/actions/wallet/cardanoStakingActions';
-import * as walletSettingsActions from 'src/actions/settings/walletSettingsActions';
-import { fixLoadedCoinjoinAccount } from 'src/utils/wallet/coinjoinUtils';
-import * as modalActions from 'src/actions/suite/modalActions';
+import { type StorageLoadAction } from 'src/actions/suite/storageLifecycleActions';
 
-import * as suiteActions from '../actions/suite/suiteActions';
-import { AppState, ButtonRequest, TrezorDevice } from '../types/suite';
-import { METADATA, STORAGE } from '../actions/suite/constants';
+import { type SuiteServices } from './createSuiteCompositionRoot';
+import type { BioAuthState } from '../reducers/bioAuth';
+import { type TrezorDevice } from '../types/suite';
 
-const connectSrc = resolveStaticPath('connect/');
-// 'https://localhost:8088/';
-// 'https://connect.corp.sldev.cz/develop/';
+export type ExtraDependenciesSuite = ExtraDependenciesStatic &
+    TokenDefinitionsMiddlewareDeps &
+    WithServices<SuiteServices>;
 
-const connectInitSettings = {
-    connectSrc,
-    transportReconnect: true,
-    debug: false,
-    popup: false,
-    manifest: {
-        email: 'info@trezor.io',
-        appUrl: '@trezor/suite',
-    },
-    sharedLogger: false,
-};
-
-export const extraDependencies: ExtraDependencies = {
+export const extraDependencies: ExtraDependenciesStatic & TokenDefinitionsMiddlewareDeps = {
     thunks: {
-        cardanoValidatePendingTxOnBlock: cardanoStakingActions.validatePendingTxOnBlock,
-        cardanoFetchTrezorPools: cardanoStakingActions.fetchTrezorPools,
-        initMetadata: metadataLabelingActions.init,
-        fetchAndSaveMetadata: metadataLabelingActions.fetchAndSaveMetadata,
-    },
-    selectors: {
-        selectFeeInfo: (networkSymbol: NetworkSymbol) => (state: AppState) =>
-            state.wallet.fees[networkSymbol],
-        selectDevices: (state: AppState) => state.device.devices,
-        selectBitcoinAmountUnit: (state: AppState) => state.wallet.settings.bitcoinAmountUnit,
-        selectEnabledNetworks: (state: AppState) => state.wallet.settings.enabledNetworks,
-        selectLocalCurrency: (state: AppState) => state.wallet.settings.localCurrency,
-        selectIsPendingTransportEvent,
-        selectDebugSettings: (state: AppState) => state.suite.settings.debug,
-        selectDesktopBinDir: (state: AppState) => state.desktop?.paths?.binDir,
-        selectDevice: (state: AppState) => state.device.selectedDevice,
-        selectMetadata: (state: AppState) => state.metadata,
-        selectDeviceDiscovery: (state: DiscoveryRootState & DeviceRootState) =>
-            selectDiscoveryByDeviceState(state, state.device.selectedDevice?.state),
-        selectRouterApp: (state: AppState) => state.router.app,
-        selectCheckFirmwareAuthenticity: (state: AppState) =>
-            state.suite.settings.debug.checkFirmwareAuthenticity,
+        fetchAndSaveMetadata: metadataLabelingActions.fetchAndSaveMetadataThunk,
+        forgetBluetoothDevice: forgetBluetoothDeviceThunk,
     },
     actions: {
         setAccountAddMetadata: metadataActions.setAccountAdd,
-        setWalletSettingsLocalCurrency: walletSettingsActions.setLocalCurrency,
-        lockDevice: suiteActions.lockDevice,
-        appChanged: suiteActions.appChanged,
-        setSelectedDevice: deviceActions.selectDevice,
-        updateSelectedDevice: deviceActions.updateSelectedDevice,
-        requestAuthConfirm: suiteActions.requestAuthConfirm,
-        onModalCancel: modalActions.onCancel,
-        openModal: modalActions.openModal,
+        lockDevice,
+        onModalCancel: closeModal,
+        openModal,
+        changeNetworks,
     },
     actionTypes: {
-        storageLoad: STORAGE.LOAD,
-        setDeviceMetadata: METADATA.SET_DEVICE_METADATA,
+        storageLoad: '@storage/load',
+        setDeviceMetadata: '@metadata/set-device-metadata',
+        setDeviceMetadataPasswords: '@metadata/set-device-metadata-passwords',
     },
     reducers: {
         storageLoadBlockchain: (state: BlockchainState, { payload }: StorageLoadAction) => {
             payload.backendSettings.forEach(backend => {
-                const blockchain = state[backend.key];
+                const blockchain = state[backend.key as keyof typeof state];
+
                 if (blockchain) {
                     blockchain.backends = backend.value;
                 }
             });
         },
+        storageLoadExplorer: (state: ExplorerConfig, { payload }: StorageLoadAction) => {
+            payload.explorer.forEach(({ symbol, explorer }) => {
+                state[symbol as keyof typeof state] = {
+                    ...state[symbol as keyof typeof state],
+                    custom: explorer,
+                };
+            });
+        },
         storageLoadTransactions: (state: TransactionsState, { payload }: StorageLoadAction) => {
-            const { txs } = payload;
+            const { txs, phishing } = payload;
+
             txs.forEach(item => {
-                const k = getAccountKey(item.tx.descriptor, item.tx.symbol, item.tx.deviceState);
+                const k = createAccountKey({
+                    accountDescriptor: item.tx.descriptor,
+                    networkSymbol: item.tx.symbol,
+                    deviceStaticSessionId: item.tx.deviceState,
+                });
+
                 if (!state.transactions[k]) {
                     state.transactions[k] = [];
                 }
+
                 state.transactions[k][item.order] = item.tx;
             });
+
+            phishing.forEach(({ key, value }) => {
+                state.phishing[key] = value;
+            });
+        },
+        storageLoadPhishingMetadata: (state: PhishingState, { payload }: StorageLoadAction) => {
+            if (payload.phishingMetadata) {
+                return { ...state, ...payload.phishingMetadata };
+            }
+
+            return state;
+        },
+        storageLoadHistoricRates: (state: FiatRatesState, { payload }: StorageLoadAction) => {
+            if (payload.historicRates) {
+                const fiatRates = payload.historicRates.map(rate => rate.value);
+                const historicRates = buildHistoricRatesFromStorage(fiatRates);
+                state.historic = historicRates;
+            }
+        },
+        storageLoadTokenManagement: (
+            state: TokenDefinitionsState,
+            { payload }: StorageLoadAction,
+        ) => {
+            if (payload.tokenManagement) {
+                const tokenDefinitions = buildTokenDefinitionsFromStorage(payload.tokenManagement);
+                Object.keys(tokenDefinitions).forEach(symbol => {
+                    if (isNetworkSymbol(symbol)) {
+                        state[symbol] = tokenDefinitions[symbol];
+                    }
+                });
+            }
         },
         storageLoadAccounts: (_, { payload }: StorageLoadAction) =>
-            payload.accounts.map(acc =>
-                acc.backendType === 'coinjoin' ? fixLoadedCoinjoinAccount(acc) : acc,
+            // Storage returns accounts in IndexedDB key order, sort them like the reducer does.
+            sortByCoin(
+                payload.accounts.map(acc =>
+                    acc.backendType === 'coinjoin' ? fixLoadedCoinjoinAccount(acc) : acc,
+                ),
+                payload.supportedNetworks,
             ),
-        storageLoadFirmware: (state, { payload }: StorageLoadAction) => {
-            if (payload.firmware?.firmwareHashInvalid) {
-                state.firmwareHashInvalid = payload.firmware.firmwareHashInvalid;
-            }
-        },
-        storageLoadDiscovery: (_, { payload }: StorageLoadAction) => payload.discovery,
-        addButtonRequestFirmware: (
-            state,
+        setDeviceMetadataReducer: (
+            state: DeviceReducerState,
             {
                 payload,
-            }: PayloadAction<{
-                device?: TrezorDevice;
-                buttonRequest: ButtonRequest;
-            }>,
-        ) => {
-            if (payload.buttonRequest?.code === 'ButtonRequest_FirmwareUpdate') {
-                state.status = 'waiting-for-confirmation';
-            }
-        },
-        setDeviceMetadataReducer: (
-            state,
-            { payload }: PayloadAction<{ deviceState: string; metadata: TrezorDevice['metadata'] }>,
+            }: PayloadAction<{ deviceState: StaticSessionId; metadata: TrezorDevice['metadata'] }>,
         ) => {
             const { deviceState, metadata } = payload;
-            const index = state.devices.findIndex((d: TrezorDevice) => d.state === deviceState);
+            const index = state.devices.findIndex(
+                (d: TrezorDevice) => d.state?.staticSessionId === deviceState,
+            );
             const device = state.devices[index];
             if (!device) return;
             device.metadata = metadata;
         },
-        storageLoadDevices: (state, { payload }: StorageLoadAction) => {
-            state.devices = payload.devices;
+        setDeviceMetadataPasswordsReducer: (
+            state: DeviceReducerState,
+            {
+                payload,
+            }: PayloadAction<{
+                deviceState: StaticSessionId;
+                metadata: TrezorDevice['passwords'];
+            }>,
+        ) => {
+            const { deviceState, metadata } = payload;
+            const index = state.devices.findIndex(
+                (d: TrezorDevice) => d.state?.staticSessionId === deviceState,
+            );
+            const device = state.devices[index];
+            if (!device) return;
+            device.passwords = metadata;
         },
-        storageLoadFormDrafts: (state, { payload }: StorageLoadAction) => {
+        storageLoadDevices: (state: DeviceReducerState, { payload }: StorageLoadAction) => {
+            // @ts-expect-error loaded devices have empty path, TODO deviceReducer should have path nullable, because remembered wallets??
+            state.devices = payload.devices.map(device => {
+                const persistentDeviceData = payload.persistentDeviceData?.find(
+                    ({ device_id }) => device_id === device.id,
+                );
+                if (persistentDeviceData) {
+                    return {
+                        ...device,
+                        thp: persistentDeviceData.thp,
+                    };
+                } else {
+                    return device;
+                }
+            });
+        },
+        storageLoadPersistentDeviceData: (
+            _state: PersistentDeviceDataState,
+            { payload }: StorageLoadAction,
+        ) => ({ devices: payload.persistentDeviceData ?? [] }),
+        storageLoadEarnOnboarding: (_: EarnOnboardingState, { payload }: StorageLoadAction) =>
+            Object.fromEntries(payload.earnOnboarding.map(({ key, value }) => [key, value])),
+        storageLoadFormDrafts: (state: SendState, { payload }: StorageLoadAction) => {
             payload.sendFormDrafts.forEach(d => {
                 state.drafts[d.key] = d.value;
             });
         },
-    },
-    utils: {
-        saveAs: (data, fileName) => saveAs(data, fileName),
-        connectInitSettings,
+        storageLoadWalletSettings: (state: WalletSettingsState, { payload }: StorageLoadAction) =>
+            payload.walletSettings ? { ...state, ...payload.walletSettings } : state,
+        // this is deprecated, bioAuth settings is now stored in electron store
+        storageLoadBioAuth: (state: BioAuthState, { payload }: StorageLoadAction) => {
+            if (!payload?.bioAuth) return state;
+
+            // Only load the bioAuthEnabled property, ignore all other properties
+            if (payload.bioAuth.bioAuthEnabled !== undefined) {
+                return {
+                    ...state,
+                    bioAuthEnabled: payload.bioAuth.bioAuthEnabled,
+                };
+            }
+
+            return state;
+        },
+        storageLoadFlags: (state: FlagsState, { payload }: StorageLoadAction) =>
+            payload.suiteSettings?.flags
+                ? {
+                      ...state,
+                      ...payload.suiteSettings.flags,
+                      // The onboarding feedback banner is session-only: it is enabled when onboarding
+                      // is completed and must not survive an app restart. Reset it on every load so a
+                      // returning user only sees it again after completing onboarding once more.
+                      showOnboardingFeedbackBanner: false,
+                  }
+                : state,
+        storageLoadSuiteSettings: (state: SuiteSettingsState, { payload }: StorageLoadAction) => {
+            if (!payload.suiteSettings?.settings) return state;
+
+            const loadedSettings = payload.suiteSettings.settings;
+            const theme =
+                (loadedSettings.theme?.variant as string | undefined) === 'debug'
+                    ? { ...loadedSettings.theme, variant: 'light' as const }
+                    : loadedSettings.theme;
+
+            return {
+                ...state,
+                ...loadedSettings,
+                theme: theme ?? state.theme,
+                enabledSecurityChecks: {
+                    ...state.enabledSecurityChecks,
+                    ...loadedSettings.enabledSecurityChecks,
+                },
+            };
+        },
+        storageLoadReceiveAccounts: (state: ReceiveState, { payload }: StorageLoadAction) => {
+            state.accounts =
+                payload.receive?.reduce<ReceiveState['accounts']>((accounts, { key, value }) => {
+                    accounts[key] = {
+                        touchedAddresses: value.touchedAddresses.map(({ path, address }) => ({
+                            path,
+                            address,
+                        })),
+                        currentFreshAddress: value.currentFreshAddress,
+                    };
+
+                    return accounts;
+                }, {}) ?? {};
+        },
     },
 };

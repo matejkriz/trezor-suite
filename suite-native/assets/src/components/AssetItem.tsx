@@ -1,56 +1,40 @@
-import { memo } from 'react';
-import { TouchableOpacity } from 'react-native';
+import { memo, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 
 import { useNavigation } from '@react-navigation/native';
 
-import { CryptoIconName, CryptoIconWithPercentage, Icon } from '@suite-common/icons';
-import { NetworkSymbol } from '@suite-common/wallet-config';
+import { type NetworkSymbol } from '@suite-common/wallet-config';
 import {
-    AccountsRootState,
-    DeviceRootState,
-    selectDeviceAccountsByNetworkSymbol,
+    type StakeRootState,
+    selectHasAnyDeviceAccountsWithStaking,
 } from '@suite-common/wallet-core';
-import { Box, Text } from '@suite-native/atoms';
-import { CryptoAmountFormatter, FiatAmountFormatter } from '@suite-native/formatters';
 import {
-    AppTabsParamList,
+    AccountsListItemBase,
+    type NativeAccountsRootState,
+    selectHasDeviceAnyFailedAccountForNetworkSymbol,
+} from '@suite-native/accounts';
+import { Icon } from '@suite-native/icons';
+import {
+    AccountsStackRoutes,
+    type AppTabsParamList,
     AppTabsRoutes,
-    RootStackParamList,
+    type RootStackParamList,
     RootStackRoutes,
-    TabToStackCompositeNavigationProp,
+    type TabToStackCompositeNavigationProp,
 } from '@suite-native/navigation';
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
+import { type TokensRootState, selectHasDeviceAnyTokensForNetwork } from '@suite-native/tokens';
+
+import { selectSingleDeviceAccountKeyForNetworkSymbol } from '../assetsSelectors';
+import { type AssetsRootState } from '../types';
+import { AssetItemBadges } from './AssetItemBadges';
+import { AssetItemTitle } from './AssetItemTitle';
+import { CryptoAmount } from './CryptoAmount';
+import { FiatAmount } from './FiatAmount';
+import { PercentageIcon } from './PercentageIcon';
 
 type AssetItemProps = {
     cryptoCurrencySymbol: NetworkSymbol;
-    cryptoCurrencyName: string;
-    cryptoCurrencyValue: string;
-    iconName: CryptoIconName;
-    onPress?: (symbol: NetworkSymbol) => void;
-    fiatBalance: string;
-    fiatPercentage: number;
-    fiatPercentageOffset: number;
 };
-
-const assetItemWrapperStyle = prepareNativeStyle(() => ({
-    flexDirection: 'row',
-    alignItems: 'center',
-}));
-
-const assetContentStyle = prepareNativeStyle(() => ({
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flex: 1,
-    marginLeft: 10,
-}));
-
-const assetValuesStyle = prepareNativeStyle(_ => ({ maxWidth: '60%' }));
-
-const iconStyle = prepareNativeStyle(() => ({
-    marginRight: 6,
-}));
 
 type NavigationType = TabToStackCompositeNavigationProp<
     AppTabsParamList,
@@ -58,73 +42,64 @@ type NavigationType = TabToStackCompositeNavigationProp<
     RootStackParamList
 >;
 
-export const AssetItem = memo(
-    ({
+export const AssetItem = memo(({ cryptoCurrencySymbol }: AssetItemProps) => {
+    const navigation = useNavigation<NavigationType>();
+    const singleAccountKey = useSelector((state: AssetsRootState) =>
+        selectSingleDeviceAccountKeyForNetworkSymbol(state, cryptoCurrencySymbol),
+    );
+    const hasAnyTokens = useSelector((state: TokensRootState) =>
+        selectHasDeviceAnyTokensForNetwork(state, cryptoCurrencySymbol),
+    );
+    const hasAnyAccountsWithStaking = useSelector((state: StakeRootState) =>
+        selectHasAnyDeviceAccountsWithStaking(state, cryptoCurrencySymbol),
+    );
+    const hasAnyFailedAccount = useSelector((state: NativeAccountsRootState) =>
+        selectHasDeviceAnyFailedAccountForNetworkSymbol(state, cryptoCurrencySymbol),
+    );
+
+    const secondaryValue = hasAnyFailedAccount ? undefined : (
+        <CryptoAmount symbol={cryptoCurrencySymbol} />
+    );
+
+    const handleAssetPress = useCallback(() => {
+        // A single tokenless account opens its detail directly; anything else opens the list.
+        if (singleAccountKey && !hasAnyTokens && !hasAnyAccountsWithStaking) {
+            navigation.navigate(RootStackRoutes.AccountDetail, {
+                accountKey: singleAccountKey,
+                closeActionType: 'back',
+            });
+
+            return;
+        }
+
+        navigation.navigate(AppTabsRoutes.AccountsStack, {
+            screen: AccountsStackRoutes.Accounts,
+            params: { networksFilter: [cryptoCurrencySymbol] },
+        });
+    }, [
         cryptoCurrencySymbol,
-        cryptoCurrencyValue,
-        cryptoCurrencyName,
-        iconName,
-        fiatBalance,
-        fiatPercentage,
-        fiatPercentageOffset,
-        onPress,
-    }: AssetItemProps) => {
-        const { applyStyle } = useNativeStyles();
-        const navigation = useNavigation<NavigationType>();
+        hasAnyAccountsWithStaking,
+        hasAnyTokens,
+        navigation,
+        singleAccountKey,
+    ]);
 
-        const accountsForNetworkSymbol = useSelector((state: AccountsRootState & DeviceRootState) =>
-            selectDeviceAccountsByNetworkSymbol(state, cryptoCurrencySymbol),
-        );
-        const accountsPerAsset = accountsForNetworkSymbol.length;
-
-        const handleAssetPress = () => {
-            if (accountsPerAsset === 1) {
-                navigation.navigate(RootStackRoutes.AccountDetail, {
-                    accountKey: accountsForNetworkSymbol[0].key,
-                    closeActionType: 'back',
-                });
-            } else if (onPress) {
-                onPress(cryptoCurrencySymbol);
+    return (
+        <AccountsListItemBase
+            onPress={handleAssetPress}
+            icon={<PercentageIcon symbol={cryptoCurrencySymbol} />}
+            title={<AssetItemTitle symbol={cryptoCurrencySymbol} />}
+            badges={<AssetItemBadges symbol={cryptoCurrencySymbol} />}
+            mainValue={
+                hasAnyFailedAccount ? (
+                    <Icon name="warning" color="contentWarning" size="medium" />
+                ) : (
+                    <FiatAmount symbol={cryptoCurrencySymbol} />
+                )
             }
-        };
-
-        return (
-            <TouchableOpacity disabled={!onPress} onPress={handleAssetPress}>
-                <Box style={applyStyle(assetItemWrapperStyle)}>
-                    <CryptoIconWithPercentage
-                        iconName={iconName}
-                        percentage={fiatPercentage}
-                        percentageOffset={fiatPercentageOffset}
-                    />
-                    <Box style={applyStyle(assetContentStyle)}>
-                        <Box flex={1} justifyContent="space-between" alignItems="flex-start">
-                            <Text>{cryptoCurrencyName}</Text>
-                            <Box flexDirection="row" alignItems="center">
-                                <Box style={applyStyle(iconStyle)}>
-                                    <Icon size="medium" color="iconSubdued" name="standardWallet" />
-                                </Box>
-                                <Text variant="hint" color="textSubdued">
-                                    {accountsPerAsset}
-                                </Text>
-                            </Box>
-                        </Box>
-                        <Box alignItems="flex-end" style={applyStyle(assetValuesStyle)}>
-                            <FiatAmountFormatter
-                                network={cryptoCurrencySymbol}
-                                value={fiatBalance}
-                            />
-                            <CryptoAmountFormatter
-                                value={cryptoCurrencyValue}
-                                network={cryptoCurrencySymbol}
-                                // Every asset crypto amount is rounded to 8 decimals to prevent UI overflow.
-                                decimals={8}
-                            />
-                        </Box>
-                    </Box>
-                </Box>
-            </TouchableOpacity>
-        );
-    },
-);
+            secondaryValue={secondaryValue}
+        />
+    );
+});
 
 AssetItem.displayName = 'AssetItem';

@@ -1,18 +1,68 @@
-import { TrezorDevice } from 'src/types/suite/index';
-import { DeviceModelInternal } from '@trezor/connect';
 import { deflateRaw } from 'pako';
 
-export const deviceModelInformation = {
-    [DeviceModelInternal.T1B1]: { width: 128, height: 64, supports: ['png', 'jpeg'] },
-    [DeviceModelInternal.T2T1]: { width: 240, height: 240, supports: ['jpeg'] },
-    [DeviceModelInternal.T2B1]: { width: 128, height: 64, supports: ['png', 'jpeg'] },
+import { DeviceModelInternal } from '@trezor/device-utils';
+import { splitStringEveryNCharacters } from '@trezor/utils';
+
+import { HAS_MONOCHROME_SCREEN } from 'src/constants/suite/device';
+import { type TrezorDevice } from 'src/types/suite/index';
+
+// TODO: this is already part of features (since certain version) so I suggest forbidding screen changes
+// prior to that version and removing this definition from here
+
+type DeviceModelInformation = {
+    width: number;
+    height: number;
+    supports: Array<'png' | 'jpeg'>;
+    maxImageSize: number;
+};
+
+const safe3Information: DeviceModelInformation = {
+    width: 128,
+    height: 64,
+    supports: ['png', 'jpeg'],
+    maxImageSize: 16384,
+};
+
+export const deviceModelInformation: Record<DeviceModelInternal, DeviceModelInformation> = {
+    [DeviceModelInternal.UNKNOWN]: {
+        width: 280,
+        height: 520,
+        supports: ['jpeg'],
+        maxImageSize: 16384,
+    },
+    [DeviceModelInternal.T1B1]: {
+        width: 128,
+        height: 64,
+        supports: ['png', 'jpeg'],
+        maxImageSize: 16384,
+    },
+    [DeviceModelInternal.T2T1]: {
+        width: 240,
+        height: 240,
+        supports: ['jpeg'],
+        maxImageSize: 16384,
+    },
+    [DeviceModelInternal.T2B1]: safe3Information,
+    [DeviceModelInternal.T3B1]: safe3Information,
+    [DeviceModelInternal.T3T1]: {
+        width: 240,
+        height: 240,
+        supports: ['jpeg'],
+        maxImageSize: 16384,
+    },
+    [DeviceModelInternal.T3W1]: {
+        width: 380,
+        height: 520,
+        supports: ['jpeg'],
+        maxImageSize: 65536,
+    },
 };
 
 export const enum ImageValidationError {
     InvalidFormatOnlyPngJpg = 'IMAGE_VALIDATION_ERROR_INVALID_FORMAT_ONLY_PNG_JPG',
     InvalidFormatOnlyJpg = 'IMAGE_VALIDATION_ERROR_INVALID_FORMAT_ONLY_JPG',
     InvalidDimensions = 'IMAGE_VALIDATION_ERROR_INVALID_DIMENSIONS',
-    InvalidSize = 'IMAGE_VALIDATION_ERROR_INVALID_SIZE',
+    InvalidSize = 'IMAGE_VALIDATION_ERROR_INVALID_SIZE_JPG',
     ProgressiveJpgFormat = 'IMAGE_VALIDATION_ERROR_PROGRESSIVE_JPG',
     UnexpectedAlpha = 'IMAGE_VALIDATION_ERROR_UNEXPECTED_ALPHA',
     InvalidColorCombination = 'IMAGE_VALIDATION_ERROR_INVALID_COLOR_COMBINATION',
@@ -110,14 +160,6 @@ const evenPad = (val: string) => {
     return `0${val}`;
 };
 
-const chunkString = (size: number, str: string) => {
-    const re = new RegExp(`.{1,${size}}`, 'g');
-    const result = str.match(re);
-    if (!result) return [];
-
-    return result;
-};
-
 // Convert RGB to grayscale using the formula grayscale = 0.299 * R + 0.587 * G + 0.114 * B
 const toGrayscale = (red: number, green: number, blue: number): number =>
     Math.round(0.299 * red + 0.587 * green + 0.114 * blue);
@@ -134,7 +176,7 @@ const toig = (imageData: ImageData, deviceModelInternal: DeviceModelInternal) =>
                 const g = imageData.data[4 * i + 1];
                 const b = imageData.data[4 * i + 2];
 
-                return toGrayscale(r, g, b);
+                return toGrayscale(r ?? 0, g ?? 0, b ?? 0);
             }),
         )
         .flat();
@@ -146,7 +188,7 @@ const toig = (imageData: ImageData, deviceModelInternal: DeviceModelInternal) =>
         const odd = pixels[i + 1];
 
         // Use the even pixel for the higher 4 bits and odd pixel for the lower 4 bits.
-        const packedByte = ((even & 0xf0) >> 4) | (odd & 0xf0);
+        const packedByte = (((even ?? 0) & 0xf0) >> 4) | ((odd ?? 0) & 0xf0);
         bytes.push(packedByte);
     }
 
@@ -163,7 +205,7 @@ const toig = (imageData: ImageData, deviceModelInternal: DeviceModelInternal) =>
     if (length.length % 2 > 0) {
         length = evenPad(length);
     }
-    length = chunkString(2, length).reverse().join('');
+    length = splitStringEveryNCharacters(length, 2).reverse().join('');
     header += rightPad(8, length);
 
     return header + byteArrayToHexString(packed);
@@ -207,7 +249,7 @@ export const isValidImageHeight = (
 };
 
 export const isProgressiveJPG = (buffer: ArrayBuffer, deviceModelInternal: DeviceModelInternal) => {
-    if (deviceModelInternal !== DeviceModelInternal.T2T1) {
+    if (HAS_MONOCHROME_SCREEN[deviceModelInternal]) {
         return false;
     }
 
@@ -223,46 +265,117 @@ export const isProgressiveJPG = (buffer: ArrayBuffer, deviceModelInternal: Devic
 };
 
 export const isValidImageSize = (file: File, deviceModelInternal: DeviceModelInternal) => {
-    if (deviceModelInternal !== DeviceModelInternal.T2T1) {
+    if (HAS_MONOCHROME_SCREEN[deviceModelInternal]) {
         return true;
     }
 
-    return file.size <= 16384;
+    return file.size <= deviceModelInformation[deviceModelInternal].maxImageSize;
 };
 
 export const validateImageColors = (
     origImage: HTMLImageElement,
     deviceModelInternal: DeviceModelInternal,
-) => {
+): ImageValidationError | undefined => {
     const imageData = imageToImageData(origImage, deviceModelInternal);
 
-    if ([DeviceModelInternal.T1B1, DeviceModelInternal.T2B1].includes(deviceModelInternal)) {
-        try {
-            range(imageData.height).forEach((j: number) => {
-                range(imageData.width).forEach(i => {
-                    const index = j * 4 * imageData.width + i * 4;
-                    const red = imageData.data[index];
-                    const green = imageData.data[index + 1];
-                    const blue = imageData.data[index + 2];
-                    const alpha = imageData.data[index + 3];
-                    if (alpha !== 255) {
-                        throw new Error(ImageValidationError.UnexpectedAlpha);
-                    }
-                    const isBlack = red === 0 && green === 0 && blue === 0;
-                    const isWhite = red === 255 && green === 255 && blue === 255;
+    if (HAS_MONOCHROME_SCREEN[deviceModelInternal]) {
+        for (const j of range(imageData.height)) {
+            for (const i of range(imageData.width)) {
+                const index = j * 4 * imageData.width + i * 4;
+                const red = imageData.data[index];
+                const green = imageData.data[index + 1];
+                const blue = imageData.data[index + 2];
+                const alpha = imageData.data[index + 3];
 
-                    if (!isBlack && !isWhite) {
-                        throw new Error(ImageValidationError.InvalidColorCombination);
-                    }
-                });
-            });
-        } catch (error) {
-            return error.message;
+                if (alpha !== 255) {
+                    return ImageValidationError.UnexpectedAlpha;
+                }
+
+                const isBlack = red === 0 && green === 0 && blue === 0;
+                const isWhite = red === 255 && green === 255 && blue === 255;
+
+                if (!isBlack && !isWhite) {
+                    return ImageValidationError.InvalidColorCombination;
+                }
+            }
         }
+    }
+
+    return undefined;
+};
+
+type ImageOperationParam = {
+    file: File;
+    deviceModelInternal: DeviceModelInternal;
+};
+
+const exportCanvas = (
+    canvas: HTMLCanvasElement,
+    filename: string,
+    filetype: 'jpeg' | 'png',
+    quality: number,
+): File | undefined => {
+    try {
+        const mimeType = `image/${filetype}`;
+        const outDataUrl = canvas.toDataURL(mimeType, quality);
+        const bin = atob(outDataUrl.split(',')[1] ?? '');
+        const arr = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+
+        return new File([arr], filename, { type: mimeType });
+    } catch {
+        return;
     }
 };
 
-export const validateImage = async (file: File, deviceModelInternal: DeviceModelInternal) => {
+export const convertImage = async ({
+    file,
+    deviceModelInternal,
+}: ImageOperationParam): Promise<File | undefined> => {
+    // Tries converting to valid image. Best effort only.
+    const { supports, width, height, maxImageSize } = deviceModelInformation[deviceModelInternal];
+
+    const dataUrl = await fileToDataUrl(file);
+    const image = await dataUrlToImage(dataUrl);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return undefined;
+
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, width, height);
+
+    const scale = Math.min(width / image.width, height / image.height);
+    const drawWidth = image.width * scale;
+    const drawHeight = image.height * scale;
+    const offsetX = (width - drawWidth) / 2;
+    const offsetY = (height - drawHeight) / 2;
+    ctx.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
+
+    const QUALITY_DECREASE_STEP = 0.1;
+    for (const filetype of supports) {
+        let quality = 1.0;
+        while (quality > QUALITY_DECREASE_STEP) {
+            const attempt = exportCanvas(
+                canvas,
+                file.name.replace(/\.\w+$/, `.${filetype}`),
+                filetype,
+                quality,
+            );
+            if (attempt && attempt.size <= maxImageSize) return attempt;
+            quality -= QUALITY_DECREASE_STEP;
+        }
+    }
+
+    return;
+};
+
+export const validateImage = async ({
+    file,
+    deviceModelInternal,
+}: ImageOperationParam): Promise<ImageValidationError | undefined> => {
     const dataUrl = await fileToDataUrl(file);
     const arrayBuffer = await fileToArrayBuffer(file);
     const image = await dataUrlToImage(dataUrl);
@@ -276,15 +389,18 @@ export const validateImage = async (file: File, deviceModelInternal: DeviceModel
 
         return ImageValidationError.InvalidFormatOnlyJpg;
     }
+
     if (
         !isValidImageWidth(image, deviceModelInternal) ||
         !isValidImageHeight(image, deviceModelInternal)
     ) {
         return ImageValidationError.InvalidDimensions;
     }
+
     if (isProgressiveJPG(arrayBuffer, deviceModelInternal)) {
         return ImageValidationError.ProgressiveJpgFormat;
     }
+
     if (!isValidImageSize(file, deviceModelInternal)) {
         return ImageValidationError.InvalidSize;
     }
@@ -301,13 +417,13 @@ export const imagePathToHex = async (
     const response = await fetch(imagePath);
 
     // image can be loaded to device without modifications -> it is in original quality
-    if (deviceModelInternal === DeviceModelInternal.T2T1) {
+    if (!HAS_MONOCHROME_SCREEN[deviceModelInternal]) {
         const arrayBuffer = await response.arrayBuffer();
 
         return Buffer.from(arrayBuffer).toString('hex');
     }
 
-    /* 
+    /*
     - However, this method accepts the Canvas format which changes the quality of image
     */
     const blob = await response.blob();
@@ -317,7 +433,7 @@ export const imagePathToHex = async (
     const { canvas, ctx } = imageToCanvas(element, deviceModelInternal);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-    if (deviceModelInternal === DeviceModelInternal.T2B1) {
+    if ([DeviceModelInternal.T2B1, DeviceModelInternal.T3B1].includes(deviceModelInternal)) {
         return toig(imageData, deviceModelInternal);
     }
 
@@ -325,11 +441,13 @@ export const imagePathToHex = async (
     return bitmap(imageData, deviceModelInternal);
 };
 
-export const isHomescreenSupportedOnDevice = (device: TrezorDevice) => {
+export const isHomescreenSupportedOnDevice = (device: TrezorDevice): boolean => {
     const deviceModelInternal = device.features?.internal_model;
 
     return (
         deviceModelInternal !== DeviceModelInternal.T2T1 ||
-        (deviceModelInternal === DeviceModelInternal.T2T1 && device.features?.homescreen_format)
+        (deviceModelInternal === DeviceModelInternal.T2T1 &&
+            device.features?.homescreen_format !== undefined &&
+            device.features?.homescreen_format !== null)
     );
 };

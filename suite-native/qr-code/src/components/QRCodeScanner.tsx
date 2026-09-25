@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Platform } from 'react-native';
+import { Dimensions, Platform } from 'react-native';
 
-import { BarCodeEvent, BarCodeScanner, PermissionStatus } from 'expo-barcode-scanner';
+import { type BarcodeScanningResult, CameraView, PermissionStatus } from 'expo-camera';
 
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-import { Box, Loader } from '@suite-native/atoms';
+import { Box, HStack, Loader, Text, VStack } from '@suite-native/atoms';
+import { Icon } from '@suite-native/icons';
+import { Translation, useTranslate } from '@suite-native/intl';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
+import { nativeSpacings } from '@trezor/theme';
 
 import { CameraPermissionError } from './CameraPermissionError';
 import { useCameraPermission } from '../hooks/useCameraPermission';
@@ -13,16 +16,23 @@ type QRCodeScannerProps = {
     onCodeScanned: (data: string) => void;
 };
 
-const cameraStyle = prepareNativeStyle(_ => ({
-    flex: 1,
-    height: '100%',
+const SCANNER_SIZE = Dimensions.get('screen').width - 2 * nativeSpacings.sp16;
+
+const cameraContainerStyle = prepareNativeStyle(utils => ({
+    borderRadius: utils.borders.radii.r16,
+    overflow: 'hidden',
 }));
 
-const barCodeTypes = [BarCodeScanner.Constants.BarCodeType.qr];
+const cameraStyle = prepareNativeStyle(() => ({
+    height: SCANNER_SIZE,
+    width: SCANNER_SIZE,
+}));
 
 export const QRCodeScanner = ({ onCodeScanned }: QRCodeScannerProps) => {
+    const { translate } = useTranslate();
     const { applyStyle } = useNativeStyles();
-    const { cameraPermissionStatus, requestCameraPermission } = useCameraPermission();
+    const { cameraPermissionStatus } = useCameraPermission();
+
     const [scanned, setScanned] = useState(false);
     // We don't need wait on iOS, check comment in useEffect lower for more details
     const [isCameraLoading, setIsCameraLoading] = useState(Platform.OS === 'android');
@@ -38,7 +48,7 @@ export const QRCodeScanner = ({ onCodeScanned }: QRCodeScannerProps) => {
         return () => clearTimeout(timeout);
     }, []);
 
-    const handleBarCodeScanned = ({ data }: BarCodeEvent) => {
+    const handleBarCodeScanned = ({ data }: BarcodeScanningResult) => {
         setScanned(true);
         onCodeScanned(data);
     };
@@ -46,29 +56,40 @@ export const QRCodeScanner = ({ onCodeScanned }: QRCodeScannerProps) => {
     if (isCameraLoading) {
         return (
             <Box alignItems="center" justifyContent="center" flex={1}>
-                <Loader title="Loading camera..." />
+                <Loader />
             </Box>
         );
     }
 
     switch (cameraPermissionStatus) {
-        // If the status is "UNDETERMINED" the expo-barcode-scanner library shows a native permission dialog itself.
+        // If the status is "UNDETERMINED" the expo-camera library shows a native permission dialog itself.
         case PermissionStatus.UNDETERMINED:
             return null;
 
         case PermissionStatus.GRANTED:
             return (
-                <BarCodeScanner
-                    onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-                    barCodeTypes={barCodeTypes}
-                    style={applyStyle(cameraStyle)}
-                    type="back"
-                    accessibilityLabel="QR code scanner"
-                />
+                <VStack spacing="sp16" justifyContent="center">
+                    <HStack alignItems="center" justifyContent="center">
+                        <Icon name="lightbulb" color="contentBrand" size="mediumLarge" />
+                        <Text color="contentBrand">
+                            <Translation id="qrCode.qrCodeHint" />
+                        </Text>
+                    </HStack>
+                    <Box style={applyStyle(cameraContainerStyle)}>
+                        <CameraView
+                            onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+                            style={applyStyle(cameraStyle)}
+                            barcodeScannerSettings={{
+                                barcodeTypes: ['qr'],
+                            }}
+                            accessibilityLabel={translate('qrCode.scanner')}
+                        />
+                    </Box>
+                </VStack>
             );
 
         case PermissionStatus.DENIED:
         default:
-            return <CameraPermissionError onPermissionRequest={requestCameraPermission} />;
+            return <CameraPermissionError />;
     }
 };

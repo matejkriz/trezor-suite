@@ -1,69 +1,89 @@
 import { useMemo } from 'react';
+
 import styled from 'styled-components';
 
+import { selectIsDebugModeActive } from '@suite/debug';
+import { Translation } from '@suite/intl';
+import { type Network, type ServerType } from '@suite-common/wallet-config';
 import { Select } from '@trezor/components';
-import { Translation } from 'src/components/suite';
 import { isDesktop } from '@trezor/env-utils';
 
-import type { Network } from 'src/types/wallet';
-import type { BackendOption } from 'src/hooks/settings/backends';
+import { useSelector } from 'src/hooks/suite';
 
 const Capitalize = styled.span`
     text-transform: capitalize;
 `;
 
-const useBackendOptions = (network: Network) =>
-    useMemo(
+const useBackendOptions = (network: Network, isDebugModeActive: boolean) => {
+    const getBackendLabel = (backend: string) => {
+        switch (backend) {
+            case 'default':
+                return <Translation id="TR_BACKEND_DEFAULT_SERVERS" />;
+            case 'evm-rpc':
+                return <Translation id="TR_BACKEND_CUSTOM_RPC" />;
+            default:
+                return (
+                    <Translation
+                        id="TR_BACKEND_CUSTOM_SERVERS"
+                        values={{
+                            type: (
+                                <Capitalize data-testid={`@settings/advance/${backend}`}>
+                                    {backend}
+                                </Capitalize>
+                            ),
+                        }}
+                    />
+                );
+        }
+    };
+
+    return useMemo(
         () =>
-            ['default', ...network.customBackends]
+            ['default', ...network.backendOptions.map(option => option.type)]
                 .filter(backend => {
                     switch (backend) {
                         case 'default':
                             return network.symbol !== 'regtest';
                         case 'electrum':
                             return isDesktop();
+                        case 'evm-rpc':
+                            return isDebugModeActive;
                         default:
                             return true;
                     }
                 })
                 .map(backend => ({
-                    label:
-                        backend === 'default' ? (
-                            <Translation id="TR_BACKEND_DEFAULT_SERVERS" />
-                        ) : (
-                            <Translation
-                                id="TR_BACKEND_CUSTOM_SERVERS"
-                                values={{
-                                    type: (
-                                        <Capitalize data-test={`@settings/advance/${backend}`}>
-                                            {backend}
-                                        </Capitalize>
-                                    ),
-                                }}
-                            />
-                        ),
+                    label: getBackendLabel(backend),
                     value: backend,
                 })),
-        [network],
+        [network, isDebugModeActive],
     );
+};
 
 type BackendTypeSelectProps = {
     network: Network;
-    value: BackendOption;
-    onChange: (type: BackendOption) => void;
+    value: ServerType;
+    onChange: (type: ServerType) => void;
 };
 
 export const BackendTypeSelect = ({ network, value, onChange }: BackendTypeSelectProps) => {
-    const backendOptions = useBackendOptions(network);
+    const isDebugModeActive = useSelector(selectIsDebugModeActive);
+    const backendOptions = useBackendOptions(network, isDebugModeActive);
 
-    const changeType = (option: { value: BackendOption }) => onChange(option.value);
+    if (!backendOptions.length) {
+        return null;
+    }
 
-    return backendOptions.length ? (
+    return (
         <Select
             value={backendOptions.find(option => option.value === value)}
-            onChange={changeType}
+            openMenuOnFocus={false}
+            onChange={option => {
+                onChange(option.value);
+            }}
             options={backendOptions}
-            data-test="@settings/advance/select-type"
+            data-testid="@settings/advance/select-type"
+            size="small"
         />
-    ) : null;
+    );
 };

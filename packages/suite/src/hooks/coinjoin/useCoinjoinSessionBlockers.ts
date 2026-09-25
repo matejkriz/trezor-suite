@@ -1,11 +1,13 @@
-import { useSelector, useTranslation } from 'src/hooks/suite';
+import { selectCoinjoinSessionBlockerByAccountKey } from '@suite/coinjoin';
+import { useTranslation } from '@suite/intl';
+import { selectLanguage } from '@suite/settings';
 import { Feature, selectFeatureMessageContent } from '@suite-common/message-system';
-import { selectLanguage } from 'src/reducers/suite/suiteReducer';
+import { type AccountKey } from '@suite-common/wallet-types';
 
-import { selectCoinjoinSessionBlockerByAccountKey } from 'src/reducers/wallet/coinjoinReducer';
+import { useSelector } from 'src/hooks/suite';
 
 export const useCoinjoinSessionBlockers = (
-    accountKey: string,
+    accountKey: AccountKey,
 ): {
     coinjoinSessionBlocker: ReturnType<typeof selectCoinjoinSessionBlockerByAccountKey>;
     coinjoinSessionBlockedMessage?: string;
@@ -25,6 +27,8 @@ export const useCoinjoinSessionBlockers = (
         switch (blocker) {
             case 'FEATURE_DISABLED':
                 return featureMessageContent;
+            case 'COORDINATOR_UNAVAILABLE':
+                return translationString('TR_UNAVAILABLE_COINJOIN_COORDINATOR');
             case 'OFFLINE':
                 return translationString('TR_UNAVAILABLE_COINJOIN_NO_INTERNET');
             case 'NOTHING_TO_ANONYMIZE':

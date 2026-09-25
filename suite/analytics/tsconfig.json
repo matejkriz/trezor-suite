@@ -1,0 +1,24 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": { "outDir": "libDev" },
+    "references": [
+        {
+            "path": "../../suite-common/analytics"
+        },
+        { "path": "../../suite-common/feedback" },
+        {
+            "path": "../../suite-common/metadata-types"
+        },
+        {
+            "path": "../../suite-common/suite-types"
+        },
+        {
+            "path": "../../suite-common/wallet-config"
+        },
+        { "path": "../router" },
+        {
+            "path": "../../packages/analytics-uploader"
+        },
+        { "path": "../../packages/device-utils" }
+    ]
+}

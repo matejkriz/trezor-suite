@@ -5,28 +5,86 @@
         {
             "path": "../../suite-common/analytics"
         },
-        { "path": "../../suite-common/icons" },
         {
-            "path": "../../suite-common/suite-config"
+            "path": "../../suite-common/analytics-redux"
+        },
+        {
+            "path": "../../suite-common/dependency-injection"
+        },
+        { "path": "../../suite-common/device" },
+        {
+            "path": "../../suite-common/discreet-mode"
+        },
+        { "path": "../../suite-common/logger" },
+        { "path": "../../suite-common/mev" },
+        {
+            "path": "../../suite-common/redux-utils"
         },
         {
             "path": "../../suite-common/suite-constants"
         },
+        {
+            "path": "../../suite-common/suite-sync"
+        },
+        {
+            "path": "../../suite-common/suite-sync-types"
+        },
+        {
+            "path": "../../suite-common/suite-types"
+        },
+        { "path": "../../suite-common/support" },
+        {
+            "path": "../../suite-common/validators"
+        },
+        {
+            "path": "../../suite-common/wallet-config"
+        },
+        {
+            "path": "../../suite-common/wallet-core"
+        },
+        {
+            "path": "../../suite-common/wallet-types"
+        },
+        { "path": "../alerts" },
         { "path": "../analytics" },
         { "path": "../atoms" },
+        { "path": "../banners" },
         { "path": "../biometrics" },
+        { "path": "../coin-enabling" },
         { "path": "../config" },
+        { "path": "../device" },
         { "path": "../device-manager" },
-        { "path": "../feature-flags" },
+        { "path": "../experimental-features" },
+        { "path": "../feature-feedback" },
+        { "path": "../forms" },
+        { "path": "../helpers" },
+        { "path": "../icons" },
         { "path": "../intl" },
         { "path": "../link" },
+        { "path": "../module-connect-popup" },
         { "path": "../navigation" },
+        { "path": "../search" },
+        { "path": "../settings" },
         { "path": "../storage" },
+        { "path": "../suite-sync" },
         { "path": "../theme" },
         { "path": "../toasts" },
+        { "path": "../trading-residence" },
+        { "path": "../trading-state" },
+        { "path": "../wallet" },
+        {
+            "path": "../../packages/blockchain-link-types"
+        },
         { "path": "../../packages/connect" },
         { "path": "../../packages/env-utils" },
-        { "path": "../../packages/styles" },
-        { "path": "../../packages/theme" }
-    ]
+        {
+            "path": "../../packages/styles-native"
+        },
+        { "path": "../../packages/theme" },
+        { "path": "../../packages/urls" },
+        { "path": "../../packages/utils" },
+        { "path": "../test-utils-store" },
+        { "path": "../../packages/requirements" }
+    ],
+    "include": [".", "**/*.json"]
 }

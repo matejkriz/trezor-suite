@@ -1,38 +1,58 @@
-import { ReactNode } from 'react';
-import styled, { useTheme } from 'styled-components';
+import { type ReactNode } from 'react';
 
-import { spacingsPx } from '@trezor/theme';
+import { InfoIcon } from '@trezor/icons';
+import { type SpacingValue } from '@trezor/theme';
 
-import { Icon } from '../assets/Icon/Icon';
+import { type FrameProps, type FramePropsKeys } from '../../utils/frameProps';
+import { Row } from '../Flex/Flex';
+import { Icon, type IconComponent } from '../Icon/Icon';
 import { Paragraph } from '../typography/Paragraph/Paragraph';
+import { type TextIntent, type TextPriority } from '../typography/Text/Text';
 
-const Row = styled.div`
-    display: flex;
-    gap: ${spacingsPx.xs};
-`;
+export const allowedNoteFrameProps = ['margin', 'minWidth'] as const satisfies FramePropsKeys[];
+type AllowedFrameProps = Pick<FrameProps, (typeof allowedNoteFrameProps)[number]>;
 
-const InfoIcon = styled(Icon)`
-    margin-top: 2px;
-`;
-
-const StyledParagraph = styled(Paragraph)<{ $color?: string }>`
-    color: ${({ $color }) => $color};
-`;
-
-export interface NoteProps {
+export type NoteProps = AllowedFrameProps & {
+    icon?: IconComponent;
+    intent?: TextIntent;
+    priority?: TextPriority;
+    isDisabled?: boolean;
+    gap?: SpacingValue;
     children: ReactNode;
-    className?: string;
-}
-
-export const Note = ({ children, className }: NoteProps) => {
-    const theme = useTheme();
-
-    return (
-        <Row className={className}>
-            <InfoIcon icon="INFO" size={14} color={theme.textSubdued} />
-            <StyledParagraph typographyStyle="hint" $color={theme.textSubdued}>
-                {children}
-            </StyledParagraph>
-        </Row>
-    );
+    'data-testid'?: string;
+    isInverse?: boolean;
 };
+
+export const Note = ({
+    children,
+    icon = InfoIcon,
+    margin,
+    gap = 4,
+    minWidth,
+    intent = 'neutral',
+    priority = 'secondary',
+    isDisabled = false,
+    isInverse = false,
+    'data-testid': dataTestId,
+}: NoteProps) => (
+    <Row gap={gap} margin={margin} minWidth={minWidth} data-component="Note">
+        <Icon
+            as={icon}
+            size={16}
+            intent={intent}
+            priority={priority}
+            isDisabled={isDisabled}
+            isInverse={isInverse}
+        />
+        <Paragraph
+            data-testid={dataTestId}
+            typographyStyle="body-sm"
+            intent={intent}
+            priority={priority}
+            isDisabled={isDisabled}
+            isInverse={isInverse}
+        >
+            {children}
+        </Paragraph>
+    </Row>
+);

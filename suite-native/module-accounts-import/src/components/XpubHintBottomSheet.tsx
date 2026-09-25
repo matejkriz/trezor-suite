@@ -1,42 +1,54 @@
-import { BottomSheet, Box, Button, Text, VStack } from '@suite-native/atoms';
-import { Video, VideoName } from '@suite-native/video-assets';
-import { NetworkType } from '@suite-common/wallet-config';
+import { type NetworkType } from '@suite-common/wallet-config';
 import { isAddressBasedNetwork } from '@suite-common/wallet-utils';
-import { Translation, TxKeyPath, useTranslate } from '@suite-native/intl';
+import {
+    BottomSheetModal,
+    type BottomSheetModalRef,
+    Box,
+    Button,
+    Text,
+    VStack,
+} from '@suite-native/atoms';
+import { Translation, type TxKeyPath } from '@suite-native/intl';
+import { Video, type VideoName } from '@suite-native/video-assets';
 
 type XpubHintBottomSheetProps = {
     networkType: NetworkType;
-    isVisible: boolean;
     handleClose: () => void;
+    ref: BottomSheetModalRef;
 };
 
 export const XpubHintBottomSheet = ({
     networkType,
-    isVisible,
     handleClose,
+    ref,
 }: XpubHintBottomSheetProps) => {
-    const { translate } = useTranslate();
     const isAddressBased = isAddressBasedNetwork(networkType);
-    const video: VideoName = isAddressBased ? 'xpubImportBTC' : 'xpubImportETH';
-    const title = isAddressBased
-        ? translate('moduleAccountImport.xpubScanScreen.hintBottomSheet.title.address')
-        : translate('moduleAccountImport.xpubScanScreen.hintBottomSheet.title.xpub');
+    const video: VideoName = isAddressBased ? 'xpubImportETH' : 'xpubImportBTC';
+    const title = (
+        <Translation
+            id={
+                isAddressBased
+                    ? 'moduleAccountImport.xpubScanScreen.hintBottomSheet.title.address'
+                    : 'moduleAccountImport.xpubScanScreen.hintBottomSheet.title.xpub'
+            }
+        />
+    );
 
     const textTranslationTag: TxKeyPath = isAddressBased
         ? 'moduleAccountImport.xpubScanScreen.hintBottomSheet.text.address'
         : 'moduleAccountImport.xpubScanScreen.hintBottomSheet.text.xpub';
 
     return (
-        <BottomSheet title={title} isVisible={isVisible} onClose={handleClose}>
-            <Box paddingTop="small" justifyContent="space-between">
+        <BottomSheetModal title={title} ref={ref} isCloseDisplayed>
+            <Box paddingTop="sp8" justifyContent="space-between">
                 <Video name={video} aspectRatio={1} />
-                <VStack spacing="large" paddingTop="large">
-                    <Text color="textSubdued" textAlign="center" variant="hint">
+                <VStack spacing="sp24" paddingTop="sp24">
+                    <Text color="contentSecondary" textAlign="center" variant="body-sm">
                         <Translation
                             id={textTranslationTag}
                             values={{
                                 emphasized: chunks => (
-                                    <Text color="textDefault" variant="hint">
+                                    <Text color="contentPrimary" variant="body-sm">
                                         {chunks}
                                     </Text>
                                 ),
@@ -44,15 +56,15 @@ export const XpubHintBottomSheet = ({
                         />
                     </Text>
                 </VStack>
-                <Box marginTop="extraLarge">
+                <Box marginTop="sp32">
                     <Button
-                        data-testID="@accounts-import/xpub-help-modal/confirm-btn"
+                        testID="@accounts-import/xpub-help-modal/confirm-btn"
                         onPress={handleClose}
                     >
-                        {translate('moduleAccountImport.xpubScanScreen.confirmButton')}
+                        <Translation id="generic.buttons.gotIt" />
                     </Button>
                 </Box>
             </Box>
-        </BottomSheet>
+        </BottomSheetModal>
     );
 };

@@ -1,7 +1,12 @@
+import type { ImmediateId, TimerId } from '@trezor/type-utils';
 import { TypedEmitter } from '@trezor/utils';
 
-import { CoinjoinPrisonInmate, CoinjoinPrisonEvents } from '../types/client';
 import { WabiSabiProtocolErrorCode } from '../enums';
+import type {
+    CoinjoinPrisonEvents,
+    CoinjoinPrisonInmate,
+    CoinjoinPrisonShape,
+} from '../types/prison';
 
 export type DetainObject =
     | {
@@ -26,12 +31,12 @@ export interface DetainOptions {
 // Errored or currently registered inputs and addresses are sent here
 // inspiration: WalletWasabi/WabiSabi/Backend/Banning/Prison.cs
 
-export class CoinjoinPrison extends TypedEmitter<CoinjoinPrisonEvents> {
+export class CoinjoinPrison
+    extends TypedEmitter<CoinjoinPrisonEvents>
+    implements CoinjoinPrisonShape
+{
     inmates: CoinjoinPrisonInmate[] = [];
-    private changeEventThrottle:
-        | ReturnType<typeof setImmediate>
-        | ReturnType<typeof setTimeout>
-        | undefined;
+    private changeEventThrottle: ImmediateId | TimerId | undefined;
 
     constructor(initialState: CoinjoinPrisonInmate[] = []) {
         super();

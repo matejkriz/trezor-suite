@@ -1,8 +1,8 @@
 import { networks } from '@trezor/utxo-lib';
 
-import { CoinjoinBackendSettings } from '../types';
+import { type CoinjoinBackendSettings } from '../types';
 
-export const getNetwork = (network: CoinjoinBackendSettings['network']) => {
+export const getCoinjoinNetwork = (network: CoinjoinBackendSettings['network']) => {
     switch (network) {
         case 'btc':
             return networks.bitcoin;

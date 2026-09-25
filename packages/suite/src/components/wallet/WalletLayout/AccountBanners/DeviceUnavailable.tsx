@@ -1,25 +1,31 @@
-import { useDevice, useDispatch } from 'src/hooks/suite';
-import { applySettings } from 'src/actions/settings/deviceSettingsActions';
-import { NotificationCard, Translation } from 'src/components/suite';
+import { useDevice } from '@suite/device';
+import { Translation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { Banner } from '@trezor/components';
+
+import { applySettingsThunk } from 'src/actions/settings/deviceSettingsActions';
 
 export const DeviceUnavailable = () => {
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
     const { device, isLocked } = useDevice();
+    const passphraseProtection = !!device?.features?.passphrase_protection;
 
-    if (!device?.connected || device.available) return null;
+    if (!device?.connected || device.available || !device.features || passphraseProtection) {
+        return null;
+    }
 
-    const handleButtonClick = () => dispatch(applySettings({ use_passphrase: true }));
+    const handleButtonClick = () => dispatch(applySettingsThunk({ use_passphrase: true }));
 
     return (
-        <NotificationCard
-            variant="info"
-            button={{
-                children: <Translation id="TR_ACCOUNT_ENABLE_PASSPHRASE" />,
-                isLoading: isLocked(),
-                onClick: handleButtonClick,
-            }}
-        >
-            <Translation id="TR_ACCOUNT_PASSPHRASE_DISABLED" />
-        </NotificationCard>
+        <Banner
+            intent="info"
+            rightContent={
+                <Banner.Button onClick={handleButtonClick} isLoading={isLocked()}>
+                    <Translation id="TR_ACCOUNT_ENABLE_PASSPHRASE" />
+                </Banner.Button>
+            }
+            description={<Translation id="TR_ACCOUNT_PASSPHRASE_DISABLED" />}
+        />
     );
 };

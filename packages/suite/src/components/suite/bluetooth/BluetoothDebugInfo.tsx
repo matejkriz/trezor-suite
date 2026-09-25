@@ -1,0 +1,59 @@
+import { useEffect, useState } from 'react';
+
+import { type DesktopBluetoothDevice } from '@suite/bluetooth';
+import { selectKnownDevices, selectNearbyDevices } from '@suite-common/bluetooth';
+import { Code, Icon, InfoSegments, Text } from '@trezor/components';
+import { CellSignalFullIcon, FloppyDiskBackFilledIcon } from '@trezor/icons';
+
+import { useSelector } from 'src/hooks/suite';
+
+const TimeAgo = ({ timestamp }: { timestamp: number }) => {
+    const [secAgo, setSecAgo] = useState(0);
+
+    useEffect(() => {
+        setSecAgo(Math.floor((Date.now() - timestamp) / 1000));
+        const interval = setInterval(() => setSecAgo(t => t + 1), 1000);
+
+        return () => clearInterval(interval);
+    }, [timestamp]);
+
+    return (
+        <Text>
+            <Text intent="warning">{secAgo}</Text>&nbsp;s ago
+        </Text>
+    );
+};
+
+type BluetoothDeviceProps = {
+    device: DesktopBluetoothDevice;
+};
+
+export const BluetoothDebugInfo = ({ device }: BluetoothDeviceProps) => {
+    const nearbyDevices = useSelector(selectNearbyDevices<DesktopBluetoothDevice>);
+    const isNearbyDevice = (nearbyDevices ?? []).find(
+        nearbyDevice => nearbyDevice.id === device.id,
+    );
+
+    const knownDevices = useSelector(selectKnownDevices<DesktopBluetoothDevice>);
+    const isKnownDevice = knownDevices.find(knownDevice => knownDevice.id === device.id);
+
+    return (
+        <>
+            <InfoSegments>
+                {isKnownDevice && (
+                    <Icon as={FloppyDiskBackFilledIcon} size={16} intent="critical" />
+                )}
+                {isNearbyDevice && (
+                    <>
+                        <Icon as={CellSignalFullIcon} size={16} intent="brand" />
+                        {isNearbyDevice.rssi} dBm
+                    </>
+                )}
+                <TimeAgo timestamp={device.lastUpdatedTimestamp} />
+            </InfoSegments>
+            <Text typographyStyle="body-sm" intent="accentViolet">
+                <Code>{device.macAddress}</Code>
+            </Text>
+        </>
+    );
+};

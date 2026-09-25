@@ -1,17 +1,17 @@
-import { coordinatorRequest, RequestOptions } from './coordinatorRequest';
-import { patchResponse } from '../utils/http';
-import {
-    CoinjoinStatus,
-    ZeroCredentials,
-    RealCredentials,
-    ConfirmationData,
-    IssuanceData,
-    RegistrationData,
-} from '../types/coordinator';
+import { type RequestOptions, coordinatorRequest } from './coordinatorRequest';
 import { AFFILIATION_ID } from '../constants';
+import {
+    type CoinjoinStatus,
+    type ConfirmationData,
+    type IssuanceData,
+    type RealCredentials,
+    type RegistrationData,
+    type ZeroCredentials,
+} from '../types/coordinator';
+import { patchResponse } from '../utils/http';
 
 const request = <T>(...args: Parameters<typeof coordinatorRequest>) =>
-    coordinatorRequest<T>(...args).then(patchResponse);
+    coordinatorRequest<T>(...args).then<T>(patchResponse);
 
 export const getStatus = async (options: RequestOptions) => {
     const data = await request<CoinjoinStatus>(
@@ -151,4 +151,4 @@ export const transactionSignature = (
 export { WabiSabiProtocolException } from './coordinatorRequest';
 
 // reexport all coordinator types
-export * from '../types/coordinator';
+export type * from '../types/coordinator';

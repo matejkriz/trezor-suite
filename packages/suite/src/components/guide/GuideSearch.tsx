@@ -1,42 +1,26 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
 import styled from 'styled-components';
-import { Icon, Input, Spinner, variables } from '@trezor/components';
-import { Translation } from 'src/components/suite';
-import { useTranslation } from 'src/hooks/suite';
-import { GuideNode } from 'src/components/guide';
-import { useGuideSearch } from 'src/hooks/guide';
 
+import { Translation, useTranslation } from '@suite/intl';
 import type { GuideCategory } from '@suite-common/suite-types';
-import { spacingsPx } from '@trezor/theme';
+import { Box, CardList, Icon, Input, Paragraph, Spinner } from '@trezor/components';
+import { MagnifyingGlassIcon } from '@trezor/icons';
+import { typography } from '@trezor/theme';
 
-const Wrapper = styled.div`
-    margin-bottom: ${spacingsPx.xs};
-`;
-
-const PageFoundList = styled.div`
-    margin-top: 10px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-`;
-
-const NoResults = styled.p`
-    margin-top: 10px;
-    font-size: ${variables.FONT_SIZE.SMALL};
-    font-weight: ${variables.FONT_WEIGHT.REGULAR};
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-`;
+import { GuideNode } from 'src/components/guide';
+import { MIN_QUERY_LENGTH, useGuideSearch } from 'src/hooks/guide';
 
 const PreviewContent = styled.div`
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
+    ${typography['body-md']}
+    color: ${({ theme }) => theme.contentSecondary};
 
     & > em {
         font-style: inherit;
-        color: ${({ theme }) => theme.TYPE_DARK_GREY};
+        color: ${({ theme }) => theme.contentPrimary};
     }
 `;
 
@@ -61,31 +45,46 @@ type GuideSearchProps = {
 
 export const GuideSearch = ({ pageRoot, setSearchActive }: GuideSearchProps) => {
     const [query, setQuery] = useState('');
+    const inputRef = useRef<HTMLInputElement | null>(null);
 
     const { translationString } = useTranslation();
-    const { searchResult, loading } = useGuideSearch(query, pageRoot);
+    const { searchResult, loading, isQueryTooShort } = useGuideSearch(query, pageRoot);
 
     useEffect(() => {
-        if (setSearchActive) {
-            setSearchActive(!!searchResult.length || !!query);
-        }
+        setSearchActive?.(!!searchResult.length || !!query);
     }, [query, searchResult, setSearchActive, loading]);
 
     return (
-        <Wrapper>
+        <Box margin={{ bottom: 16 }}>
             <Input
                 placeholder={translationString('TR_SEARCH')}
                 value={query}
+                size="small"
                 onChange={e => setQuery(e.currentTarget.value)}
-                innerAddonAlign="left"
-                showClearButton="always"
+                showClearButton={true}
                 onClear={() => setQuery('')}
-                innerAddon={loading ? <Spinner size={24} /> : <Icon icon="SEARCH" size={24} />}
-                data-test="@guide/search"
+                leftContent={
+                    loading ? (
+                        <Spinner size={24} isDisabled={true} />
+                    ) : (
+                        <Icon
+                            as={MagnifyingGlassIcon}
+                            size={20}
+                            intent="neutral"
+                            priority="secondary"
+                            onClick={() => {
+                                inputRef?.current?.select();
+                            }}
+                            cursor="pointer"
+                        />
+                    )
+                }
+                data-testid="@guide/search"
+                innerRef={inputRef}
             />
 
             {searchResult.length ? (
-                <PageFoundList data-test="@guide/search/results">
+                <CardList margin={{ top: 16 }} data-testid="@guide/search/results">
                     {searchResult.map(({ page, preview }) => (
                         <GuideNode
                             key={page.id}
@@ -93,15 +92,35 @@ export const GuideSearch = ({ pageRoot, setSearchActive }: GuideSearchProps) => 
                             description={preview && <Preview {...preview} />}
                         />
                     ))}
-                </PageFoundList>
+                </CardList>
             ) : (
                 query &&
-                !loading && (
-                    <NoResults data-test="@guide/search/no-results">
+                !loading &&
+                (isQueryTooShort ? (
+                    <Paragraph
+                        data-testid="@guide/search/min-query-length"
+                        typographyStyle="body-md"
+                        intent="neutral"
+                        priority="secondary"
+                        margin={{ top: 16 }}
+                    >
+                        <Translation
+                            id="TR_GUIDE_SEARCH_MIN_QUERY_LENGTH"
+                            values={{ count: MIN_QUERY_LENGTH }}
+                        />
+                    </Paragraph>
+                ) : (
+                    <Paragraph
+                        data-testid="@guide/search/no-results"
+                        typographyStyle="body-md"
+                        intent="neutral"
+                        priority="secondary"
+                        margin={{ top: 16 }}
+                    >
                         <Translation id="TR_ACCOUNT_SEARCH_NO_RESULTS" />
-                    </NoResults>
-                )
+                    </Paragraph>
+                ))
             )}
-        </Wrapper>
+        </Box>
     );
 };

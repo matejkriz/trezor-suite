@@ -1,6 +1,8 @@
 import path from 'path';
-import { createInterceptor, TorController } from '../src';
+
+import { TorController, createInterceptor } from '../src';
 import { torRunner } from './torRunner';
+import { InterceptorOptions } from '../src/types';
 
 // The purpose of this script is to allow "manual" testing Tor identities changing some parameters.
 // Run it like:
@@ -15,7 +17,8 @@ const processId = process.pid;
 const torDataDir = path.join(__dirname, 'tmp');
 const ipRegex = /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/;
 
-const INTERCEPTOR = {
+const interceptorOptions: InterceptorOptions = {
+    getWhitelistedDomains: () => ['check.torproject.org', 'localhost'],
     handler: () => {},
     getTorSettings: () => ({ running: true, host, port }),
 };
@@ -27,7 +30,7 @@ const intervalBetweenRequests = 1000 * 20;
 
 (async () => {
     // Callback in in createInterceptor should return true in order for the request to use Tor.
-    createInterceptor(INTERCEPTOR);
+    createInterceptor(interceptorOptions);
 
     console.log('Starting Tor.');
     // Starting Tor controller to make sure that Tor is running.
@@ -54,8 +57,8 @@ const intervalBetweenRequests = 1000 * 20;
         identities.push(`Basic ${identity}`);
     }
 
-    const makeRequests = async (identities: any) => {
-        const promises: Promise<Response>[] = identities.map((identity: string) => {
+    const makeRequests = async (identities2: any) => {
+        const promises: Promise<Response>[] = identities2.map((identity: string) => {
             console.log('identity', identity);
 
             return fetch(testGetUrlHttps, {

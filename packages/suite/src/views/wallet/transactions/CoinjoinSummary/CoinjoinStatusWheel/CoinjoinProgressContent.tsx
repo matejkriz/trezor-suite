@@ -1,21 +1,26 @@
-import styled, { css, useTheme } from 'styled-components';
-import { Spinner, Icon, Tooltip } from '@trezor/components';
-import { Translation } from 'src/components/suite/Translation';
-import { CountdownTimer } from 'src/components/suite/CountdownTimer';
-import { useSelector } from 'src/hooks/suite/useSelector';
+import { FormattedNumber } from 'react-intl';
+
+import styled from 'styled-components';
+
 import {
     selectCurrentCoinjoinWheelStates,
     selectCurrentSessionDeadlineInfo,
     selectRoundsDurationInHours,
-} from 'src/reducers/wallet/coinjoinReducer';
+} from '@suite/coinjoin';
+import { Translation } from '@suite/intl';
+import { type AccountKey } from '@suite-common/wallet-types';
+import { Icon, Spinner, Tooltip } from '@trezor/components';
+import { PauseIcon, PlayIcon, StopIcon } from '@trezor/icons';
+import { typography } from '@trezor/theme';
+
+import { CountdownTimer } from 'src/components/suite/CountdownTimer';
 import { useCoinjoinSessionBlockers } from 'src/hooks/coinjoin/useCoinjoinSessionBlockers';
-import { FormattedNumber } from 'react-intl';
-import { spacingsPx, typography } from '@trezor/theme';
+import { useSelector } from 'src/hooks/suite';
 
 export const Container = styled.div<{ $isWide: boolean }>`
     width: ${({ $isWide }) => `calc(100% - ${$isWide ? 12 : 8}px)`};
     height: ${({ $isWide }) => `calc(100% - ${$isWide ? 12 : 8}px)`};
-    background: ${({ theme }) => theme.BG_WHITE};
+    background: ${({ theme }) => theme.surfaceFillRaised};
     border-radius: 50%;
     transition:
         background 0.15s ease-out,
@@ -36,16 +41,12 @@ const CenteringContainer = styled.div`
 `;
 
 const AllPrivateContent = styled.div`
-    padding-top: ${spacingsPx.xxxs};
-    color: ${({ theme }) => theme.textPrimaryDefault};
+    padding-top: 2px;
+    color: ${({ theme }) => theme.contentBrand};
 `;
 
 const ProgressPercentage = styled.p`
-    ${typography.titleMedium}
-`;
-
-const StyledLoader = styled(Spinner)`
-    opacity: 0.4;
+    ${typography['headline-md']}
 `;
 
 const TooltipChildren = styled.div`
@@ -56,25 +57,12 @@ const TooltipChildren = styled.div`
 
 const TimeLeft = styled.p`
     max-width: 80%;
-    color: ${({ theme }) => theme.textDefault};
-    ${typography.highlight}
-`;
-
-const iconBase = css`
-    margin-bottom: ${spacingsPx.xxs};
-`;
-
-const PlayIcon = styled(Icon)`
-    ${iconBase}
-    margin-left: ${spacingsPx.xxs};
-`;
-
-const StyledIcon = styled(Icon)`
-    ${iconBase};
+    color: ${({ theme }) => theme.contentPrimary};
+    ${typography['body-md-strong']}
 `;
 
 interface CoinjoinProgressContentProps {
-    accountKey: string;
+    accountKey: AccountKey;
     isWheelHovered: boolean;
 }
 
@@ -94,14 +82,13 @@ export const CoinjoinProgressContent = ({
     const { sessionDeadline } = useSelector(selectCurrentSessionDeadlineInfo);
     const roundsDurationInHours = useSelector(selectRoundsDurationInHours);
 
-    const theme = useTheme();
     const { coinjoinSessionBlocker, isCoinjoinSessionBlocked } =
         useCoinjoinSessionBlockers(accountKey);
 
     const getProgressContent = () => {
         const iconConfig = {
             size: 25,
-            color: theme.iconDefault,
+            color: 'contentPrimary' as const,
         };
 
         const isLoadingIndicatorShown =
@@ -111,11 +98,11 @@ export const CoinjoinProgressContent = ({
         const isRunningAndBlocked = isSessionActive && isCoinjoinSessionBlocked && isPaused;
 
         if (isAccountEmpty || coinjoinSessionBlocker === 'ANONYMITY_ERROR') {
-            return <PlayIcon icon="PLAY" {...iconConfig} />;
+            return <Icon as={PlayIcon} margin={{ bottom: 4, left: 4 }} {...iconConfig} />;
         }
 
         if (isLoadingIndicatorShown) {
-            return <StyledLoader size={40} isGrey={false} />;
+            return <Spinner size={40} opacity={0.4} />;
         }
 
         if (isAllPrivate && !isSessionActive) {
@@ -132,7 +119,7 @@ export const CoinjoinProgressContent = ({
         if (isRunningAndBlocked) {
             return (
                 <>
-                    <StyledIcon icon="PAUSE" {...iconConfig} />
+                    <Icon as={PauseIcon} margin={{ bottom: 4 }} {...iconConfig} />
                     <Translation id="TR_PAUSED" />
                 </>
             );
@@ -142,7 +129,7 @@ export const CoinjoinProgressContent = ({
             if (isWheelHovered) {
                 return (
                     <>
-                        <StyledIcon icon="PLAY" {...iconConfig} />
+                        <Icon as={PlayIcon} margin={{ bottom: 4 }} {...iconConfig} />
                         <Translation id="TR_RESUME" />
                     </>
                 );
@@ -150,7 +137,7 @@ export const CoinjoinProgressContent = ({
 
             return (
                 <>
-                    <StyledIcon icon="STOP" {...iconConfig} />
+                    <Icon as={StopIcon} margin={{ bottom: 4 }} {...iconConfig} />
                     <Translation id="TR_STOPPING" />
                 </>
             );
@@ -166,7 +153,7 @@ export const CoinjoinProgressContent = ({
                         content={<Translation id="TR_AUTO_STOP_TOOLTIP" />}
                     >
                         <TooltipChildren>
-                            <StyledIcon icon="STOP" {...iconConfig} />
+                            <Icon as={StopIcon} margin={{ bottom: 4 }} {...iconConfig} />
                             <Translation id="TR_STOP" />
                         </TooltipChildren>
                     </Tooltip>
@@ -175,7 +162,7 @@ export const CoinjoinProgressContent = ({
 
             return (
                 <>
-                    <StyledIcon icon="STOP" {...iconConfig} />
+                    <Icon as={StopIcon} margin={{ bottom: 4 }} {...iconConfig} />
                     <Translation id="TR_STOP" />
                 </>
             );
@@ -201,7 +188,7 @@ export const CoinjoinProgressContent = ({
 
         return (
             <>
-                <PlayIcon icon="PLAY" {...iconConfig} color={theme.iconPrimaryDefault} />
+                <Icon as={PlayIcon} margin={{ bottom: 4 }} {...iconConfig} color="contentBrand" />
                 <Translation id="TR_START" />
             </>
         );

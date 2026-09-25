@@ -1,33 +1,31 @@
-import styled from 'styled-components';
+import { Translation } from '@suite/intl';
+import { selectSelectedDeviceLabelOrName } from '@suite-common/device';
+import { Modal } from '@trezor/components';
 
-import { Paragraph } from '@trezor/components';
-import { Translation } from 'src/components/suite/Translation';
-import { DeviceConfirmImage, Modal, ModalProps } from 'src/components/suite';
-import { TrezorDevice } from 'src/types/suite';
+import { useSelector } from 'src/hooks/suite';
 
-const Divider = styled.div`
-    margin-bottom: 10px;
-`;
+export const PinInvalidModal = ({ onCancel }: { onCancel: () => void }) => {
+    const deviceLabel = useSelector(selectSelectedDeviceLabelOrName);
 
-const StyledModal = styled(Modal)`
-    width: 360px;
-`;
-
-interface PinInvalidModalProps extends ModalProps {
-    device: TrezorDevice;
-}
-
-export const PinInvalidModal = ({ device, ...rest }: PinInvalidModalProps) => (
-    <StyledModal
-        heading={
-            <Translation id="TR_ENTERED_PIN_NOT_CORRECT" values={{ deviceLabel: device.label }} />
-        }
-        {...rest}
-    >
-        <DeviceConfirmImage device={device} />
-        <Divider />
-        <Paragraph typographyStyle="hint">
-            <Translation id="TR_RETRYING_DOT_DOT" />
-        </Paragraph>
-    </StyledModal>
-);
+    return (
+        <Modal.Backdrop>
+            <Modal.ModalBase
+                heading={<Translation id="TR_ENTERED_PIN_NOT_CORRECT" values={{ deviceLabel }} />}
+                onCancel={onCancel}
+                data-testid="@modal/pin"
+                width={400}
+                bottomContent={
+                    <>
+                        <Modal.Button onClick={onCancel} intent="neutral" priority="secondary">
+                            <Translation id="TR_CANCEL" />
+                        </Modal.Button>
+                    </>
+                }
+            >
+                Looks like you do not remember your PIN. Step away, take a deep breath and try again
+                later. You may have noticed that pin processing time doubles after each invalid
+                attempt.
+            </Modal.ModalBase>
+        </Modal.Backdrop>
+    );
+};

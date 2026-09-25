@@ -1,0 +1,240 @@
+import { useEffect, useMemo, useState } from 'react';
+
+import { Address, copyAddressToClipboard, showCopyAddressModal } from '@suite/address';
+import { selectIsCopyAddressModalShown } from '@suite/flags';
+import { Translation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { selectIsSpecificCoinDefinitionKnown } from '@suite-common/token-definitions';
+import {
+    type Explorer,
+    getNetwork,
+    getNetworkDisplaySymbolName,
+} from '@suite-common/wallet-config';
+import { selectExplorer } from '@suite-common/wallet-core';
+import { type TokenAddress } from '@suite-common/wallet-types';
+import {
+    getContractAddressForNetworkSymbol,
+    getTokenExplorerUrl,
+    hasNetworkFeatures,
+    isErc4626,
+    isNftToken,
+} from '@suite-common/wallet-utils';
+import { Banner, Card, Column, IconButton, Link, Row, Text } from '@trezor/components';
+import { CaretDownIcon } from '@trezor/icons';
+import { TokenIcon } from '@trezor/product-components';
+
+import { setSendFormPrefill } from 'src/actions/suite/suiteActions';
+import { BaseCurrencyValue, FormattedCryptoAmount, HiddenPlaceholder } from 'src/components/suite';
+import { useSelector } from 'src/hooks/suite';
+import { useSendFormContext } from 'src/hooks/wallet';
+import { selectSendFormPrefill } from 'src/selectors/suite/suiteSelectors';
+import { getTokenAddressTranslationId } from 'src/utils/wallet/tokenUtils';
+
+import { SelectTokenAssetModal } from './SelectTokenAssetModal/SelectTokenAssetModal';
+
+type TokenSelectProps = {
+    outputId: number;
+};
+
+export const TokenSelect = ({ outputId }: TokenSelectProps) => {
+    const { account, setAmount, getValues, getDefaultValue, watch, setValue, setDraftSaveRequest } =
+        useSendFormContext();
+
+    const { dispatch } = useServices(injectDispatch);
+
+    const sendFormPrefill = useSelector(selectSendFormPrefill);
+
+    const [isTokensModalActive, setIsTokensModalActive] = useState(false);
+    const [prefillContractAddress, setPrefillContractAddress] = useState(sendFormPrefill);
+
+    const explorer = useSelector(state => selectExplorer(state, account.symbol)) as Explorer;
+    const shouldShowCopyAddressModal = useSelector(selectIsCopyAddressModalShown);
+
+    const tokenInputName = `outputs.${outputId}.token` as const;
+    const tokenContractAddress = watch(tokenInputName);
+
+    const isTokenKnown = useSelector(state =>
+        selectIsSpecificCoinDefinitionKnown(
+            state,
+            account.symbol,
+            (tokenContractAddress || '') as TokenAddress,
+        ),
+    );
+
+    const isSetMaxActive = getDefaultValue('setMaxOutputId') === outputId;
+
+    // Amount needs to be re-validated again AFTER token change propagation (decimal places, available balance)
+    // watch token change and use "useSendFormFields.setAmount" util for validation (if amount is set)
+    // if Amount is not valid 'react-hook-form' will set an error to it, and composeTransaction will be prevented
+    // N0TE: do this conditionally only for networks with tokens and when set-max is not enabled
+    const tokenWatch = watch(tokenInputName, null);
+
+    useEffect(() => {
+        if (hasNetworkFeatures(account, 'tokens') && !isSetMaxActive) {
+            const amountValue = getValues(`outputs.${outputId}.amount`);
+            if (amountValue) setAmount(outputId, amountValue);
+        }
+    }, [account, outputId, tokenWatch, setAmount, getValues, isSetMaxActive]);
+
+    useEffect(() => {
+        if (prefillContractAddress) {
+            setValue(tokenInputName, prefillContractAddress, {
+                shouldValidate: true,
+                shouldDirty: true,
+            });
+            setDraftSaveRequest(true);
+            setPrefillContractAddress(undefined);
+            dispatch(setSendFormPrefill({ contractAddress: undefined }));
+        }
+    }, [prefillContractAddress, setValue, tokenInputName, setDraftSaveRequest, dispatch]);
+
+    const selectedToken = useMemo(
+        () => account.tokens?.find(token => token.contract === tokenContractAddress),
+        [account.tokens, tokenContractAddress],
+    );
+
+    const hasNoStandardTokens = !account.tokens?.filter(token => !isNftToken(token))?.length;
+    const onOpenTokensModal = !hasNoStandardTokens ? () => setIsTokensModalActive(true) : undefined;
+
+    const networkTokenContractAddress =
+        selectedToken && getContractAddressForNetworkSymbol(account.symbol, selectedToken.contract);
+
+    const isDeFiToken = !!selectedToken && isErc4626(selectedToken);
+
+    return (
+        <>
+            {isTokensModalActive && (
+                <SelectTokenAssetModal
+                    onModalClose={() => setIsTokensModalActive(false)}
+                    outputId={outputId}
+                    tokenInputName={tokenInputName}
+                />
+            )}
+
+            <Card type="raised" paddingType="normal" onClick={onOpenTokensModal}>
+                <Row justifyContent="space-between" height={64}>
+                    <Row justifyContent="flex-start" gap={12}>
+                        {selectedToken ? (
+                            <TokenIcon
+                                symbol={account.symbol}
+                                contractAddress={selectedToken?.contract}
+                                size={24}
+                                placeholder={selectedToken?.symbol || account.symbol}
+                                placeholderWithTooltip={false}
+                                shouldTryToFetch={isTokenKnown}
+                            />
+                        ) : (
+                            <TokenIcon symbol={account.symbol} size={40} showNetworkIcon />
+                        )}
+                        <Column alignItems="flex-start">
+                            <Row justifyContent="flex-start">
+                                <Text intent="neutral" typographyStyle="body-md">
+                                    {selectedToken?.name ||
+                                        getNetworkDisplaySymbolName(account.symbol)}
+                                </Text>
+                            </Row>
+                            <Row>
+                                <Text
+                                    intent="neutral"
+                                    priority="secondary"
+                                    typographyStyle="body-sm"
+                                >
+                                    <HiddenPlaceholder>
+                                        <FormattedCryptoAmount
+                                            value={
+                                                selectedToken?.balance || account.formattedBalance
+                                            }
+                                            symbol={selectedToken?.symbol ?? account.symbol}
+                                            contractAddress={selectedToken?.contract}
+                                            tokenDecimals={selectedToken?.decimals}
+                                            isCompact
+                                            data-testid={tokenInputName}
+                                        />
+                                    </HiddenPlaceholder>{' '}
+                                    <BaseCurrencyValue
+                                        tokenAddress={selectedToken?.contract as TokenAddress}
+                                        amount={selectedToken?.balance || account.formattedBalance}
+                                        symbol={account.symbol}
+                                        showApproximationIndicator
+                                    />
+                                </Text>
+                            </Row>
+                            {networkTokenContractAddress && (
+                                <Row justifyContent="flex-start">
+                                    <Text
+                                        intent="neutral"
+                                        priority="secondary"
+                                        typographyStyle="body-sm"
+                                    >
+                                        <Row gap={4}>
+                                            <Translation
+                                                id={getTokenAddressTranslationId(
+                                                    account.networkType,
+                                                )}
+                                            />
+                                            <Link
+                                                href={getTokenExplorerUrl(
+                                                    explorer,
+                                                    getNetwork(account.symbol).networkType,
+                                                    selectedToken,
+                                                )}
+                                                onClick={ev => ev.stopPropagation()}
+                                            >
+                                                <Address
+                                                    isTruncated
+                                                    value={networkTokenContractAddress}
+                                                    typographyStyle="body-sm"
+                                                    intent="neutral"
+                                                    priority="secondary"
+                                                    isCopyAllowed
+                                                    onCopy={() => {
+                                                        dispatch(
+                                                            shouldShowCopyAddressModal
+                                                                ? showCopyAddressModal(
+                                                                      networkTokenContractAddress,
+                                                                      'contract',
+                                                                  )
+                                                                : copyAddressToClipboard(
+                                                                      networkTokenContractAddress,
+                                                                  ),
+                                                        );
+                                                    }}
+                                                />
+                                            </Link>
+                                        </Row>
+                                    </Text>
+                                </Row>
+                            )}
+                        </Column>
+                    </Row>
+                    {!hasNoStandardTokens && (
+                        <IconButton
+                            icon={CaretDownIcon}
+                            intent="neutral"
+                            priority="secondary"
+                            tooltip={{ isActive: false }}
+                        />
+                    )}
+                </Row>
+
+                {isDeFiToken && (
+                    <Banner
+                        icon
+                        intent="info"
+                        title={
+                            <Translation
+                                id="TR_DEFI_YIELD_TOKEN_BANNER_TITLE"
+                                values={{
+                                    token: selectedToken?.symbol ?? account.symbol,
+                                }}
+                            />
+                        }
+                        description={<Translation id="TR_DEFI_YIELD_TOKEN_BANNER_DESCRIPTION" />}
+                        margin={{ top: 16 }}
+                    />
+                )}
+            </Card>
+        </>
+    );
+};

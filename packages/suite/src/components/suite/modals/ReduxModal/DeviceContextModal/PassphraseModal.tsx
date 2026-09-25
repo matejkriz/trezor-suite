@@ -1,199 +1,123 @@
-import { useCallback, useState } from 'react';
-import { useIntl } from 'react-intl';
+import { useCallback } from 'react';
 
-import styled from 'styled-components';
-
-import { variables, PassphraseTypeCard } from '@trezor/components';
-import TrezorConnect from '@trezor/connect';
-import * as deviceUtils from '@suite-common/suite-utils';
+import { selectIsDeviceInteractionModalActive, selectModalRequestId } from '@suite/modal';
+import { gotoThunk } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { selectHasDevicePassphraseEntryCapability } from '@suite-common/device';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { type TrezorDevice } from '@suite-common/suite-types';
 import {
-    selectIsDiscoveryAuthConfirmationRequired,
-    selectDevices,
-    onPassphraseSubmit,
+    cancelDiscoveryThunk,
+    selectDiscoveryByDevicePath,
+    selectIsDiscoveryStatusConfirmEmptyPassphrase,
+    submitPassphraseThunk,
 } from '@suite-common/wallet-core';
+import { UI_EVENTS } from '@trezor/connect';
 
-import { useSelector, useDispatch } from 'src/hooks/suite';
-import { Translation, Modal } from 'src/components/suite';
-import type { TrezorDevice } from 'src/types/suite';
-import { OpenGuideFromTooltip } from 'src/components/guide';
-import messages from 'src/support/messages';
+import { useSelector } from 'src/hooks/suite';
 
-const Wrapper = styled.div<{ $authConfirmation?: boolean }>`
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+import { PassphraseWalletExistsFlow } from './PassphraseWalletExistsFlow';
+import { PassphraseWalletIsNotExistFlow } from './PassphraseWalletIsNotExistFlow';
+import { DiscoveryLoader } from '../../ModalSwitcher/DiscoveryLoader';
+import { PassphraseDuplicateModal } from '../UserContextModal/PassphraseDuplicateModal';
+import { PassphraseMismatchModal } from '../UserContextModal/PassphraseMismatchModal';
 
-    @media screen and (max-width: ${variables.SCREEN_SIZE.MD}) {
-        width: 100%;
-    }
-`;
+export const PassphraseModal = ({ device }: { device: TrezorDevice }) => {
+    const discovery = useSelector(state => selectDiscoveryByDevicePath(state, device?.path));
+    const requestId = useSelector(selectModalRequestId);
+    const { dispatch } = useServices(injectDispatch);
+    const isDeviceInteractionModalActive = useSelector(selectIsDeviceInteractionModalActive);
+    const onPassphraseConfirm = useCallback(
+        (value: string, passphraseOnDevice?: boolean) => {
+            if (!discovery) return;
 
-const WalletsWrapper = styled.div`
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-`;
-
-const Divider = styled.div`
-    margin: 16px;
-    height: 1px;
-    background: ${({ theme }) => theme.STROKE_GREY};
-`;
-
-const TinyModal = styled(Modal)`
-    width: 450px;
-`;
-
-const SmallModal = styled(Modal)`
-    width: 600px;
-`;
-
-interface PassphraseModalProps {
-    device: TrezorDevice;
-}
-
-export const PassphraseModal = ({ device }: PassphraseModalProps) => {
-    const [submitted, setSubmitted] = useState(false);
-    const devices = useSelector(selectDevices);
-    const authConfirmation =
-        useSelector(selectIsDiscoveryAuthConfirmationRequired) || device.authConfirm;
-
-    const stateConfirmation = !!device.state;
-    const hasEmptyPassphraseWallet = deviceUtils
-        .getDeviceInstances(device, devices)
-        .find(d => d.useEmptyPassphrase);
-    const noPassphraseOffer = !hasEmptyPassphraseWallet && !stateConfirmation;
-    const onDeviceOffer = !!(
-        device.features &&
-        device.features.capabilities &&
-        device.features.capabilities.includes('Capability_PassphraseEntry')
+            dispatch(
+                submitPassphraseThunk({
+                    device,
+                    passphrase: value,
+                    passphraseOnDevice,
+                    requestId,
+                }),
+            );
+        },
+        [discovery, dispatch, device, requestId],
     );
 
-    const dispatch = useDispatch();
+    const confirmEmptyPassphrase = useSelector(state =>
+        selectIsDiscoveryStatusConfirmEmptyPassphrase(state, device?.path),
+    );
 
-    const intl = useIntl();
+    const onBackToInitial = () => {
+        dispatch(cancelDiscoveryThunk(device));
+        dispatch({ type: UI_EVENTS.CLOSE_UI_WINDOW });
+        dispatch(gotoThunk({ routeName: 'suite-switch-device', params: { cancelable: true } }));
+    };
 
-    const onCancel = () => TrezorConnect.cancel(intl.formatMessage(messages.TR_CANCELLED));
+    const onCancel = () => {
+        dispatch(cancelDiscoveryThunk(device));
+        dispatch({ type: UI_EVENTS.CLOSE_UI_WINDOW });
+    };
 
     const onSubmit = useCallback(
         (value: string, passphraseOnDevice?: boolean) => {
-            setSubmitted(true);
-            dispatch(onPassphraseSubmit({ value, passphraseOnDevice: !!passphraseOnDevice }));
+            if (!device || !discovery) return;
+
+            if (confirmEmptyPassphrase) {
+                onPassphraseConfirm(value, passphraseOnDevice);
+
+                return;
+            }
+
+            dispatch(
+                submitPassphraseThunk({
+                    device,
+                    passphrase: value,
+                    passphraseOnDevice,
+                    requestId,
+                }),
+            );
         },
-        [setSubmitted, dispatch],
+        [device, confirmEmptyPassphrase, dispatch, discovery, onPassphraseConfirm, requestId],
     );
 
-    const onRecreate = useCallback(() => {
-        // Cancel TrezorConnect request and pass error to suiteAction.authConfirm
-        TrezorConnect.cancel('auth-confirm-cancel');
-    }, []);
+    const offerPassphraseOnDevice = useSelector(selectHasDevicePassphraseEntryCapability);
 
-    if (submitted) {
-        return null;
+    if (!device || !discovery?.isAddingHiddenWallet) return null;
+
+    if (isDeviceInteractionModalActive) return null;
+
+    switch (discovery.status) {
+        case 'progress':
+            return <DiscoveryLoader />;
+
+        case 'passphrase-duplicate':
+            return <PassphraseDuplicateModal device={device} discovery={discovery} />;
+
+        case 'passphrase-mismatch':
+            return <PassphraseMismatchModal device={device} discovery={discovery} />;
     }
 
-    if (authConfirmation || stateConfirmation) {
-        // show borderless one-column modal for confirming passphrase and state confirmation
+    if (discovery.isAddingExistingWallet) {
         return (
-            <TinyModal
-                heading={
-                    !authConfirmation ? (
-                        <Translation id="TR_ENTER_PASSPHRASE" />
-                    ) : (
-                        <Translation id="TR_CONFIRM_EMPTY_HIDDEN_WALLET" />
-                    )
-                }
-                isCancelable
+            <PassphraseWalletExistsFlow
+                device={device}
+                offerPassphraseOnDevice={offerPassphraseOnDevice}
+                discovery={discovery}
+                onBackToInitial={onBackToInitial}
                 onCancel={onCancel}
-                onBackClick={authConfirmation ? onRecreate : undefined}
-                description={
-                    !authConfirmation ? (
-                        <Translation id="TR_UNLOCK" />
-                    ) : (
-                        <Translation id="TR_THIS_HIDDEN_WALLET_IS_EMPTY" />
-                    )
-                }
-            >
-                <PassphraseTypeCard
-                    type="hidden"
-                    authConfirmation={authConfirmation}
-                    submitLabel={<Translation id="TR_CONFIRM_PASSPHRASE" />}
-                    offerPassphraseOnDevice={onDeviceOffer}
-                    onSubmit={onSubmit}
-                    singleColModal
-                    learnMoreTooltipOnClick={
-                        <OpenGuideFromTooltip
-                            dataTest="@tooltip/guideAnchor"
-                            id="/1_initialize-and-secure-your-trezor/6_passphrase.md"
-                        />
-                    }
-                />
-            </TinyModal>
+                onSubmit={onSubmit}
+            />
         );
     }
 
-    // creating a hidden wallet
-    if (!noPassphraseOffer) {
-        return (
-            <TinyModal
-                heading={<Translation id="TR_PASSPHRASE_HIDDEN_WALLET" />}
-                description={<Translation id="TR_HIDDEN_WALLET_MODAL_DESCRIPTION" />}
-                isCancelable
-                onCancel={onCancel}
-            >
-                <PassphraseTypeCard
-                    title={<Translation id="TR_WALLET_SELECTION_HIDDEN_WALLET" />}
-                    description={<Translation id="TR_HIDDEN_WALLET_DESCRIPTION" />}
-                    submitLabel={<Translation id="TR_ACCESS_HIDDEN_WALLET" />}
-                    type="hidden"
-                    singleColModal
-                    offerPassphraseOnDevice={onDeviceOffer}
-                    onSubmit={onSubmit}
-                    learnMoreTooltipOnClick={
-                        <OpenGuideFromTooltip
-                            dataTest="@tooltip/guideAnchor"
-                            id="/1_initialize-and-secure-your-trezor/6_passphrase.md"
-                        />
-                    }
-                />
-            </TinyModal>
-        );
-    }
-
-    // show 2-column modal for selecting between standard and hidden wallets
     return (
-        <SmallModal
-            headingSize="large"
-            isCancelable
+        <PassphraseWalletIsNotExistFlow
+            device={device}
+            offerPassphraseOnDevice={offerPassphraseOnDevice}
+            discovery={discovery}
+            onBackToInitial={onBackToInitial}
             onCancel={onCancel}
-            heading={<Translation id="TR_SELECT_WALLET_TO_ACCESS" />}
-        >
-            <Wrapper>
-                <WalletsWrapper>
-                    <PassphraseTypeCard
-                        title={<Translation id="TR_NO_PASSPHRASE_WALLET" />}
-                        description={<Translation id="TR_STANDARD_WALLET_DESCRIPTION" />}
-                        submitLabel={<Translation id="TR_ACCESS_STANDARD_WALLET" />}
-                        type="standard"
-                        onSubmit={onSubmit}
-                    />
-                    <Divider />
-                    <PassphraseTypeCard
-                        title={<Translation id="TR_WALLET_SELECTION_HIDDEN_WALLET" />}
-                        description={<Translation id="TR_HIDDEN_WALLET_DESCRIPTION" />}
-                        submitLabel={<Translation id="TR_WALLET_SELECTION_ACCESS_HIDDEN_WALLET" />}
-                        type="hidden"
-                        offerPassphraseOnDevice={onDeviceOffer}
-                        onSubmit={onSubmit}
-                        learnMoreTooltipOnClick={
-                            <OpenGuideFromTooltip
-                                dataTest="@tooltip/guideAnchor"
-                                id="/1_initialize-and-secure-your-trezor/6_passphrase.md"
-                            />
-                        }
-                    />
-                </WalletsWrapper>
-            </Wrapper>
-        </SmallModal>
+            onSubmit={onSubmit}
+        />
     );
 };

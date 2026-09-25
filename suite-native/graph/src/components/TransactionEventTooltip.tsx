@@ -1,24 +1,34 @@
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { Dimensions } from 'react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { useSelector } from 'react-redux';
 
-import { G, N } from '@mobily/ts-belt';
+import { N } from '@mobily/ts-belt';
 
-import { Card, Text } from '@suite-native/atoms';
-import { CryptoAmountFormatter, SignValueFormatter } from '@suite-native/formatters';
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-import { GroupedBalanceMovementEventPayload } from '@suite-common/graph';
-import { EventTooltipComponentProps } from '@suite-native/react-native-graph/src/LineGraphProps';
-import { SignValue } from '@suite-common/suite-types';
-import { NetworkSymbol } from '@suite-common/wallet-config';
+import { type GroupedBalanceMovementEventPayload } from '@suite-common/graph';
+import { type SignValue } from '@suite-common/suite-types';
+import { type NetworkSymbol, getNetworkType } from '@suite-common/wallet-config';
+import { type AccountKey, type TokenAddress } from '@suite-common/wallet-types';
+import { Box, Card, Text } from '@suite-native/atoms';
+import {
+    ExactCryptoAmountFormatter,
+    ExactTokenAmountFormatter,
+    SignValueFormatter,
+    asDecimalTokenAmount,
+} from '@suite-native/formatters';
+import { type EventTooltipComponentProps } from '@suite-native/react-native-graph';
+import { type TokensRootState, selectAccountTokenInfo } from '@suite-native/tokens';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
+import { isNotNullOrUndefined } from '@trezor/utils';
 
-export type TransactionEventTooltipProps =
-    EventTooltipComponentProps<GroupedBalanceMovementEventPayload>;
+type TransactionEventTooltipProps = EventTooltipComponentProps<GroupedBalanceMovementEventPayload>;
 
 type EventTooltipRowProps = {
     title: string;
     signValue: SignValue;
     value: number;
-    networkSymbol: NetworkSymbol;
+    symbol: NetworkSymbol;
+    accountKey: AccountKey;
+    tokenAddress?: TokenAddress;
 };
 
 const SCREEN_WIDTH = Dimensions.get('screen').width;
@@ -41,24 +51,77 @@ const TooltipContainerStyle = prepareNativeStyle<{ x: number; y: number }>((_, {
 }));
 
 const TooltipCardStyle = prepareNativeStyle(utils => ({
-    paddingVertical: 1.5 * utils.spacings.small,
+    paddingVertical: utils.spacings.sp12,
+    // fade in/out animation doesn't work for elevation (shadow) on Android
+    elevation: 0,
 }));
 
-const EventTooltipRow = ({ title, signValue, networkSymbol, value }: EventTooltipRowProps) => (
+const TokenAmountTooltipFormatter = ({
+    accountKey,
+    tokenAddress,
+    symbol,
+    value,
+}: {
+    accountKey: AccountKey;
+    tokenAddress: TokenAddress;
+    symbol: NetworkSymbol;
+    value: number;
+}) => {
+    const token = useSelector((state: TokensRootState) =>
+        selectAccountTokenInfo(state, accountKey, tokenAddress),
+    );
+    const tokenDecimals = token?.decimals;
+
+    if (!token?.symbol || !tokenDecimals) {
+        return null;
+    }
+
+    // We might want to add support for other networks in the future.
+    if (getNetworkType(symbol) === 'ethereum') {
+        return (
+            <ExactTokenAmountFormatter
+                color="contentPrimary"
+                variant="body-xs"
+                value={asDecimalTokenAmount(value)}
+                tokenSymbol={token.symbol}
+            />
+        );
+    }
+
+    return null;
+};
+
+const EventTooltipRow = ({
+    title,
+    signValue,
+    symbol,
+    tokenAddress,
+    value,
+    accountKey,
+}: EventTooltipRowProps) => (
     <>
-        <Text variant="label" color="textSubdued">
+        <Text variant="body-xs" color="contentSecondary">
             {title}
         </Text>
-        <Text>
-            <SignValueFormatter value={signValue} variant="label" />
-            <CryptoAmountFormatter
-                color="textDefault"
-                variant="label"
-                value={value}
-                network={networkSymbol}
-                isBalance={false}
-            />
-        </Text>
+        <Box flexDirection="row">
+            <SignValueFormatter value={signValue} variant="body-xs" />
+            {!tokenAddress ? (
+                <ExactCryptoAmountFormatter
+                    color="contentPrimary"
+                    variant="body-xs"
+                    value={value}
+                    symbol={symbol}
+                    isBalance={false}
+                />
+            ) : (
+                <TokenAmountTooltipFormatter
+                    accountKey={accountKey}
+                    tokenAddress={tokenAddress}
+                    symbol={symbol}
+                    value={value}
+                />
+            )}
+        </Box>
     </>
 );
 
@@ -66,11 +129,13 @@ export const TransactionEventTooltip = ({
     eventX,
     eventY,
     eventPayload: {
-        networkSymbol,
+        symbol,
         received,
         sent,
         receivedTransactionsCount,
         sentTransactionsCount,
+        tokenAddress,
+        accountKey,
     },
 }: TransactionEventTooltipProps) => {
     const { applyStyle } = useNativeStyles();
@@ -92,7 +157,9 @@ export const TransactionEventTooltip = ({
                         title={`Sent · ${sentTransactionsCount}`}
                         signValue="negative"
                         value={sent}
-                        networkSymbol={networkSymbol}
+                        symbol={symbol}
+                        tokenAddress={tokenAddress}
+                        accountKey={accountKey}
                     />
                 )}
                 {isReceivedDisplayed && (
@@ -100,15 +167,19 @@ export const TransactionEventTooltip = ({
                         title={`Received · ${receivedTransactionsCount}`}
                         signValue="positive"
                         value={received}
-                        networkSymbol={networkSymbol}
+                        symbol={symbol}
+                        tokenAddress={tokenAddress}
+                        accountKey={accountKey}
                     />
                 )}
-                {G.isNotNullable(totalAmount) && (
+                {isNotNullOrUndefined(totalAmount) && (
                     <EventTooltipRow
                         title="In total"
                         signValue={totalAmount}
                         value={Math.abs(totalAmount)}
-                        networkSymbol={networkSymbol}
+                        symbol={symbol}
+                        tokenAddress={tokenAddress}
+                        accountKey={accountKey}
                     />
                 )}
             </Card>

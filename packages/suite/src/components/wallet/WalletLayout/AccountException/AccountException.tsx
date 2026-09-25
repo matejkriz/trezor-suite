@@ -1,34 +1,17 @@
-import styled from 'styled-components';
-import { H2 } from '@trezor/components';
-import { SelectedAccountException } from '@suite-common/wallet-types';
+import { type SelectedAccountException } from '@suite-common/wallet-types';
+import { Column, H2 } from '@trezor/components';
 
-import { AuthFailed } from './AuthFailed';
-import { DiscoveryFailed } from './DiscoveryFailed';
-import { DiscoveryEmpty } from './DiscoveryEmpty';
 import { AccountNotEnabled } from './AccountNotEnabled';
-import { AccountNotLoaded } from './AccountNotLoaded';
 import { AccountNotExists } from './AccountNotExists';
-
-const Wrapper = styled.div`
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    height: 100%;
-`;
-
-const Title = styled(H2)`
-    display: flex;
-    text-align: center;
-    color: ${({ theme }) => theme.TYPE_DARK_GREY};
-`;
+import { AccountNotLoaded } from './AccountNotLoaded';
+import { DiscoveryEmpty } from './DiscoveryEmpty';
+import { DiscoveryFailed } from './DiscoveryFailed';
 
 const getExceptionPage = (
     loader: SelectedAccountException['loader'],
     network: SelectedAccountException['network'],
 ) => {
     switch (loader) {
-        case 'auth-failed':
-            return <AuthFailed />;
         case 'discovery-error':
             return <DiscoveryFailed />;
         case 'discovery-empty':
@@ -52,12 +35,16 @@ export const AccountException = ({ loader, network }: AccountExceptionProps) => 
     const page = getExceptionPage(loader, network);
 
     if (page) {
-        return <Wrapper>{page}</Wrapper>;
+        return (
+            <Column alignItems="center" height="100%">
+                {page}
+            </Column>
+        );
     }
 
     return (
-        <Wrapper>
-            <Title>Exception {loader} not implemented</Title>
-        </Wrapper>
+        <Column alignItems="center" height="100%">
+            <H2 align="center">Exception {loader} not implemented</H2>
+        </Column>
     );
 };

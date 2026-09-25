@@ -1,0 +1,49 @@
+import { type ReactNode } from 'react';
+import { Pressable } from 'react-native';
+
+import { Card, HStack, IconSquare, Text } from '@suite-native/atoms';
+import { Icon, type IconName } from '@suite-native/icons';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
+
+const labelStyle = prepareNativeStyle(() => ({
+    flex: 1,
+}));
+
+export type DemoAccountQuestionnaireLinkProps = {
+    iconName?: IconName;
+    label: ReactNode;
+    onPress: () => void;
+};
+
+export const DemoAccountQuestionnaireLink = ({
+    iconName,
+    label,
+    onPress,
+}: DemoAccountQuestionnaireLinkProps) => {
+    const { applyStyle } = useNativeStyles();
+
+    return (
+        <Pressable onPress={onPress}>
+            <Card noPadding>
+                <HStack
+                    alignItems="center"
+                    justifyContent="space-between"
+                    padding="sp12"
+                    spacing="sp12"
+                >
+                    <HStack spacing="sp12" alignItems="center" flex={1}>
+                        {!!iconName && <IconSquare icon={iconName} />}
+                        <Text
+                            variant="body-md"
+                            color="contentPrimary"
+                            style={applyStyle(labelStyle)}
+                        >
+                            {label}
+                        </Text>
+                    </HStack>
+                    <Icon name="arrowSquareOut" color="contentBrand" />
+                </HStack>
+            </Card>
+        </Pressable>
+    );
+};

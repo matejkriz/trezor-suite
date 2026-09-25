@@ -1,14 +1,19 @@
-import type { BottomTabScreenProps, BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { BottomTabNavigationProp, BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type {
-    NativeStackScreenProps,
+    CompositeNavigationProp,
+    CompositeScreenProps,
+    NavigationHelpers,
+    ParamListBase,
+} from '@react-navigation/native';
+import type {
     NativeStackNavigationProp,
+    NativeStackScreenProps,
 } from '@react-navigation/native-stack';
-import type { ParamListBase, CompositeScreenProps } from '@react-navigation/native';
-import { CompositeNavigationProp } from '@react-navigation/native';
 
-import { IconName } from '@suite-common/icons';
+import { type IconName } from '@suite-native/icons';
 
-export type TabProps<T extends ParamListBase, K extends keyof T> = BottomTabScreenProps<T, K>;
+import { type AppTabsRoutes } from './routes';
+
 export type TabNavigationProp<
     T extends ParamListBase,
     K extends keyof ParamListBase,
@@ -58,9 +63,13 @@ export type StackToStackCompositeNavigationProps<
 
 export type TabsOptions = {
     [routeName: string]: {
-        routeName: string;
+        routeName: AppTabsRoutes;
         iconName: IconName;
-        label: string;
+        focusedIconName: IconName;
         params?: Record<string, unknown>;
     };
 };
+
+export type NavigateParameters<TParamList extends ParamListBase = ParamListBase> = Parameters<
+    NavigationHelpers<TParamList>['navigate']
+>[0];

@@ -1,84 +1,112 @@
 import React from 'react';
+
 import styled from 'styled-components';
-import { borders } from '@trezor/theme';
-import { Button, ButtonProps } from '../Button/Button';
-import { ButtonSize, ButtonVariant } from '../buttonStyleUtils';
-import { IconButton, IconButtonProps } from '../IconButton/IconButton';
 
-const Container = styled.div<{ $variant?: Exclude<ButtonVariant, 'danger'> }>`
-    position: relative;
+import {
+    type FrameProps,
+    type FramePropsKeys,
+    pickAndPrepareFrameProps,
+    withFrameProps,
+} from '../../../utils/frameProps';
+import { type TransientProps } from '../../../utils/transientProps';
+import { Tooltip, type TooltipProps } from '../../Tooltip/Tooltip';
+import { type ButtonProps } from '../Button/Button';
+import { type IconButtonProps } from '../IconButton/IconButton';
+import { type ButtonIntent, type ButtonPriority, type ButtonSize } from '../types';
+import { mapSizeToBorderRadius } from '../utils';
+
+export const allowedButtonGroupFrameProps = [
+    'margin',
+    'minWidth',
+    'maxWidth',
+    'width',
+    'flex',
+] as const satisfies FramePropsKeys[];
+export type AllowedButtonGroupFrameProps = Pick<
+    FrameProps,
+    (typeof allowedButtonGroupFrameProps)[number]
+>;
+
+const Container = styled.div<TransientProps<AllowedButtonGroupFrameProps> & { $size: ButtonSize }>`
     display: flex;
-    align-items: center;
+    /* stylelint-disable-next-line trezor/dimension-token-values */
+    gap: 1px;
+    align-items: stretch;
 
-    > button {
-        border-radius: 0;
+    :is(button, a) {
+        border-radius: 4px;
     }
 
-    > :first-child {
-        border-radius: ${borders.radii.full} 0 0 ${borders.radii.full};
+    > :is(button, a):first-child,
+    > :first-child :is(button, a) {
+        border-top-left-radius: ${({ $size }) => mapSizeToBorderRadius($size)}px;
+        border-bottom-left-radius: ${({ $size }) => mapSizeToBorderRadius($size)}px;
     }
 
-    > :last-child {
-        border-radius: 0 ${borders.radii.full} ${borders.radii.full} 0;
+    > :is(button, a):last-child,
+    > :last-child :is(button, a) {
+        border-top-right-radius: ${({ $size }) => mapSizeToBorderRadius($size)}px;
+        border-bottom-right-radius: ${({ $size }) => mapSizeToBorderRadius($size)}px;
     }
 
-    > :not(:last-child) {
-        position: relative;
-
-        &::after {
-            content: '';
-            position: absolute;
-            right: -1px;
-            width: 1px;
-            height: 66%;
-            background: ${({ theme, $variant }) =>
-                $variant === 'tertiary' ? theme.textOnTertiary : theme.textOnPrimary};
-            opacity: 0.1;
-        }
-    }
+    ${withFrameProps}
 `;
 
-const checkChildren = (children: Array<React.ReactNode>) =>
-    children.every(
-        child =>
-            React.isValidElement(child) && (child.type === Button || child.type === IconButton),
-    );
+type AllowedChildrenPropsType = ButtonProps | IconButtonProps;
 
-interface ButtonGroupProps {
-    variant?: Exclude<ButtonVariant, 'danger'>;
+export type ButtonGroupProps = {
+    intent?: ButtonIntent;
+    priority?: ButtonPriority;
     size?: ButtonSize;
     isDisabled?: boolean;
-    className?: string;
-    children: React.ReactElement<ButtonProps | IconButtonProps>[];
-}
+    children: (React.ReactElement<AllowedChildrenPropsType | TooltipProps> | null)[];
+} & AllowedButtonGroupFrameProps;
 
 export const ButtonGroup = ({
-    variant,
-    size,
+    intent = 'brand',
+    priority = 'primary',
+    size = 'medium',
     isDisabled,
-    className,
     children,
+    ...rest
 }: ButtonGroupProps) => {
-    const areChildrenValid = checkChildren(children);
+    const frameProps = pickAndPrepareFrameProps(rest, allowedButtonGroupFrameProps);
 
-    if (!areChildrenValid) {
-        console.error(
-            'Invalid children passed to ButtonGroup. Only Button and IconButton are allowed.',
-        );
+    const childrenWithProps = React.Children.map(children, child => {
+        if (React.isValidElement(child)) {
+            if (
+                child.type === Tooltip &&
+                React.isValidElement((child.props as TooltipProps).children)
+            ) {
+                const tooltipProps = child.props as TooltipProps;
+                const tooltipChild =
+                    tooltipProps.children as React.ReactElement<AllowedChildrenPropsType>;
+                const tooltipChildProps: AllowedChildrenPropsType = tooltipChild?.props;
+                const childWithProps = React.cloneElement(tooltipChild, {
+                    intent: tooltipChildProps.intent || intent,
+                    priority: tooltipChildProps.priority || priority,
+                    size,
+                    isDisabled: tooltipChildProps.isDisabled || isDisabled,
+                });
 
-        return null;
-    }
+                return React.cloneElement(child, {}, childWithProps);
+            }
 
-    const childrenWithProps = children.map(child =>
-        React.cloneElement(child, {
-            variant: child.props.variant || variant,
-            size: child.props.size || size,
-            isDisabled: child.props.isDisabled || isDisabled,
-        }),
-    );
+            const childProps = child.props as AllowedChildrenPropsType;
+
+            return React.cloneElement(child, {
+                intent: childProps.intent || intent,
+                priority: childProps.priority || priority,
+                size,
+                isDisabled: childProps.isDisabled || isDisabled,
+            });
+        }
+
+        return child;
+    });
 
     return (
-        <Container $variant={variant} className={className}>
+        <Container data-component="ButtonGroup" $size={size} {...frameProps}>
             {childrenWithProps}
         </Container>
     );

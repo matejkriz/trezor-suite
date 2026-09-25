@@ -1,0 +1,12 @@
+{
+    "ignore-patterns": ["libDev", "lib"],
+    "ignores": [
+        "@lottiefiles/dotlottie-react",
+        "@react-native-community/datetimepicker",
+        "@react-native-community/slider",
+        "@storybook/addon-ondevice-controls",
+        "@formatjs/intl-getcanonicallocales",
+        "@formatjs/intl-locale",
+        "@formatjs/intl-listformat"
+    ]
+}

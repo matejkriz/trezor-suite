@@ -1,45 +1,36 @@
-import { ReactNode } from 'react';
-import styled from 'styled-components';
+import { type ReactNode } from 'react';
 
-import { variables } from '@trezor/components';
-import { GuideCategory } from '@suite-common/suite-types';
-import { GuideNode } from 'src/components/guide';
+import { type GuideCategory } from '@suite-common/suite-types';
+import { Box, CardList, Column } from '@trezor/components';
 
-const Section = styled.section`
-    padding-bottom: 20px;
-`;
-
-const SectionHeading = styled.h3`
-    font-size: ${variables.FONT_SIZE.SMALL};
-    font-weight: ${variables.FONT_WEIGHT.DEMI_BOLD};
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    padding: 0 0 18px;
-`;
-
-const Nodes = styled.div`
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-`;
+import { GuideNode } from './GuideNode';
+import { GuideSectionHeadline } from './GuideSectionHeadline';
 
 type GuideCategoriesProps = {
     node: GuideCategory | null;
     label?: string | ReactNode;
+    variant?: 'default' | 'cardList';
 };
 
-export const GuideCategories = ({ node, label }: GuideCategoriesProps) => {
-    if (!node || node.type !== 'category') {
+export const GuideCategories = ({ node, label, variant = 'default' }: GuideCategoriesProps) => {
+    if (node?.type !== 'category') {
         return null;
     }
 
+    const children = node.children.map(child => (
+        <GuideNode key={child.id} node={child} itemVariant={variant} />
+    ));
+
     return (
-        <Section>
-            {label && <SectionHeading>{label}</SectionHeading>}
-            <Nodes data-test="@guide/nodes">
-                {node.children.map(child => (
-                    <GuideNode key={child.id} node={child} />
-                ))}
-            </Nodes>
-        </Section>
+        <Box as="section" padding={{ bottom: 20 }}>
+            {label && <GuideSectionHeadline>{label}</GuideSectionHeadline>}
+            {variant === 'cardList' ? (
+                <CardList data-testid="@guide/nodes">{children}</CardList>
+            ) : (
+                <Column gap={12} data-testid="@guide/nodes">
+                    {children}
+                </Column>
+            )}
+        </Box>
     );
 };

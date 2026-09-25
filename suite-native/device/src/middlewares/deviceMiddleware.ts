@@ -1,83 +1,113 @@
-import { AnyAction, isAnyOf } from '@reduxjs/toolkit';
+import { type UnknownAction, isAnyOf } from '@reduxjs/toolkit';
 
-import { createMiddlewareWithExtraDeps } from '@suite-common/redux-utils';
-import { DEVICE } from '@trezor/connect';
+import { deviceActions, isTrezorDeviceWithState } from '@suite-common/device';
+import { type WithServices, createMiddlewareWithExtraDeps } from '@suite-common/redux-utils';
+import { type SuiteSyncDep } from '@suite-common/suite-sync-types';
+import { isAnyDeviceEventAction } from '@suite-common/suite-utils';
 import {
-    deviceActions,
-    forgetDisconnectedDevices,
-    handleDeviceDisconnect,
-    observeSelectedDevice,
-    selectDeviceThunk,
+    type AccountsRootState,
+    type DiscoveryRootState,
+    accountsActions,
+    forgetDisconnectedDevicesThunk,
+    handleDeviceDisconnectThunk,
+    observeSelectedDeviceThunk,
+    selectAccountsByDeviceState,
+    selectDiscoveryByDevicePath,
 } from '@suite-common/wallet-core';
-import { FeatureFlag, selectIsFeatureFlagEnabled } from '@suite-native/feature-flags';
+import { type NativeAnalyticsDep } from '@suite-native/analytics';
+import {
+    type NativeBluetoothRootState,
+    selectIsBluetoothDeviceOsUnpairingRequired,
+} from '@suite-native/bluetooth';
+import { clearAndUnlockDeviceAccessQueue } from '@suite-native/device-mutex';
+import { reportSecurityCheck } from '@suite-native/sentry';
+import { setShouldShowAutoEjectAlert } from '@suite-native/settings';
+import { DEVICE, isDeviceEventOfType } from '@trezor/connect';
 
-import { wipeDisconnectedDevicesDataThunk } from '../deviceThunks';
+import { reportDeviceConnectionAnalytics } from '../utils';
 
-const isActionDeviceRelated = (action: AnyAction): boolean => {
+const isActionDeviceRelated = (action: UnknownAction): boolean => {
     if (
         isAnyOf(
-            deviceActions.authDevice,
-            deviceActions.authFailed,
             deviceActions.selectDevice,
-            deviceActions.receiveAuthConfirm,
-            deviceActions.updatePassphraseMode,
             deviceActions.addButtonRequest,
             deviceActions.removeButtonRequests,
-            deviceActions.rememberDevice,
+            deviceActions.setRememberDevice,
             deviceActions.forgetDevice,
+            deviceActions.setDiscovered,
         )(action)
     ) {
         return true;
     }
 
-    return Object.values(DEVICE).includes(action.type);
+    return isAnyDeviceEventAction(action);
 };
 
-export const prepareDeviceMiddleware = createMiddlewareWithExtraDeps(
-    (action, { dispatch, next, getState }) => {
-        if (action.type === DEVICE.DISCONNECT) {
-            dispatch(forgetDisconnectedDevices(action.payload));
-        }
+type DeviceMiddlewareDeps = WithServices<SuiteSyncDep & NativeAnalyticsDep>;
+type DeviceMiddlewareState = AccountsRootState & DiscoveryRootState & NativeBluetoothRootState;
 
-        /* The `next` function has to be executed here, because the further dispatched actions of this middleware
-         expect that the state was already changed by the action stored in the `action` variable. */
-        next(action);
-
-        if (deviceActions.createDeviceInstance.match(action)) {
-            dispatch(selectDeviceThunk(action.payload));
-        }
-
-        if (
-            deviceActions.forgetDevice.match(action) ||
-            deviceActions.forgetAndDisconnectDevice.match(action)
-        ) {
-            dispatch(handleDeviceDisconnect(action.payload));
-        }
-
-        const isUsbDeviceConnectFeatureEnabled = selectIsFeatureFlagEnabled(
-            getState(),
-            FeatureFlag.IsDeviceConnectEnabled,
+export const prepareDeviceMiddleware = createMiddlewareWithExtraDeps<
+    DeviceMiddlewareDeps,
+    UnknownAction,
+    DeviceMiddlewareState
+>((action, { dispatch, next, getState, extra }) => {
+    if (deviceActions.deviceDisconnect.match(action)) {
+        dispatch(
+            forgetDisconnectedDevicesThunk({
+                device: action.payload,
+                forceForget: selectIsBluetoothDeviceOsUnpairingRequired(getState()),
+            }),
         );
 
-        switch (action.type) {
-            case DEVICE.CONNECT:
-            case DEVICE.CONNECT_UNACQUIRED:
-                if (isUsbDeviceConnectFeatureEnabled) {
-                    dispatch(selectDeviceThunk(action.payload));
-                }
-                break;
-            case DEVICE.DISCONNECT:
-                dispatch(handleDeviceDisconnect(action.payload));
-                dispatch(wipeDisconnectedDevicesDataThunk());
-                break;
-            default:
-                break;
+        const discovery = selectDiscoveryByDevicePath(getState(), action.payload.path);
+        if (discovery?.status === 'complete' && action.payload.mode === 'normal') {
+            dispatch(setShouldShowAutoEjectAlert(true));
         }
+    }
 
-        if (isActionDeviceRelated(action)) {
-            dispatch(observeSelectedDevice());
+    /* The `next` function has to be executed here, because the further dispatched actions of this middleware
+         expect that the state was already changed by the action stored in the `action` variable. */
+    next(action);
+
+    if (deviceActions.forgetDevice.match(action)) {
+        const { device } = action.payload;
+
+        dispatch(handleDeviceDisconnectThunk(device));
+
+        if (isTrezorDeviceWithState(device)) {
+            const accountsToRemove = selectAccountsByDeviceState(getState(), device.state);
+            dispatch(accountsActions.removeAccount(accountsToRemove));
+            extra.services.suiteSync.turnOffSuiteSyncForWallet({
+                deviceStaticSessionId: device.state.staticSessionId,
+            });
         }
+    }
 
-        return action;
-    },
-);
+    if (deviceActions.connectDevice.match(action)) {
+        reportDeviceConnectionAnalytics(action.payload.device, extra.services.analytics);
+    } else if (deviceActions.deviceDisconnect.match(action)) {
+        dispatch(handleDeviceDisconnectThunk(action.payload));
+
+        clearAndUnlockDeviceAccessQueue();
+    } else if (isDeviceEventOfType(action, DEVICE.FIRMWARE_VERSION_CHANGED)) {
+        const { device, oldVersion, newVersion } = action.payload;
+        reportSecurityCheck({
+            level: 'error',
+            checkType: 'Firmware version',
+            contextData: {
+                model: device?.features?.internal_model,
+                revision: device?.features?.revision,
+                oldVersion,
+                newVersion,
+                vendor: device?.features?.fw_vendor,
+                error: 'Firmware version changed unexpectedly.',
+            },
+        });
+    }
+
+    if (isActionDeviceRelated(action)) {
+        dispatch(observeSelectedDeviceThunk());
+    }
+
+    return action;
+});

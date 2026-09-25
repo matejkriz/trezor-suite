@@ -1,0 +1,75 @@
+---
+icon: newspaper
+---
+
+import Markdown from 'react-markdown';
+
+import rehypeSectionize from '@hbsnow/rehype-sectionize';
+import { Callout } from 'nextra/components';
+import remarkGemoji from 'remark-gemoji';
+import remarkGfm from 'remark-gfm';
+import useSWR from 'swr';
+
+import { CollapsibleBox } from '@trezor/components';
+import { useMDXComponents } from '@trezor/connect-explorer-theme';
+
+import { loadData } from '../utils/changelog';
+
+export const MarkdownCustom = ({ children }) => {
+    const components = useMDXComponents();
+
+    return (
+        <Markdown
+            components={components}
+            remarkPlugins={[remarkGfm, remarkGemoji]}
+            rehypePlugins={[rehypeSectionize]}
+        >
+            {children}
+        </Markdown>
+    );
+
+};
+
+export const Changelog = () => {
+    const { data, error } = useSWR("changelog", loadData);
+
+    if (!data) return <>Loading...</>;
+    if (error) return <Callout>
+        <MarkdownCustom>An error occurred while loading the changelog. Please [view it on GitHub](https://github.com/trezor/trezor-suite/blob/develop/packages/connect/CHANGELOG.md).</MarkdownCustom>
+    </Callout>;
+
+    const { changelog, versionOverview, upgradeBanner } = data;
+
+    return (
+        <>
+            {upgradeBanner && (
+                <Callout type="info">
+                    <MarkdownCustom>{upgradeBanner}</MarkdownCustom>
+                </Callout>
+            )}
+
+            <MarkdownCustom>{versionOverview}</MarkdownCustom>
+
+            <CollapsibleBox heading="What is a Canary Release?" margin={{ top: 16 }}>
+                <MarkdownCustom>
+                    Canary releases are beta versions available before the stable release. They provide early access to new features, improvements, and (hot)fixes, allowing developers to test their applications with the latest changes. Unlike stable versions, which are extensively tested and released less frequently, canary versions are released more often to address immediate needs, such as critical fixes or compatibility updates required by specific third-party applications or implementations.
+                </MarkdownCustom>
+
+                <MarkdownCustom>
+                    ###### Why Use Canary Releases?
+                </MarkdownCustom>
+                <MarkdownCustom>
+                    **Immediate fixes**: If your application encounters a critical issue with the current stable release, a canary version might already have the necessary fix, allowing you to resolve problems more quickly.
+                </MarkdownCustom>
+                <MarkdownCustom>
+                    **Feedback Opportunity**: Using canary releases allows you to provide feedback on new features and fixes, influencing the final stable release and ensuring it works smoothly with your application. If you encounter any issue, bug, or incompatibility introduced in a Canary release, report it by creating [a new issue in our repository](https://github.com/trezor/trezor-suite/issues/new/choose).
+                </MarkdownCustom>
+            </CollapsibleBox>
+
+            <MarkdownCustom>{changelog}</MarkdownCustom>
+        </>
+    );
+
+};
+
+<Changelog />

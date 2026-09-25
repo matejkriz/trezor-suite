@@ -1,140 +1,145 @@
 import React from 'react';
-import styled, { css, DefaultTheme, useTheme } from 'styled-components';
-import { IconName } from '@suite-common/icons';
-import { Icon } from '@suite-common/icons/src/webComponents';
-import { borders, Color, CSSColor, spacings, spacingsPx, typography } from '@trezor/theme';
-import { focusStyleTransition, getFocusShadowStyle } from '../../utils/utils';
-import type { UISize, UIVariant } from '../../config/types';
 
-type BadgeSize = Extract<UISize, 'tiny' | 'small' | 'medium'>;
-type BadgeVariant = Extract<UIVariant, 'primary' | 'tertiary' | 'destructive'>;
+import styled, { css, keyframes } from 'styled-components';
 
-export interface BadgeProps {
-    size?: BadgeSize;
-    variant?: BadgeVariant;
-    isDisabled?: boolean;
-    icon?: IconName;
-    hasAlert?: boolean;
-    className?: string;
-    children?: React.ReactNode;
-}
+import { type BadgeIntent, type BadgeSize } from './types';
+import {
+    mapIntentToBackgroundColor,
+    mapIntentToIconColor,
+    mapSizeToIconSize,
+    mapSizeToPadding,
+    mapSizeToTypographyStyle,
+} from './utils';
+import {
+    type FrameProps,
+    type FramePropsKeys,
+    pickAndPrepareFrameProps,
+    withFrameProps,
+} from '../../utils/frameProps';
+import { type TransientProps } from '../../utils/transientProps';
+import { Row } from '../Flex/Flex';
+import { Icon, type IconComponent } from '../Icon/Icon';
+import { Text, type TextPriority } from '../typography/Text/Text';
 
-type MapArgs = {
-    $variant: BadgeVariant;
-    theme: DefaultTheme;
-};
+const ENTRY_DURATION = 200;
+const ENTRY_DELAY = 500;
+const RING_DURATION = 1400;
+const RING_DELAY = ENTRY_DELAY;
+const PULSE_DELAY = RING_DELAY + RING_DURATION / 2;
+const PULSE_ITERATIONS = 2;
+const RING_ITERATIONS = 3;
+const EASE_OUT = 'cubic-bezier(0.33, 1, 0.68, 1)';
 
-type BadgeContainerProps = {
-    $size: BadgeSize;
-    $variant: BadgeVariant;
-    $hasAlert: boolean;
-};
+const badgeIn = keyframes`
+    from { opacity: 0; transform: scale(0.85); }
+    to { opacity: 1; transform: scale(1); }
+`;
 
-const mapVariantToBackgroundColor = ({ $variant, theme }: MapArgs): CSSColor => {
-    const colorMap: Record<BadgeVariant, Color> = {
-        primary: 'backgroundPrimarySubtleOnElevation0',
-        tertiary: 'backgroundNeutralSubtleOnElevation0',
-        destructive: 'backgroundAlertRedSubtleOnElevation0',
-    };
+const badgePulse = keyframes`
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(0.96); }
+`;
 
-    return theme[colorMap[$variant]];
-};
+const badgeRing = keyframes`
+    0% { opacity: 0.45; box-shadow: 0 0 0 0 var(--badge-color); }
+    25% { opacity: 0.45; }
+    100% { opacity: 0; box-shadow: 0 0 0 6px var(--badge-color); }
+`;
 
-const mapVariantToTextColor = ({ $variant, theme }: MapArgs): CSSColor => {
-    const colorMap: Record<BadgeVariant, Color> = {
-        primary: 'textPrimaryDefault',
-        tertiary: 'textSubdued',
-        destructive: 'textAlertRed',
-    };
+export const allowedBadgeFrameProps = ['margin', 'cursor'] as const satisfies FramePropsKeys[];
+type AllowedFrameProps = Pick<FrameProps, (typeof allowedBadgeFrameProps)[number]>;
 
-    return theme[colorMap[$variant]];
-};
+const Container = styled.div<
+    TransientProps<AllowedFrameProps> & { $intent: BadgeIntent; $isAnimated: boolean }
+>`
+    --badge-color: ${({ theme, $intent }) => theme[mapIntentToBackgroundColor($intent)]};
+    display: inline-flex;
+    border-radius: calc(infinity * 1px);
+    background: var(--badge-color);
 
-const mapVariantToIconColor = ({ $variant, theme }: MapArgs): CSSColor => {
-    const colorMap: Record<BadgeVariant, Color> = {
-        primary: 'iconPrimaryDefault',
-        tertiary: 'iconSubdued',
-        destructive: 'iconAlertRed',
-    };
-
-    return theme[colorMap[$variant]];
-};
-
-const mapVariantToPadding = ({ $size }: { $size: BadgeSize }): string => {
-    const colorMap: Record<BadgeSize, string> = {
-        tiny: `0 ${spacings.xs - spacings.xxxs}px`,
-        small: `0 ${spacingsPx.xs}`,
-        medium: `${spacingsPx.xxxs} ${spacingsPx.xs}`,
-    };
-
-    return colorMap[$size];
-};
-
-const Container = styled.button<BadgeContainerProps>`
-    display: flex;
-    align-items: center;
-    gap: ${spacingsPx.xxs};
-    padding: ${mapVariantToPadding};
-    border-radius: ${borders.radii.full};
-    border: 1px solid transparent;
-    background: ${mapVariantToBackgroundColor};
-    transition: ${focusStyleTransition};
-
-    &:disabled {
-        background: ${({ theme }) => theme.backgroundNeutralSubtleOnElevation0};
-    }
-
-    ${getFocusShadowStyle()}
-
-    ${({ theme, $hasAlert }) =>
-        $hasAlert &&
+    ${({ $isAnimated }) =>
+        $isAnimated &&
         css`
-            &:not(:focus-visible) {
-                border: 1px solid ${theme.borderAlertRed};
-                box-shadow: 0 0 0 1px ${theme.borderAlertRed};
+            position: relative;
+            animation:
+                ${badgeIn} ${ENTRY_DURATION}ms ${EASE_OUT} ${ENTRY_DELAY}ms both,
+                ${badgePulse} ${RING_DURATION}ms ease-in-out ${PULSE_DELAY}ms ${PULSE_ITERATIONS};
+
+            &::after {
+                content: '';
+                position: absolute;
+                inset: 0;
+                border-radius: inherit;
+                pointer-events: none;
+                animation: ${badgeRing} ${RING_DURATION}ms ${EASE_OUT} ${RING_DELAY}ms
+                    ${RING_ITERATIONS} both;
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+                animation: none;
+
+                &::after {
+                    display: none;
+                }
             }
         `}
+
+    ${withFrameProps}
 `;
 
-const Content = styled.span<{ $isDisabled: boolean; $variant: BadgeVariant; $size: BadgeSize }>`
-    color: ${({ $isDisabled, theme }) =>
-        $isDisabled ? theme.textDisabled : mapVariantToTextColor};
-    ${({ $size }) => ($size === 'medium' ? typography.hint : typography.label)};
-`;
+export type BadgeProps = AllowedFrameProps & {
+    size?: BadgeSize;
+    intent?: BadgeIntent;
+    isAnimated?: boolean;
+    /** Text emphasis. Defaults to full strength, dimmed for the `neutral` intent. */
+    priority?: TextPriority;
+    iconLeft?: IconComponent;
+    iconRight?: IconComponent;
+    children?: React.ReactNode;
+    'data-testid'?: string;
+};
 
 export const Badge = ({
     size = 'medium',
-    variant = 'tertiary',
-    isDisabled,
-    icon,
-    hasAlert,
-    className,
+    intent = 'neutral',
+    isAnimated = false,
+    priority = intent === 'neutral' ? 'secondary' : 'primary',
+    iconLeft,
+    iconRight,
     children,
+    'data-testid': dataTest,
+    ...rest
 }: BadgeProps) => {
-    const theme = useTheme();
+    const frameProps = pickAndPrepareFrameProps(rest, allowedBadgeFrameProps);
+
+    const iconProps = {
+        color: mapIntentToIconColor(intent),
+        size: mapSizeToIconSize(size),
+    };
 
     return (
         <Container
-            $size={size}
-            $variant={variant}
-            disabled={!!isDisabled}
-            $hasAlert={!!hasAlert}
-            className={className}
+            data-component="Badge"
+            data-testid={dataTest}
+            $intent={intent}
+            $isAnimated={isAnimated}
+            {...frameProps}
         >
-            {icon && (
-                <Icon
-                    name={icon}
-                    color={
-                        isDisabled
-                            ? 'iconDisabled'
-                            : mapVariantToIconColor({ $variant: variant, theme })
-                    }
-                />
-            )}
-
-            <Content $size={size} $variant={variant} $isDisabled={!!isDisabled}>
-                {children}
-            </Content>
+            <Row gap={4} padding={mapSizeToPadding(size)}>
+                {iconLeft && <Icon as={iconLeft} {...iconProps} />}
+                <Text
+                    as="div"
+                    typographyStyle={mapSizeToTypographyStyle(size)}
+                    intent={intent}
+                    priority={priority}
+                    textWrap="nowrap"
+                >
+                    {children}
+                </Text>
+                {iconRight && <Icon as={iconRight} {...iconProps} />}
+            </Row>
         </Container>
     );
 };
+
+export type { BadgeSize, BadgeIntent };

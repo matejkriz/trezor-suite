@@ -1,22 +1,10 @@
-# 9.1.12
+See https://github.com/trezor/trezor-suite/blob/develop/packages/connect/CHANGELOG.md for the Connect changelog. This file lists only changes to the `@trezor/connect-webextension` package itself.
 
--   initial non-beta release
--   added serviceworker proxy and example how to use it.
+# 10.0.0
 
-# 0.0.0-beta.3
+The Connect core is no longer bundled in this package. The extension's service worker talks to the core hosted by Trezor Suite through the same popup and desktop WebSocket code as `@trezor/connect-web`. Setup is described at https://connect.trezor.io/10/#web-extension.
 
--   Include directory `lib/` into release in order to publish TypeScript types.
--   Update existing TrezorConnect running in ServiceWorker to allow communication with new frontend proxy.
--   New TrezorConnect proxy to be used in frontend of the webextension in order to be able to use TrezorConnect that is running in popup using ServiceWorker as a persistent middle proxy.
-
-# 0.0.0-beta.2
-
--   publish content-script to allow manual injection by webextension
-
-# 0.0.0-beta.1
-
--   feat: allow content script to be added manually by the extension instead of injected using scripting permissions
-
-# 0.0.0-beta.0
-
--   first release
+- The Suite popup reaches the extension through `externally_connectable` instead of an injected content script, so the extension manifest must allow the Suite origin (c84e94b607).
+- The `popup` value of `coreMode` was removed (a902e2d3cb).
+- The `popup` and `_extendWebextensionLifetime` settings were removed (1f5d7a30a2, e33578fe8f).
+- ESM only. The build output moved to `lib/` as `.js` and `.d.ts` files, and the license changed to MIT (b99609bfb8, 25f0ed758f, 7b03152f66).

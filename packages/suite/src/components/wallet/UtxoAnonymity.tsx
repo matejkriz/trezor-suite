@@ -1,27 +1,15 @@
-import styled from 'styled-components';
+import { Icon, Row, Text } from '@trezor/components';
+import { UsersIcon } from '@trezor/icons';
 
-import { Icon, variables } from '@trezor/components';
-
-const Wrapper = styled.div`
-    align-items: center;
-    display: flex;
-    gap: 6px;
-`;
-
-const AnonymityLevel = styled.span`
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    font-size: ${variables.FONT_SIZE.TINY};
-    font-variant-numeric: tabular-nums;
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-`;
-
-interface UtxoAnonymityProps {
+type UtxoAnonymityProps = {
     anonymity: number; // float
-}
+};
 
 export const UtxoAnonymity = ({ anonymity }: UtxoAnonymityProps) => (
-    <Wrapper>
-        <Icon icon="USERS" size={20} />
-        <AnonymityLevel>{Math.floor(anonymity)}</AnonymityLevel>
-    </Wrapper>
+    <Row gap={6}>
+        <Icon as={UsersIcon} size={20} />
+        <Text typographyStyle="body-xs" intent="neutral" priority="secondary">
+            {Math.floor(anonymity)}
+        </Text>
+    </Row>
 );

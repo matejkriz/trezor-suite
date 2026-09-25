@@ -1,130 +1,97 @@
-import { Dispatch, SetStateAction } from 'react';
-import { FieldPath, UseFormReturn } from 'react-hook-form';
+import { type CryptoId } from 'invity-api';
 
-import { Network, NetworkSymbol } from '@suite-common/wallet-config';
-import { AccountUtxo, FeeLevel, PROTO } from '@trezor/connect';
+import { type NetworkSymbol } from '@suite-common/wallet-config';
+import type { AccountUtxo, FeeLevel } from '@trezor/connect';
 
-import { Account } from './account';
-import {
-    CurrencyOption,
-    FeeInfo,
-    Output,
-    PrecomposedLevels,
-    PrecomposedLevelsCardano,
-    RbfTransactionParams,
-} from './transaction';
-import { Rate } from './fiatRates';
+import { type AccountKey } from './account';
+import { type Output, type RbfTransactionParams } from './transaction';
 
 export type FormOptions =
     | 'broadcast'
     | 'utxoSelection'
-    | 'bitcoinRBF'
-    | 'bitcoinLockTime'
-    | 'ethereumData'
-    | 'ethereumNonce' // TODO
-    | 'rippleDestinationTag';
+    | 'bitcoinLocktime'
+    | 'transactionData'
+    | 'ethereumNonce'
+    | 'destinationTag';
+
+export type UtxoSorting = 'newestFirst' | 'oldestFirst' | 'smallestFirst' | 'largestFirst';
+
+export type TronStakingFormState =
+    | { kind: 'freeze' | 'unstake'; resource: 'bandwidth' | 'energy' }
+    | { kind: 'vote'; votes: string }
+    | { kind: 'withdraw' }
+    | { kind: 'claim' };
+
+export type FormStateTradingCryptoCurrency = {
+    cryptoId: CryptoId | undefined;
+    accountKey: AccountKey | undefined;
+    symbol: NetworkSymbol;
+    contractAddress?: string;
+    amount: string;
+};
+
+export type FormStateTradingFiatCurrency = {
+    amount: string;
+    fiatCurrency: string;
+};
+
+type FormStateTradingDefault = {
+    activeSection: 'sell' | 'exchange';
+    isSlip24Active: boolean;
+};
+
+type FormStateTradingCommon = {
+    recipientName: string;
+    send: FormStateTradingCryptoCurrency;
+    isSlip24Active: boolean;
+};
+
+export type FormStateTradingSell = {
+    activeSection: 'sell';
+    receive: FormStateTradingFiatCurrency;
+} & FormStateTradingCommon;
+
+export type FormStateTradingExchange = {
+    activeSection: 'exchange';
+    receive: FormStateTradingCryptoCurrency;
+    receiveAddress?: string;
+} & FormStateTradingCommon;
+
+export type FormStateTrading =
+    FormStateTradingSell | FormStateTradingExchange | FormStateTradingDefault;
 
 export interface FormState {
     outputs: Output[]; // output arrays, each element is corresponding with single Output item
     setMaxOutputId?: number;
     selectedFee?: FeeLevel['label'];
     feePerUnit: string; // bitcoin/ethereum/ripple custom fee field (satB/gasPrice/drops)
-    feeLimit: string; // ethereum only (gasLimit)
-    estimatedFeeLimit?: string; // ethereum only (gasLimit)
-    baseFee?: number; // used by RBF from. pay for related transactions
+    maxPriorityFeePerGas?: string; // ethereum eip1559 only
+    maxFeePerGas?: string; // ethereum eip1559 only
+    feeLimit: string; // ethereum: gas limit; tron: fee_limit cap in SUN for TRC-20 transfers
+    estimatedFeeLimit?: string; // ethereum: estimated gas limit; tron: estimated fee_limit cap in SUN for TRC-20 transfers
+
+    /**
+     * Fee that was paid by chained transactions. To perform RBF transaction (bump fee or cancel)
+     * we must pay higher fee than all previous transactions + its own relay fee (see BIP-125 rules)
+     *
+     * This is passed down to `utxo-lib` as `baseFee` parameter (see `CoinSelectOptions`).
+     */
+    baseFee?: number;
+
     // advanced form inputs
     options: FormOptions[];
-    bitcoinLockTime?: string; // bitcoin RBF/schedule
+    bitcoinLocktimeBlockHeight?: string;
+    bitcoinLocktimeDatetime?: string;
     ethereumNonce?: string; // TODO: ethereum RBF
-    ethereumDataAscii?: string;
-    ethereumDataHex?: string;
     ethereumAdjustGasLimit?: string; // if used, final gas limit = estimated limit * ethereumAdjustGasLimit
-    rippleDestinationTag?: string;
+    transactionData?: string; // used for solana serialized txn from trading api, ethereum, tron txn hex data or bitcoin psbt hex data
+    destinationTag?: string; // For Ripple, Stellar, Solana, and Tron
+    tronStaking?: TronStakingFormState;
     rbfParams?: RbfTransactionParams;
     isCoinControlEnabled: boolean;
     hasCoinControlBeenOpened: boolean;
     anonymityWarningChecked?: boolean;
     selectedUtxos: AccountUtxo[];
+    utxoSorting?: UtxoSorting;
+    trading?: FormStateTrading;
 }
-
-export type FormSignedTx = { tx: string; coin: NetworkSymbol };
-
-export type ExcludedUtxos = Record<string, 'low-anonymity' | 'dust' | undefined>;
-
-// local state of @wallet-hooks/useSendForm
-export type UseSendFormState = {
-    account: Account;
-    network: Network;
-    coinFees: FeeInfo;
-    localCurrencyOption: CurrencyOption;
-    feeInfo: FeeInfo;
-    composedLevels?: PrecomposedLevels | PrecomposedLevelsCardano;
-    online: boolean;
-    metadataEnabled: boolean;
-};
-
-export interface ComposeActionContext {
-    account: Account;
-    network: Network;
-    feeInfo: FeeInfo;
-    excludedUtxos?: ExcludedUtxos;
-    prison?: Record<string, unknown>;
-}
-
-export interface UtxoSelectionContext {
-    excludedUtxos: ExcludedUtxos;
-    allUtxosSelected: boolean;
-    composedInputs: PROTO.TxInputType[];
-    dustUtxos: AccountUtxo[];
-    isCoinControlEnabled: boolean;
-    lowAnonymityUtxos: AccountUtxo[];
-    selectedUtxos: AccountUtxo[];
-    spendableUtxos: AccountUtxo[];
-    coinjoinRegisteredUtxos: AccountUtxo[];
-    isLowAnonymityUtxoSelected: boolean;
-    anonymityWarningChecked: boolean;
-    toggleAnonymityWarning: () => void;
-    toggleCheckAllUtxos: () => void;
-    toggleCoinControl: () => void;
-    toggleUtxoSelection: (utxo: AccountUtxo) => void;
-}
-
-// strongly typed UseFormMethods.getValues with fallback value
-export interface GetDefaultValue {
-    <K extends keyof FormState, T = undefined>(
-        fieldName: K,
-        fallback?: T,
-    ): K extends keyof FormState ? FormState[K] : unknown;
-    <K, T>(fieldName: K, fallback: T): K extends keyof FormState ? FormState[K] : T;
-}
-
-export type SendContextValues<TFormValues extends FormState = FormState> =
-    UseFormReturn<TFormValues> &
-        UseSendFormState & {
-            isLoading: boolean;
-            fiatRate?: Rate;
-            // additional fields
-            outputs: Partial<Output & { id: string }>[]; // useFieldArray fields
-            updateContext: (value: Partial<UseSendFormState>) => void;
-            resetContext: () => void;
-            composeTransaction: (field?: FieldPath<TFormValues>) => void;
-            loadTransaction: () => Promise<void>;
-            signTransaction: () => void;
-            // useSendFormFields utils:
-            calculateFiat: (outputIndex: number, amount?: string) => void;
-            setAmount: (outputIndex: number, amount: string) => void;
-            changeFeeLevel: (currentLevel: FeeLevel['label']) => void;
-            resetDefaultValue: (field: FieldPath<TFormValues>) => void;
-            setMax: (index: number, active: boolean) => void;
-            getDefaultValue: GetDefaultValue;
-            toggleOption: (option: FormOptions) => void;
-            // useSendFormOutputs utils:
-            addOutput: () => void; // useFieldArray append
-            removeOutput: (index: number) => void; // useFieldArray remove
-            addOpReturn: () => void;
-            removeOpReturn: (index: number) => void;
-            // useSendFormCompose
-            setDraftSaveRequest: Dispatch<SetStateAction<boolean>>;
-            // UTXO selection
-            utxoSelection: UtxoSelectionContext;
-        };

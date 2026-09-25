@@ -1,0 +1,219 @@
+import {
+    type TransactionCreatedEventAction,
+    events,
+    injectDesktopAnalytics,
+} from '@suite/analytics';
+import { type ExtendedMessageDescriptor, Translation } from '@suite/intl';
+import { selectConnectPopupCall } from '@suite-common/connect-popup';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { notificationsActions } from '@suite-common/toast-notifications';
+import {
+    type Account,
+    type FormState,
+    type RbfTransactionType,
+    type ReviewOutput,
+    type TronStakingFormState,
+} from '@suite-common/wallet-types';
+import {
+    getTxValidityTimeoutInMs,
+    isRbfCancelTransaction,
+    isRbfTransaction,
+} from '@suite-common/wallet-utils';
+import { type StakeType } from '@trezor/blockchain-link-types';
+import { Modal } from '@trezor/components';
+import { copyToClipboard, download } from '@trezor/dom-utils';
+import { type Deferred } from '@trezor/utils';
+
+import { useSelector } from 'src/hooks/suite';
+
+import { type TxInfoState, getTxType, hasTxValidityExpired } from '../utils';
+
+const mapRbfTypeToReporting: Record<RbfTransactionType, TransactionCreatedEventAction> = {
+    'bump-fee': 'replaced',
+    cancel: 'canceled',
+};
+
+const mapTronStakingKindToConfirmAction: Record<
+    TronStakingFormState['kind'],
+    'stake' | 'unstake' | 'claim' | 'change-delegate' | 'withdraw'
+> = {
+    freeze: 'stake',
+    vote: 'change-delegate',
+    unstake: 'unstake',
+    withdraw: 'withdraw',
+    claim: 'claim',
+};
+
+type TransactionReviewModalBottomContentProps = {
+    decision: Deferred<boolean, string | number | undefined> | undefined;
+    isSending: boolean;
+    onSend: (send: boolean) => void;
+    onCancel: () => void;
+    handleTryAgain: (close: boolean) => void;
+    txInfoState: TxInfoState;
+    actionTranslation: ExtendedMessageDescriptor;
+    hasTxReviewExpired: boolean;
+    stakeType?: StakeType;
+    isRbfConfirmedError?: boolean;
+    account: Account;
+    precomposedForm: FormState;
+    outputs: ReviewOutput[];
+};
+
+export const TransactionReviewModalBottomContent = ({
+    decision,
+    isRbfConfirmedError,
+    isSending,
+    onSend,
+    onCancel,
+    handleTryAgain,
+    txInfoState,
+    actionTranslation,
+    hasTxReviewExpired,
+    stakeType,
+    account,
+    precomposedForm,
+    outputs,
+}: TransactionReviewModalBottomContentProps) => {
+    const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
+    const connectPopupCall = useSelector(selectConnectPopupCall);
+    const { precomposedTx, serializedTx } = txInfoState;
+
+    const { symbol, networkType } = account;
+    const { options, selectedFee } = precomposedForm;
+
+    const isBroadcastEnabled = options.includes('broadcast');
+    const txType = getTxType(txInfoState, precomposedForm);
+
+    const isCancelRbfAction = precomposedTx ? isRbfCancelTransaction(precomposedTx) : false;
+
+    const createdTxTimestamp = txInfoState?.precomposedTx?.createdTimestamp ?? 0;
+    const shouldCheckTxTimeValidity = account?.networkType === 'solana' && createdTxTimestamp !== 0;
+    const deadline = createdTxTimestamp + getTxValidityTimeoutInMs(account.networkType);
+    const hasTxDeadlineExpired = shouldCheckTxTimeValidity && hasTxValidityExpired(deadline);
+
+    const reportTransactionCreatedEvent = (action: TransactionCreatedEventAction) =>
+        analytics.report({
+            type: events.transactionCreatedEvent.name,
+            payload: {
+                action,
+                symbol,
+                tokens: outputs
+                    .filter((output: ReviewOutput) => output.token?.symbol)
+                    .map((output: ReviewOutput) => output.token?.symbol)
+                    .join(','),
+                outputsCount: precomposedForm.outputs.length,
+                broadcast: isBroadcastEnabled,
+                bitcoinLocktime: !!options.includes('bitcoinLocktime'),
+                transactionData: !!options.includes('transactionData'),
+                ethereumNonce: !!options.includes('ethereumNonce'),
+                destinationTag: !!options.includes('destinationTag'),
+                selectedFee: selectedFee || 'normal',
+                isCoinControlEnabled: precomposedForm.isCoinControlEnabled,
+                hasCoinControlBeenOpened: precomposedForm.hasCoinControlBeenOpened,
+                txType,
+            },
+        });
+
+    const handleSend = () => {
+        if (networkType === 'solana' || networkType === 'stellar' || networkType === 'tron') {
+            onSend(true);
+        }
+
+        if (decision) {
+            decision.resolve(true);
+            reportTransactionCreatedEvent(
+                isRbfTransaction(precomposedTx!)
+                    ? mapRbfTypeToReporting[precomposedTx.rbfType]
+                    : 'sent',
+            );
+
+            const stakingConfirmAction =
+                stakeType ??
+                (precomposedForm.tronStaking &&
+                    mapTronStakingKindToConfirmAction[precomposedForm.tronStaking.kind]);
+
+            if (stakingConfirmAction) {
+                return analytics.report({
+                    type: events.stakingConfirmEvent.name,
+                    payload: { action: stakingConfirmAction, networkSymbol: symbol },
+                });
+            }
+        }
+    };
+
+    const handleCopy = async () => {
+        const result = await copyToClipboard(serializedTx!.tx);
+
+        if (typeof result !== 'string') {
+            dispatch(notificationsActions.addToast({ type: 'copy-to-clipboard' }));
+        }
+
+        reportTransactionCreatedEvent('copied');
+    };
+
+    const handleDownload = () => {
+        download(serializedTx!.tx, 'signed-transaction.txt');
+        reportTransactionCreatedEvent('downloaded');
+    };
+
+    if (isRbfConfirmedError) {
+        return (
+            <Modal.Button intent="neutral" priority="secondary" onClick={onCancel}>
+                <Translation id="TR_CLOSE" />
+            </Modal.Button>
+        );
+    }
+
+    if (shouldCheckTxTimeValidity && hasTxReviewExpired && !isSending) {
+        return (
+            <>
+                <Modal.Button onClick={() => handleTryAgain(false)}>
+                    <Translation id="TR_TRY_AGAIN" />
+                </Modal.Button>
+                <Modal.Button intent="neutral" priority="secondary" onClick={onCancel}>
+                    <Translation id="TR_CLOSE" />
+                </Modal.Button>
+            </>
+        );
+    }
+
+    if (connectPopupCall?.state === 'ongoing') {
+        return null;
+    }
+
+    if (isBroadcastEnabled) {
+        return (
+            <Modal.Button
+                data-testid="@modal/send"
+                isDisabled={!serializedTx || hasTxDeadlineExpired}
+                isLoading={isSending}
+                intent={isCancelRbfAction ? 'critical' : 'brand'}
+                onClick={handleSend}
+            >
+                <Translation {...actionTranslation} />
+            </Modal.Button>
+        );
+    }
+
+    return (
+        <>
+            <Modal.Button
+                isDisabled={!serializedTx}
+                onClick={handleCopy}
+                data-testid="@send/copy-raw-transaction"
+            >
+                <Translation id="COPY_TRANSACTION_TO_CLIPBOARD" />
+            </Modal.Button>
+            <Modal.Button
+                intent="neutral"
+                priority="secondary"
+                isDisabled={!serializedTx}
+                onClick={handleDownload}
+            >
+                <Translation id="DOWNLOAD_TRANSACTION" />
+            </Modal.Button>
+        </>
+    );
+};

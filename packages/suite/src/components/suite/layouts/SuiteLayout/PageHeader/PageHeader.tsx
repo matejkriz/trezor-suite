@@ -1,45 +1,93 @@
-import styled from 'styled-components';
+import { type ReactNode } from 'react';
 
-import { Route } from '@suite-common/suite-types';
-import { spacingsPx, zIndices } from '@trezor/theme';
+import styled, { css } from 'styled-components';
+
+import { selectSelectedAccountKey } from '@suite/account';
+import {
+    injectSuiteRouterHistory,
+    isAccountTabRoute,
+    resolveEffectiveBackgroundRouteName,
+    selectRoute,
+} from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { selectAccounts } from '@suite-common/wallet-core';
+import { Row } from '@trezor/components';
+import { zIndices } from '@trezor/theme';
+
+import { HEADER_HEIGHT } from 'src/constants/suite/layout';
 import { useSelector } from 'src/hooks/suite';
-import { selectSelectedAccount } from 'src/reducers/wallet/selectedAccountReducer';
-import { selectIsAccountTabPage } from 'src/reducers/suite/routerReducer';
+
+import { GlobalSendReceive } from './GlobalSendReceive/GlobalSendReceive';
 import { HeaderActions } from './HeaderActions';
+import { HeaderDropdown } from './HeaderDropdown';
 import { PageName } from './PageNames/PageName';
+import { TradeActions } from './TradeActions';
 
-const HEADER_HEIGHT = 64;
-
-const Container = styled.div`
+const Container = styled.div<{ $expandable?: boolean }>`
     position: sticky;
     top: 0;
     display: flex;
+    flex-shrink: 0;
+    align-items: center;
     justify-content: space-between;
     width: 100%;
-    height: ${HEADER_HEIGHT}px;
-    min-height: ${HEADER_HEIGHT}px;
-    padding: ${spacingsPx.xs} ${spacingsPx.md};
-    background: ${({ theme }) => theme.backgroundSurfaceElevation0};
-    border-bottom: 1px solid ${({ theme }) => theme.borderElevation1};
-    overflow: hidden;
+    gap: 8px;
+    min-height: ${HEADER_HEIGHT};
+    padding: 8px 16px;
+    background: ${({ theme }) => theme.surfaceFillPage};
+    border-bottom: 1px solid ${({ theme }) => theme.borderNeutral};
     z-index: ${zIndices.pageHeader};
+
+    ${({ $expandable }) =>
+        !$expandable &&
+        css`
+            height: ${HEADER_HEIGHT};
+            overflow: hidden;
+        `}
 `;
 
-// TODO: perhaps this could be a part of some router config / useLayoutHook / somthing else?
+const PageHeaderIndex = () => {
+    const hasAccounts = useSelector(state => selectAccounts(state).length > 0);
+
+    if (!hasAccounts) return null;
+
+    return (
+        <Row gap={12}>
+            <HeaderDropdown />
+            <TradeActions />
+            <GlobalSendReceive />
+        </Row>
+    );
+};
+
 interface PageHeaderProps {
-    backRoute?: Route['name'];
+    children?: ReactNode;
+    expandable?: boolean;
 }
 
-export const PageHeader = ({ backRoute }: PageHeaderProps) => {
-    const selectedAccount = useSelector(selectSelectedAccount);
-    // TODO subpages + tabs could be in some router config? this approach feels a bit fragile
-    const isAccountTabPage = useSelector(selectIsAccountTabPage);
+export const PageHeader = ({ children, expandable }: PageHeaderProps) => {
+    const selectedAccountKey = useSelector(selectSelectedAccountKey);
+    const route = useSelector(selectRoute);
+    const { suiteRouterHistory } = useServices(injectSuiteRouterHistory);
+    const effectiveRouteName = resolveEffectiveBackgroundRouteName(
+        route,
+        suiteRouterHistory.getLocation(),
+    );
+    const isAccountTabPage = isAccountTabRoute(effectiveRouteName);
+
+    // handle moment when children are not rendered yet in the Trade section
+    const isTradeSection = !!effectiveRouteName?.includes('wallet-trading');
+
+    if (isTradeSection || children != null) {
+        return <Container $expandable={expandable}>{children}</Container>;
+    }
 
     return (
         <Container>
-            <PageName backRoute={backRoute} />
+            <PageName />
 
-            {!!selectedAccount && isAccountTabPage && <HeaderActions />}
+            {effectiveRouteName === 'suite-index' && <PageHeaderIndex />}
+            {!!selectedAccountKey && isAccountTabPage && <HeaderActions />}
         </Container>
     );
 };

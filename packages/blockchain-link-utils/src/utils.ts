@@ -1,8 +1,6 @@
-import BigNumber from 'bignumber.js';
-
+import type { EnhancedVinVout, Transaction, VinVout } from '@trezor/blockchain-link-types';
 import { isNotUndefined, topologicalSort } from '@trezor/utils';
-import type { Transaction, EnhancedVinVout } from '@trezor/blockchain-link-types/src/common';
-import type { VinVout } from '@trezor/blockchain-link-types/src/blockbook';
+import { BigNumber, type BigNumberValue } from '@trezor/utils/src/bigNumber';
 
 export type Addresses = ({ address: string } | string)[] | string;
 
@@ -35,7 +33,7 @@ export const enhanceVinVout =
         isAccountOwned: isAccountOwned(addresses)(vinVout) || undefined,
     });
 
-export const sumVinVout = (sum: BigNumber.Value, { value }: VinVout): BigNumber.Value =>
+export const sumVinVout = (sum: BigNumberValue, { value }: VinVout): BigNumberValue =>
     typeof value === 'string' ? new BigNumber(value || '0').plus(sum) : sum;
 
 export const transformTarget = (target: VinVout, incoming: VinVout[]) => ({
@@ -46,6 +44,7 @@ export const transformTarget = (target: VinVout, incoming: VinVout[]) => ({
     coinbase: target.coinbase,
     isAccountTarget: incoming.includes(target) ? true : undefined,
 });
+
 const adjustHeight = ({ blockHeight }: { blockHeight?: number }) =>
     blockHeight === undefined || blockHeight <= 0 ? Number.MAX_SAFE_INTEGER : blockHeight;
 
@@ -53,12 +52,20 @@ export const sortTxsFromLatest = (transactions: Transaction[]) => {
     const txs = transactions.slice().sort((a, b) => adjustHeight(b) - adjustHeight(a));
     let from = 0;
     while (from < txs.length - 1) {
-        const fromHeight = adjustHeight(txs[from]);
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const fromTx: Transaction = txs[from];
+        const fromHeight = adjustHeight(fromTx);
         let to = from + 1;
-        if (fromHeight === adjustHeight(txs[to])) {
-            do {
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const toTx: Transaction = txs[to];
+        if (fromHeight === adjustHeight(toTx)) {
+            to++;
+            while (to < txs.length) {
+                // @ts-expect-error: indexing with noUncheckedIndexedAccess
+                const nextTx: Transaction = txs[to];
+                if (fromHeight !== adjustHeight(nextTx)) break;
                 to++;
-            } while (to < txs.length && fromHeight === adjustHeight(txs[to]));
+            }
             const toposorted = topologicalSort(txs.slice(from, to), (a, b) =>
                 a.details.vin.some(({ txid }) => txid === b.txid),
             );
@@ -68,4 +75,39 @@ export const sortTxsFromLatest = (transactions: Transaction[]) => {
     }
 
     return txs;
+};
+
+const isOutgoing = (lowerCasedDescriptor: string, tx: Transaction) =>
+    tx.details?.vin?.[0]?.addresses?.[0]?.toLowerCase() === lowerCasedDescriptor;
+
+export const filterShadowedPendingTxsByNonce = (
+    txs: Transaction[],
+    lowerCasedDescriptor: string,
+) => {
+    // txs should come sorted by nonce
+    const myLatestMinedTx = txs.find(
+        tx =>
+            isOutgoing(lowerCasedDescriptor, tx) &&
+            tx.ethereumSpecific &&
+            (tx.ethereumSpecific.status === 0 || tx.ethereumSpecific.status === 1) &&
+            Number.isInteger(tx.ethereumSpecific.nonce),
+    );
+
+    if (!myLatestMinedTx?.ethereumSpecific) return txs;
+
+    const latestMinedNonce = myLatestMinedTx.ethereumSpecific.nonce;
+
+    return txs.filter(tx => {
+        const es = tx.ethereumSpecific;
+        if (!es) return true;
+
+        const isOutgoingTx = isOutgoing(lowerCasedDescriptor, tx);
+        const isPending = es.status === -1;
+
+        if (isOutgoingTx && isPending && es.nonce <= latestMinedNonce) {
+            return false;
+        }
+
+        return true;
+    });
 };

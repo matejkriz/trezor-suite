@@ -1,54 +1,91 @@
-import TrezorConnect from '@trezor/connect';
-import styled from 'styled-components';
+import { Translation } from '@suite/intl';
+import { selectModalRequestId } from '@suite/modal';
+import { usePin } from '@suite-common/device';
+import { Modal } from '@trezor/components';
+import { ConfirmOnDevicePill } from '@trezor/product-components';
 
-import { Modal, ModalProps, PinMatrix, Translation } from 'src/components/suite';
-import { PIN_MATRIX_MAX_WIDTH } from 'src/components/suite/PinMatrix/PinMatrix';
-import { usePin } from 'src/hooks/suite/usePinModal';
-import { TrezorDevice } from 'src/types/suite';
+import { PinMatrix } from 'src/components/suite/PinMatrix/PinMatrix';
+import { useSelector } from 'src/hooks/suite';
+import { type TrezorDevice } from 'src/types/suite';
 
-const StyledModal = styled(Modal)<{ $isExtended: boolean }>`
-    width: unset;
-
-    ${Modal.Description} {
-        max-width: ${({ $isExtended }) =>
-            $isExtended
-                ? 'fit-content'
-                : PIN_MATRIX_MAX_WIDTH}; /* limit width to prevent extending the modal past the width of the pin matrix */
-    }
-`;
-
-interface PinModalProps extends ModalProps {
+type PinModalProps = {
     device: TrezorDevice;
-}
+};
 
-export const PinModal = ({ device, ...rest }: PinModalProps) => {
-    const { isRequestingNewPinCode, isWipeCode, isPinInvalid, isModalExtended } = usePin();
-
+export const PinModal = ({ device }: PinModalProps) => {
+    const requestId = useSelector(selectModalRequestId);
+    const {
+        isSettingNewPin,
+        isSettingNewWipeCode,
+        hasInvalidAttempts,
+        onCancel,
+        handlePinSubmit,
+        setPin,
+        pin,
+        submitted,
+    } = usePin(device.buttonRequests, requestId);
     if (!device.features) return null;
 
-    const onCancel = () =>
-        isWipeCode ? TrezorConnect.cancel('wipe-cancelled') : TrezorConnect.cancel('pin-cancelled');
+    const getHeading = () => {
+        const pinRequestType = device.buttonRequests[device.buttonRequests.length - 1];
+
+        switch (pinRequestType?.code) {
+            case 'PinMatrixRequestType_NewFirst':
+                return 'TR_ENTER_NEW_PIN';
+            case 'PinMatrixRequestType_NewSecond':
+                return 'TR_RE_ENTER_NEW_PIN';
+            case 'PinMatrixRequestType_WipeCodeFirst':
+                return 'TR_ENTER_WIPECODE';
+            case 'PinMatrixRequestType_WipeCodeSecond':
+                return 'TR_RE_ENTER_WIPECODE';
+            default:
+                return 'TR_ENTER_PIN';
+        }
+    };
 
     return (
-        <StyledModal
-            heading={<Translation id={isWipeCode ? 'TR_ENTER_WIPECODE' : 'TR_ENTER_PIN'} />}
-            description={
-                <Translation
-                    id="TR_THE_PIN_LAYOUT_IS_DISPLAYED"
-                    values={{ deviceLabel: device.label, b: text => <b>{text}</b> }}
-                />
-            }
-            onCancel={onCancel}
-            isCancelable
-            data-test="@modal/pin"
-            $isExtended={isModalExtended}
-            {...rest}
-        >
-            <PinMatrix
-                device={device}
-                hideExplanation={!isRequestingNewPinCode}
-                invalid={isPinInvalid}
+        <Modal.Backdrop>
+            <ConfirmOnDevicePill
+                title={<Translation id="TR_CONFIRM_ON_TREZOR" />}
+                deviceModelInternal={device.features?.internal_model}
+                deviceUnitColor={device?.features?.unit_color}
+                onCancel={onCancel}
             />
-        </StyledModal>
+            <Modal.ModalBase
+                heading={<Translation id={getHeading()} />}
+                onCancel={onCancel}
+                data-testid="@modal/pin"
+                width={400}
+                bottomContent={
+                    <>
+                        <Modal.Button
+                            onClick={handlePinSubmit}
+                            data-testid="@pin/submit-button"
+                            isDisabled={submitted}
+                            flex="1"
+                        >
+                            <Translation id="TR_CONFIRM" />
+                        </Modal.Button>
+                        <Modal.Button
+                            onClick={onCancel}
+                            intent="neutral"
+                            priority="secondary"
+                            flex="1"
+                        >
+                            <Translation id="TR_CANCEL" />
+                        </Modal.Button>
+                    </>
+                }
+            >
+                <PinMatrix
+                    pin={pin}
+                    setPin={setPin}
+                    onSubmit={handlePinSubmit}
+                    // show explanation when either setting a new pin or wipe code or entering existing pin but has at least one invalid attempt
+                    showExplanation={isSettingNewPin || isSettingNewWipeCode || hasInvalidAttempts}
+                    isDisabled={submitted}
+                />
+            </Modal.ModalBase>
+        </Modal.Backdrop>
     );
 };

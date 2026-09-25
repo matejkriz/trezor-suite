@@ -1,38 +1,18 @@
-import { useDispatch } from 'react-redux';
 import styled from 'styled-components';
 
-import { Translation } from 'src/components/suite';
-import { useSelector } from 'src/hooks/suite/useSelector';
-import { Switch, variables } from '@trezor/components';
-import { coinjoinAccountToggleSkipRounds } from 'src/actions/wallet/coinjoinAccountActions';
-import { selectCurrentCoinjoinSession } from 'src/reducers/wallet/coinjoinReducer';
+import { coinjoinAccountToggleSkipRounds, selectCurrentCoinjoinSession } from '@suite/coinjoin';
+import { Translation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { H3, Paragraph, Switch, Text } from '@trezor/components';
+
+import { useSelector } from 'src/hooks/suite';
 
 const Row = styled.div`
     display: flex;
     gap: 12px;
     justify-content: space-between;
     margin-top: 16px;
-`;
-
-const Heading = styled.div`
-    font-size: ${variables.FONT_SIZE.H3};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-`;
-
-const Subheading = styled.div`
-    font-size: ${variables.FONT_SIZE.NORMAL};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-    margin-bottom: 3px;
-`;
-
-const Text = styled.p`
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    font-size: ${variables.FONT_SIZE.SMALL};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-`;
-
-const StyledSwitch = styled(Switch)`
-    margin-top: 10px;
 `;
 
 interface SkipRoundsSetupProps {
@@ -43,28 +23,29 @@ interface SkipRoundsSetupProps {
 export const SkipRoundsSetup = ({ accountKey, skipRounds }: SkipRoundsSetupProps) => {
     const session = useSelector(selectCurrentCoinjoinSession);
 
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
 
     const toggleSkipRounds = () => dispatch(coinjoinAccountToggleSkipRounds(accountKey));
 
     return (
         <div>
-            <Heading>
+            <H3>
                 <Translation id="TR_SKIP_ROUNDS" />
-            </Heading>
+            </H3>
             <Row>
-                <StyledSwitch
+                <Switch
                     isChecked={skipRounds}
                     isDisabled={!!session}
                     onChange={toggleSkipRounds}
+                    margin={{ top: 12 }}
                 />
                 <div>
-                    <Subheading>
+                    <Text as="div" typographyStyle="body-md" margin={{ bottom: 4 }}>
                         <Translation id="TR_SKIP_ROUNDS_HEADING" />
-                    </Subheading>
-                    <Text>
-                        <Translation id="TR_SKIP_ROUNDS_DESCRIPTION" />
                     </Text>
+                    <Paragraph intent="neutral" priority="secondary" typographyStyle="body-sm">
+                        <Translation id="TR_SKIP_ROUNDS_DESCRIPTION" />
+                    </Paragraph>
                 </div>
             </Row>
         </div>

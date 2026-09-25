@@ -1,31 +1,45 @@
-import produce from 'immer';
-import { GRAPH } from 'src/actions/wallet/constants';
-import { STORAGE } from 'src/actions/suite/constants';
-import { WalletAction, Account } from 'src/types/wallet';
-import { Action as SuiteAction } from 'src/types/suite';
-import { SETTINGS } from 'src/config/suite';
+import type { UnknownAction } from '@reduxjs/toolkit';
+import { produce } from 'immer';
 
 import { accountsActions } from '@suite-common/wallet-core';
-import { GraphData, AccountIdentifier, GraphRange, GraphScale } from 'src/types/wallet/graph';
 
-export interface State {
+import { storageLoad } from 'src/actions/suite/storageLifecycleActions';
+import {
+    accountGraphFail,
+    accountGraphStart,
+    accountGraphSuccess,
+    aggregatedGraphStart,
+    aggregatedGraphSuccess,
+    setSelectedRange,
+} from 'src/actions/wallet/graphActions';
+import { SETTINGS } from 'src/config/suite';
+import { type Account } from 'src/types/wallet';
+import { type AccountIdentifier, type GraphData, type GraphRange } from 'src/types/wallet/graph';
+
+export interface GraphState {
     data: GraphData[];
     error: null | AccountIdentifier[];
     isLoading: boolean;
     selectedRange: GraphRange;
-    selectedView: GraphScale;
 }
 
-const initialState: State = {
-    data: [],
-    selectedRange: SETTINGS.DEFAULT_GRAPH_RANGE,
-    selectedView: 'linear',
-    error: null,
-    isLoading: false,
-    // selectedRange: SETTINGS.DEFAULT_GRAPH_RANGE,
+export type GraphRootState = {
+    wallet: {
+        graph: GraphState;
+    };
 };
 
-const updateError = (draft: State) => {
+export const selectGraph = (state: GraphRootState) => state.wallet.graph;
+export const selectGraphSelectedRange = (state: GraphRootState) => state.wallet.graph.selectedRange;
+
+const initialState: GraphState = {
+    data: [],
+    selectedRange: SETTINGS.DEFAULT_GRAPH_RANGE,
+    error: null,
+    isLoading: false,
+};
+
+const updateError = (draft: GraphState) => {
     const failedGraphData = draft.data.filter(d => d.error);
     if (failedGraphData.length > 0) {
         draft.error = failedGraphData.map(a => a.account);
@@ -34,18 +48,24 @@ const updateError = (draft: State) => {
     }
 };
 
-const update = (draft: State, payload: GraphData) => {
-    const { account, data, error, isLoading } = payload;
-    const dataIndex = draft.data.findIndex(
+const findEntryIndex = (draft: GraphState, account: AccountIdentifier) =>
+    draft.data.findIndex(
         d =>
             d.account.deviceState === account.deviceState &&
             d.account.descriptor === account.descriptor &&
             d.account.symbol === account.symbol,
     );
+
+const update = (draft: GraphState, payload: GraphData) => {
+    const { account, data, error, isLoading } = payload;
+    const dataIndex = findEntryIndex(draft, account);
     if (dataIndex !== -1) {
-        draft.data[dataIndex].data = data;
-        draft.data[dataIndex].error = error;
-        draft.data[dataIndex].isLoading = isLoading;
+        const entry = draft.data[dataIndex];
+        if (entry) {
+            entry.data = data;
+            entry.error = error;
+            entry.isLoading = isLoading;
+        }
     } else {
         draft.data.push({
             account,
@@ -58,12 +78,33 @@ const update = (draft: State, payload: GraphData) => {
     updateError(draft);
 };
 
-const loadFromStorage = (draft: State, payload: GraphData[] = []) => {
+const updateProgress = (draft: GraphState, payload: Omit<GraphData, 'data'>) => {
+    const { account, error, isLoading } = payload;
+    const dataIndex = findEntryIndex(draft, account);
+    if (dataIndex !== -1) {
+        const entry = draft.data[dataIndex];
+        if (entry) {
+            entry.error = error;
+            entry.isLoading = isLoading;
+        }
+    } else {
+        draft.data.push({
+            account,
+            isLoading,
+            error,
+            data: [],
+        });
+    }
+
+    updateError(draft);
+};
+
+const loadFromStorage = (draft: GraphState, payload: GraphData[] = []) => {
     draft.data = payload;
     updateError(draft);
 };
 
-const remove = (draft: State, accounts: Account[]) => {
+const remove = (draft: GraphState, accounts: Account[]) => {
     accounts.forEach(account => {
         const affected = draft.data.filter(
             d =>
@@ -79,40 +120,22 @@ const remove = (draft: State, accounts: Account[]) => {
     updateError(draft);
 };
 
-const graphReducer = (state: State = initialState, action: WalletAction | SuiteAction): State =>
+const graphReducer = (state: GraphState = initialState, action: UnknownAction): GraphState =>
     produce(state, draft => {
-        switch (action.type) {
-            case STORAGE.LOAD:
-                loadFromStorage(draft, action.payload.graph);
-                break;
-            case GRAPH.ACCOUNT_GRAPH_START:
-                update(draft, action.payload);
-                break;
-            case GRAPH.ACCOUNT_GRAPH_SUCCESS:
-                update(draft, action.payload);
-                break;
-            case GRAPH.ACCOUNT_GRAPH_FAIL:
-                update(draft, action.payload);
-                break;
-            case GRAPH.AGGREGATED_GRAPH_START:
-                draft.isLoading = true;
-                break;
-            case GRAPH.AGGREGATED_GRAPH_SUCCESS:
-                draft.isLoading = false;
-                break;
-            case GRAPH.SET_SELECTED_RANGE:
-                draft.selectedRange = action.payload;
-                break;
-            case GRAPH.SET_SELECTED_VIEW:
-                draft.selectedView = action.payload;
-                break;
-            case accountsActions.removeAccount.type: {
-                if (accountsActions.removeAccount.match(action)) {
-                    remove(draft, action.payload);
-                }
-                break;
-            }
-            // no default
+        if (storageLoad.match(action)) {
+            loadFromStorage(draft, action.payload.graph);
+        } else if (accountGraphStart.match(action) || accountGraphFail.match(action)) {
+            updateProgress(draft, action.payload);
+        } else if (accountGraphSuccess.match(action)) {
+            update(draft, action.payload);
+        } else if (aggregatedGraphStart.match(action)) {
+            draft.isLoading = true;
+        } else if (aggregatedGraphSuccess.match(action)) {
+            draft.isLoading = false;
+        } else if (setSelectedRange.match(action)) {
+            draft.selectedRange = action.payload;
+        } else if (accountsActions.removeAccount.match(action)) {
+            remove(draft, action.payload);
         }
     });
 

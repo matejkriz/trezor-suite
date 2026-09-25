@@ -2,21 +2,22 @@
 
 Prerequisites environments:
 
--   `COINGECKO_API_KEY` Coingecko pro api key
--   `JWS_PRIVATE_KEY_ENV` For production build, private key required
--   `IS_CODESIGN_BUILD` For production build, set to true
+- `COINGECKO_API_KEY` Coingecko pro api key
+- `JWS_PRIVATE_KEY_ENV` For production build, private key required
+- `IS_CODESIGN_BUILD` For production build, set to true
 
 Scripts:
 
--   options `yarn nfts` and `yarn coins`
--   has to be called with structure type
-    -   `simple` (used for Suite)
-    -   `advanced` (planned to be used for Solana token symbols and names)
--   and chain
-
-    -   `ethereum`, `polygon-pos`, `solana`,...
-
--   e.g. `yarn coins advanced solana` and you get `jws` in format:
+- options `yarn nfts` and `yarn coins`
+- has to be called with structure type
+    - `simple` (array of contract addresses)
+    - `advanced` (object with token symbols and names per contract address)
+- and chain
+    - `ethereum`, `polygon-pos`, `solana`, `stellar`...
+- and file type
+    - `jws` for signed data
+    - `json` for unsigned data
+- e.g. `yarn coins advanced solana json` and you get `json` in format:
 
 ```
 {
@@ -40,7 +41,7 @@ Scripts:
 }
 ```
 
--   e.g. `yarn nfts simple polygon-pos` and you get `jws` in format:
+- e.g. `yarn nfts simple polygon-pos jws` and you get `jws` in format:
 
 ```
 [
@@ -55,8 +56,8 @@ Scripts:
 ]
 ```
 
-## Naming
+## Naming
 
--   Token definitions: include both coin and nft definitions
--   Coin definitions: contain just tokens ERC20 and SPL
--   NFT definitions: contain just nfts ERC1155 and ERC721
+- Token definitions: include both coin and nft definitions
+- Coin definitions: contain just tokens ERC20, SPL and Stellar classic assets (`code-issuer` format)
+- NFT definitions: contain just nfts ERC1155 and ERC721

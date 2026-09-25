@@ -1,44 +1,34 @@
 import styled from 'styled-components';
 
-import { variables } from '@trezor/components';
-import {
-    GuideHeader,
-    GuideContent,
-    GuideViewWrapper,
-    GuideNode,
-    GuideCategories,
-} from 'src/components/guide';
-import { useDispatch, useSelector } from 'src/hooks/suite';
-import { Translation } from 'src/components/suite';
+import { selectLanguage } from '@suite/settings';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { CardList } from '@trezor/components';
+
 import { setView } from 'src/actions/suite/guideActions';
+import {
+    GuideCategories,
+    GuideContent,
+    GuideHeader,
+    GuideNode,
+    GuideViewWrapper,
+} from 'src/components/guide';
+import { useSelector } from 'src/hooks/suite';
+import { selectGuideCurrentNode } from 'src/selectors/suite/guideSelectors';
 import { getNodeTitle } from 'src/utils/suite/guide';
-import { selectLanguage } from 'src/reducers/suite/suiteReducer';
 
 const Section = styled.div`
     margin-bottom: 20px;
 
     &:not(:last-of-type) {
-        margin-bottom: 100px;
+        margin-bottom: 96px;
     }
 `;
 
-const SectionHeading = styled.h3`
-    font-size: ${variables.FONT_SIZE.SMALL};
-    font-weight: ${variables.FONT_WEIGHT.DEMI_BOLD};
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    padding: 8px 0 18px;
-`;
-
-const Nodes = styled.div`
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-`;
-
 export const GuideCategory = () => {
-    const currentNode = useSelector(state => state.guide.currentNode);
+    const currentNode = useSelector(selectGuideCurrentNode);
     const language = useSelector(selectLanguage);
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
 
     if (!currentNode || currentNode.type === 'page') {
         return null;
@@ -60,27 +50,21 @@ export const GuideCategory = () => {
             <GuideContent>
                 {pages.length ? (
                     <Section>
-                        <SectionHeading>
-                            <Translation id="TR_GUIDE_ARTICLES" />
-                        </SectionHeading>
-                        <Nodes data-test="@guide/nodes">
+                        <CardList data-testid="@guide/nodes">
                             {pages.map(page => (
                                 <GuideNode key={page.id} node={page} />
                             ))}
-                        </Nodes>
+                        </CardList>
                     </Section>
                 ) : null}
-                {subcategories.length
-                    ? subcategories.map(subcategory =>
-                          subcategory.type === 'category' ? (
-                              <GuideCategories
-                                  key={subcategory.id}
-                                  node={subcategory}
-                                  label={getNodeTitle(subcategory, language)}
-                              />
-                          ) : null,
-                      )
-                    : null}
+                {subcategories.map(subcategory => (
+                    <GuideCategories
+                        key={subcategory.id}
+                        node={subcategory}
+                        label={getNodeTitle(subcategory, language)}
+                        variant="cardList"
+                    />
+                ))}
             </GuideContent>
         </GuideViewWrapper>
     );

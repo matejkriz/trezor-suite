@@ -1,20 +1,24 @@
-import { ReactNode } from 'react';
+import { type ReactNode } from 'react';
+
 import { ThemeProvider as SCThemeProvider } from 'styled-components';
-import { getThemeColors } from 'src/utils/suite/theme';
+
 import { getOsTheme } from 'src/utils/suite/env';
+import { getThemeColors } from 'src/utils/suite/theme';
+
 import GlobalStyle from './styles/GlobalStyle';
 
 type ThemeProviderProps = {
     children: ReactNode;
-    themeVariant?: 'light' | 'dark' | 'debug';
+    themeVariant?: 'light' | 'dark';
 };
 
 export const ThemeProvider = ({ children, themeVariant }: ThemeProviderProps) => {
-    const theme = getThemeColors({ variant: themeVariant ?? getOsTheme() });
+    const variant = themeVariant ?? getOsTheme();
+    const theme = getThemeColors({ variant });
 
     return (
-        <SCThemeProvider theme={theme}>
-            <GlobalStyle theme={theme} />
+        <SCThemeProvider theme={{ variant, ...theme }}>
+            <GlobalStyle theme={{ variant, ...theme }} />
             {children}
         </SCThemeProvider>
     );

@@ -24,6 +24,7 @@ export const getChangeAddressParameters = [
                             'addr1qq0w6pmkt9khgfud806ycw50zm7gvzkhlf0gpperulsrelhm2tfs2k368ger3n3pngluz0lympuh65rzarw5vux862dskal4js',
                         path: "m/1852'/1815'/0'/0/0",
                         transfers: 6,
+                        balance: '0',
                         received: '1003000000',
                         sent: '1003000000',
                     },
@@ -34,6 +35,7 @@ export const getChangeAddressParameters = [
                             'addr1qq2zpf6lqjs0lm0y624qv3a4j3w9x9ynaf5hkx8yqwgxl30m2tfs2k368ger3n3pngluz0lympuh65rzarw5vux862ds83yr28',
                         path: "m/1852'/1815'/0'/0/6",
                         transfers: 0,
+                        balance: '0',
                         received: '0',
                         sent: '0',
                     },
@@ -44,6 +46,7 @@ export const getChangeAddressParameters = [
                             'addr1qq43pzxxgfdvffrw5jnrej9840nuylaykv7uzcy56t02xv8m2tfs2k368ger3n3pngluz0lympuh65rzarw5vux862dszv2e9w',
                         path: "m/1852'/1815'/0'/1/0",
                         transfers: 30,
+                        balance: '0',
                         received: '10',
                         sent: '10',
                     },
@@ -52,6 +55,7 @@ export const getChangeAddressParameters = [
                             'addr1qpqz745252wmrd2gmttze7njgguzgrp2dk3e8756u7xdwxlm2tfs2k368ger3n3pngluz0lympuh65rzarw5vux862dscg0wdp',
                         path: "m/1852'/1815'/0'/1/1",
                         transfers: 0,
+                        balance: '0',
                         received: '0',
                         sent: '0',
                     },
@@ -219,12 +223,14 @@ export const formatMaxOutputAmount = [
             symbol: 'ada',
             tokens: [
                 {
+                    policyId: '57fca08abbaddee36da742a839f7d83a7e1d2419f1507fcbf3916522',
                     contract: '57fca08abbaddee36da742a839f7d83a7e1d2419f1507fcbf391652243484f43',
                     balance: '500000',
                     decimals: 5,
-                    name: 'asset1pwhywk7x54g739z3dqs245q62yu47vjh8gapjv',
+                    fingerprint: 'asset1pwhywk7x54g739z3dqs245q62yu47vjh8gapjv',
+                    name: 'Nuts',
                     symbol: 'NUTS',
-                    type: 'BLOCKFROST',
+                    standard: 'BLOCKFROST',
                 },
             ],
         },
@@ -249,12 +255,14 @@ export const formatMaxOutputAmount = [
             symbol: 'ada',
             tokens: [
                 {
-                    contract: '57fca08abbaddee36da742a839f7d83a7e1d2419f1507fcbf391652243484f43',
+                    policyId: '57fca08abbaddee36da742a839f7d83a7e1d2419f1507fcbf3916522',
                     balance: '500000',
                     decimals: 5,
-                    name: 'asset1pwhywk7x54g739z3dqs245q62yu47vjh8gapjv',
+                    fingerprint: 'asset1pwhywk7x54g739z3dqs245q62yu47vjh8gapjv',
+                    name: 'Nuts',
                     symbol: 'NUTS',
-                    type: 'BLOCKFROST',
+                    standard: 'BLOCKFROST',
+                    contract: '57fca08abbaddee36da742a839f7d83a7e1d2419f1507fcbf391652243484f43',
                 },
             ],
         },
@@ -411,184 +419,6 @@ export const prepareCertificates = [
     },
 ];
 
-export const parseAsset = [
-    {
-        description: 'asset with name',
-        hex: '57fca08abbaddee36da742a839f7d83a7e1d2419f1507fcbf391652243484f43',
-        result: {
-            assetNameInHex: '43484f43', // CHOC
-            policyId: '57fca08abbaddee36da742a839f7d83a7e1d2419f1507fcbf3916522',
-        },
-    },
-    {
-        description: 'asset without name',
-        hex: '6b8d07d69639e9413dd637a1a815a7323c69c86abbafb66dbfdb1aa7',
-        result: {
-            assetNameInHex: '',
-            policyId: '6b8d07d69639e9413dd637a1a815a7323c69c86abbafb66dbfdb1aa7',
-        },
-    },
-];
-
-export const isPoolOverSaturated = [
-    {
-        description: 'missing data',
-        pool: {
-            hex: 'abc',
-            bech32: 'pool1abc',
-        },
-        additionalStake: undefined,
-        result: false,
-    },
-    {
-        description: 'not saturated',
-        pool: {
-            hex: 'abc',
-            bech32: 'pool1abc',
-            live_stake: '0',
-            saturation: '60000000',
-        },
-        additionalStake: undefined,
-        result: false,
-    },
-    {
-        description: 'not saturated',
-        pool: {
-            hex: 'abc',
-            bech32: 'pool1abc',
-            live_stake: '10000000',
-            saturation: '60000000',
-        },
-        additionalStake: undefined,
-        result: false,
-    },
-    {
-        description: 'oversaturation',
-        // 83 % saturation
-        pool: {
-            hex: 'abc',
-            bech32: 'pool1abc',
-            live_stake: '50000000',
-            saturation: '60000000',
-        },
-        additionalStake: undefined,
-        result: true,
-    },
-    {
-        description: 'over the top oversaturation',
-        pool: {
-            hex: 'abc',
-            bech32: 'pool1abc',
-            live_stake: '70000000',
-            saturation: '60000000',
-        },
-        additionalStake: undefined,
-        result: true,
-    },
-    {
-        description: "balance can't cause oversaturation",
-        pool: {
-            hex: 'abc',
-            bech32: 'pool1abc',
-            live_stake: '30000000',
-            saturation: '60000000',
-        },
-        additionalStake: '10000000',
-        // 66 % including balance
-        result: false,
-    },
-    {
-        description: 'balance would cause oversaturation',
-        // 83 % saturation
-        pool: {
-            hex: 'abc',
-            bech32: 'pool1abc',
-            live_stake: '40000000',
-            saturation: '60000000',
-        },
-        additionalStake: '10000000',
-        result: true,
-    },
-];
-
-export const getStakePoolForDelegation = [
-    {
-        description: 'should pick "next" pool',
-        trezorPools: {
-            next: {
-                hex: 'a',
-                bech32: 'pool1a',
-                live_stake: '40000000',
-                saturation: '60000000',
-            },
-            pools: [
-                {
-                    hex: 'abc',
-                    bech32: 'pool1abc',
-                    live_stake: '0',
-                    saturation: '60000000',
-                },
-                {
-                    hex: 'a',
-                    bech32: 'pool1a',
-                    live_stake: '40000000',
-                    saturation: '60000000',
-                },
-                {
-                    hex: 'b',
-                    bech32: 'pool1a',
-                    live_stake: '50000000',
-                    saturation: '60000000',
-                },
-            ],
-        },
-        accountBalance: '0',
-        result: {
-            hex: 'a',
-            bech32: 'pool1a',
-            live_stake: '40000000',
-            saturation: '60000000',
-        },
-    },
-    {
-        description: 'should pick pool a',
-        trezorPools: {
-            next: {
-                hex: 'a',
-                bech32: 'pool1a',
-                live_stake: '40000000',
-                saturation: '60000000',
-            },
-            pools: [
-                {
-                    hex: 'a',
-                    bech32: 'pool1a',
-                    live_stake: '40000000',
-                    saturation: '60000000',
-                },
-                {
-                    hex: 'abc',
-                    bech32: 'pool1abc',
-                    live_stake: '10000000',
-                    saturation: '60000000',
-                },
-                {
-                    hex: 'b',
-                    bech32: 'pool1a',
-                    live_stake: '50000000',
-                    saturation: '60000000',
-                },
-            ],
-        },
-        accountBalance: '10000000',
-        result: {
-            hex: 'a',
-            bech32: 'pool1a',
-            live_stake: '40000000',
-            saturation: '60000000',
-        },
-    },
-];
 export const getDelegationCertificates = [
     {
         description: 'without registration',
@@ -616,6 +446,76 @@ export const getDelegationCertificates = [
                 path: 'path',
                 pool: 'abc',
                 type: 2,
+            },
+        ],
+    },
+];
+export const getVotingCertificates = [
+    {
+        description: 'delegating votes to keyHash',
+        stakingPath: 'path',
+        dRep: {
+            type: 0, //keyHash
+            hex: 'hex',
+        },
+        result: [
+            {
+                type: 9,
+                path: 'path',
+                dRep: {
+                    type: 0,
+                    keyHash: 'hex',
+                },
+            },
+        ],
+    },
+    {
+        description: 'delegating votes to scriptHash',
+        stakingPath: 'path',
+        dRep: {
+            type: 1, // scriptHash
+            hex: 'hex',
+        },
+        result: [
+            {
+                type: 9,
+                path: 'path',
+                dRep: {
+                    type: 1,
+                    scriptHash: 'hex',
+                },
+            },
+        ],
+    },
+    {
+        description: 'delegating votes abstain',
+        stakingPath: 'path',
+        dRep: {
+            type: 2, // abstain
+        },
+        result: [
+            {
+                type: 9,
+                path: 'path',
+                dRep: {
+                    type: 2,
+                },
+            },
+        ],
+    },
+    {
+        description: 'delegating votes no confidence',
+        stakingPath: 'path',
+        dRep: {
+            type: 3, // no confidence
+        },
+        result: [
+            {
+                type: 9,
+                path: 'path',
+                dRep: {
+                    type: 3,
+                },
             },
         ],
     },

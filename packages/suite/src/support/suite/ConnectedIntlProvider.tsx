@@ -1,9 +1,17 @@
-import { useState, useEffect, ReactNode } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { IntlProvider } from 'react-intl';
-import enMessages from '@trezor/suite-data/files/translations/en.json';
-import { useSelector } from 'src/hooks/suite/useSelector';
+
+import enMessages from '@suite/app-assets/files/translations/en-US.json';
+import { messages as definedMessages } from '@suite/intl';
+import { selectLanguage, selectShowTranslationKeys } from '@suite/settings';
+import type { Locale } from '@suite-common/suite-types';
 import { isDevEnv } from '@suite-common/suite-utils';
-import type { Locale } from 'src/config/suite/languages';
+
+import { useSelector } from 'src/hooks/suite';
+
+import { getEffectiveIntlMessages } from './getEffectiveIntlMessages';
+
+const DEFINED_MESSAGE_IDS = Object.keys(definedMessages);
 
 const useFetchMessages = (locale: Locale) => {
     const [messages, setMessages] = useState<{ [key: string]: any }>({});
@@ -12,9 +20,11 @@ const useFetchMessages = (locale: Locale) => {
         let active = true;
         const fetchMessages = async () => {
             const messages =
-                locale === 'en'
+                locale === 'en-US'
                     ? {}
-                    : await import(`@trezor/suite-data/files/translations/${locale}.json`)
+                    : await import(
+                          /* webpackChunkName: "translations/[request]" */ `@suite/app-assets/files/translations/${locale}.json`
+                      )
                           .then(res => res.default)
                           .catch(() => ({}));
             if (!active) return;
@@ -35,13 +45,23 @@ interface ConnectedIntlProviderProps {
 }
 
 export const ConnectedIntlProvider = ({ children }: ConnectedIntlProviderProps) => {
-    const locale = useSelector(state => state.suite.settings.language);
+    const locale = useSelector(selectLanguage);
+    const showTranslationKeys = useSelector(selectShowTranslationKeys);
     const messages = useFetchMessages(locale);
+    const effectiveMessages = useMemo(
+        () =>
+            getEffectiveIntlMessages({
+                localizedMessages: messages,
+                definedMessageIds: DEFINED_MESSAGE_IDS,
+                showTranslationKeys,
+            }),
+        [messages, showTranslationKeys],
+    );
 
     return (
         <IntlProvider
             locale={locale}
-            messages={messages}
+            messages={effectiveMessages}
             onError={err => {
                 if (isDevEnv) {
                     // ignore, this expected

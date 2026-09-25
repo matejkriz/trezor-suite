@@ -1,10 +1,10 @@
-import { ReactNode } from 'react';
+import { type ReactNode } from 'react';
 
 import { G } from '@mobily/ts-belt';
 
+import { Box } from './Box';
 import { VStack } from './Stack';
 import { Text } from './Text';
-import { Box } from './Box';
 
 type HeaderedProps = {
     header: ReactNode;
@@ -14,16 +14,14 @@ type HeaderedProps = {
 type HeaderContainerProps = { children: ReactNode };
 
 const HeaderContainer = ({ children }: HeaderContainerProps) => (
-    <Box paddingHorizontal="medium">
-        {G.isString(children) ? <Text>{children}</Text> : children}
-    </Box>
+    <Box paddingHorizontal="sp16">{G.isString(children) ? <Text>{children}</Text> : children}</Box>
 );
 
 /**
  * Adds a header to child component with app-wide padding styles.
  */
 export const Headered = ({ children, header }: HeaderedProps) => (
-    <VStack spacing="medium">
+    <VStack spacing="sp16">
         <HeaderContainer>{header}</HeaderContainer>
         {children}
     </VStack>

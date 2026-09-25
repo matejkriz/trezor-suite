@@ -1,32 +1,48 @@
 import { useEffect } from 'react';
-import { Modal, Pressable } from 'react-native';
+import { Modal, StyleSheet } from 'react-native';
 import Animated from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-import { Button, Card, VStack, useBottomSheetAnimation, Pictogram } from '@suite-native/atoms';
+import {
+    AnimatedPressable,
+    Box,
+    Button,
+    Card,
+    Pictogram,
+    TitleHeader,
+    VStack,
+    useAlertAnimation,
+} from '@suite-native/atoms';
+import { getScreenHeight, getScreenWidth } from '@trezor/env-utils';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
 
-import { useShakeAnimation } from '../useShakeAnimation';
-import { Alert } from '../alertsAtoms';
+import { type Alert } from '../alertsAtoms';
 import { useAlert } from '../useAlert';
+import { useShakeAnimation } from '../useShakeAnimation';
 
 type AlertSheetProps = {
     alert: Alert;
 };
 
-const alertSheetContainerStyle = prepareNativeStyle(utils => ({
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: utils.spacings.extraLarge,
-    paddingHorizontal: utils.spacings.large,
-    paddingVertical: utils.spacings.extraLarge,
-    marginBottom: utils.spacings.extraLarge,
-    marginHorizontal: utils.spacings.small,
-    borderRadius: utils.borders.radii.medium,
-    ...utils.boxShadows.small,
-}));
+const SCREEN_WIDTH = getScreenWidth();
+const SCREEN_HEIGHT = getScreenHeight();
 
-const alertSheetContentStyle = prepareNativeStyle(_ => ({
+const alertSheetContainerStyle = prepareNativeStyle<{ bottomInset: number }>(
+    (utils, { bottomInset }) => ({
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: utils.spacings.sp24,
+        paddingVertical: utils.spacings.sp32,
+        marginHorizontal: utils.spacings.sp16,
+        borderRadius: utils.borders.radii.r16,
+        marginBottom: bottomInset + utils.spacings.sp16,
+        ...utils.boxShadows.small,
+    }),
+);
+
+const alertSheetContentStyle = prepareNativeStyle(utils => ({
     width: '100%',
+    gap: utils.spacings.sp32,
 }));
 
 const shakeTriggerStyle = prepareNativeStyle(_ => ({
@@ -35,20 +51,23 @@ const shakeTriggerStyle = prepareNativeStyle(_ => ({
 }));
 
 const sheetOverlayStyle = prepareNativeStyle(_ => ({
-    flex: 1,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+    ...StyleSheet.absoluteFill,
 }));
 
 export const AlertSheet = ({ alert }: AlertSheetProps) => {
     const { hideAlert } = useAlert();
     const { applyStyle } = useNativeStyles();
     const { runShakeAnimation, shakeAnimatedStyle } = useShakeAnimation();
+    const { bottom } = useSafeAreaInsets();
 
     const {
         animatedSheetWithOverlayStyle,
         animatedSheetWrapperStyle,
         closeSheetAnimated,
         openSheetAnimated,
-    } = useBottomSheetAnimation({ onClose: hideAlert, isVisible: true });
+    } = useAlertAnimation({ onClose: hideAlert });
 
     useEffect(() => {
         openSheetAnimated();
@@ -56,67 +75,103 @@ export const AlertSheet = ({ alert }: AlertSheetProps) => {
 
     const {
         title,
+        textAlign = 'center',
+        titleSpacing,
         description,
         icon,
         pictogramVariant,
         onPressPrimaryButton,
         primaryButtonTitle,
+        primaryButtonIconLeft,
+        primaryButtonIconRight,
         onPressSecondaryButton,
         secondaryButtonTitle,
-        primaryButtonVariant = 'primary',
+        primaryButtonColorProps = {
+            intent: 'brand',
+            priority: 'primary',
+        },
+        secondaryButtonColorProps = {
+            intent: 'neutral',
+            priority: 'secondary',
+        },
         appendix,
+        testID,
+        isClosableByOutsidePress = false,
     } = alert;
 
-    const handlePressPrimaryButton = async () => {
+    const handlePressOutside = async () => {
+        if (!isClosableByOutsidePress) {
+            runShakeAnimation();
+
+            return;
+        }
+
         await closeSheetAnimated();
+    };
+
+    const handlePressPrimaryButton = async () => {
         onPressPrimaryButton?.();
+        await closeSheetAnimated();
     };
 
     const handlePressSecondaryButton = async () => {
-        await closeSheetAnimated();
         onPressSecondaryButton?.();
+        await closeSheetAnimated();
     };
 
     return (
-        <Modal transparent visible={!!alert}>
-            <Animated.View style={[animatedSheetWithOverlayStyle, applyStyle(sheetOverlayStyle)]}>
-                <Pressable onPress={runShakeAnimation} style={applyStyle(shakeTriggerStyle)}>
-                    <Animated.View
-                        style={[animatedSheetWrapperStyle, shakeAnimatedStyle]}
-                        onStartShouldSetResponder={_ => true} // Stop the shake event trigger propagation.
-                    >
-                        <Card style={applyStyle(alertSheetContainerStyle)}>
-                            <VStack style={applyStyle(alertSheetContentStyle)} spacing="large">
-                                <Pictogram
-                                    title={title}
-                                    variant={pictogramVariant}
-                                    subtitle={description}
-                                    icon={icon}
-                                />
+        <Modal transparent visible={!!alert} testID={testID}>
+            <Animated.View style={[applyStyle(sheetOverlayStyle), animatedSheetWithOverlayStyle]} />
+            <AnimatedPressable
+                onPress={handlePressOutside}
+                style={[animatedSheetWrapperStyle, applyStyle(shakeTriggerStyle)]}
+            >
+                <Animated.View
+                    style={shakeAnimatedStyle}
+                    onStartShouldSetResponder={_ => true} // Stop the shake event trigger propagation.
+                >
+                    <Card style={applyStyle(alertSheetContainerStyle, { bottomInset: bottom })}>
+                        <VStack style={applyStyle(alertSheetContentStyle)}>
+                            {pictogramVariant && (
+                                <Box alignItems="center">
+                                    <Pictogram variant={pictogramVariant} icon={icon} />
+                                </Box>
+                            )}
+                            <VStack spacing="sp20">
+                                {(title || description) && (
+                                    <TitleHeader
+                                        title={title}
+                                        subtitle={description}
+                                        textAlign={textAlign}
+                                        titleSpacing={titleSpacing}
+                                    />
+                                )}
                                 {appendix}
-                                <VStack spacing="medium">
-                                    <Button
-                                        size="large"
-                                        colorScheme={primaryButtonVariant}
-                                        onPress={handlePressPrimaryButton}
-                                    >
-                                        {primaryButtonTitle}
-                                    </Button>
-                                    {secondaryButtonTitle && (
-                                        <Button
-                                            size="large"
-                                            colorScheme="tertiaryElevation1"
-                                            onPress={handlePressSecondaryButton}
-                                        >
-                                            {secondaryButtonTitle}
-                                        </Button>
-                                    )}
-                                </VStack>
                             </VStack>
-                        </Card>
-                    </Animated.View>
-                </Pressable>
-            </Animated.View>
+                            <VStack spacing="sp12">
+                                <Button
+                                    {...primaryButtonColorProps}
+                                    onPress={handlePressPrimaryButton}
+                                    iconLeft={primaryButtonIconLeft}
+                                    iconRight={primaryButtonIconRight}
+                                    testID="@alert-sheet/primary-button"
+                                >
+                                    {primaryButtonTitle}
+                                </Button>
+                                {secondaryButtonTitle && (
+                                    <Button
+                                        {...secondaryButtonColorProps}
+                                        onPress={handlePressSecondaryButton}
+                                        testID="@alert-sheet/secondary-button"
+                                    >
+                                        {secondaryButtonTitle}
+                                    </Button>
+                                )}
+                            </VStack>
+                        </VStack>
+                    </Card>
+                </Animated.View>
+            </AnimatedPressable>
         </Modal>
     );
 };

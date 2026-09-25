@@ -1,55 +1,74 @@
-import { useState } from 'react';
+import { useSelector } from 'react-redux';
 
 import { useNavigation } from '@react-navigation/native';
 
-import { DeviceManagerScreenHeader } from '@suite-native/device-manager';
-import { AccountsList, SearchableAccountsListScreenHeader } from '@suite-native/accounts';
+import { useServices } from '@suite-common/dependency-injection';
+import { AccountsListWithFilter, type OnSelectAccount } from '@suite-native/accounts';
+import { events, injectNativeAnalytics } from '@suite-native/analytics';
+import { selectHasFirmwareAuthenticityCheckHardFailedForSelectedDevice } from '@suite-native/device';
+import { Translation } from '@suite-native/intl';
 import {
-    Screen,
-    ReceiveStackParamList,
+    type ReceiveStackParamList,
     ReceiveStackRoutes,
-    RootStackRoutes,
-    StackToStackCompositeNavigationProps,
-    RootStackParamList,
+    Screen,
+    type StackNavigationProps,
+    useNavigateToInitialScreen,
 } from '@suite-native/navigation';
-import { AccountKey, TokenAddress } from '@suite-common/wallet-types';
 
-type NavigationProps = StackToStackCompositeNavigationProps<
+import { ReceiveBlockedDeviceCompromisedScreen } from './ReceiveBlockedDeviceCompromisedScreen';
+
+type NavigationProp = StackNavigationProps<
     ReceiveStackParamList,
-    ReceiveStackRoutes.ReceiveAccounts,
-    RootStackParamList
+    ReceiveStackRoutes.ReceiveAccounts
 >;
 
 export const ReceiveAccountsScreen = () => {
-    const navigation = useNavigation<NavigationProps>();
+    const navigateToInitialScreen = useNavigateToInitialScreen();
+    const { analytics } = useServices(injectNativeAnalytics);
+    const navigation = useNavigation<NavigationProp>();
+    const hasFirmwareAuthenticityCheckHardFailed = useSelector(
+        selectHasFirmwareAuthenticityCheckHardFailedForSelectedDevice,
+    );
 
-    const navigateToReceiveScreen = (accountKey: AccountKey, tokenContract?: TokenAddress) =>
-        navigation.navigate(RootStackRoutes.ReceiveModal, {
-            accountKey,
-            tokenContract,
-            closeActionType: 'back',
+    if (hasFirmwareAuthenticityCheckHardFailed) return <ReceiveBlockedDeviceCompromisedScreen />;
+
+    const navigateToReceiveScreen: OnSelectAccount = ({ account, tokenAddress }) => {
+        analytics.report({
+            type: events.receiveOptionsScreenEvent.name,
+            payload: { option: 'account' },
         });
 
-    const [accountsFilterValue, setAccountsFilterValue] = useState<string>('');
+        navigation.navigate(ReceiveStackRoutes.ReceiveAddress, {
+            accountKey: account.key,
+            tokenContract: tokenAddress,
+            closeActionType: 'back',
+        });
+    };
 
-    const handleFilterChange = (value: string) => {
-        setAccountsFilterValue(value);
+    const handleClose = () => {
+        analytics.report({
+            type: events.receiveOptionsScreenEvent.name,
+            payload: { option: 'close' },
+        });
+        navigateToInitialScreen();
+    };
+
+    const handleAddAccount = () => {
+        analytics.report({
+            type: events.receiveOptionsScreenEvent.name,
+            payload: { option: 'addAccount' },
+        });
     };
 
     return (
-        <Screen
-            screenHeader={<DeviceManagerScreenHeader />}
-            subheader={
-                <SearchableAccountsListScreenHeader
-                    title="Receive to"
-                    onSearchInputChange={handleFilterChange}
-                    flowType="receive"
-                />
-            }
-        >
-            <AccountsList
+        <Screen isScrollable={false}>
+            <AccountsListWithFilter
+                title={<Translation id="moduleReceive.receiveTitle" />}
                 onSelectAccount={navigateToReceiveScreen}
-                filterValue={accountsFilterValue}
+                flowType="receive"
+                closeActionType="close"
+                closeAction={handleClose}
+                onAddAccount={handleAddAccount}
             />
         </Screen>
     );

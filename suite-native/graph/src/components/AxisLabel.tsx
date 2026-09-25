@@ -3,9 +3,11 @@ import { Dimensions, View } from 'react-native';
 
 import { useFocusEffect } from '@react-navigation/native';
 
-import { useDiscreetMode } from '@suite-native/atoms';
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-import { FiatAmountFormatter } from '@suite-native/formatters';
+import { useDiscreetMode } from '@suite-common/discreet-mode';
+import { asBaseCurrencyAmount } from '@suite-common/wallet-types';
+import { BaseCurrencyAmountFormatter } from '@suite-native/formatters';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
+import { BigNumber } from '@trezor/utils';
 
 type AxisLabelProps = {
     x: number;
@@ -31,7 +33,7 @@ const axisLabelStyle = prepareNativeStyle<AxisLabelStyleProps>(
             condition: isOverflowing,
             style: {
                 left: undefined,
-                right: spacings.small,
+                right: spacings.sp8,
             },
         },
     }),
@@ -46,7 +48,7 @@ export const AxisLabel = ({ x, value }: AxisLabelProps) => {
     const handleLayoutOverflow = useCallback(() => {
         if (viewRef.current) {
             viewRef.current.measureInWindow((viewX, _, viewWidth) => {
-                const graphHorizontalPadding = utils.spacings.small;
+                const graphHorizontalPadding = utils.spacings.sp8;
                 // The right most pixel of the axis label is overflowing the graph width.
                 if (viewX + viewWidth + graphHorizontalPadding > SCREEN_WIDTH) {
                     setIsOverflowing(true);
@@ -71,7 +73,11 @@ export const AxisLabel = ({ x, value }: AxisLabelProps) => {
             onLayout={handleLayoutOverflow}
             ref={viewRef}
         >
-            <FiatAmountFormatter value={String(value)} variant="label" color="textDisabled" />
+            <BaseCurrencyAmountFormatter
+                value={asBaseCurrencyAmount(new BigNumber(value))}
+                variant="body-xs"
+                color="contentDisabled"
+            />
         </View>
     );
 };

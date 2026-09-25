@@ -4,42 +4,62 @@ set -euxo pipefail
 
 echo $#
 
-PARENT_PATH=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )
+get_abs_path() {
+  echo "$( cd -- "$(dirname "$1")" >/dev/null 2>&1 ; pwd -P )"
+}
 
-SRC="../../submodules/trezor-common/protob"
-DIST="."
+SCRIPTS_PATH=$(get_abs_path "${BASH_SOURCE[0]}")
 
-if [[ $# -ne 0 && $# -ne 2 ]]
+REPO_BRANCH="main"
+REPO_PATH=$(get_abs_path "$SCRIPTS_PATH/../../../../.")/trezor-firmware-probuf-update
+
+if [[ $# -ne 0 && $# -ne 1 ]]
     then
-        echo "must provide either 2 or 0 arguments. $# provided"
+        echo "must provide either 1 or 0 arguments. $# provided"
         exit 1
 fi
 
-if [[ $# -eq 2 ]]
+if [[ $# -eq 1 ]]
     then
-        SRC=$1
-        DIST=$2
+        REPO_BRANCH=$1
 fi
 
-# BUILD combined messages.proto file from protobuf files
-# this code was copied from ./submodules/trezor-common/protob Makekile
-# clear protobuf syntax and remove unknown values to be able to work with proto2js
-echo 'syntax = "proto2";' > "$DIST"/messages.proto
-echo 'import "google/protobuf/descriptor.proto";' >> "$DIST"/messages.proto
-echo "Build proto file from $SRC"
-grep -hv -e '^import ' -e '^syntax' -e '^package' -e 'option java_' "$SRC"/messages*.proto \
-| sed 's/ hw\.trezor\.messages\.common\./ /' \
-| sed 's/ common\./ /' \
-| sed 's/ ethereum_definitions\./ /' \
-| sed 's/ management\./ /' \
-| sed 's/^option /\/\/ option /' \
-| grep -v '    reserved '>> "$DIST"/messages.proto
+if test -d "$REPO_PATH"; then
+    echo "$REPO_PATH directory exists"
+else
+    echo "$REPO_PATH directory does not exist"
+    git clone https://github.com/trezor/trezor-firmware.git "$REPO_PATH"
+fi
 
-# BUILD messages.json from message.proto
-# pbjs command is added by protobufjs-cli package
-yarn pbjs -t json -p "$DIST" -o "$DIST"/messages.json --keep-case messages.proto
-rm "$DIST"/messages.proto
+cd "$REPO_PATH"
+git fetch origin
+git checkout "$REPO_BRANCH"
+git reset "origin/$REPO_BRANCH" --hard
+cd ..
 
-cd "$PARENT_PATH"
+cd "$SCRIPTS_PATH"
 
-node ./protobuf-types.js typescript
+# copy proto files to monorepo context
+rm -rf ./build
+mkdir -p ./build
+cp  "$REPO_PATH"/common/protob/*.proto ./build
+
+# remove unused files
+rm -f ./build/messages-{webauthn,benchmark,nem}.proto
+
+# build `@bufbuild`` definitions
+buf generate
+cd ..
+
+# clear all generated comments and empty lines
+perl -0777 -pi -e 's{/\*.*?\*/}{}gs; s/^\s*\n//mg' src/definitions/*.js
+
+# generated source JS is inside a package with "type": "module", so relative JS imports
+# need explicit extensions for strict ESM resolution in bundlers
+perl -pi -e 's{from (["'"'"'])(\.\/[^"'"'"']+)\1;}{from $1$2.js$1;}g' src/definitions/*.js
+
+# enable type-aware rules so the fix matches what CI enforces
+ESLINT_RUN_EXPENSIVE_CHECKS=true yarn workspace @trezor/protobuf g:eslint --fix src/definitions/*
+yarn workspace @trezor/protobuf g:prettier --write src/definitions/*
+
+mv src/definitions/messages-thp_types.ts ../protocol/src/protocol-thp/messages/protobufTypes.ts

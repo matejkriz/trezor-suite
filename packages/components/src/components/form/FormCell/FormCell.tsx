@@ -1,0 +1,109 @@
+import { type ReactNode, useState } from 'react';
+
+import styled from 'styled-components';
+
+import {
+    type FrameProps,
+    type FramePropsKeys,
+    pickAndPrepareFrameProps,
+    withFrameProps,
+} from '../../../utils/frameProps';
+import { type TransientProps } from '../../../utils/transientProps';
+import { Column } from '../../Flex/Flex';
+import { type IconComponent } from '../../Icon/Icon';
+import { BottomText } from '../BottomText';
+import { TopAddons } from '../TopAddons';
+
+export const allowedFormCellFrameProps = [
+    'margin',
+    'width',
+    'maxWidth',
+    'flex',
+] as const satisfies FramePropsKeys[];
+type AllowedFrameProps = Pick<FrameProps, (typeof allowedFormCellFrameProps)[number]>;
+
+const formCellProps = [
+    'labelHoverRight',
+    'labelLeft',
+    'labelRight',
+    'bottomText',
+    'bottomTextIconComponent',
+    'bottomTextIcon',
+    'hasError',
+    'isDisabled',
+    ...allowedFormCellFrameProps,
+] as const satisfies (keyof FormCellProps)[];
+
+export const pickFormCellProps = (props: Record<string, any>): Partial<FormCellProps> =>
+    formCellProps.reduce(
+        (acc: Partial<FormCellProps>, prop: string) => ({ ...acc, [prop]: props[prop] }),
+        {},
+    );
+
+const Wrapper = styled.div<TransientProps<AllowedFrameProps>>`
+    width: 100%;
+
+    ${withFrameProps}
+`;
+
+export type FormCellProps = AllowedFrameProps & {
+    labelHoverRight?: React.ReactNode;
+    labelLeft?: React.ReactNode;
+    labelRight?: React.ReactNode;
+    bottomText?: ReactNode;
+    bottomTextIconComponent?: ReactNode;
+    bottomTextIcon?: IconComponent;
+    hasError?: boolean;
+    isDisabled?: boolean;
+    children: ReactNode;
+    'data-testid'?: string;
+    'data-component'?: string;
+};
+
+export const FormCell = ({
+    children,
+    labelLeft,
+    labelRight,
+    labelHoverRight,
+    bottomText,
+    bottomTextIconComponent,
+    bottomTextIcon,
+    hasError,
+    isDisabled,
+    'data-testid': dataTestId,
+    'data-component': dataComponent = 'FormCell',
+    ...rest
+}: FormCellProps) => {
+    const [isHovered, setIsHovered] = useState(false);
+    const frameProps = pickAndPrepareFrameProps(rest, allowedFormCellFrameProps);
+
+    return (
+        <Wrapper
+            {...frameProps}
+            data-component={dataComponent}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+        >
+            <Column gap={8}>
+                <TopAddons
+                    isHovered={isHovered}
+                    addonLeft={labelLeft}
+                    hoverAddonRight={labelHoverRight}
+                    addonRight={labelRight}
+                />
+                {children}
+                {bottomText && (
+                    <BottomText
+                        hasError={hasError}
+                        isDisabled={isDisabled}
+                        iconComponent={bottomTextIconComponent}
+                        icon={bottomTextIcon}
+                        data-testid={dataTestId ? `${dataTestId}/bottom-text` : undefined}
+                    >
+                        {bottomText}
+                    </BottomText>
+                )}
+            </Column>
+        </Wrapper>
+    );
+};

@@ -1,0 +1,41 @@
+{
+    "name": "@suite-native/suite-sync",
+    "version": "1.0.0",
+    "private": true,
+    "license": "See LICENSE.md in repo root",
+    "sideEffects": false,
+    "type": "module",
+    "main": "src/index",
+    "scripts": {
+        "depcheck": "yarn g:depcheck",
+        "type-check": "yarn g:tsc --build",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'"
+    },
+    "dependencies": {
+        "@evolu/common": "8.10.0",
+        "@evolu/react-native": "16.0.2",
+        "@react-navigation/native": "7.1.31",
+        "@reduxjs/toolkit": "2.12.0",
+        "@suite-common/delegated-identity-key-types": "workspace:*",
+        "@suite-common/dependency-injection": "workspace:*",
+        "@suite-common/device": "workspace:*",
+        "@suite-common/message-system": "workspace:*",
+        "@suite-common/platform-encryption": "workspace:*",
+        "@suite-common/suite-sync": "workspace:*",
+        "@suite-common/suite-sync-evolu": "workspace:*",
+        "@suite-common/suite-sync-quota-manager": "workspace:*",
+        "@suite-common/suite-sync-storage": "workspace:*",
+        "@suite-common/suite-sync-types": "workspace:*",
+        "@suite-native/alerts": "workspace:*",
+        "@suite-native/intl": "workspace:*",
+        "@suite-native/navigation": "workspace:*",
+        "@suite-native/toasts": "workspace:*",
+        "@trezor/connect": "workspace:*",
+        "@trezor/type-utils": "workspace:*",
+        "expo": "~57.0.8",
+        "expo-sqlite": "~57.0.1",
+        "react": "19.2.3",
+        "react-native": "0.86.0",
+        "react-redux": "9.3.0"
+    }
+}

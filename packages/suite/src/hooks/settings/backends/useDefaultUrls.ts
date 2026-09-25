@@ -1,21 +1,18 @@
-import { useState, useEffect } from 'react';
-import TrezorConnect, { BlockchainLink } from '@trezor/connect';
-import type { Network } from 'src/types/wallet';
+import { desktopQueryKeys, useQuery } from '@suite-common/react-query';
+import { type NetworkSymbol } from '@suite-common/wallet-config';
+import TrezorConnect from '@trezor/connect';
 
-export const useDefaultUrls = (
-    coin: Network['symbol'],
-): { defaultUrls: string[]; isLoading: boolean } => {
-    const [link, setLink] = useState<BlockchainLink>();
-    const [isLoading, setIsLoading] = useState(false);
-    useEffect(() => {
-        setIsLoading(true);
-        TrezorConnect.getCoinInfo({ coin }).then(result => {
-            if (result.success) {
-                setLink(result.payload.blockchainLink);
+export const useDefaultUrls = (symbol: NetworkSymbol) =>
+    useQuery({
+        queryKey: desktopQueryKeys.defaultUrls(symbol),
+        queryFn: async () => {
+            const result = await TrezorConnect.getCoinInfo({ coin: symbol });
+
+            if (!result.success) {
+                throw new Error('Failed to get coin info');
             }
-            setIsLoading(false);
-        });
-    }, [coin]);
 
-    return { defaultUrls: link?.url ?? [], isLoading };
-};
+            return result.payload.blockchainLink?.url ?? [];
+        },
+        initialData: [],
+    });

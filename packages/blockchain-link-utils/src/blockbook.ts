@@ -1,28 +1,36 @@
-import BigNumber from 'bignumber.js';
-
 import type {
-    Utxo,
-    Transaction,
-    TokenTransfer,
-    TokenInfo,
-    Address,
     AccountAddresses,
     AccountInfo,
+    Address,
+    BlockbookAccountInfo,
+    BlockbookAccountUtxo,
+    BlockbookTransaction,
     InternalTransfer,
-} from '@trezor/blockchain-link-types';
-import type {
-    ServerInfo,
-    AccountInfo as BlockbookAccountInfo,
-    AccountUtxo as BlockbookAccountUtxo,
-    Transaction as BlockbookTransaction,
+    BlockbookServerInfo as ServerInfo,
+    TokenInfo,
+    TokenTransfer,
+    Transaction,
+    Utxo,
     VinVout,
-} from '@trezor/blockchain-link-types/src/blockbook';
+} from '@trezor/blockchain-link-types';
+import { BigNumber } from '@trezor/utils/src/bigNumber';
 
-import { Addresses, filterTargets, enhanceVinVout, sumVinVout, transformTarget } from './utils';
+import {
+    type Addresses,
+    enhanceVinVout,
+    filterShadowedPendingTxsByNonce,
+    filterTargets,
+    sumVinVout,
+    transformTarget,
+} from './utils';
+
+// ERC-20 default when a token does not expose decimals(); avoids breaking amount formatting.
+const DEFAULT_TOKEN_DECIMALS = 18;
 
 export const transformServerInfo = (payload: ServerInfo) => ({
     name: payload.name,
     shortcut: payload.shortcut,
+    network: payload.network ?? payload.shortcut, // some instances don't send network (e.g. regtest)
     testnet: payload.testnet,
     version: payload.version,
     decimals: payload.decimals,
@@ -55,16 +63,16 @@ export const filterTokenTransfers = (
         .filter(transfer => {
             if (transfer && typeof transfer === 'object') {
                 return (
-                    (transfer.from && all.indexOf(transfer.from) >= 0) ||
-                    (transfer.to && all.indexOf(transfer.to) >= 0)
+                    (transfer.from && all.includes(transfer.from)) ||
+                    (transfer.to && all.includes(transfer.to))
                 );
             }
 
             return false;
         })
         .map(transfer => {
-            const isIncoming = transfer.from && all.indexOf(transfer.from) >= 0;
-            const isOutgoing = transfer.to && all.indexOf(transfer.to) >= 0;
+            const isIncoming = transfer.from && all.includes(transfer.from);
+            const isOutgoing = transfer.to && all.includes(transfer.to);
 
             let type: TokenTransfer['type'];
             if (isIncoming && isOutgoing) {
@@ -78,14 +86,31 @@ export const filterTokenTransfers = (
             const tokenTransfer = {
                 ...transfer,
                 type,
-                decimals: transfer.decimals || 0,
+                decimals: transfer.decimals || DEFAULT_TOKEN_DECIMALS,
                 amount: transfer.value || '',
-                standard: transfer.type,
+                standard: transfer.standard,
             };
             delete tokenTransfer.value;
 
             return tokenTransfer;
         });
+};
+
+const ethereumStakingAddresses = {
+    poolInstance: [
+        '0xD523794C879D9eC028960a231F866758e405bE34',
+        '0xAFA848357154a6a624686b348303EF9a13F63264',
+    ],
+    withdrawTreasury: [
+        '0x19449f0f696703Aa3b1485DfA2d855F33659397a',
+        '0x66cb3AeD024740164EBcF04e292dB09b5B63A2e1',
+    ],
+};
+
+export const isEthereumStakingInternalTransfer = (from: string, to: string) => {
+    const { poolInstance, withdrawTreasury } = ethereumStakingAddresses;
+
+    return poolInstance.includes(from) && withdrawTreasury.includes(to);
 };
 
 export const filterEthereumInternalTransfers = (
@@ -102,7 +127,11 @@ export const filterEthereumInternalTransfers = (
     return (
         internalTransfers
             // type 1 and 2 are filtered out (contract creating and destruction)
-            .filter(({ type, from, to }) => type === 0 && [from, to].includes(address))
+            .filter(
+                ({ type, from, to }) =>
+                    type === 0 &&
+                    ([from, to].includes(address) || isEthereumStakingInternalTransfer(from, to)),
+            )
             .map(({ from, to, value }) => {
                 const isIncoming = from === address;
                 const isOutgoing = to === address;
@@ -112,8 +141,11 @@ export const filterEthereumInternalTransfers = (
                     type = 'self';
                 } else if (isIncoming) {
                     type = 'sent';
-                } else {
+                } else if (isOutgoing) {
                     type = 'recv';
+                } else {
+                    // For transfers where both 'from' and 'to' addresses are not the account address (like instant staking)
+                    type = 'external';
                 }
 
                 return {
@@ -135,6 +167,46 @@ type TransformAddresses = {
 
 export const isTxFailed = (tx: BlockbookTransaction) =>
     !(!tx.blockHeight || tx.blockHeight < 0) && tx.ethereumSpecific?.status === 0;
+
+const getTransactionFee = (tx: BlockbookTransaction): string => {
+    if (tx.chainExtraData?.payloadType === 'tron') {
+        return tx.chainExtraData.payload?.totalFee || tx.fees;
+    }
+    if (tx.ethereumSpecific && !tx.ethereumSpecific.gasUsed && tx.ethereumSpecific.gasLimit) {
+        return new BigNumber(
+            tx.ethereumSpecific.maxFeePerGas ?? tx.ethereumSpecific.gasPrice ?? '0',
+        )
+            .times(tx.ethereumSpecific.gasLimit)
+            .toString();
+    }
+
+    return tx.fees;
+};
+
+const getTronStakingClassification = (
+    tx: BlockbookTransaction,
+): { type: Transaction['type']; amount: string } | undefined => {
+    if (tx.chainExtraData?.payloadType !== 'tron') return undefined;
+
+    const { contractType, stakeAmount, unstakeAmount, claimedVoteReward } =
+        tx.chainExtraData.payload ?? {};
+
+    switch (contractType) {
+        case 'FreezeBalanceContract':
+        case 'FreezeBalanceV2Contract':
+            return { type: 'sent', amount: stakeAmount ?? '0' };
+        case 'UnfreezeBalanceContract':
+        case 'UnfreezeBalanceV2Contract':
+        case 'VoteWitnessContract':
+            return { type: 'sent', amount: '0' };
+        case 'WithdrawExpireUnfreezeContract':
+            return { type: 'recv', amount: unstakeAmount ?? '0' };
+        case 'WithdrawBalanceContract':
+            return { type: 'recv', amount: claimedVoteReward ?? '0' };
+        default:
+            return undefined;
+    }
+};
 
 export const transformTransaction = (
     tx: BlockbookTransaction,
@@ -164,7 +236,7 @@ export const transformTransaction = (
     const myInternalTransfers = filterEthereumInternalTransfers(descriptor, tx.ethereumSpecific);
 
     const isNonChangeOutput = (o: VinVout) =>
-        addresses ? filterTargets(addresses.change, tx.vout).indexOf(o) < 0 : true;
+        addresses ? !filterTargets(addresses.change, tx.vout).includes(o) : true;
 
     const isNonZero = (o: VinVout) => o.value && o.value !== '0';
 
@@ -172,7 +244,16 @@ export const transformTransaction = (
     let amount: string;
     let targets: VinVout[];
 
-    if (tx.ethereumSpecific?.createdContract) {
+    const tronStaking = getTronStakingClassification(tx);
+
+    if (tronStaking) {
+        type = tronStaking.type;
+        amount = tronStaking.amount;
+        targets =
+            amount === '0'
+                ? []
+                : [{ n: 0, isAddress: true, value: amount, addresses: myAddresses }];
+    } else if (tx.ethereumSpecific?.createdContract) {
         type = 'contract';
         amount = tx.value;
         targets = [];
@@ -228,6 +309,32 @@ export const transformTransaction = (
         type = 'unknown';
         amount = tx.value;
         targets = [];
+        // [btc-unknown-tx-debug] 'unknown' is the catch-all the categorizer falls back to when it cannot
+        // tell whether the tx is recv/sent/self for this account — for an account's own tx that is never a
+        // desired outcome, it is a hole in our categorization (we show "something" rather than dropping it).
+        // We log every such case EXCEPT calls that pass no account context at all — transformTransaction(tx)
+        // by id (prev/ref-tx during signing, CoinControl UTXO detail): there is no account to compare
+        // against, so `type` is an unused placeholder that is never shown, not a categorization miss, and
+        // logging it would only flood Sentry. When account context WAS provided (an addresses object or a
+        // descriptor), an 'unknown' is a genuine gap worth capturing — including the anomalous case where
+        // the supplied addresses were empty (myAddressesCount === 0).
+        // Intentionally no txid / addresses / descriptor: these reach Sentry and could deanonymize the user.
+        if (addresses !== undefined) {
+            console.error('[btc-unknown-tx-debug-v2] transformTransaction', {
+                isPending: !tx.blockHeight || tx.blockHeight <= 0,
+                knownUsedCount: addresses.used.length,
+                knownUnusedCount: addresses.unused.length,
+                knownChangeCount: addresses.change.length,
+                vinCount: inputs.length,
+                voutCount: outputs.length,
+                vinWithAddressesCount: inputs.filter(
+                    v => Array.isArray(v.addresses) && v.addresses.length > 0,
+                ).length,
+                voutWithAddressesCount: outputs.filter(
+                    v => Array.isArray(v.addresses) && v.addresses.length > 0,
+                ).length,
+            });
+        }
     }
 
     type = isTxFailed(tx) ? 'failed' : type;
@@ -237,12 +344,7 @@ export const transformTransaction = (
             ? true
             : undefined;
 
-    const fee =
-        tx.ethereumSpecific && !tx.ethereumSpecific.gasUsed
-            ? new BigNumber(tx.ethereumSpecific?.gasPrice ?? '0')
-                  .times(tx.ethereumSpecific.gasLimit)
-                  .toString()
-            : tx.fees;
+    const fee = getTransactionFee(tx);
 
     // some instances of bb don't send vsize yet
     const feeRate = tx.vsize
@@ -273,7 +375,10 @@ export const transformTransaction = (
         ethereumSpecific: tx.ethereumSpecific && {
             ...tx.ethereumSpecific,
             gasPrice: tx.ethereumSpecific.gasPrice ?? '0', // even if it shouldn't, `null` sometimes came from Erigon
+            gasLimit: tx.ethereumSpecific.gasLimit ?? 0,
         },
+        tronSpecific:
+            tx.chainExtraData?.payloadType === 'tron' ? tx.chainExtraData.payload : undefined,
         details: {
             vin: inputs.map(enhanceVinVout(myAddresses)),
             vout: outputs.map(enhanceVinVout(myAddresses)),
@@ -294,7 +399,8 @@ export const transformTokenInfo = (
         return arr.concat([
             {
                 ...token,
-                decimals: token.decimals || 0,
+                decimals: token.decimals || DEFAULT_TOKEN_DECIMALS,
+                standard: token.standard,
             },
         ]);
     }, [] as TokenInfo[]);
@@ -323,7 +429,7 @@ export const transformAddresses = (
 
     if (addresses.length < 1) return undefined;
     const internal = addresses.filter(a => a.path.split('/')[4] === '1');
-    const external = addresses.filter(a => internal.indexOf(a) < 0);
+    const external = addresses.filter(a => !internal.includes(a));
 
     return {
         change: internal,
@@ -341,35 +447,47 @@ export const transformAccountInfo = (payload: BlockbookAccountInfo): AccountInfo
             total: payload.totalPages,
         };
     }
-    let misc: AccountInfo['misc'] = {};
-    if (typeof payload.nonce === 'string') {
-        misc.nonce = payload.nonce;
+    // Blockbook is used for both Bitcoin-like and Ethereum-like networks; there is no parameter to distinguish them.
+    // However, the nonce is specific to Ethereum, so we can determine the network type based on its availability.
+    const isEVM = typeof payload.nonce === 'string';
+    let misc: AccountInfo['misc'];
+    if (payload.chainExtraData?.payloadType === 'tron') {
+        misc = {
+            tronResources: payload.chainExtraData.payload,
+            contractInfo: payload.contractInfo,
+        };
+    } else if (isEVM) {
+        misc = {
+            nonce: payload.nonce,
+            confirmedNonce: payload.confirmedNonce,
+            contractInfo: payload.contractInfo,
+            stakingPools: payload.stakingPools,
+            addressAliases: payload.addressAliases,
+        };
     }
-    if (payload.erc20Contract) {
-        const token = transformTokenInfo([
-            { ...payload.erc20Contract, type: payload.erc20Contract.type || 'ERC20' },
-        ]);
-        if (token) {
-            const [erc20Contract] = token;
-            misc.erc20Contract = erc20Contract;
-        }
-    }
-    if (Object.keys(misc).length < 1) {
-        misc = undefined;
-    }
+
     const descriptor = payload.address;
     const addresses = transformAddresses(payload.tokens);
     const tokens = transformTokenInfo(payload.tokens);
-    const unconfirmed = new BigNumber(payload.unconfirmedBalance);
-    // reduce or increase availableBalance
-    const availableBalance =
-        !unconfirmed.isNaN() && !unconfirmed.isZero()
-            ? unconfirmed.plus(payload.balance).toString()
-            : payload.balance;
+    const unconfirmedBalance = new BigNumber(payload.unconfirmedBalance);
+
+    let availableBalance = payload.balance;
+    if (!unconfirmedBalance.isNaN() && !isEVM) {
+        availableBalance = unconfirmedBalance.plus(payload.balance).toString();
+    }
     const empty =
         payload.txs === 0 &&
         payload.unconfirmedTxs === 0 &&
         new BigNumber(availableBalance).isZero();
+
+    const unfilteredTransactions = payload.transactions
+        ? payload.transactions.map(t => transformTransaction(t, addresses ?? descriptor))
+        : undefined;
+
+    const transactions =
+        isEVM && unfilteredTransactions
+            ? filterShadowedPendingTxsByNonce(unfilteredTransactions, descriptor.toLowerCase())
+            : unfilteredTransactions;
 
     return {
         descriptor,
@@ -386,13 +504,10 @@ export const transformAccountInfo = (payload: BlockbookAccountInfo): AccountInfo
                     ? payload.txs - payload.nonTokenTxs
                     : undefined,
             unconfirmed: payload.unconfirmedTxs,
-            transactions: payload.transactions
-                ? payload.transactions.map(t => transformTransaction(t, addresses ?? descriptor))
-                : undefined,
+            transactions,
         },
         misc,
         page,
-        stakingPools: payload?.stakingPools,
     };
 };
 

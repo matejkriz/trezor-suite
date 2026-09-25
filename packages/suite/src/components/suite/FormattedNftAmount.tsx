@@ -1,89 +1,130 @@
-import styled from 'styled-components';
-
-import { SignValue } from '@suite-common/suite-types';
-import { getNftTokenId } from '@suite-common/wallet-utils';
-import { TokenTransfer } from '@trezor/connect';
+import { RedactNumericalValue } from '@suite/discreet-mode';
+import { TrezorLink } from '@suite/external-links';
+import { Translation, useTranslation } from '@suite/intl';
+import { type SignValue } from '@suite-common/suite-types';
+import { type NetworkSymbol, getExplorerUrl, getNetworkType } from '@suite-common/wallet-config';
+import { selectExplorer } from '@suite-common/wallet-core';
+import { isNftMultitokenTransfer } from '@suite-common/wallet-utils';
+import { Box, Column, Row, Text } from '@trezor/components';
+import { type TokenTransfer } from '@trezor/connect';
+import { type TypographyStyle } from '@trezor/theme';
 
 import { HiddenPlaceholder, Sign } from 'src/components/suite';
-// importing directly, otherwise unit tests fail, seems to be a styled-components issue
-import { TrezorLink } from 'src/components/suite/TrezorLink';
-import { useSelector } from 'src/hooks/suite/useSelector';
-import { variables } from '@trezor/components';
-
-const Container = styled.div`
-    max-width: 100%;
-    display: flex;
-`;
-
-const Symbol = styled.div`
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 120px;
-`;
-
-const StyledTrezorLink = styled(TrezorLink)`
-    color: ${({ theme }) => theme.TYPE_GREEN};
-    text-decoration: underline;
-    display: flex;
-    font-size: ${variables.FONT_SIZE.TINY};
-    line-height: initial;
-    align-items: center;
-`;
-
-const NoLink = styled.div`
-    display: flex;
-`;
-
-const Id = styled.div`
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 145px;
-`;
+import { useSelector } from 'src/hooks/suite';
+import { BlurUrls } from 'src/views/wallet/tokens/common/BlurUrls';
 
 export interface FormattedNftAmountProps {
     transfer: TokenTransfer;
+    networkSymbol: NetworkSymbol;
     signValue?: SignValue;
-    className?: string;
+    signGrayscale?: boolean;
     isWithLink?: boolean;
+    alignMultitoken?: 'flex-end' | 'flex-start';
+    linkTypographyStyle?: TypographyStyle;
 }
 
 export const FormattedNftAmount = ({
     transfer,
+    networkSymbol,
     signValue,
-    className,
+    signGrayscale,
     isWithLink,
+    alignMultitoken = 'flex-end',
+    linkTypographyStyle,
 }: FormattedNftAmountProps) => {
-    const id = getNftTokenId(transfer);
+    const { translationString } = useTranslation();
+    const networkType = getNetworkType(networkSymbol);
+    const explorer = useSelector(state => selectExplorer(state, networkSymbol));
 
-    const { selectedAccount } = useSelector(state => state.wallet);
-    const { network } = selectedAccount;
-    const explorerUrl =
-        network?.networkType === 'ethereum'
-            ? `${network?.explorer.nft}/${transfer.contract}/${id}`
-            : undefined;
+    const symbolComponent = transfer.symbol ? (
+        <Text ellipsisLineCount={1}>
+            <BlurUrls text={transfer.symbol} />
+        </Text>
+    ) : null;
 
-    const idComponent = <Id>{id}</Id>;
-    const symbolComponent = transfer.symbol ? <Symbol>&nbsp;{transfer.symbol}</Symbol> : null;
+    const isMultitoken = isNftMultitokenTransfer(transfer);
+
+    if (isMultitoken) {
+        const tokens = transfer.multiTokenValues;
+
+        return (
+            <Column alignItems={alignMultitoken}>
+                {tokens?.map((token, index) => (
+                    <Row key={`${token.id}-${index}`} gap={4}>
+                        <Row>
+                            {signValue ? (
+                                <Sign value={signValue} grayscale={signGrayscale} />
+                            ) : null}
+                            {transfer.name ? (
+                                <BlurUrls
+                                    text={translationString('TR_COLLECTION_NAME_OF_TOKEN_ID', {
+                                        tokenValue: token.value,
+                                        collectionName: transfer.name,
+                                    })}
+                                />
+                            ) : (
+                                <Row gap={4}>
+                                    <Row>{token.value}x</Row>
+                                    <Translation id="TR_TOKEN_ID_COLON" />
+                                </Row>
+                            )}
+                        </Row>
+                        {isWithLink && networkType === 'ethereum' ? (
+                            <TrezorLink
+                                href={`${getExplorerUrl(explorer, 'nft')}${transfer.contract}/${token.id}`}
+                                typographyStyle={linkTypographyStyle}
+                            >
+                                <Text maxWidth={145} ellipsisLineCount={1} intent="brand">
+                                    {token.id}
+                                </Text>
+                            </TrezorLink>
+                        ) : (
+                            <Text maxWidth={145} ellipsisLineCount={1}>
+                                {token.id}
+                            </Text>
+                        )}
+                    </Row>
+                ))}
+            </Column>
+        );
+    }
 
     return (
-        <HiddenPlaceholder>
-            <Container className={className}>
-                {signValue ? <Sign value={signValue} /> : null}
-                ID:&nbsp;
-                {isWithLink ? (
-                    <StyledTrezorLink href={explorerUrl}>
-                        {idComponent}
+        <Row>
+            {signValue ? <Sign value={signValue} grayscale={signGrayscale} /> : null}
+            <Box margin={{ right: 4 }}>
+                <Translation id="TR_TOKEN_ID_COLON" />
+            </Box>
+            {isWithLink ? (
+                <TrezorLink
+                    href={
+                        networkType === 'ethereum'
+                            ? `${getExplorerUrl(explorer, 'nft')}${transfer.contract}/${transfer.amount}`
+                            : undefined
+                    }
+                    typographyStyle={linkTypographyStyle}
+                >
+                    <Row gap={0}>
+                        <Text maxWidth={145} ellipsisLineCount={1} intent="brand">
+                            <HiddenPlaceholder>
+                                <RedactNumericalValue value={transfer.amount} />
+                            </HiddenPlaceholder>
+                            &nbsp;
+                        </Text>
                         {symbolComponent}
-                    </StyledTrezorLink>
-                ) : (
-                    <NoLink>
-                        {idComponent}
-                        {symbolComponent}
-                    </NoLink>
-                )}
-            </Container>
-        </HiddenPlaceholder>
+                    </Row>
+                </TrezorLink>
+            ) : (
+                <Row padding={{ horizontal: 4 }}>
+                    <Text maxWidth={145} ellipsisLineCount={1}>
+                        <HiddenPlaceholder>
+                            <RedactNumericalValue value={transfer.amount} />
+                        </HiddenPlaceholder>
+                        &nbsp;
+                    </Text>
+                    {symbolComponent}
+                </Row>
+            )}
+        </Row>
     );
 };

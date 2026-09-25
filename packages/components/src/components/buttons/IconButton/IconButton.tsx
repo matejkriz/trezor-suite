@@ -1,80 +1,119 @@
-import React from 'react';
-import styled, { useTheme } from 'styled-components';
-import { Icon, IconType } from '../../assets/Icon/Icon';
+import styled from 'styled-components';
+
+import {
+    type FrameProps,
+    type FramePropsKeys,
+    pickAndPrepareFrameProps,
+    withFrameProps,
+} from '../../../utils/frameProps';
+import { type TransientProps } from '../../../utils/transientProps';
+import { Box } from '../../Box/Box';
+import { Icon, type IconComponent, getIconComponentName } from '../../Icon/Icon';
+import { Tooltip, type UnmanagedTooltipProps } from '../../Tooltip/Tooltip';
+import { TOOLTIP_DELAY_NORMAL } from '../../Tooltip/TooltipDelay';
 import { Spinner } from '../../loaders/Spinner/Spinner';
-import { ButtonContainer, ButtonProps } from '../Button/Button';
-import { ButtonVariant, getIconColor, getIconSize, getPadding } from '../buttonStyleUtils';
-import { TOOLTIP_DELAY_NONE, TOOLTIP_DELAY_SHORT } from '../../Tooltip/TooltipDelay';
-import { useElevation } from '../../ElevationContext/ElevationContext';
-import { Tooltip } from '../../Tooltip/Tooltip';
+import {
+    type ButtonIntent,
+    type ButtonPriority,
+    type ButtonSize,
+    type CommonButtonProps,
+} from '../types';
+import {
+    commonButtonStyles,
+    mapPropsToCSS,
+    mapPropsToColorToken,
+    mapSizeToBorderRadius,
+    mapSizeToIconSize,
+    pickButtonProps,
+} from '../utils';
+import { mapSizeToPadding } from './utils';
 
-const IconButtonContainer = styled(ButtonContainer)`
-    position: relative;
-    padding: ${({ $size }) => getPadding($size, false)};
+export const allowedIconButtonFrameProps = ['margin'] as const satisfies FramePropsKeys[];
+export type AllowedIconButtonFrameProps = Pick<
+    FrameProps,
+    (typeof allowedIconButtonFrameProps)[number]
+>;
+
+type ButtonContainerProps = TransientProps<AllowedIconButtonFrameProps> & {
+    $size: ButtonSize;
+    $priority: ButtonPriority;
+    $intent: ButtonIntent;
+    $isInverse: boolean;
+    $isFloating: boolean;
+    disabled: boolean;
+};
+
+const Container = styled.button<ButtonContainerProps>`
+    ${commonButtonStyles}
+
+    border-radius: ${({ $size }) => mapSizeToBorderRadius($size)}px;
+
+    ${({ $intent, $priority, disabled, $isInverse, $isFloating, theme }) =>
+        mapPropsToCSS($intent, $priority, disabled, $isInverse, theme, $isFloating)}
+
+    ${withFrameProps}
 `;
 
-const Label = styled.span<{ $isDisabled: boolean }>`
-    position: absolute;
-    bottom: -22px;
-    color: ${({ theme, $isDisabled }) => ($isDisabled ? theme.textDisabled : theme.textSubdued)};
-    white-space: nowrap;
-`;
+export type IconButtonTooltipProps = Omit<UnmanagedTooltipProps, 'children' | 'content'> & {
+    content?: UnmanagedTooltipProps['content'];
+};
 
-export interface IconButtonProps
-    extends Omit<
-        ButtonProps,
-        'isFullWidth' | 'iconAlignment' | 'iconSize' | 'variant' | 'children'
-    > {
-    icon: IconType;
-    label?: React.ReactNode;
-    iconSize?: number;
-    variant?: ButtonVariant;
-    bottomLabel?: React.ReactNode;
-}
+export type IconButtonProps = CommonButtonProps &
+    AllowedIconButtonFrameProps & {
+        size?: ButtonSize;
+        icon: IconComponent;
+        tooltip: IconButtonTooltipProps;
+        'data-testid'?: string;
+        'data-component'?: string;
+        'aria-label'?: string;
+    };
 
 export const IconButton = ({
+    'data-testid': dataTestId,
+    'data-component': dataComponent = 'IconButton',
+    'aria-label': ariaLabel,
     icon,
-    label = null,
-    bottomLabel,
-    variant = 'primary',
-    size = 'large',
-    iconSize,
-    isDisabled = false,
-    isLoading = false,
-    ...rest
+    size = 'medium',
+    isFloating = false,
+    tooltip,
+    ...props
 }: IconButtonProps) => {
-    const theme = useTheme();
-    const { elevation } = useElevation();
+    const frameProps = pickAndPrepareFrameProps(props, allowedIconButtonFrameProps);
+    const { intent, priority, isInverse, ...buttonProps } = pickButtonProps(props);
+    const colorToken = mapPropsToColorToken(intent, priority, buttonProps.disabled, isInverse);
 
-    const IconComponent = (
-        <Icon
-            icon={icon}
-            size={iconSize || getIconSize(size)}
-            color={getIconColor(variant, isDisabled, theme)}
-        />
-    );
-
-    const Loader = <Spinner size={getIconSize(size)} />;
+    const iconProps = {
+        size: mapSizeToIconSize(size),
+        color: colorToken,
+    };
 
     return (
-        <Tooltip
-            content={label}
-            delayShow={TOOLTIP_DELAY_SHORT}
-            delayHide={TOOLTIP_DELAY_NONE}
-            cursor="default"
+        <Container
+            data-component={dataComponent}
+            data-icon={getIconComponentName(icon)}
+            data-testid={dataTestId}
+            aria-label={ariaLabel}
+            $size={size}
+            $priority={priority}
+            $intent={intent}
+            $isInverse={isInverse}
+            $isFloating={isFloating}
+            {...buttonProps}
+            {...frameProps}
         >
-            <IconButtonContainer
-                $variant={variant}
-                $size={size}
-                disabled={isDisabled || isLoading}
-                $elevation={elevation}
-                {...rest}
-            >
-                {!isLoading && icon && IconComponent}
-                {isLoading && Loader}
-
-                {bottomLabel && <Label $isDisabled={isDisabled}>{bottomLabel}</Label>}
-            </IconButtonContainer>
-        </Tooltip>
+            <Tooltip delayShow={TOOLTIP_DELAY_NORMAL} content={null} {...tooltip}>
+                <Box padding={mapSizeToPadding(size)}>
+                    {props.isLoading ? (
+                        <Spinner
+                            isDisabled={true}
+                            size={mapSizeToIconSize(size)}
+                            data-testid={`${dataTestId}/spinner`}
+                        />
+                    ) : (
+                        <Icon as={icon} {...iconProps} />
+                    )}
+                </Box>
+            </Tooltip>
+        </Container>
     );
 };

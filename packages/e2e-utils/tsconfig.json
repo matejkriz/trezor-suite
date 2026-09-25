@@ -1,5 +1,10 @@
 {
     "extends": "../../tsconfig.base.json",
     "compilerOptions": { "outDir": "libDev" },
-    "references": []
+    "references": [
+        { "path": "../node-utils" },
+        { "path": "../trezor-user-env-link" },
+        { "path": "../utils" },
+        { "path": "../eslint" }
+    ]
 }

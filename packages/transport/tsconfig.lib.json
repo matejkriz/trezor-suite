@@ -1,22 +1,15 @@
 {
     "extends": "../../tsconfig.lib.json",
+    "include": ["./src"],
     "compilerOptions": {
         "outDir": "./lib",
-        "types": ["w3c-web-usb"]
+        "rootDir": "./src",
+        "types": ["node"]
     },
-    "include": ["./src"],
     "references": [
-        {
-            "path": "../protobuf"
-        },
-        {
-            "path": "../protocol"
-        },
-        {
-            "path": "../utils"
-        },
-        {
-            "path": "../trezor-user-env-link"
-        }
+        { "path": "../transport-common" },
+        { "path": "../type-utils" },
+        { "path": "../utils" },
+        { "path": "../eslint" }
     ]
 }

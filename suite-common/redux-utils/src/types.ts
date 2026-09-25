@@ -1,12 +1,54 @@
-/* eslint-disable @typescript-eslint/ban-types */
-import { AnyAction, AsyncThunk, ThunkAction } from '@reduxjs/toolkit';
+import {
+    type AsyncThunk,
+    type Reducer,
+    type ThunkAction,
+    type ThunkDispatch,
+    type UnknownAction,
+} from '@reduxjs/toolkit';
+
+export type Dispatch = ThunkDispatch<any, any, UnknownAction>;
+
+export type WithServices<TServices extends object> = {
+    services: TServices;
+};
+
+/**
+ * Original thunk type in Redux before redux-toolkit
+ */
+export type OriginalReduxThunk<TPayload, TReturn = void> = (
+    payload: TPayload,
+) => ThunkAction<TReturn, any, any, UnknownAction>;
 
 // This SuiteCompatible types should be used only in places where you need support
 // for both redux-toolkit and legacy redux stuff like it is in externalDependencies.
 // Primary you should use types like ActionCreatorWithPayload from redux-toolkit!
 export type SuiteCompatibleThunk<TPayload, TReturn = void> =
-    | AsyncThunk<TReturn, TPayload, {}>
-    | ((payload: TPayload) => ThunkAction<TReturn, any, any, AnyAction>);
-export type SuiteCompatibleSelector<TReturn> = (state: any) => TReturn;
+    AsyncThunk<TReturn, TPayload, Record<never, never>> | OriginalReduxThunk<TPayload, TReturn>;
 
-export type ActionType = string;
+export interface TypeGuard<T> {
+    (value: any): value is T;
+}
+interface HasMatchFunction<T> {
+    match: TypeGuard<T>;
+}
+type Matcher<T> = HasMatchFunction<T> | TypeGuard<T>;
+export type ActionFromMatcher<M extends Matcher<any>> = M extends Matcher<infer T> ? T : never;
+
+type AnyAsyncThunk = {
+    pending: {
+        match: (action: any) => action is any;
+    };
+    fulfilled: {
+        match: (action: any) => action is any;
+    };
+    rejected: {
+        match: (action: any) => action is any;
+    };
+};
+export type ActionsFromAsyncThunk<T extends AnyAsyncThunk> =
+    | ActionFromMatcher<T['pending']>
+    | ActionFromMatcher<T['fulfilled']>
+    | ActionFromMatcher<T['rejected']>;
+
+export type ReducerState<TReducer extends Reducer<any, any>> =
+    TReducer extends Reducer<infer TState, any> ? TState : never;

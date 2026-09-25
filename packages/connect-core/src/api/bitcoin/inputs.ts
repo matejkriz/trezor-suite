@@ -1,0 +1,64 @@
+// origin: https://github.com/trezor/connect/blob/develop/src/js/core/methods/tx/inputs.js
+
+import type {
+    BitcoinNetworkInfo,
+    ComposeUtxo,
+    ProtoWithDerivationPath,
+} from '@trezor/connect-common';
+import type { MessagesSchema as PROTO } from '@trezor/protobuf';
+
+import { convertMultisigPubKey } from '../../utils/hdnodeUtils';
+import { fixPath, getHDPath, getScriptType, validatePath } from '../../utils/pathUtils';
+import { validateParams } from '../common/paramsValidator';
+
+/** *****
+ * SignTx: validation
+ ****** */
+export const validateTrezorInputs = (
+    inputs: ProtoWithDerivationPath<PROTO.TxInputType>[],
+    coinInfo: BitcoinNetworkInfo,
+): PROTO.TxInputType[] =>
+    inputs
+        .map(i => fixPath(i))
+        .map(i => convertMultisigPubKey(coinInfo.network, i))
+        .map(input => {
+            validateParams(input, [
+                { name: 'prev_hash', type: 'string', required: true },
+                { name: 'prev_index', type: 'number', required: true },
+                { name: 'amount', type: 'uint', required: true },
+                { name: 'script_type', type: 'string' },
+                { name: 'sequence', type: 'number' },
+                { name: 'multisig', type: 'object' },
+                { name: 'coinjoin_flags', type: 'number' },
+            ]);
+
+            if (input.script_type === 'EXTERNAL') {
+                validateParams(input, [
+                    { name: 'script_pubkey', type: 'string', required: true },
+                    { name: 'commitment_data', type: 'string' },
+                    { name: 'ownership_proof', type: 'string' },
+                    { name: 'script_sig', type: 'string' },
+                    { name: 'witness', type: 'string' },
+                ]);
+            } else {
+                validatePath(input.address_n);
+            }
+
+            return input;
+        });
+
+/** *****
+ * Transform from @trezor/utxo-lib/compose format to Trezor
+ ****** */
+export const inputToTrezor = (input: ComposeUtxo, sequence = 0xffffffff): PROTO.TxInputType => {
+    const address_n = getHDPath(input.path);
+
+    return {
+        address_n,
+        prev_index: input.vout,
+        prev_hash: input.txid, // NOTE: protobuf name is confusing. prev_hash is in fact txid (reversed tx hash)
+        script_type: getScriptType(address_n),
+        amount: input.amount,
+        sequence,
+    };
+};

@@ -1,19 +1,46 @@
-import { Meta, StoryObj } from '@storybook/react';
-import { Spinner as SpinnerComponent, SpinnerProps } from './Spinner';
+import { type ArgTypes, type Meta, type StoryObj } from '@storybook/react';
 
-const meta: Meta = {
-    title: 'Loaders/Spinner',
+import {
+    Spinner as SpinnerComponent,
+    type SpinnerProps,
+    allowedSpinnerFrameProps,
+} from './Spinner';
+import { spinnerSizes, spinnerVariants } from './types';
+import { getFramePropsStory } from '../../../utils/frameProps';
+
+const meta: Meta<typeof SpinnerComponent> = {
+    title: 'Spinner',
     component: SpinnerComponent,
-} as Meta;
+};
 export default meta;
 
-export const Spinner: StoryObj<SpinnerProps> = {
-    args: {
-        size: 50,
+const args: Partial<SpinnerProps> | undefined = {
+    size: 40,
+    variant: 'loading',
+    ...getFramePropsStory(allowedSpinnerFrameProps).args,
+};
+const argTypes: Partial<ArgTypes<SpinnerProps>> | undefined = {
+    variant: {
+        control: {
+            type: 'select',
+        },
+        options: spinnerVariants,
     },
-    argTypes: {
-        className: {
-            control: false,
+    size: {
+        control: {
+            type: 'select',
+        },
+        options: spinnerSizes,
+    },
+    isDisabled: {
+        control: {
+            type: 'boolean',
         },
     },
+    ...getFramePropsStory(allowedSpinnerFrameProps).argTypes,
+};
+
+export const Spinner: StoryObj<SpinnerProps> = {
+    args,
+    argTypes,
 };

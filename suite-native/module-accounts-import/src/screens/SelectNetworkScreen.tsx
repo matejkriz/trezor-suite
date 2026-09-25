@@ -1,25 +1,25 @@
+import { type NetworkSymbol } from '@suite-common/wallet-config';
 import {
-    AccountsImportStackParamList,
+    type AccountsImportStackParamList,
     AccountsImportStackRoutes,
     Screen,
-    StackProps,
+    type StackProps,
 } from '@suite-native/navigation';
-import { NetworkSymbol } from '@suite-common/wallet-config';
 
-import { AccountImportSubHeader } from '../components/AccountImportSubHeader';
+import { AccountImportScreenHeader } from '../components/AccountImportScreenHeader';
 import { SelectableNetworkList } from '../components/SelectableNetworkList';
 
 export const SelectNetworkScreen = ({
     navigation,
 }: StackProps<AccountsImportStackParamList, AccountsImportStackRoutes.SelectNetwork>) => {
-    const handleSelectNetworkSymbol = (networkSymbol: NetworkSymbol) => {
+    const handleSelectNetworkSymbol = (symbol: NetworkSymbol) => {
         navigation.navigate(AccountsImportStackRoutes.XpubScan, {
-            networkSymbol,
+            networkSymbol: symbol,
         });
     };
 
     return (
-        <Screen screenHeader={<AccountImportSubHeader />}>
+        <Screen header={<AccountImportScreenHeader />}>
             <SelectableNetworkList onSelectItem={handleSelectNetworkSymbol} />
         </Screen>
     );

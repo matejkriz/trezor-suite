@@ -1,0 +1,41 @@
+import { BridgeTransport } from '@trezor/transport-common';
+import { Model } from '@trezor/trezor-user-env-link';
+
+import { controller as TrezorUserEnvLink } from './controller';
+import { descriptor as expectedDescriptor } from './expect';
+import { assertSuccess } from '../api/utils';
+
+const emulatorStartOpts = { model: Model.T2T1, version: '2-latest', wipe: true } as const;
+
+describe('bridge', () => {
+    beforeAll(async () => {
+        await TrezorUserEnvLink.connect();
+        await TrezorUserEnvLink.stopBridge();
+        await TrezorUserEnvLink.startEmu(emulatorStartOpts);
+    });
+
+    afterAll(async () => {
+        await TrezorUserEnvLink.stopEmu();
+        await TrezorUserEnvLink.stopBridge();
+        TrezorUserEnvLink.disconnect();
+    });
+
+    // special case of listen. for happy-path listen fixtures referer to multi-client.test.ts
+    test('listen - bridge already has some descriptors, client subscribes with non-matching descriptors', async () => {
+        await TrezorUserEnvLink.startBridge();
+        const bridge = new BridgeTransport({ id: '' });
+        await bridge.init();
+        const enumerateResult = await bridge.enumerate();
+        assertSuccess(enumerateResult);
+        bridge.handleDescriptorsChange([]);
+        const brideSpy = jest.spyOn(bridge, 'emit');
+        bridge.listen();
+        await new Promise(resolve => setTimeout(resolve, 100));
+        expect(brideSpy).toHaveBeenCalledWith('transport-device_connected', {
+            ...expectedDescriptor,
+            session: null,
+        });
+        bridge.removeAllListeners('transport-device_connected');
+        jest.clearAllMocks();
+    });
+});

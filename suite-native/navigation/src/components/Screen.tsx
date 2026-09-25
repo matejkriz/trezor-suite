@@ -1,169 +1,177 @@
-import { useEffect, useContext, ReactNode } from 'react';
-import { Platform, ScrollViewProps, StatusBar, View } from 'react-native';
-import { useSafeAreaInsets, EdgeInsets } from 'react-native-safe-area-context';
+import { type ReactNode, useContext } from 'react';
+import { type ScrollViewProps, View, type ViewProps } from 'react-native';
+import { SystemBars } from 'react-native-edge-to-edge';
+import { KeyboardStickyView } from 'react-native-keyboard-controller';
+import { type EdgeInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 
-import * as SystemUI from 'expo-system-ui';
-import * as NavigationBar from 'expo-navigation-bar';
 import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
+import { useRoute } from '@react-navigation/native';
 
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-import { Color, nativeSpacings } from '@trezor/theme';
 import { selectIsAnyBannerMessageActive } from '@suite-common/message-system';
-import { Box } from '@suite-native/atoms';
+import { Box, useBannerAwareSafeAreaInsets } from '@suite-native/atoms';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
+import { type Color } from '@trezor/theme';
 
+import { type DynamicScreenHeaderProps } from './DynamicHeader/DynamicScreenHeader';
+import { DynamicHeaderProvider } from './DynamicHeader/DynamicScreenHeaderContext';
+import { DynamicScrollableScreenContentHeader } from './DynamicHeader/DynamicScrollableScreenContentHeader';
+import { isScreenHeaderPropDynamic } from './DynamicHeader/dynamicHeaderUtils';
 import { ScreenContentWrapper } from './ScreenContentWrapper';
+import { useAndroidNavigationBarStyle } from '../hooks/useAndroidNavigationBarStyle';
+import { useIsKeyboardShown } from '../hooks/useIsKeyboardShown';
 
-type ScreenProps = {
+export type ScreenProps = {
     children: ReactNode;
+    header?: ReactNode;
     footer?: ReactNode;
-    subheader?: ReactNode;
-    screenHeader?: ReactNode;
-    hasStatusBar?: boolean;
+    systemThemeStyle?: 'dark' | 'light';
     isScrollable?: boolean;
     backgroundColor?: Color;
-    customVerticalPadding?: number;
-    customHorizontalPadding?: number;
-    extraKeyboardAvoidingViewHeight?: number;
+    noHorizontalPadding?: boolean;
+    noBottomPadding?: boolean;
+    focusedInputBottomOffset?: number;
+    isFooterKeyboardAware?: boolean;
     hasBottomInset?: boolean;
     refreshControl?: ScrollViewProps['refreshControl'];
+    containerStyle?: ViewProps['style'];
 };
 
 const screenContainerStyle = prepareNativeStyle<{
     backgroundColor: Color;
     insets: EdgeInsets;
-    customVerticalPadding: number;
-    hasPaddingBottom: boolean;
     isMessageBannerDisplayed: boolean;
-}>(
-    (
-        utils,
+}>((utils, { backgroundColor, insets, isMessageBannerDisplayed }) => ({
+    flex: 1,
+    backgroundColor: utils.colors[backgroundColor],
+    paddingTop: Math.max(insets.top, utils.spacings.sp8),
+    extend: [
         {
-            backgroundColor,
-            customVerticalPadding,
-            insets,
-            hasPaddingBottom,
-            isMessageBannerDisplayed,
+            // If the message banner is displayed, the top padding has to be equal to 0
+            // to render the app content right under the banner.
+            condition: isMessageBannerDisplayed,
+            style: {
+                paddingTop: 0,
+            },
         },
-    ) => ({
-        flex: 1,
-        backgroundColor: utils.colors[backgroundColor],
-        paddingTop: Math.max(insets.top, customVerticalPadding),
-        extend: [
-            {
-                condition: hasPaddingBottom,
-                style: {
-                    paddingBottom: Math.max(insets.bottom, customVerticalPadding),
-                },
-            },
-            {
-                // If the message banner is displayed, the top padding has to be equal to 0
-                // to render the app content right under the banner.
-                condition: isMessageBannerDisplayed,
-                style: {
-                    paddingTop: 0,
-                },
-            },
-        ],
-    }),
-);
+    ],
+}));
 
-const screenContentBaseStyle = prepareNativeStyle<{
+const screenContentStyle = prepareNativeStyle<{
     insets: EdgeInsets;
-    customHorizontalPadding: number;
-    customVerticalPadding: number;
-    isScrollable: boolean;
-}>((_, { customHorizontalPadding, customVerticalPadding, insets, isScrollable }) => {
-    const { left, right } = insets;
+    horizontalPadding: number;
+    applyBottomInset: boolean;
+    bottomPadding: number;
+}>((_, { insets, horizontalPadding, applyBottomInset, bottomPadding }) => {
+    const { left, right, bottom } = insets;
+    const bottomInset = applyBottomInset ? bottom : 0;
 
     return {
         flexGrow: 1,
-        paddingTop: customVerticalPadding,
-        paddingLeft: Math.max(left, customHorizontalPadding),
-        paddingRight: Math.max(right, customHorizontalPadding),
-
-        extend: {
-            // Scrollable screen takes the whole height of the screen. This padding is needed to
-            // prevent the content being "sticked" to the bottom navbar.
-            condition: isScrollable,
-            style: {
-                paddingBottom: customVerticalPadding,
-            },
-        },
+        paddingLeft: Math.max(left, horizontalPadding),
+        paddingRight: Math.max(right, horizontalPadding),
+        paddingBottom: bottomInset + bottomPadding,
     };
 });
 
+const screenFooterStyle = prepareNativeStyle<{
+    insets: EdgeInsets;
+    applyBottomInset: boolean;
+}>((_, { insets, applyBottomInset }) => ({
+    paddingBottom: applyBottomInset ? insets.bottom : 0,
+}));
+
 export const Screen = ({
     children,
+    header,
     footer,
-    screenHeader,
-    subheader,
-    isScrollable = true,
-    hasStatusBar = true,
-    backgroundColor = 'backgroundSurfaceElevation0',
-    customVerticalPadding = nativeSpacings.small,
-    customHorizontalPadding = nativeSpacings.small,
-    extraKeyboardAvoidingViewHeight = 0,
-    hasBottomInset = true,
     refreshControl,
+    containerStyle,
+    systemThemeStyle,
+    isScrollable = true,
+    backgroundColor = 'surfaceFillPage',
+    noHorizontalPadding = false,
+    noBottomPadding = false,
+    focusedInputBottomOffset,
+    isFooterKeyboardAware = true,
+    hasBottomInset = true,
 }: ScreenProps) => {
     const {
         applyStyle,
-        utils: { colors, isDarkColor },
+        utils: { spacings },
     } = useNativeStyles();
 
-    const hasPaddingBottom = !useContext(BottomTabBarHeightContext) && hasBottomInset;
-    const insets = useSafeAreaInsets();
-    const backgroundCSSColor = colors[backgroundColor];
-    const barStyle = isDarkColor(backgroundCSSColor) ? 'light-content' : 'dark-content';
+    const insets = useBannerAwareSafeAreaInsets();
+    const isKeyboardShown = useIsKeyboardShown();
+
+    const horizontalPadding = noHorizontalPadding ? 0 : spacings.sp16;
+    const bottomPadding = noBottomPadding ? 0 : spacings.sp16;
+    const applyBottomInset =
+        !useContext(BottomTabBarHeightContext) && hasBottomInset && !isKeyboardShown;
+    const systemBarsStyle = useAndroidNavigationBarStyle({ backgroundColor });
 
     const isMessageBannerDisplayed = useSelector(selectIsAnyBannerMessageActive);
 
-    useEffect(() => {
-        // this prevents some weird flashing of splash screen on Android during screen transitions
-        SystemUI.setBackgroundColorAsync(backgroundCSSColor);
+    const { name } = useRoute();
 
-        if (Platform.OS === 'android') {
-            NavigationBar.setBackgroundColorAsync(backgroundCSSColor);
-            NavigationBar.setButtonStyleAsync(isDarkColor(backgroundCSSColor) ? 'light' : 'dark');
+    // We have to extract dynamic header props from header prop. While not ideal, this allows us to only send one header prop to the screen.
+    const dynamicHeaderProps = ((): DynamicScreenHeaderProps | null => {
+        if (isScreenHeaderPropDynamic(header)) {
+            return header.props;
         }
-    }, [backgroundCSSColor, isDarkColor]);
+
+        return null;
+    })();
+
+    const shouldRenderDynamicScrollableHeader =
+        isScreenHeaderPropDynamic(header) && !dynamicHeaderProps?.isCompactOnly;
 
     return (
-        <View
-            style={applyStyle(screenContainerStyle, {
-                backgroundColor,
-                customVerticalPadding,
-                insets,
-                hasPaddingBottom,
-                isMessageBannerDisplayed,
-            })}
-        >
-            <StatusBar
-                barStyle={barStyle}
-                hidden={!hasStatusBar}
-                translucent={false}
-                backgroundColor={backgroundCSSColor}
-            />
-            {screenHeader}
-            <ScreenContentWrapper
-                isScrollable={isScrollable}
-                extraKeyboardAvoidingViewHeight={extraKeyboardAvoidingViewHeight}
-                refreshControl={refreshControl}
-            >
-                {subheader}
-                <Box
-                    style={applyStyle(screenContentBaseStyle, {
+        <DynamicHeaderProvider scrollThreshold={dynamicHeaderProps?.scrollThreshold}>
+            <View
+                accessible
+                style={[
+                    applyStyle(screenContainerStyle, {
+                        backgroundColor,
                         insets,
-                        customHorizontalPadding,
-                        customVerticalPadding,
-                        isScrollable,
-                    })}
+                        isMessageBannerDisplayed,
+                    }),
+                    containerStyle,
+                ]}
+                testID={`@screen/${name}`}
+            >
+                <SystemBars style={systemThemeStyle ?? systemBarsStyle} />
+                {header}
+                <ScreenContentWrapper
+                    isScrollable={isScrollable}
+                    hasHeader={!!header}
+                    focusedInputBottomOffset={focusedInputBottomOffset}
+                    refreshControl={refreshControl}
+                    isDynamicHeader={isScreenHeaderPropDynamic(header)}
                 >
-                    {children}
-                </Box>
-            </ScreenContentWrapper>
-            {footer}
-        </View>
+                    {shouldRenderDynamicScrollableHeader && (
+                        <DynamicScrollableScreenContentHeader {...dynamicHeaderProps} />
+                    )}
+                    <Box
+                        style={applyStyle(screenContentStyle, {
+                            insets,
+                            applyBottomInset: applyBottomInset && !footer,
+                            horizontalPadding,
+                            bottomPadding,
+                        })}
+                    >
+                        {children}
+                    </Box>
+                </ScreenContentWrapper>
+                {footer && (
+                    <KeyboardStickyView
+                        enabled={isFooterKeyboardAware}
+                        style={applyStyle(screenFooterStyle, { insets, applyBottomInset })}
+                    >
+                        {footer}
+                    </KeyboardStickyView>
+                )}
+            </View>
+        </DynamicHeaderProvider>
     );
 };

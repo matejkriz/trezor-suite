@@ -1,45 +1,19 @@
-import { ReactNode } from 'react';
-import styled from 'styled-components';
-import { H3, Paragraph, variables } from '@trezor/components';
-import { IconBorderedWrapper } from 'src/components/suite';
-import { spacingsPx } from '@trezor/theme';
+import { type ReactNode } from 'react';
 
-const StyledH3 = styled(H3)<{ $size?: string }>`
-    margin-top: ${spacingsPx.lg};
-    font-size: ${({ $size }) => $size === 'small' && variables.FONT_SIZE.NORMAL};
-`;
-
-const GreyP = styled(Paragraph)`
-    color: ${({ theme }) => theme.textSubdued};
-`;
-
-const StyledP = styled(GreyP)`
-    margin-top: ${spacingsPx.xs};
-    font-size: ${variables.FONT_SIZE.TINY};
-`;
+import { H3, IconCircle, type IconComponent, Paragraph } from '@trezor/components';
 
 interface StakingFeatureProps {
-    icon: ReactNode;
+    icon: IconComponent;
     title: ReactNode;
-    titleSize?: 'small' | 'normal';
     description: ReactNode;
-    extraDescription?: ReactNode;
 }
 
-export const StakingFeature = ({
-    icon,
-    title,
-    titleSize = 'normal',
-    description,
-    extraDescription,
-}: StakingFeatureProps) => (
-    <div>
-        <IconBorderedWrapper>{icon}</IconBorderedWrapper>
-
-        <StyledH3 $size={titleSize}>{title}</StyledH3>
-
-        <GreyP>{description}</GreyP>
-
-        <StyledP>{extraDescription}</StyledP>
-    </div>
+export const StakingFeature = ({ icon, title, description }: StakingFeatureProps) => (
+    <section>
+        <IconCircle icon={icon} intent="brand" size={96} />
+        <H3 margin={{ top: 16 }}>{title}</H3>
+        <Paragraph intent="neutral" priority="secondary">
+            {description}
+        </Paragraph>
+    </section>
 );

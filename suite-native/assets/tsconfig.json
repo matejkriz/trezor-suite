@@ -3,9 +3,16 @@
     "compilerOptions": { "outDir": "libDev" },
     "references": [
         { "path": "../../suite-common/assets" },
-        { "path": "../../suite-common/icons" },
+        { "path": "../../suite-common/device" },
         {
-            "path": "../../suite-common/suite-config"
+            "path": "../../suite-common/formatters"
+        },
+        { "path": "../../suite-common/networks" },
+        {
+            "path": "../../suite-common/redux-utils"
+        },
+        {
+            "path": "../../suite-common/token-definitions"
         },
         {
             "path": "../../suite-common/wallet-config"
@@ -21,11 +28,13 @@
         },
         { "path": "../accounts" },
         { "path": "../atoms" },
-        { "path": "../ethereum-tokens" },
+        { "path": "../discovery" },
         { "path": "../formatters" },
+        { "path": "../icons" },
         { "path": "../intl" },
-        { "path": "../module-settings" },
+        { "path": "../module-earn" },
         { "path": "../navigation" },
-        { "path": "../../packages/styles" }
+        { "path": "../tokens" },
+        { "path": "../../packages/utils" }
     ]
 }

@@ -1,45 +1,45 @@
 import {
-    formatDistance,
-    formatDistanceStrict,
+    type Locale,
+    differenceInCalendarMonths,
     differenceInMonths,
+    eachDayOfInterval,
+    eachMonthOfInterval,
+    eachQuarterOfInterval,
+    format,
+    formatDistanceStrict,
     fromUnixTime,
     getUnixTime,
+    parse,
     startOfDay,
     startOfMonth,
-    differenceInCalendarMonths,
-    eachQuarterOfInterval,
-    eachMonthOfInterval,
-    eachDayOfInterval,
-    differenceInMinutes,
-    Locale,
 } from 'date-fns';
-
-export const formatDuration = (seconds: number) =>
-    formatDistance(0, seconds * 1000, { includeSeconds: true });
 
 export const formatDurationStrict = (seconds: number, locale?: Locale) =>
     formatDistanceStrict(0, seconds * 1000, { locale });
 
 export const calcTicks = (startDate: Date, endDate: Date) => {
-    let timestamps = [];
-    if (differenceInMonths(endDate, startDate) <= 1) {
-        timestamps = eachDayOfInterval({ start: startDate, end: endDate });
-    } else {
-        timestamps = eachMonthOfInterval({ start: startDate, end: endDate });
-    }
+    const timestamps =
+        differenceInMonths(endDate, startDate) <= 1
+            ? eachDayOfInterval({ start: startDate, end: endDate })
+            : eachMonthOfInterval({ start: startDate, end: endDate });
 
     return timestamps;
 };
 
 export const calcTicksFromData = (data: { time: number }[]) => {
-    if (!data || data.length < 1) return [];
+    // without datapoints there is no interval to derive ticks from
+    // anchor the axis to the current month so that an empty or still-loading account
+    // does not end up with an axis around the unix epoch
+    if (!data || data.length < 1) return [startOfMonth(new Date())];
+
+    const firstTime = data[0]?.time ?? 0;
     const startDate = data.reduce(
         (min, current) => (current.time < min ? current.time : min),
-        data[0].time,
+        firstTime,
     );
     const endDate = data.reduce(
         (max, current) => (current.time > max ? current.time : max),
-        data[0].time,
+        firstTime,
     );
 
     const startUnix = fromUnixTime(startDate);
@@ -74,19 +74,6 @@ export const calcTicksFromData = (data: { time: number }[]) => {
 };
 
 /**
- * @deprecated It's not needed anymore, new blockbook will handle it
- */
-export const getBlockbookSafeTime = (timestamp?: number) => {
-    const currentTimestamp = getUnixTime(new Date());
-    if (timestamp && differenceInMinutes(currentTimestamp * 1000, timestamp * 1000) > 3) {
-        // timestamp is older than 3 mins, no adjustment needed
-        return timestamp;
-    }
-
-    return currentTimestamp - 180;
-};
-
-/**
  * Sets hh:mm:ss to 00:00:00 in local timezone (UTC time may be different).
  * If `resetDay` is true  sets date to the first of the month
  * Returns unix timestamp
@@ -107,24 +94,43 @@ export const resetTime = (ts: number, resetDay?: boolean) => {
 };
 
 /**
- * Sets hh:mm:ss to 00:00:00 in UTC.
- * If `resetDay` is true  sets date to the first of the month
- * Returns unix timestamp
+ * Parses datetime in UTC from one of the following formats:
+ * - dd/MM/yyyy
+ * - dd/MM/yyyy HH:mm
+ * - dd/MM/yyyy HH:mm:ss
+ * If a component is omitted, it is assumed to be zero.
  *
- * @param {number} ts
- * @param {boolean} [resetDay]
- * @returns
+ * @param {string} input
+ * @returns {Date | undefined}
  */
-export const resetUTCTime = (ts: number, resetDay?: boolean) => {
-    let sanitizedTimestamp = fromUnixTime(ts);
-    sanitizedTimestamp = fromUnixTime(sanitizedTimestamp.setUTCHours(0) / 1000);
-    sanitizedTimestamp = fromUnixTime(sanitizedTimestamp.setUTCMinutes(0) / 1000);
-    sanitizedTimestamp = fromUnixTime(sanitizedTimestamp.setUTCSeconds(0) / 1000);
+export const parseUTCdatetime = (input: string): Date | undefined => {
+    const formats = ['dd/MM/yyyy X', 'dd/MM/yyyy HH:mm X', 'dd/MM/yyyy HH:mm:ss X'];
 
-    if (resetDay) {
-        sanitizedTimestamp = fromUnixTime(sanitizedTimestamp.setUTCDate(1) / 1000);
+    for (const format_candidate of formats) {
+        const parsed = parse(input + ' Z', format_candidate, new Date()); // Force UTC timezone
+        if (!isNaN(parsed.getTime())) {
+            return parsed;
+        }
     }
-    const sanitizedUnixTimestamp = getUnixTime(sanitizedTimestamp);
 
-    return sanitizedUnixTimestamp;
+    return undefined;
+};
+
+/**
+ * Returns current UTC time in "dd/MM/yyyy HH:mm" format
+ *
+ * @returns {string}
+ */
+export const getCurrentUTCDatetime = () => {
+    const now = new Date();
+
+    const utcDate = new Date(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate(),
+        now.getUTCHours(),
+        now.getUTCMinutes(),
+    );
+
+    return format(utcDate, 'dd/MM/yyyy HH:mm');
 };

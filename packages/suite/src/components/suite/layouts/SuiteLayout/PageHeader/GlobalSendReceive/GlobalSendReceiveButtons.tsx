@@ -1,0 +1,57 @@
+import { events, injectDesktopAnalytics } from '@suite/analytics';
+import { Translation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { type GlobalSendReceiveType } from '@suite-common/wallet-types';
+import { ButtonGroup, type ButtonProps } from '@trezor/components';
+import { ArrowDownIcon, ArrowUpIcon } from '@trezor/icons';
+
+import { HeaderActionButton } from '../HeaderActionButton';
+
+type GlobalSendReceiveButtonsProps = {
+    setActiveModal: (activeModal: NonNullable<GlobalSendReceiveType>) => void;
+    intent: NonNullable<ButtonProps['intent']>;
+    priority: NonNullable<ButtonProps['priority']>;
+};
+export const GlobalSendReceiveButtons = ({
+    setActiveModal,
+    intent,
+    priority,
+}: GlobalSendReceiveButtonsProps) => {
+    const { analytics } = useServices(injectDesktopAnalytics);
+
+    return (
+        <ButtonGroup intent={intent} priority={priority}>
+            <HeaderActionButton
+                key="wallet-receive"
+                icon={ArrowDownIcon}
+                onClick={() => {
+                    setActiveModal('receive');
+
+                    analytics.report({
+                        type: events.dashboardReceiveModalEvent.name,
+                        payload: { source: 'page-header' },
+                    });
+                }}
+                data-testid="@wallet/menu/wallet-global-receive"
+            >
+                <Translation id="TR_NAV_RECEIVE" />
+            </HeaderActionButton>
+
+            <HeaderActionButton
+                key="wallet-send"
+                icon={ArrowUpIcon}
+                onClick={() => {
+                    setActiveModal('send');
+
+                    analytics.report({
+                        type: events.dashboardSendModalEvent.name,
+                        payload: { source: 'page-header' },
+                    });
+                }}
+                data-testid="@wallet/menu/wallet-global-send"
+            >
+                <Translation id="TR_NAV_SEND" />
+            </HeaderActionButton>
+        </ButtonGroup>
+    );
+};

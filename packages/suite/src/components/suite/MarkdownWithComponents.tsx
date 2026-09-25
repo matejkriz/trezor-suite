@@ -1,0 +1,25 @@
+import { TrezorLink } from '@suite/external-links';
+import { Markdown } from '@trezor/components';
+
+type MarkdownWithComponentsProps = {
+    children: string;
+};
+
+export const MarkdownWithComponents = ({ children }: MarkdownWithComponentsProps) => (
+    <Markdown
+        components={{
+            a: ({ children, href }) => {
+                if (!href) {
+                    return null;
+                }
+
+                // Support for both http(s) links and Tor (.onion) addresses
+                // All links in release notes are external, so we use TrezorLink
+                // which handles opening links in external browser
+                return <TrezorLink href={href}>{children}</TrezorLink>;
+            },
+        }}
+    >
+        {children}
+    </Markdown>
+);

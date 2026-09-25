@@ -1,0 +1,30 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "include": [
+        "src/**/*",
+        "scripts/**/*",
+        "package.json",
+        "styled.d.ts"
+    ],
+    "exclude": [],
+    "compilerOptions": {
+        "outDir": "libDev",
+        "types": ["vite/client", "jest"],
+        "paths": {
+            "@trezor/analytics-log-server": [
+                "../analytics-log-server/src/index.ts"
+            ]
+        }
+    },
+    "references": [
+        {
+            "path": "../../suite-common/analytics"
+        },
+        { "path": "../components" },
+        { "path": "../eslint" },
+        { "path": "../icons" },
+        { "path": "../react-utils" },
+        { "path": "../theme" },
+        { "path": "../utils" }
+    ]
+}

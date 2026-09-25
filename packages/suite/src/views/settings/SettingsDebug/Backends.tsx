@@ -1,0 +1,178 @@
+import styled from 'styled-components';
+
+import { Translation } from '@suite/intl';
+import { openModal } from '@suite/modal';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { type NetworkSymbol, getNetwork } from '@suite-common/wallet-config';
+import { selectEnabledNetworks, selectNetworkBlockchainInfo } from '@suite-common/wallet-core';
+import { type ConnectionStatus } from '@suite-common/wallet-types';
+import { Button } from '@trezor/components';
+import { SectionItem, TokenIcon } from '@trezor/product-components';
+import { typography } from '@trezor/theme';
+
+import { StatusLight } from 'src/components/suite';
+import { useBackendReconnection } from 'src/hooks/settings/backends';
+import { useSelector } from 'src/hooks/suite';
+
+const CoinSection = styled.div`
+    display: flex;
+    flex: 1;
+    gap: 16px;
+    align-items: center;
+    justify-content: space-between;
+
+    > div {
+        display: flex;
+        gap: 8px;
+        flex-direction: column;
+    }
+`;
+
+const CoinCell = styled.div`
+    display: flex;
+    gap: 8px;
+    align-items: center;
+`;
+
+const BackendRow = styled.div`
+    display: flex;
+    align-items: center;
+    gap: 16px;
+
+    > :nth-child(2) {
+        width: 200px;
+
+        > * {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    }
+
+    > :last-child {
+        width: 100px;
+        display: flex;
+        justify-content: end;
+    }
+`;
+
+const Title = styled.div`
+    ${typography['body-md']}
+`;
+
+const Subtitle = styled.div<{ $error?: boolean }>`
+    ${typography['body-sm']}
+    color: ${({ $error, theme }) => ($error ? theme.contentCritical : theme.contentSecondary)};
+`;
+
+type BackendItemProps = ConnectionStatus & {
+    identity?: string;
+    symbol: NetworkSymbol;
+    url?: string;
+};
+
+type CoinItemProps = { symbol: NetworkSymbol };
+
+const BackendItem = ({
+    symbol,
+    identity,
+    url,
+    connected,
+    error,
+    reconnectionTime,
+}: BackendItemProps) => {
+    const { reconnect, isReconnecting, countdownSeconds } = useBackendReconnection(
+        symbol,
+        identity,
+        reconnectionTime,
+    );
+
+    const subtitle =
+        (countdownSeconds && (
+            <Translation id="TR_BACKEND_RECONNECTING" values={{ time: countdownSeconds }} />
+        )) ||
+        (error ?? url);
+
+    return (
+        <BackendRow>
+            <div>
+                <StatusLight variant={connected ? 'primary' : 'destructive'} />
+            </div>
+            <div>
+                <Title>{identity ?? 'Default'}</Title>
+                <Subtitle $error={!!error}>{subtitle}</Subtitle>
+            </div>
+            <div>
+                {!connected && (
+                    <Button
+                        size="small"
+                        intent="neutral"
+                        priority="secondary"
+                        isLoading={isReconnecting}
+                        onClick={reconnect}
+                    >
+                        <Translation id="TR_CONNECT" />
+                    </Button>
+                )}
+            </div>
+        </BackendRow>
+    );
+};
+
+const CoinItem = ({ symbol }: CoinItemProps) => {
+    const { url, error, connected, reconnectionTime, identityConnections } = useSelector(state =>
+        selectNetworkBlockchainInfo(state, symbol),
+    );
+
+    const { dispatch } = useServices(injectDispatch);
+
+    const onSettings = () => {
+        dispatch(
+            openModal({
+                type: 'advanced-coin-settings',
+                symbol,
+            }),
+        );
+    };
+
+    return (
+        <SectionItem>
+            <CoinSection>
+                <div>
+                    <CoinCell>
+                        <TokenIcon symbol={symbol} />
+                        <Title>{getNetwork(symbol).name}</Title>
+                    </CoinCell>
+                    <Button size="small" intent="neutral" priority="secondary" onClick={onSettings}>
+                        <Translation id="TR_SETTINGS" />
+                    </Button>
+                </div>
+                <div>
+                    <BackendItem
+                        symbol={symbol}
+                        url={url}
+                        connected={connected}
+                        error={error}
+                        reconnectionTime={reconnectionTime}
+                    />
+                    {Object.entries(identityConnections ?? {}).map(([identity, connection]) => (
+                        <BackendItem
+                            key={identity}
+                            identity={identity}
+                            symbol={symbol}
+                            url={url}
+                            {...connection}
+                        />
+                    ))}
+                </div>
+            </CoinSection>
+        </SectionItem>
+    );
+};
+
+export const Backends = () => {
+    const enabledNetworks = useSelector(selectEnabledNetworks);
+
+    return enabledNetworks.map(symbol => <CoinItem key={symbol} symbol={symbol} />);
+};

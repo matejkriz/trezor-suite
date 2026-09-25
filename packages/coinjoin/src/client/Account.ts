@@ -1,11 +1,11 @@
-import { Network } from '@trezor/utxo-lib';
+import { type Network } from '@trezor/utxo-lib';
 
+import { type RegisterAccountParams } from '../types';
+import { type AccountAddress, type AccountUtxo } from '../types/account';
+import { type AllowedScriptTypes, type Round } from '../types/coordinator';
+import { type RawLiquidityClue } from '../types/middleware';
 import { getScriptPubKeyFromAddress, prefixScriptPubKey } from '../utils/coordinatorUtils';
-import { getRoundEvents, compareOutpoint } from '../utils/roundUtils';
-import { AllowedScriptTypes, Round } from '../types/coordinator';
-import { RawLiquidityClue } from '../types/middleware';
-import { RegisterAccountParams } from '../types';
-import { AccountUtxo, AccountAddress } from '../types/account';
+import { compareOutpoint, getRoundEvents } from '../utils/roundUtils';
 
 const enhanceAccountUtxo = (
     utxos: Omit<AccountUtxo, 'scriptPubKey'>[],
@@ -47,7 +47,6 @@ export class Account {
     maxRounds: number;
     skipRounds?: [number, number];
     skipRoundCounter = 0;
-    signedRounds: string[] = [];
     rawLiquidityClue: RawLiquidityClue;
 
     constructor(account: RegisterAccountParams, network: Network) {

@@ -1,25 +1,22 @@
 import styled from 'styled-components';
-import BigNumber from 'bignumber.js';
-import { Translation, HiddenPlaceholder, FormattedDate } from 'src/components/suite';
-import { Account } from 'src/types/wallet';
 
+import { Translation } from '@suite/intl';
+import { DISCREET_PLACEHOLDER, useShouldRedactNumbers } from '@suite-common/discreet-mode';
 import { useFormatters } from '@suite-common/formatters';
-import { variables } from '@trezor/components';
+import { useDisplayBaseCurrency } from '@suite-common/wallet-core';
+import { asBaseCurrencyAmount } from '@suite-common/wallet-types';
+import { type BaseCurrencyCode } from '@trezor/blockchain-link-types';
+import { Grid } from '@trezor/components';
+import { exhaustive } from '@trezor/type-utils';
+import { BigNumber } from '@trezor/utils';
+
+import { FormattedDate, HiddenPlaceholder } from 'src/components/suite';
+import { useLayoutSize } from 'src/hooks/suite/useLayoutSize';
+import { type Account } from 'src/types/wallet';
+import { type AggregatedAccountHistory, type GraphRange } from 'src/types/wallet/graph';
+import { type FiatValueMap, sumFiatValueMap } from 'src/utils/wallet/graph';
 
 import { InfoCard } from './InfoCard';
-import { AggregatedAccountHistory, GraphRange } from 'src/types/wallet/graph';
-import { sumFiatValueMap } from 'src/utils/wallet/graph';
-
-const InfoCardsWrapper = styled.div`
-    display: grid;
-    margin-top: 20px;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-gap: 20px;
-
-    @media screen and (max-width: ${variables.SCREEN_SIZE.XL}) {
-        grid-template-columns: 1fr;
-    }
-`;
 
 const getFormattedLabelLong = (rangeLabel: GraphRange['label']) => {
     switch (rangeLabel) {
@@ -35,56 +32,82 @@ const getFormattedLabelLong = (rangeLabel: GraphRange['label']) => {
             return <Translation id="TR_DATE_WEEK_LONG" />;
         case 'day':
             return <Translation id="TR_DATE_DAY_LONG" />;
-        // no default
+        default:
+            return exhaustive(rangeLabel);
     }
 };
 
-interface SummaryCardProps {
+type SummaryCardProps = {
     selectedRange: GraphRange;
     data: AggregatedAccountHistory[];
-    dataInterval: [number, number];
-    localCurrency: string;
-    symbol: Account['symbol'];
+    dataInterval: [number | undefined, number | undefined];
+    localCurrency: BaseCurrencyCode;
+    account: Account;
     isLoading?: boolean;
-    className?: string;
-}
+    isGraphDataLoaded?: boolean;
+};
 
 const DateWrapper = styled.span`
     white-space: nowrap;
 `;
+
+const NumberOfTransactions = ({ value }: { value: number }) => (
+    <Translation
+        id="TR_N_TRANSACTIONS"
+        values={{ value: useShouldRedactNumbers() ? DISCREET_PLACEHOLDER : value }}
+    />
+);
 
 export const SummaryCards = ({
     selectedRange,
     data,
     dataInterval,
     localCurrency,
-    symbol,
+    account,
     isLoading,
-    className,
+    isGraphDataLoaded,
 }: SummaryCardProps) => {
-    const { FiatAmountFormatter } = useFormatters();
+    const { isBelowDesktop } = useLayoutSize();
+    const { BaseCurrencyAmountFormatter } = useFormatters();
     const [fromTimestamp, toTimestamp] = dataInterval;
-    // aggregate values from shown graph data
-    const numOfTransactions = data.reduce((acc, d) => (acc += d.txs), 0);
-    const totalSentAmount = data.reduce((acc, d) => acc.plus(d.sent), new BigNumber(0));
-    const totalReceivedAmount = data.reduce((acc, d) => acc.plus(d.received), new BigNumber(0));
-    const totalSentFiatMap: { [k: string]: string | undefined } = data.reduce(
+
+    const { shallDisplayBaseCurrency } = useDisplayBaseCurrency(account.symbol);
+
+    // Aggregate values from shown graph data.
+    const txsFromData = data.reduce((acc, d) => acc + d.txs, 0);
+    // only fall back to account.history.total before graph data has loaded.
+    const numOfTransactions = isGraphDataLoaded
+        ? txsFromData
+        : txsFromData || account.history.total;
+
+    // on some networks it is not easy to get total number of txs (e.g. Ripple & Stellar)
+    if (numOfTransactions === -1) {
+        return null;
+    }
+
+    const totalSentAmount = asBaseCurrencyAmount(
+        data.reduce((acc, d) => acc.plus(d.sent), new BigNumber(0)),
+    );
+    const totalReceivedAmount = asBaseCurrencyAmount(
+        data.reduce((acc, d) => acc.plus(d.received), new BigNumber(0)),
+    );
+    const totalSentFiatMap: FiatValueMap = data.reduce(
         (acc, d) => sumFiatValueMap(acc, d.sentFiat),
         {},
     );
-    const totalReceivedFiatMap: { [k: string]: string | undefined } = data.reduce(
+    const totalReceivedFiatMap: FiatValueMap = data.reduce(
         (acc, d) => sumFiatValueMap(acc, d.receivedFiat),
         {},
     );
 
     return (
-        <InfoCardsWrapper className={className}>
+        <Grid columns={isBelowDesktop ? 1 : 3} gap={20}>
             <InfoCard
                 title={getFormattedLabelLong(selectedRange.label)}
                 isLoading={isLoading}
                 value={
                     <HiddenPlaceholder>
-                        <Translation id="TR_N_TRANSACTIONS" values={{ value: numOfTransactions }} />
+                        <NumberOfTransactions value={numOfTransactions} />
                     </HiddenPlaceholder>
                 }
                 secondaryValue={
@@ -104,14 +127,14 @@ export const SummaryCards = ({
                 title={<Translation id="TR_INCOMING" />}
                 value={totalReceivedAmount.toFixed()}
                 secondaryValue={
-                    totalReceivedFiatMap[localCurrency] ? (
-                        <FiatAmountFormatter
+                    shallDisplayBaseCurrency && totalReceivedFiatMap[localCurrency] ? (
+                        <BaseCurrencyAmountFormatter
                             currency={localCurrency}
-                            value={totalReceivedFiatMap[localCurrency]!}
+                            value={totalReceivedFiatMap[localCurrency]}
                         />
                     ) : undefined
                 }
-                symbol={symbol}
+                symbol={account.symbol}
                 isLoading={isLoading}
                 isNumeric
             />
@@ -119,17 +142,17 @@ export const SummaryCards = ({
                 title={<Translation id="TR_OUTGOING" />}
                 value={totalSentAmount.negated().toFixed()}
                 secondaryValue={
-                    totalSentFiatMap[localCurrency] ? (
-                        <FiatAmountFormatter
+                    shallDisplayBaseCurrency && totalSentFiatMap[localCurrency] ? (
+                        <BaseCurrencyAmountFormatter
                             currency={localCurrency}
-                            value={totalSentFiatMap[localCurrency]!}
+                            value={totalSentFiatMap[localCurrency]}
                         />
                     ) : undefined
                 }
-                symbol={symbol}
+                symbol={account.symbol}
                 isLoading={isLoading}
                 isNumeric
             />
-        </InfoCardsWrapper>
+        </Grid>
     );
 };

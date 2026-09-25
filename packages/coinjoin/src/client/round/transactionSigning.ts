@@ -1,30 +1,32 @@
-import { arrayShuffle } from '@trezor/utils';
+import { arrayShuffle, getWeakRandomInt } from '@trezor/utils';
 
-import * as coordinator from '../coordinator';
-import * as middleware from '../middleware';
+import { TX_SIGNING_DELAY } from '../../constants';
+import { SessionPhase, WabiSabiProtocolErrorCode } from '../../enums';
+import { type CoinjoinTransactionData } from '../../types';
+import type { AliceShape } from '../../types/alice';
+import type { CoinjoinRoundOptions, CoinjoinRoundShape } from '../../types/round';
 import {
-    getRoundEvents,
-    compareOutpoint,
-    getAffiliateRequest,
-    scheduleDelay,
-} from '../../utils/roundUtils';
-import {
+    getAddressFromScriptPubKey,
     mergePubkeys,
+    prefixScriptPubKey,
+    readOutpoint,
     sortInputs,
     sortOutputs,
-    readOutpoint,
-    prefixScriptPubKey,
-    getAddressFromScriptPubKey,
 } from '../../utils/coordinatorUtils';
+import {
+    compareOutpoint,
+    getAffiliateRequest,
+    getRoundEvents,
+    getRoundParams,
+    getSigningSendDeadline,
+    scheduleDelay,
+} from '../../utils/roundUtils';
 import type { Account } from '../Account';
-import type { Alice } from '../Alice';
-import type { CoinjoinRound, CoinjoinRoundOptions } from '../CoinjoinRound';
-import { CoinjoinTransactionData } from '../../types';
-import { SessionPhase, WabiSabiProtocolErrorCode } from '../../enums';
-import { TX_SIGNING_DELAY } from '../../constants';
+import * as coordinator from '../coordinator';
+import * as middleware from '../middleware';
 
 const getTransactionData = (
-    round: CoinjoinRound,
+    round: CoinjoinRoundShape,
     options: CoinjoinRoundOptions,
 ): CoinjoinTransactionData => {
     const registeredInputs = getRoundEvents('InputAdded', round.coinjoinState.Events);
@@ -85,12 +87,21 @@ const getTransactionData = (
     return {
         inputs,
         outputs,
-        affiliateRequest: getAffiliateRequest(round.roundParameters, round.affiliateRequest),
+        affiliateRequest: {
+            ...getRoundParams(round.roundParameters),
+            ...(options.affiliationId
+                ? getAffiliateRequest(round.affiliateRequest)
+                : {
+                      mask_public_key: '',
+                      signature: '',
+                      coinjoin_flags_array: [],
+                  }),
+        },
     };
 };
 
 const updateRawLiquidityClue = async (
-    round: CoinjoinRound,
+    round: CoinjoinRoundShape,
     accounts: Account[],
     tx: CoinjoinTransactionData,
     options: CoinjoinRoundOptions,
@@ -98,7 +109,7 @@ const updateRawLiquidityClue = async (
     const result = await Promise.all(
         accounts.map(account => {
             const externalAmounts = tx.outputs
-                .filter(o => !account.changeAddresses.find(addr => addr.address === o.address))
+                .filter(o => !account.changeAddresses.some(addr => addr.address === o.address))
                 .map(o => o.amount);
 
             return middleware.updateLiquidityClue(
@@ -111,7 +122,8 @@ const updateRawLiquidityClue = async (
     );
 
     return accounts.map((account, index) => {
-        const rawLiquidityClue = result[index];
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const rawLiquidityClue: (typeof result)[number] = result[index];
         // NOTE: immediately update new value in Account
         // it's intentionally not updated by `updateAccount` to prevent race conditions
         account.updateRawLiquidityClue(rawLiquidityClue);
@@ -124,9 +136,9 @@ const updateRawLiquidityClue = async (
 };
 
 const sendTxSignature = async (
-    round: CoinjoinRound,
+    round: CoinjoinRoundShape,
     resolvedTime: number,
-    input: Alice,
+    input: AliceShape,
     { signal, coordinatorUrl, logger }: CoinjoinRoundOptions,
 ) => {
     // if DelayTransactionSigning is set then start sending signatures **after** 50 seconds reduced by time spent on actual signing on the device.
@@ -134,7 +146,12 @@ const sendTxSignature = async (
     const roundSigningDelay = round.roundParameters.DelayTransactionSigning ? TX_SIGNING_DELAY : 0;
     const minimumDelay = roundSigningDelay - resolvedTime;
     const maximumDelay = minimumDelay + TX_SIGNING_DELAY;
-    const delay = scheduleDelay(round.phaseDeadline - Date.now(), minimumDelay, maximumDelay);
+    // Size the randomized privacy spread against a poll-lag-safe deadline (see getSigningSendDeadline)
+    // so a witness is never delayed past the coordinator's real phase end. The request below keeps
+    // the optimistic `phaseDeadline` as its hard cancellation deadline.
+    const sendDeadline = getSigningSendDeadline(round);
+    const remainingTime = sendDeadline - Date.now();
+    const delay = scheduleDelay(remainingTime, minimumDelay, maximumDelay);
 
     logger.info(
         `Sending signature of ~~${input.outpoint}~~ with delay ${delay}ms. Round signing delay: ${round.roundParameters.DelayTransactionSigning}`,
@@ -164,10 +181,10 @@ const sendTxSignature = async (
 };
 
 export const transactionSigning = async (
-    round: CoinjoinRound,
+    round: CoinjoinRoundShape,
     accounts: Account[],
     options: CoinjoinRoundOptions,
-): Promise<CoinjoinRound> => {
+): Promise<CoinjoinRoundShape> => {
     const { logger } = options;
 
     logger.info(`transactionSigning: ~~${round.id}~~`);
@@ -188,7 +205,7 @@ export const transactionSigning = async (
         return round;
     }
 
-    if (!round.affiliateRequest) {
+    if (options.affiliationId && !round.affiliateRequest) {
         logger.warn(`Missing affiliate request. Waiting for status`);
         round.setSessionPhase(SessionPhase.AwaitingCoinjoinTransaction);
         round.transactionSignTries.push(Date.now());
@@ -224,7 +241,7 @@ export const transactionSigning = async (
 
         round.setSessionPhase(SessionPhase.SendingSignature);
         await Promise.all(
-            arrayShuffle(round.inputs).map(input =>
+            arrayShuffle(round.inputs, { randomInt: getWeakRandomInt }).map(input =>
                 sendTxSignature(round, resolvedTime, input, options),
             ),
         );

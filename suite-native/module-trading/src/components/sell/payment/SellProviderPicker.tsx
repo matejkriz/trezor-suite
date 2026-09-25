@@ -1,0 +1,128 @@
+import { StretchInY, StretchOutY } from 'react-native-reanimated';
+import { useSelector } from 'react-redux';
+
+import type { SellFiatTrade } from 'invity-api';
+
+import { useServices } from '@suite-common/dependency-injection';
+import { invariant } from '@suite-common/suite-utils';
+import {
+    type TradingRootState as TradingRootStateCommon,
+    selectTradingProviderByNameAndTradeType,
+    selectTradingSellIsLoading,
+    selectTradingSellProviders,
+} from '@suite-common/trading';
+import { events, injectNativeAnalytics } from '@suite-native/analytics';
+import { AnimatedBox } from '@suite-native/atoms';
+import { useTranslate } from '@suite-native/intl';
+import { OverviewRow, OverviewValueSkeleton, ProviderDisplay } from '@suite-native/trading-atoms';
+import {
+    type TradingRootState,
+    selectSellQuotesByPaymentMethod,
+} from '@suite-native/trading-state';
+
+import { useSheetControls } from '../../../hooks/general/useSheetControls';
+import { useSellFormContext } from '../../../hooks/sell/useSellFormContext';
+import { ProviderSheet } from '../../general/ProviderSheet/ProviderSheet';
+
+const PROVIDER_PICKER_TEST_ID = '@trading/sell/provider-picker';
+
+type SellProviderPickerRightProps = {
+    isLoading: boolean;
+    selectedValue: SellFiatTrade | undefined;
+};
+
+const SellProviderPickerRight = ({ isLoading, selectedValue }: SellProviderPickerRightProps) => {
+    const { translate } = useTranslate();
+    const { exchange } = selectedValue ?? {};
+
+    const provider = useSelector((state: TradingRootStateCommon) =>
+        selectTradingProviderByNameAndTradeType(state, exchange, 'sell'),
+    );
+
+    if (isLoading) {
+        return <OverviewValueSkeleton />;
+    }
+
+    invariant(provider, 'Selected provider should be defined');
+    const { companyName, logo } = provider;
+
+    return (
+        <ProviderDisplay
+            accessibilityLabel={translate('moduleTrading.tradingScreen.selectedProvider')}
+            logo={logo}
+            providerName={companyName}
+            testID={PROVIDER_PICKER_TEST_ID + '/value'}
+        />
+    );
+};
+
+export const SellProviderPicker = () => {
+    const { translate } = useTranslate();
+    const { analytics } = useServices(injectNativeAnalytics);
+    const form = useSellFormContext();
+    const providers = useSelector(selectTradingSellProviders);
+    const isLoading = useSelector(selectTradingSellIsLoading);
+    const { isSheetVisible, hideSheet, showSheet, setSelectedValue, selectedValue } =
+        useSheetControls(form, 'quote');
+
+    const { paymentMethod } = selectedValue ?? {};
+    const quotes = useSelector((state: TradingRootState) =>
+        selectSellQuotesByPaymentMethod(state, paymentMethod),
+    );
+
+    const shouldShowPicker = (providers && Object.values(quotes).flat().length > 0) || isLoading;
+
+    if (!shouldShowPicker) {
+        return null;
+    }
+
+    const handleProviderPress = () => {
+        if (isLoading) return;
+
+        showSheet();
+        analytics.report({
+            type: events.tradingCompareOffersEvent.name,
+            payload: {
+                type: 'sell',
+            },
+        });
+    };
+
+    const handleQuoteSelect = (quote: SellFiatTrade) => {
+        setSelectedValue(quote);
+
+        if (selectedValue?.exchange === quote.exchange) return;
+
+        analytics.report({
+            type: events.tradingParameterChangedEvent.name,
+            payload: {
+                type: 'sell',
+                parameter: 'provider',
+            },
+        });
+    };
+
+    return (
+        <>
+            <AnimatedBox entering={StretchInY} exiting={StretchOutY}>
+                <OverviewRow
+                    title={translate('moduleTrading.tradingScreen.provider')}
+                    onPress={handleProviderPress}
+                    noCaret={isLoading}
+                    testID={PROVIDER_PICKER_TEST_ID}
+                    noBottomBorder
+                >
+                    <SellProviderPickerRight isLoading={isLoading} selectedValue={selectedValue} />
+                </OverviewRow>
+            </AnimatedBox>
+            <ProviderSheet
+                quotes={quotes}
+                isVisible={isSheetVisible}
+                onClose={hideSheet}
+                onQuoteSelect={handleQuoteSelect}
+                selectedQuote={selectedValue}
+                tradingType="sell"
+            />
+        </>
+    );
+};

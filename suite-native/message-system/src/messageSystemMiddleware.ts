@@ -1,18 +1,28 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 
-import { createMiddleware } from '@suite-common/redux-utils';
+import { deviceActions, selectSelectedDevice } from '@suite-common/device';
+import { geolocationActions, selectCountryCode } from '@suite-common/geolocation';
 import {
-    messageSystemActions,
     categorizeMessages,
+    getValidExperimentIds,
     getValidMessages,
+    messageSystemActions,
     selectMessageSystemConfig,
 } from '@suite-common/message-system';
-import { deviceActions, selectAccountsSymbols, selectDevice } from '@suite-common/wallet-core';
+import { createMiddleware } from '@suite-common/redux-utils';
+import { changeNetworks } from '@suite-common/wallet-core';
+import { selectDeviceEnabledDiscoveryNetworkSymbols } from '@suite-native/discovery';
 
 const isAnyOfMessageSystemAffectingActions = isAnyOf(
     messageSystemActions.fetchSuccessUpdate,
+    messageSystemActions.addMessage,
+    messageSystemActions.removeMessage,
+    messageSystemActions.addExperiment,
+    messageSystemActions.removeExperiment,
     deviceActions.selectDevice,
     deviceActions.connectDevice,
+    changeNetworks,
+    geolocationActions.setCountryCode,
 );
 
 export const messageSystemMiddleware = createMiddleware((action, { next, dispatch, getState }) => {
@@ -22,20 +32,25 @@ export const messageSystemMiddleware = createMiddleware((action, { next, dispatc
 
     if (isAnyOfMessageSystemAffectingActions(action)) {
         const config = selectMessageSystemConfig(getState());
-        const device = selectDevice(getState());
-        const enabledNetworks = selectAccountsSymbols(getState());
+        const device = selectSelectedDevice(getState());
+        const enabledNetworks = selectDeviceEnabledDiscoveryNetworkSymbols(getState());
+        const countryCode = selectCountryCode(getState());
 
-        const validMessages = getValidMessages(config, {
+        const validationParams = {
             device,
             settings: {
                 tor: false, // not supported in suite-native
                 enabledNetworks,
             },
-        });
+            countryCode,
+        };
+        const validMessages = getValidMessages(config, validationParams);
+        const validExperimentIds = getValidExperimentIds(config, validationParams);
 
         const categorizedValidMessages = categorizeMessages(validMessages);
 
         dispatch(messageSystemActions.updateValidMessages(categorizedValidMessages));
+        dispatch(messageSystemActions.updateValidExperiments(validExperimentIds));
     }
 
     return action;

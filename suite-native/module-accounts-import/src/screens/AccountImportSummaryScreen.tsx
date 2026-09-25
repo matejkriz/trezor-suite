@@ -1,13 +1,23 @@
+import { useSelector } from 'react-redux';
+
+import type { DeviceRootState } from '@suite-common/device';
 import {
-    StackToTabCompositeScreenProps,
-    Screen,
-    AccountsImportStackRoutes,
-    RootStackParamList,
-    AccountsImportStackParamList,
+    type AccountsRootState,
+    selectDeviceAccountByDescriptorAndNetworkSymbol,
+} from '@suite-common/wallet-core';
+import { ErrorMessage } from '@suite-native/atoms';
+import { selectDiscoveryNetworkSymbols } from '@suite-native/discovery';
+import { Translation } from '@suite-native/intl';
+import {
+    type AccountsImportStackParamList,
+    type AccountsImportStackRoutes,
+    type RootStackParamList,
+    type StackToTabCompositeScreenProps,
+    useInterceptNativeNavigation,
 } from '@suite-native/navigation';
 
-import { AccountImportSubHeader } from '../components/AccountImportSubHeader';
-import { AccountImportSummary } from '../components/AccountImportSummary';
+import { AccountAlreadyImportedScreen } from '../components/AccountAlreadyImportedScreen';
+import { AccountImportConfirmFormScreen } from '../components/AccountImportConfirmFormScreen';
 
 export const AccountImportSummaryScreen = ({
     route,
@@ -18,9 +28,30 @@ export const AccountImportSummaryScreen = ({
 >) => {
     const { accountInfo, networkSymbol } = route.params;
 
-    return (
-        <Screen screenHeader={<AccountImportSubHeader />}>
-            <AccountImportSummary accountInfo={accountInfo} networkSymbol={networkSymbol} />
-        </Screen>
+    useInterceptNativeNavigation();
+
+    const account = useSelector((state: AccountsRootState & DeviceRootState) =>
+        selectDeviceAccountByDescriptorAndNetworkSymbol(
+            state,
+            accountInfo.descriptor,
+            networkSymbol,
+        ),
     );
+    const supportedNetworks = useSelector(selectDiscoveryNetworkSymbols);
+
+    const isAccountImportSupported = supportedNetworks.includes(networkSymbol);
+
+    if (!isAccountImportSupported) {
+        return (
+            <ErrorMessage
+                errorMessage={<Translation id="moduleAccountImport.error.unsupportedNetworkType" />}
+            />
+        );
+    }
+
+    if (account) {
+        return <AccountAlreadyImportedScreen account={account} />;
+    }
+
+    return <AccountImportConfirmFormScreen symbol={networkSymbol} accountInfo={accountInfo} />;
 };

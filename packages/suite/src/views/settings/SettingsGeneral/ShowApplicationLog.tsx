@@ -1,40 +1,38 @@
-import { openModal } from 'src/actions/suite/modalActions';
-import { useDispatch } from 'src/hooks/suite';
-import {
-    ActionButton,
-    ActionColumn,
-    SectionItem,
-    TextColumn,
-    Translation,
-} from 'src/components/suite';
-import { useAnchor } from 'src/hooks/suite/useAnchor';
-import { SettingsAnchor } from 'src/constants/suite/anchors';
+import { Translation } from '@suite/intl';
+import { openModal } from '@suite/modal';
+import { Anchor, SettingsAnchor } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { ActionButton, ActionColumn, SectionItem, TextColumn } from '@trezor/product-components';
 
 export const ShowApplicationLog = () => {
-    const dispatch = useDispatch();
-    const { anchorRef, shouldHighlight } = useAnchor(SettingsAnchor.ShowLog);
+    const { dispatch } = useServices(injectDispatch);
 
     const handleClick = () => dispatch(openModal({ type: 'application-log' }));
 
     return (
-        <SectionItem
-            data-test="@settings/application-log"
-            ref={anchorRef}
-            shouldHighlight={shouldHighlight}
-        >
-            <TextColumn
-                title={<Translation id="TR_LOG" />}
-                description={<Translation id="TR_LOG_DESCRIPTION" />}
-            />
-            <ActionColumn>
-                <ActionButton
-                    onClick={handleClick}
-                    variant="secondary"
-                    data-test="@settings/show-log-button"
+        <Anchor anchorId={SettingsAnchor.ShowLog}>
+            {({ anchorId, anchorRef, shouldHighlight }) => (
+                <SectionItem
+                    data-testid={anchorId}
+                    ref={anchorRef}
+                    shouldHighlight={shouldHighlight}
                 >
-                    <Translation id="TR_SHOW_LOG" />
-                </ActionButton>
-            </ActionColumn>
-        </SectionItem>
+                    <TextColumn
+                        title={<Translation id="TR_LOG" />}
+                        description={<Translation id="TR_LOG_DESCRIPTION" />}
+                    />
+                    <ActionColumn>
+                        <ActionButton
+                            onClick={handleClick}
+                            intent="brand"
+                            data-testid="@settings/show-log-button"
+                        >
+                            <Translation id="TR_SHOW_LOG" />
+                        </ActionButton>
+                    </ActionColumn>
+                </SectionItem>
+            )}
+        </Anchor>
     );
 };

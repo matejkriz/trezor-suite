@@ -1,12 +1,15 @@
-import { Card, HStack, IconButton, Text, VStack } from '@suite-native/atoms';
-import { Icon } from '@suite-common/icons';
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-import { Color } from '@trezor/theme';
+import { Card, HStack, IconButton, Text, TitledSection, VStack } from '@suite-native/atoms';
+import { useCoinLabel } from '@suite-native/device';
+import { Icon } from '@suite-native/icons';
+import { Translation } from '@suite-native/intl';
 import { useOpenLink } from '@suite-native/link';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
+import { type Color } from '@trezor/theme';
+import { TREZOR_INSTAGRAM_URL, TREZOR_TIKTOK_URL, TREZOR_X_URL } from '@trezor/urls';
 
 const cardStyle = prepareNativeStyle<{ backgroundColor: Color }>((utils, { backgroundColor }) => ({
-    paddingHorizontal: utils.spacings.large,
-    paddingVertical: utils.spacings.large * 2,
+    paddingHorizontal: utils.spacings.sp24,
+    paddingVertical: utils.spacings.sp24,
     backgroundColor: utils.colors[backgroundColor],
 }));
 
@@ -23,57 +26,68 @@ const trezorDescriptionTextStyle = prepareNativeStyle(_ => ({
 export const AboutUsBanners = () => {
     const openLink = useOpenLink();
     const { applyStyle } = useNativeStyles();
+    const coinLabel = useCoinLabel();
 
     return (
-        <VStack>
-            <Card style={applyStyle(cardStyle, { backgroundColor: 'backgroundNeutralBold' })}>
-                <VStack spacing="large" style={applyStyle(stackStyle)}>
-                    <Icon color="iconOnPrimary" name="trezor" />
-                    <Text
-                        textAlign="center"
-                        color="textOnPrimary"
-                        variant="titleSmall"
-                        style={applyStyle(trezorDescriptionTextStyle)}
-                    >
-                        Trezor Suite Lite is a safe and secure way to stay connected to the crypto
-                        on your hardware wallet. Track coin balances on the go without exposing your
-                        private data. Easily create and send payment addresses to anyone.
-                    </Text>
-                </VStack>
-            </Card>
-            <Card style={applyStyle(cardStyle, { backgroundColor: 'backgroundSecondaryDefault' })}>
-                <VStack spacing="large" style={applyStyle(stackStyle)}>
-                    <Text color="textDefaultInverted" variant="titleMedium">
-                        Follow us
-                    </Text>
-                    <HStack spacing="large">
-                        <IconButton
-                            size="large"
-                            colorScheme="tertiaryElevation1"
-                            iconName="facebook"
-                            accessibilityRole="link"
-                            accessibilityLabel="facebook"
-                            onPress={() => openLink('https://www.facebook.com/trezor.io')}
-                        />
-                        <IconButton
-                            size="large"
-                            colorScheme="tertiaryElevation1"
-                            iconName="twitter"
-                            accessibilityRole="link"
-                            accessibilityLabel="twitter"
-                            onPress={() => openLink('https://twitter.com/Trezor')}
-                        />
-                        <IconButton
-                            size="large"
-                            colorScheme="tertiaryElevation1"
-                            iconName="github"
-                            accessibilityRole="link"
-                            accessibilityLabel="github"
-                            onPress={() => openLink('https://github.com/trezor')}
-                        />
-                    </HStack>
-                </VStack>
-            </Card>
-        </VStack>
+        <TitledSection title={<Translation id="moduleSettings.aboutUs.title" />}>
+            <VStack>
+                <Card
+                    style={applyStyle(cardStyle, {
+                        backgroundColor: 'elementFillContrast',
+                    })}
+                >
+                    <VStack spacing="sp24" style={applyStyle(stackStyle)}>
+                        <Icon color="contentPrimaryInverse" name="trezorLogo" />
+                        <Text
+                            textAlign="center"
+                            color="contentPrimaryInverse"
+                            variant="headline-sm"
+                            style={applyStyle(trezorDescriptionTextStyle)}
+                        >
+                            <Translation
+                                id="moduleSettings.aboutUs.text"
+                                values={{
+                                    coinLabel,
+                                }}
+                            />
+                        </Text>
+                    </VStack>
+                </Card>
+                <Card
+                    style={applyStyle(cardStyle, {
+                        backgroundColor: 'elementFillBrandBold',
+                    })}
+                >
+                    <VStack spacing="sp24" style={applyStyle(stackStyle)}>
+                        <Text color="contentButtonBrandPrimary" variant="headline-md">
+                            <Translation id="moduleSettings.aboutUs.followUs" />
+                        </Text>
+                        <HStack spacing="sp24">
+                            <IconButton
+                                intent="neutral"
+                                priority="primary"
+                                isInverse={true}
+                                iconName="twitterLogo"
+                                onPress={() => openLink(TREZOR_X_URL, { enforce: true })}
+                            />
+                            <IconButton
+                                intent="neutral"
+                                priority="primary"
+                                isInverse={true}
+                                iconName="tiktokLogo"
+                                onPress={() => openLink(TREZOR_TIKTOK_URL, { enforce: true })}
+                            />
+                            <IconButton
+                                intent="neutral"
+                                priority="primary"
+                                isInverse={true}
+                                iconName="instagramLogo"
+                                onPress={() => openLink(TREZOR_INSTAGRAM_URL, { enforce: true })}
+                            />
+                        </HStack>
+                    </VStack>
+                </Card>
+            </VStack>
+        </TitledSection>
     );
 };

@@ -1,267 +1,645 @@
-import { useState } from 'react';
-import styled from 'styled-components';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { useSelector } from 'react-redux';
 
-import { accountsActions, selectDeviceSupportedNetworks } from '@suite-common/wallet-core';
-import { arrayPartition } from '@trezor/utils';
-import { NetworkSymbol } from '@suite-common/wallet-config';
-import { Button, CoinLogo, CollapsibleBox } from '@trezor/components';
-import { FirmwareType } from '@trezor/connect';
-import { spacingsPx } from '@trezor/theme';
-import { Translation, Modal, CoinList } from 'src/components/suite';
-import { NETWORKS } from 'src/config/wallet';
-import { Account, Network } from 'src/types/wallet';
-import { TrezorDevice } from 'src/types/suite';
-import { useSelector, useDispatch } from 'src/hooks/suite';
-import { changeCoinVisibility } from 'src/actions/settings/walletSettingsActions';
-import { goto } from 'src/actions/suite/routerActions';
-import { selectIsPublic } from 'src/reducers/wallet/coinjoinReducer';
-import { useEnabledNetworks } from 'src/hooks/settings/useEnabledNetworks';
+import { events, injectDesktopAnalytics } from '@suite/analytics';
+import { selectIsPublic } from '@suite/coinjoin';
+import { selectIsDebugModeActive } from '@suite/debug';
+import { Translation } from '@suite/intl';
+import { preserveModal } from '@suite/modal';
+import { selectIsTestnetNetworksEnabled } from '@suite/settings';
+import { useServices } from '@suite-common/dependency-injection';
+import { selectSupportedNetworkSymbols } from '@suite-common/networks';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { notificationsActions } from '@suite-common/toast-notifications';
+import {
+    type Network,
+    type NetworkAccount,
+    type NetworkSymbol,
+    getNetwork,
+} from '@suite-common/wallet-config';
+import {
+    accountsActions,
+    changeCoinVisibilityThunk,
+    reportWalletBalanceThunk,
+    selectAccounts,
+    selectEnabledNetworks,
+} from '@suite-common/wallet-core';
+import { getAvailableAccountTypes, prepareNewAccountPayload } from '@suite-common/wallet-utils';
+import { Box, Column, Icon, Modal, Tooltip } from '@trezor/components';
+import { hasBitcoinOnlyFirmware } from '@trezor/device-utils';
+import { InfoIcon } from '@trezor/icons';
+
+import { NetworkSettingsSearchInput } from 'src/components/suite/NetworkList/NetworkSettingsSearchInput';
+import { AddAccountBannerAboutNetworks } from 'src/components/suite/modals/ReduxModal/UserContextModal/AddAccountModal/AddAccountBannerAboutNetworks';
+import { useAvailableNetworkSymbols } from 'src/components/wallet/WalletLayout/AccountsMenu/useAvailableNetworkSymbols';
+import { useNetworkSupport } from 'src/hooks/settings/useNetworkSupport';
+import { useAccountSearch } from 'src/hooks/suite';
+import { type TrezorDevice } from 'src/types/suite';
+import { type Account } from 'src/types/wallet';
+import { NoNetworkSearchResults } from 'src/views/settings/SettingsCoins/NoNetworkSearchResults';
+import { useNetworkSettingsSearch } from 'src/views/settings/SettingsCoins/useNetworkSettingsSearch';
+
 import { AccountTypeSelect } from './AccountTypeSelect/AccountTypeSelect';
-import { SelectNetwork } from './SelectNetwork';
 import { AddAccountButton } from './AddAccountButton/AddAccountButton';
+import { SelectNetwork } from './SelectNetwork';
+import { getSortedNetworks, getVisibleAccountCounts } from './addAccountModalUtils';
+import { useNetworkActivationQueue } from './useNetworkActivationQueue';
+import { verifyAvailability } from './verifyAvailability';
+import { AdvancedCoinSettingsModal } from '../AdvancedCoinSettingsModal/AdvancedCoinSettingsModal';
 
-const StyledModal = styled(Modal)`
-    width: 480px;
-    text-align: left;
-`;
-
-const NetworksWrapper = styled.div`
-    display: flex;
-    flex-direction: column;
-    gap: ${spacingsPx.md};
-`;
-
-const CoinLogoWrapper = styled.span`
-    display: inline;
-    margin-right: ${spacingsPx.xxs};
-    vertical-align: text-top;
-`;
-
-const StyledCollapsibleBox = styled(CollapsibleBox)`
-    margin-top: ${spacingsPx.md};
-`;
-
-interface AddAccountProps {
+type AddAccountProps = {
     device: TrezorDevice;
+    // Callback when modal is closed, same as any other modal.
     onCancel: () => void;
+    // Callback when the add-account flow completed successfully enough to resume the parent flow.
+    onConfirm?: () => void;
     symbol?: NetworkSymbol;
-    noRedirect?: boolean;
-}
+    isCoinjoinDisabled?: boolean;
+    isBackClickDisabled?: boolean;
+    onBack?: () => void;
+    // Callback when the flow produced a specific single usable account (not when enabling a pinned network).
+    onAddAccount?: (account: Account) => void;
+};
 
-export const AddAccountModal = ({ device, onCancel, symbol, noRedirect }: AddAccountProps) => {
-    const accounts = useSelector(state => state.wallet.accounts);
-    const supportedNetworkSymbols = useSelector(selectDeviceSupportedNetworks);
-    const app = useSelector(state => state.router.app);
-    const debug = useSelector(state => state.suite.settings.debug);
+export const AddAccountModal = ({
+    device,
+    onCancel,
+    onConfirm,
+    symbol,
+    onAddAccount,
+    onBack,
+    isCoinjoinDisabled,
+    isBackClickDisabled,
+}: AddAccountProps) => {
+    const accounts = useSelector(selectAccounts);
+    const isDebug = useSelector(selectIsDebugModeActive);
     const isCoinjoinPublic = useSelector(selectIsPublic);
-    const dispatch = useDispatch();
+    const enabledNetworkSymbols = useSelector(selectEnabledNetworks);
+    const useTestnetNetworks = useSelector(selectIsTestnetNetworksEnabled);
+    const allNetworkSymbols = useSelector(selectSupportedNetworkSymbols);
+    const { activateNetwork, activatingNetworkSymbols, activationErrors } =
+        useNetworkActivationQueue(device);
 
-    const { mainnets, testnets, enabledNetworks: enabledNetworkSymbols } = useEnabledNetworks();
+    const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
+    const { setCoinFilter, setSearchString, coinFilter } = useAccountSearch();
 
-    const getSupportedNetworks = (networks: Network[]) =>
-        networks.filter(network => supportedNetworkSymbols.includes(network.symbol));
+    const closeModalAndNotifyCompletion = useCallback(() => {
+        onCancel();
+        onConfirm?.();
+    }, [onCancel, onConfirm]);
 
-    const supportedMainnets = getSupportedNetworks(mainnets);
-    const supportedTestnets = getSupportedNetworks(testnets);
+    const resetAccountSearch = (networkSymbol: NetworkSymbol) => {
+        // Reset the account search so the new account is visible in the list.
+        setSearchString(undefined);
+        if (coinFilter && !coinFilter.includes(networkSymbol)) {
+            // Reset an active filter only when it does not include the added account.
+            setCoinFilter([]);
+        }
+    };
+
+    const reportNewAccountAnalytics = (
+        account: Pick<Account, 'accountType' | 'path' | 'symbol'>,
+    ) => {
+        analytics.report({
+            type: events.accountsNewAccountEvent.name,
+            payload: {
+                type: account.accountType,
+                path: account.path,
+                symbol: account.symbol,
+            },
+        });
+    };
+
+    const { supportedMainnets, supportedTestnets } = useNetworkSupport();
+
     const supportedNetworks = [...supportedMainnets, ...supportedTestnets];
-    const allTestnetNetworksDisabled = supportedTestnets.some(network =>
+    const allTestnetNetworksDisabled = !supportedTestnets.some(network =>
         enabledNetworkSymbols.includes(network.symbol),
     );
+    const isBitcoinOnlyFirmware = hasBitcoinOnlyFirmware(device);
 
-    const isCoinjoinVisible = isCoinjoinPublic || debug.showDebugMenu;
-
-    // applied when changing account in coinmarket exchange receive options context
+    // Applied when changing account in trading exchange receive options context.
     const networkPinned = !!symbol;
+    const shouldKeepModalOpen = !networkPinned && !onAddAccount;
     const preselectedNetwork = symbol && supportedNetworks.find(n => n.symbol === symbol);
-    // or in case of only btc is enabled on bitcoin-only firmware
-    const bitcoinNetwork = NETWORKS.find(n => n.symbol === 'btc');
+    // Applied when only BTC is enabled on bitcoin-only firmware.
     const bitcoinOnlyDefaultNetworkSelection =
-        device.firmwareType === FirmwareType.BitcoinOnly &&
-        supportedMainnets.length === 1 &&
-        allTestnetNetworksDisabled
-            ? bitcoinNetwork
+        isBitcoinOnlyFirmware && supportedMainnets.length === 1 && allTestnetNetworksDisabled
+            ? getNetwork('btc')
             : undefined;
 
-    const [selectedNetwork, setSelectedNetwork] = useState<Network | undefined>(
-        preselectedNetwork || bitcoinOnlyDefaultNetworkSelection,
+    const isCoinjoinVisible = (isCoinjoinPublic || isDebug) && !isCoinjoinDisabled;
+
+    const getAccountTypesForNetwork = useCallback(
+        (network?: Network) => {
+            if (!network || !enabledNetworkSymbols.includes(network.symbol)) {
+                return undefined;
+            }
+
+            return getAvailableAccountTypes(network.symbol, {
+                isCoinjoinVisible,
+                isDebug,
+            });
+        },
+        [enabledNetworkSymbols, isCoinjoinVisible, isDebug],
     );
 
-    const isSelectedNetworkEnabled =
-        !!selectedNetwork && enabledNetworkSymbols.includes(selectedNetwork.symbol);
-    const [enabledNetworks, disabledNetworks] = arrayPartition(supportedNetworks, network =>
-        enabledNetworkSymbols.includes(network.symbol),
+    const defaultAccountTypeSelectionNetwork =
+        preselectedNetwork || bitcoinOnlyDefaultNetworkSelection;
+    const initialAccountTypeSelectionNetwork =
+        defaultAccountTypeSelectionNetwork &&
+        (getAccountTypesForNetwork(defaultAccountTypeSelectionNetwork)?.length ?? 0) > 1
+            ? defaultAccountTypeSelectionNetwork
+            : undefined;
+
+    const [accountTypeSelectionNetwork, setAccountTypeSelectionNetwork] = useState<
+        Network | undefined
+    >(initialAccountTypeSelectionNetwork);
+    const [selectedAccount, setSelectedAccount] = useState<NetworkAccount | undefined>(undefined);
+    const [advancedSettingsSymbol, setAdvancedSettingsSymbol] = useState<
+        NetworkSymbol | undefined
+    >();
+    // TODO after this refactoring, no need to track it here, it will be a selector https://github.com/trezor/trezor-suite/issues/31779
+    const [addingAccountNetworkSymbol, setAddingAccountNetworkSymbol] = useState<NetworkSymbol>();
+    const addingAccountNetworkSymbolRef = useRef<NetworkSymbol | undefined>(undefined);
+
+    const closeAdvancedSettings = () => setAdvancedSettingsSymbol(undefined);
+    const shouldStartAddingAccount = (networkSymbol: NetworkSymbol) => {
+        if (addingAccountNetworkSymbolRef.current) {
+            return false;
+        }
+
+        addingAccountNetworkSymbolRef.current = networkSymbol;
+        setAddingAccountNetworkSymbol(networkSymbol);
+
+        return true;
+    };
+    const finishAddingAccount = () => {
+        addingAccountNetworkSymbolRef.current = undefined;
+        setAddingAccountNetworkSymbol(undefined);
+    };
+
+    const availableNetworksSymbols = useAvailableNetworkSymbols();
+
+    const enabledNetworks = availableNetworksSymbols.map(networkSymbol =>
+        getNetwork(networkSymbol),
     );
-    const [disabledMainnetNetworks, disabledTestnetNetworks] = arrayPartition(
-        disabledNetworks,
-        network => !network?.testnet,
+    const disabledNetworks = supportedNetworks.filter(
+        network => !availableNetworksSymbols.includes(network.symbol),
+    );
+    // `getSortedNetworks` sorts first enabled, then disabled networks. But we call it only once to maintain
+    // a stable order, so that the network rows don't jump around when networks are enabled/disabled.
+    const [stableNetworks] = useState(() =>
+        getSortedNetworks({
+            availableNetworks: [
+                ...supportedMainnets,
+                ...(useTestnetNetworks ? supportedTestnets : []),
+            ],
+            enabledNetworkSymbols: availableNetworksSymbols,
+        }),
+    );
+    const allSearchableNetworks = networkPinned ? [] : stableNetworks;
+
+    const {
+        searchQuery,
+        hasNoSearchResults,
+        filterNetworks,
+        handleSearchChange,
+        handleSearchClear,
+    } = useNetworkSettingsSearch(allSearchableNetworks, { origin: 'add-account' });
+
+    const filteredNetworks = filterNetworks(stableNetworks);
+    const accountCounts = useMemo(
+        () => getVisibleAccountCounts(accounts, device.state?.staticSessionId),
+        [accounts, device.state?.staticSessionId],
     );
 
     // Collect all empty accounts related to selected device and selected accountType
-    const currentType = selectedNetwork?.accountType ?? 'normal';
-    const emptyAccounts = selectedNetwork
-        ? accounts.filter(
-              a =>
-                  a.deviceState === device.state &&
-                  a.symbol === selectedNetwork.symbol &&
-                  a.accountType === currentType &&
-                  a.empty,
-          )
+    const currentType = selectedAccount?.accountType ?? 'normal';
+    const scopedAccounts = accountTypeSelectionNetwork
+        ? accounts
+              .filter(
+                  a =>
+                      a.deviceState === device.state?.staticSessionId &&
+                      a.symbol === accountTypeSelectionNetwork.symbol &&
+                      a.accountType === currentType,
+              )
+              .toSorted((a, b) => a.index - b.index)
+        : [];
+    const symbolPinnedEmptyAccounts = preselectedNetwork
+        ? accounts
+              .filter(
+                  a =>
+                      a.deviceState === device.state?.staticSessionId &&
+                      a.symbol === preselectedNetwork.symbol &&
+                      a.accountType === currentType,
+              )
+              .filter(a => a.empty)
         : [];
 
-    // Collect possible accountTypes
-    const accountTypes =
-        isSelectedNetworkEnabled && selectedNetwork?.networkType === 'bitcoin'
-            ? NETWORKS.filter(n => n.symbol === selectedNetwork.symbol)
-                  /**
-                   * Filter out coinjoin account type if it is not visible.
-                   * Visibility of coinjoin account type depends on coinjoin feature config in message system.
-                   * By default it is visible publicly, but it can be remotely hidden under debug menu.
-                   */
-                  .filter(({ backendType }) => backendType !== 'coinjoin' || isCoinjoinVisible)
-            : undefined;
+    const filterNetworksBySymbol = (items: Network[], networkSymbol?: NetworkSymbol) =>
+        networkSymbol ? items.filter(network => network.symbol === networkSymbol) : items;
 
-    const selectedNetworks = selectedNetwork ? [selectedNetwork.symbol] : [];
+    const filteredDisabledNetworks = filterNetworksBySymbol(disabledNetworks, symbol);
+    const filteredEnabledNetworks = filterNetworksBySymbol(enabledNetworks, symbol);
 
-    const selectNetwork = (symbol?: Network['symbol']) => {
-        if (symbol) {
-            const networkToSelect = NETWORKS.find(n => n.symbol === symbol);
+    const visibleNetworks =
+        symbolPinnedEmptyAccounts.length > 0 ? filteredEnabledNetworks : filteredDisabledNetworks;
 
-            // To prevent account type selection reset
-            const alreadySelected =
-                !!networkToSelect && networkToSelect?.symbol === selectedNetwork?.symbol;
+    const accountTypes = getAccountTypesForNetwork(accountTypeSelectionNetwork);
 
-            if (networkToSelect && !networkPinned && !alreadySelected) {
-                setSelectedNetwork(networkToSelect);
-            }
-        } else {
-            setSelectedNetwork(undefined);
+    // Mirrors the validation of the account-type-selection "Add" button for the inline
+    // network-row buttons: disable + explain when an account can't be added (e.g. the
+    // previous account is still empty, or the device lacks the capability).
+    const getAddDisabledMessage = useCallback(
+        (network: Network) => {
+            // The inline button only adds an account directly for already-enabled networks
+            // with a single account type. Disabled networks just get enabled and multi-type
+            // networks open the account-type-selection step, so neither needs this guard.
+            if (!enabledNetworkSymbols.includes(network.symbol)) return undefined;
+
+            const networkAccountTypes = getAccountTypesForNetwork(network);
+            if (!networkAccountTypes || networkAccountTypes.length > 1) return undefined;
+
+            const defaultAccountTypeName = networkAccountTypes[0]?.accountType ?? 'normal';
+            const networkScopedAccounts = accounts.filter(
+                account =>
+                    account.deviceState === device.state?.staticSessionId &&
+                    account.symbol === network.symbol &&
+                    account.accountType === defaultAccountTypeName,
+            );
+            const defaultAccount = networkScopedAccounts
+                .toSorted((a, b) => a.index - b.index)
+                .at(-1);
+            const unavailableCapability = device.unavailableCapabilities?.[defaultAccountTypeName];
+
+            const disabledMessage = verifyAvailability({
+                emptyAccounts: networkScopedAccounts.filter(
+                    account => account.empty && !account.visible,
+                ),
+                account: defaultAccount,
+                unavailableCapability,
+            });
+
+            return disabledMessage ? <Translation id={disabledMessage} /> : undefined;
+        },
+        [
+            accounts,
+            device.state?.staticSessionId,
+            device.unavailableCapabilities,
+            enabledNetworkSymbols,
+            getAccountTypesForNetwork,
+        ],
+    );
+
+    function enablePinnedNetwork(network: Network) {
+        dispatch(changeCoinVisibilityThunk({ symbol: network.symbol, shouldBeVisible: true }));
+        closeModalAndNotifyCompletion();
+    }
+
+    async function enableAccount(
+        account: Account,
+        {
+            selectedAccount: nextSelectedAccount = selectedAccount,
+            accountTypes: nextAccountTypes = accountTypes,
+        }: {
+            selectedAccount?: NetworkAccount;
+            accountTypes?: NetworkAccount[];
+        } = {},
+    ) {
+        if (addingAccountNetworkSymbolRef.current) {
+            return;
         }
-    };
-    const enableNetwork = () => {
-        onCancel();
-        if (selectedNetwork) {
-            dispatch(changeCoinVisibility(selectedNetwork.symbol, true));
-            if (app === 'wallet' && !noRedirect) {
-                // redirect to account only if added from "wallet" app
-                dispatch(
-                    goto('wallet-index', {
-                        params: {
-                            symbol: selectedNetwork.symbol,
-                            accountIndex: 0,
-                            accountType: 'normal',
-                        },
-                    }),
-                );
-            }
+
+        if (shouldKeepModalOpen) {
+            dispatch(preserveModal());
         }
-    };
-    const addAccount = (account: Account) => {
-        onCancel();
-        dispatch(accountsActions.changeAccountVisibility(account));
-        if (app === 'wallet' && !noRedirect) {
-            // redirect to account only if added from "wallet" app
+
+        const finishEnableAccount = (addedAccount: Account) => {
+            resetAccountSearch(addedAccount.symbol);
+            reportNewAccountAnalytics(addedAccount);
+            dispatch(reportWalletBalanceThunk());
             dispatch(
-                goto('wallet-index', {
-                    params: {
-                        symbol: account.symbol,
-                        accountIndex: account.index,
-                        accountType: account.accountType,
-                    },
+                notificationsActions.addToast({
+                    type: 'account-added',
+                    networkName: getNetwork(addedAccount.symbol).name,
                 }),
             );
+
+            if (shouldKeepModalOpen) {
+                setAccountTypeSelectionNetwork(undefined);
+                setSelectedAccount(undefined);
+
+                return;
+            }
+
+            closeModalAndNotifyCompletion();
+            onAddAccount?.(addedAccount);
+        };
+
+        if (!account.visible) {
+            dispatch(accountsActions.changeAccountVisibility(account));
+            finishEnableAccount(account);
+
+            return;
         }
+
+        if (!shouldStartAddingAccount(account.symbol)) {
+            return;
+        }
+
+        try {
+            const newAccount = await prepareNewAccountPayload({
+                accountType: account.accountType,
+                networkSymbol: account.symbol,
+                index: account.index + 1,
+                backendType: account.backendType != 'coinjoin' ? account.backendType : undefined,
+                selectedAccount: nextSelectedAccount,
+                accountTypes: nextAccountTypes,
+                device,
+            });
+
+            if (newAccount instanceof Error) {
+                dispatch(
+                    notificationsActions.addToast({
+                        type: 'discovery-error',
+                        error: newAccount.message,
+                    }),
+                );
+
+                return;
+            }
+
+            const createAccountAction = accountsActions.createAccount(
+                newAccount,
+                allNetworkSymbols,
+            );
+            dispatch(createAccountAction);
+            finishEnableAccount(createAccountAction.payload.account);
+        } finally {
+            finishAddingAccount();
+        }
+    }
+
+    async function addNewAccount({
+        network,
+        account,
+        accountTypes: nextAccountTypes,
+    }: {
+        network: Network;
+        account: NetworkAccount;
+        accountTypes: NetworkAccount[];
+    }) {
+        if (!shouldStartAddingAccount(network.symbol)) {
+            return;
+        }
+
+        if (shouldKeepModalOpen) {
+            dispatch(preserveModal());
+        }
+
+        try {
+            const newAccount = await prepareNewAccountPayload({
+                accountType: account.accountType,
+                networkSymbol: network.symbol,
+                index: 0,
+                backendType: account.backendType != 'coinjoin' ? account.backendType : undefined,
+                selectedAccount: account,
+                accountTypes: nextAccountTypes,
+                device,
+            });
+
+            if (newAccount instanceof Error) {
+                dispatch(
+                    notificationsActions.addToast({
+                        type: 'discovery-error',
+                        error: newAccount.message,
+                    }),
+                );
+
+                return;
+            }
+
+            const createAccountAction = accountsActions.createAccount(
+                newAccount,
+                allNetworkSymbols,
+            );
+            dispatch(createAccountAction);
+            const addedAccount = createAccountAction.payload.account;
+            resetAccountSearch(addedAccount.symbol);
+            reportNewAccountAnalytics(addedAccount);
+            dispatch(reportWalletBalanceThunk());
+            dispatch(
+                notificationsActions.addToast({
+                    type: 'account-added',
+                    networkName: getNetwork(addedAccount.symbol).name,
+                }),
+            );
+
+            if (shouldKeepModalOpen) {
+                setAccountTypeSelectionNetwork(undefined);
+                setSelectedAccount(undefined);
+
+                return;
+            }
+
+            closeModalAndNotifyCompletion();
+            onAddAccount?.(addedAccount);
+        } finally {
+            finishAddingAccount();
+        }
+    }
+
+    const handleNetworkSelection = async (networkSymbol?: NetworkSymbol) => {
+        if (!networkSymbol) {
+            setAccountTypeSelectionNetwork(undefined);
+
+            return;
+        }
+
+        const networkToSelect = getNetwork(networkSymbol);
+
+        if (!networkToSelect) {
+            return;
+        }
+
+        if (!enabledNetworkSymbols.includes(networkToSelect.symbol)) {
+            if (networkPinned) {
+                enablePinnedNetwork(networkToSelect);
+            } else {
+                activateNetwork(networkToSelect.symbol);
+            }
+
+            return;
+        }
+
+        const networkAccountTypes = getAccountTypesForNetwork(networkToSelect);
+
+        if (networkAccountTypes && networkAccountTypes.length > 1) {
+            if (!networkPinned) {
+                setAccountTypeSelectionNetwork(networkToSelect);
+                setSelectedAccount(undefined);
+            }
+
+            return;
+        }
+
+        const defaultAccountType = networkAccountTypes?.[0];
+        const defaultAccountTypeName = defaultAccountType?.accountType ?? 'normal';
+        const nextScopedAccounts = accounts
+            .filter(
+                account =>
+                    account.deviceState === device.state?.staticSessionId &&
+                    account.symbol === networkToSelect.symbol &&
+                    account.accountType === defaultAccountTypeName,
+            )
+            .toSorted((a, b) => a.index - b.index);
+        const defaultAccount = nextScopedAccounts.at(-1);
+
+        if (defaultAccount) {
+            await enableAccount(defaultAccount, {
+                selectedAccount: defaultAccountType,
+                accountTypes: networkAccountTypes,
+            });
+
+            return;
+        }
+
+        if (!defaultAccountType || !networkAccountTypes) return;
+
+        await addNewAccount({
+            network: networkToSelect,
+            account: defaultAccountType,
+            accountTypes: networkAccountTypes,
+        });
     };
 
-    const getStepConfig = () => {
-        const isAccountTypeSelectionStep =
-            !!selectedNetwork && accountTypes && accountTypes.length > 1;
+    const isAccountTypeSelectionStep =
+        !!accountTypeSelectionNetwork && !!accountTypes && accountTypes.length > 1;
 
-        return isAccountTypeSelectionStep
+    const getStepConfig = () =>
+        isAccountTypeSelectionStep
             ? {
                   heading: (
                       <Translation
                           id="TR_ADD_NETWORK_ACCOUNT"
                           values={{
-                              network: (
-                                  <>
-                                      <CoinLogoWrapper>
-                                          <CoinLogo size={24} symbol={selectedNetwork.symbol} />
-                                      </CoinLogoWrapper>
-                                      {selectedNetwork.name}
-                                  </>
-                              ),
+                              network: accountTypeSelectionNetwork.name,
                           }}
                       />
                   ),
-                  subheading: <Translation id="TR_SELECT_TYPE" />,
                   children: (
                       <AccountTypeSelect
-                          network={selectedNetwork}
+                          selectedAccountType={selectedAccount}
                           accountTypes={accountTypes}
-                          onSelectAccountType={setSelectedNetwork}
+                          onSelectAccountType={setSelectedAccount}
+                          networkType={accountTypeSelectionNetwork.networkType}
+                          symbol={accountTypeSelectionNetwork.symbol}
                       />
                   ),
-                  onBackClick: () => setSelectedNetwork(undefined),
+                  onBackClick: !isBackClickDisabled
+                      ? () => setAccountTypeSelectionNetwork(undefined)
+                      : undefined,
+                  bottomContent: (
+                      <AddAccountButton
+                          network={accountTypeSelectionNetwork}
+                          selectedAccount={selectedAccount}
+                          scopedAccounts={scopedAccounts}
+                          isLoading={
+                              addingAccountNetworkSymbol === accountTypeSelectionNetwork.symbol
+                          }
+                          onEnableAccount={account => {
+                              void enableAccount(account, {
+                                  selectedAccount,
+                                  accountTypes,
+                              });
+                          }}
+                          onAddNewAccount={() => {
+                              const account = selectedAccount ?? accountTypes[0];
+
+                              if (!account) return;
+
+                              void addNewAccount({
+                                  network: accountTypeSelectionNetwork,
+                                  account,
+                                  accountTypes,
+                              });
+                          }}
+                      />
+                  ),
               }
             : {
                   heading: <Translation id="TR_ADD_ACCOUNT" />,
-                  headingSize: 'large',
-                  children: (
-                      <>
-                          <NetworksWrapper>
-                              <SelectNetwork
-                                  heading={<Translation id="TR_ACTIVATED_COINS" />}
-                                  networks={enabledNetworks}
-                                  selectedNetworks={selectedNetworks}
-                                  handleNetworkSelection={selectNetwork}
-                              />
-                              <SelectNetwork
-                                  heading={<Translation id="TR_INACTIVE_COINS" />}
-                                  networks={disabledMainnetNetworks}
-                                  selectedNetworks={selectedNetworks}
-                                  handleNetworkSelection={selectNetwork}
-                              />
-                          </NetworksWrapper>
-                          {!!disabledTestnetNetworks.length && (
-                              <StyledCollapsibleBox
-                                  variant="small"
-                                  heading={<Translation id="TR_TESTNET_COINS" />}
-                                  data-test="@modal/account/activate_more_coins"
-                              >
-                                  <CoinList
-                                      onToggle={selectNetwork}
-                                      networks={disabledTestnetNetworks}
-                                      selectedNetworks={selectedNetworks}
+                  onBackClick: isBackClickDisabled ? undefined : onBack,
+                  children: networkPinned ? (
+                      <Column gap={24}>
+                          <SelectNetwork
+                              networks={visibleNetworks}
+                              enabledNetworkSymbols={enabledNetworkSymbols}
+                              accountCounts={accountCounts}
+                              addingAccountNetworkSymbol={addingAccountNetworkSymbol}
+                              handleNetworkSelection={handleNetworkSelection}
+                              onSettings={setAdvancedSettingsSymbol}
+                              getAddDisabledMessage={getAddDisabledMessage}
+                          />
+                      </Column>
+                  ) : (
+                      <Column gap={24}>
+                          <NetworkSettingsSearchInput
+                              searchQuery={searchQuery}
+                              onSearchChange={handleSearchChange}
+                              onSearchClear={handleSearchClear}
+                              dataTestId="@modal/account/network-search-input"
+                              rightContent={
+                                  <Tooltip
+                                      tooltipMaxWidth={285}
+                                      content={
+                                          <Translation id="TR_ADD_ACCOUNT_NETWORKS_BANNER_DESCRIPTION" />
+                                      }
+                                      placement="bottom"
+                                  >
+                                      <Icon
+                                          as={InfoIcon}
+                                          size={20}
+                                          intent="neutral"
+                                          priority="secondary"
+                                      />
+                                  </Tooltip>
+                              }
+                          />
+                          <Column padding={{ bottom: 8 }}>
+                              <AddAccountBannerAboutNetworks />
+                              {hasNoSearchResults ? (
+                                  <Box padding={{ vertical: 32 }}>
+                                      <NoNetworkSearchResults dataTestId="@modal/account/no-networks-found" />
+                                  </Box>
+                              ) : (
+                                  <SelectNetwork
+                                      networks={filteredNetworks}
+                                      enabledNetworkSymbols={enabledNetworkSymbols}
+                                      accountCounts={accountCounts}
+                                      activatingNetworkSymbols={activatingNetworkSymbols}
+                                      addingAccountNetworkSymbol={addingAccountNetworkSymbol}
+                                      activationErrors={activationErrors}
+                                      handleNetworkSelection={handleNetworkSelection}
+                                      onSettings={setAdvancedSettingsSymbol}
+                                      getAddDisabledMessage={getAddDisabledMessage}
                                   />
-                              </StyledCollapsibleBox>
-                          )}
-                      </>
+                              )}
+                          </Column>
+                      </Column>
                   ),
               };
-    };
 
-    return (
-        <StyledModal
-            isCancelable
-            onCancel={onCancel}
-            bottomBarComponents={
-                selectedNetwork &&
-                (isSelectedNetworkEnabled ? (
-                    <AddAccountButton
-                        network={selectedNetwork}
-                        emptyAccounts={emptyAccounts}
-                        onEnableAccount={addAccount}
-                    />
-                ) : (
-                    <Button variant="primary" size="small" onClick={enableNetwork}>
-                        <Translation
-                            id="TR_ENABLE_NETWORK_BUTTON"
-                            values={{ networkName: selectedNetwork.name }}
-                        />
-                    </Button>
-                ))
-            }
-            {...getStepConfig()}
-        />
-    );
+    if (advancedSettingsSymbol) {
+        return (
+            <AdvancedCoinSettingsModal
+                symbol={advancedSettingsSymbol}
+                onCancel={closeAdvancedSettings}
+                onBackClick={closeAdvancedSettings}
+            />
+        );
+    }
+
+    return <Modal onCancel={onCancel} width={600} {...getStepConfig()} />;
 };

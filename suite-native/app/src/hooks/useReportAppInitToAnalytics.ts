@@ -1,65 +1,86 @@
-import { useSelector } from 'react-redux';
-import { Platform, Dimensions } from 'react-native';
 import { useEffect, useState } from 'react';
+import { Dimensions, PixelRatio, Platform } from 'react-native';
+import { useSelector } from 'react-redux';
 
-import { useDiscreetMode } from '@suite-native/atoms';
+import { useServices } from '@suite-common/dependency-injection';
 import {
-    selectBitcoinUnits,
-    selectFiatCurrencyCode,
-    selectIsOnboardingFinished,
-} from '@suite-native/module-settings';
-import { useUserColorScheme } from '@suite-native/theme';
-import { analytics, EventType } from '@suite-native/analytics';
+    selectDeviceLanguage,
+    selectRememberedHiddenWalletsCount,
+    selectRememberedStandardWalletsCount,
+} from '@suite-common/device';
+import { useDiscreetMode } from '@suite-common/discreet-mode';
 import { UNIT_ABBREVIATIONS } from '@suite-common/suite-constants';
-import { selectIsConnectInitialized } from '@suite-native/state';
-import { useIsBiometricsEnabled } from '@suite-native/biometrics';
+import { selectIsSuiteSyncEnabled } from '@suite-common/suite-sync';
+import {
+    selectBaseCurrency,
+    selectBitcoinAmountUnit,
+    selectEnabledNetworks,
+} from '@suite-common/wallet-core';
+import { events, injectNativeAnalytics } from '@suite-native/analytics';
+import { selectIsBiometricsEnabled } from '@suite-native/biometrics';
+import { selectSupportedLanguageLocale } from '@suite-native/intl';
+import { selectIsOnboardingFinished } from '@suite-native/settings';
+import { selectIsAppReady } from '@suite-native/state';
+import { useUserColorScheme } from '@suite-native/theme';
 
-export const useReportAppInitToAnalytics = (appLaunchTimestamp: number) => {
-    const [loadDuration, setLoadDuration] = useState<number | null>(null);
+export const useReportAppInitToAnalytics = () => {
     const [initWasReported, setInitWasReported] = useState(false);
-
-    const isConnectInitialized = useSelector(selectIsConnectInitialized);
+    const { analytics } = useServices(injectNativeAnalytics);
+    const isAppReady = useSelector(selectIsAppReady);
     const isOnboardingFinished = useSelector(selectIsOnboardingFinished);
     const { userColorScheme } = useUserColorScheme();
     const { isDiscreetMode } = useDiscreetMode();
-    const currencyCode = useSelector(selectFiatCurrencyCode);
-    const bitcoinUnit = useSelector(selectBitcoinUnits);
-    const { isBiometricsOptionEnabled } = useIsBiometricsEnabled();
+    const currencyCode = useSelector(selectBaseCurrency);
+    const bitcoinUnit = useSelector(selectBitcoinAmountUnit);
+    const isBiometricsOptionEnabled = useSelector(selectIsBiometricsEnabled);
+    const rememberedStandardWallets = useSelector(selectRememberedStandardWalletsCount);
+    const rememberedHiddenWallets = useSelector(selectRememberedHiddenWalletsCount);
+    const enabledNetworks = useSelector(selectEnabledNetworks);
+    const appLanguage = useSelector(selectSupportedLanguageLocale);
+    const deviceLanguage = useSelector(selectDeviceLanguage);
+    const isSuiteSyncEnabled = useSelector(selectIsSuiteSyncEnabled);
 
     useEffect(() => {
-        if (isConnectInitialized && !loadDuration) setLoadDuration(Date.now() - appLaunchTimestamp);
-    }, [isConnectInitialized, appLaunchTimestamp, loadDuration]);
-
-    useEffect(() => {
-        if (isConnectInitialized && isOnboardingFinished && loadDuration && !initWasReported) {
+        if (isAppReady && isOnboardingFinished && !initWasReported) {
             setInitWasReported(true);
             analytics.report({
-                type: EventType.AppReady,
+                type: events.appReadyEvent.name,
                 payload: {
-                    appLanguage: 'en',
-                    deviceLanguage: undefined,
+                    appLanguage,
+                    deviceLanguage,
                     osName: Platform.OS,
                     osVersion: Platform.Version,
                     screenHeight: Dimensions.get('screen').height,
                     screenWidth: Dimensions.get('screen').width,
+                    pixelDensity: PixelRatio.get(),
+                    fontScale: PixelRatio.getFontScale(),
                     bitcoinUnit: UNIT_ABBREVIATIONS[bitcoinUnit],
                     localCurrency: currencyCode,
                     theme: userColorScheme,
                     discreetMode: isDiscreetMode,
-                    loadDuration,
                     isBiometricsEnabled: isBiometricsOptionEnabled,
+                    rememberedStandardWallets,
+                    rememberedHiddenWallets,
+                    enabledNetworks,
+                    labeling: isSuiteSyncEnabled ? 'suite-sync' : 'off',
                 },
             });
         }
     }, [
-        isConnectInitialized,
+        isAppReady,
         isOnboardingFinished,
         initWasReported,
         currencyCode,
         bitcoinUnit,
         userColorScheme,
         isDiscreetMode,
-        loadDuration,
         isBiometricsOptionEnabled,
+        rememberedStandardWallets,
+        rememberedHiddenWallets,
+        enabledNetworks,
+        appLanguage,
+        deviceLanguage,
+        isSuiteSyncEnabled,
+        analytics,
     ]);
 };

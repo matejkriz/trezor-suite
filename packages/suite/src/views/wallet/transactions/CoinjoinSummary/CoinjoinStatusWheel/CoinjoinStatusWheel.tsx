@@ -1,40 +1,18 @@
-import styled from 'styled-components';
-import { Card, Button } from '@trezor/components';
+import { selectCurrentCoinjoinWheelStates, stopCoinjoinSessionThunk } from '@suite/coinjoin';
+import { Translation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { type AccountKey } from '@suite-common/wallet-types';
+import { Button, Card, Column } from '@trezor/components';
+import { StopIcon } from '@trezor/icons';
+
+import { useSelector } from 'src/hooks/suite';
+
 import { CoinjoinProgressWheel } from './CoinjoinProgressWheel';
 import { CoinjoinStatusMessage } from './CoinjoinStatusMessage';
-import { useSelector } from 'src/hooks/suite/useSelector';
-import { selectCurrentCoinjoinWheelStates } from 'src/reducers/wallet/coinjoinReducer';
-import { Translation } from 'src/components/suite';
-import { useDispatch } from 'src/hooks/suite';
-import { stopCoinjoinSession } from 'src/actions/wallet/coinjoinClientActions';
-import { typography } from '@trezor/theme';
-
-const Container = styled(Card)<{ $isWide?: boolean }>`
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    width: ${({ $isWide }) => ($isWide ? '240px' : '180px')};
-    height: 100%;
-    padding: 10px;
-    color: ${({ theme }) => theme.textSubdued};
-    ${typography.callout}
-    text-align: center;
-`;
-
-const StopButton = styled(Button)`
-    /* 23px button height + 7 margin = 30 height of StatusMessage */
-    margin-top: 7px;
-    background: none;
-
-    path {
-        fill: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    }
-`;
 
 interface CoinjoinStatusWheelProps {
-    accountKey: string;
+    accountKey: AccountKey;
 }
 
 export const CoinjoinStatusWheel = ({ accountKey }: CoinjoinStatusWheelProps) => {
@@ -42,27 +20,34 @@ export const CoinjoinStatusWheel = ({ accountKey }: CoinjoinStatusWheelProps) =>
         selectCurrentCoinjoinWheelStates,
     );
 
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
 
     return (
-        <Container $isWide={isSessionActive}>
-            <CoinjoinProgressWheel accountKey={accountKey} />
+        <Card paddingType="small" height="100%">
+            <Column
+                alignItems="center"
+                justifyContent="center"
+                width={isSessionActive ? '240px' : '180px'}
+            >
+                <CoinjoinProgressWheel accountKey={accountKey} />
 
-            {isSessionActive && !isResumeBlockedByLastingIssue && (
-                <CoinjoinStatusMessage accountKey={accountKey} />
-            )}
+                {isSessionActive && !isResumeBlockedByLastingIssue && (
+                    <CoinjoinStatusMessage accountKey={accountKey} />
+                )}
 
-            {isPaused && !isLoading && (
-                <StopButton
-                    variant="tertiary"
-                    icon="STOP"
-                    iconAlignment="right"
-                    iconSize={10}
-                    onClick={() => dispatch(stopCoinjoinSession(accountKey))}
-                >
-                    <Translation id="TR_STOP" />
-                </StopButton>
-            )}
-        </Container>
+                {isPaused && !isLoading && (
+                    <Button
+                        intent="neutral"
+                        priority="secondary"
+                        iconRight={StopIcon}
+                        onClick={() => dispatch(stopCoinjoinSessionThunk(accountKey))}
+                        size="small"
+                        margin={{ top: 8 }}
+                    >
+                        <Translation id="TR_STOP" />
+                    </Button>
+                )}
+            </Column>
+        </Card>
     );
 };

@@ -1,6 +1,5 @@
-import BigNumber from 'bignumber.js';
-
-import { localizeNumber } from './localizeNumberUtils';
+import { type Locale } from '@suite-common/suite-types';
+import { BigNumber, localizeNumber } from '@trezor/utils';
 
 export const isZero = (value: string) => {
     const valueBig = new BigNumber(value);
@@ -8,7 +7,9 @@ export const isZero = (value: string) => {
     return valueBig.isZero();
 };
 
-export const formatCoinBalance = (value: string, locale = 'en') => {
+export const isPositiveBalance = (value: string) => new BigNumber(value).isGreaterThan(0);
+
+export const formatCoinBalance = (value: string, locale: Locale = 'en-US') => {
     const MAX_NUMBERS = 9;
     const balanceBig = new BigNumber(value);
 
@@ -19,8 +20,12 @@ export const formatCoinBalance = (value: string, locale = 'en') => {
     const hasDecimals = parts.length > 1;
 
     if (hasDecimals) {
-        const integerPartLength = parts[0].length || 1;
-        const fractionalPartLength = parts[1].length;
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const integerPart: string = parts[0];
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const fractionalPart: string = parts[1];
+        const integerPartLength = integerPart.length || 1;
+        const fractionalPartLength = fractionalPart.length;
         const fixCount = Math.max(MAX_NUMBERS - integerPartLength, 0); // don't go lower than 0
         const isTruncated = fractionalPartLength > fixCount;
         // fix to max visible numbers with decimals
@@ -28,7 +33,7 @@ export const formatCoinBalance = (value: string, locale = 'en') => {
         const fixedBalanceBig = new BigNumber(fixedBalance);
 
         // indicate the dust
-        const noDecimalsLeft = fixedBalanceBig.modulo(2).toFixed() === '0';
+        const noDecimalsLeft = fixedBalanceBig.isInteger();
         if (noDecimalsLeft) {
             return localizeNumber(fixedBalanceBig, locale, 2);
         }

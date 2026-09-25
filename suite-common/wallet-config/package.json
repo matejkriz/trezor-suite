@@ -6,12 +6,18 @@
     "sideEffects": false,
     "main": "src/index",
     "scripts": {
-        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "type-check": "yarn g:tsc --build"
+        "depcheck": "yarn g:depcheck",
+        "test:unit": "yarn g:jest",
+        "type-check": "yarn g:tsc --build",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'"
     },
     "dependencies": {
-        "@suite-common/intl-types": "workspace:*",
-        "@trezor/connect": "workspace:*",
-        "@trezor/type-utils": "workspace:*"
+        "@suite-common/earn-stablecoin-defs": "workspace:*",
+        "@suite-common/legacy-network-config": "workspace:*",
+        "@suite-common/networks": "workspace:*",
+        "@trezor/network-module-types": "workspace:*",
+        "@trezor/network-solana": "workspace:*",
+        "@trezor/type-utils": "workspace:*",
+        "@trezor/utils": "workspace:*"
     }
 }

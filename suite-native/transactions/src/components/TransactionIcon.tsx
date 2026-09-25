@@ -1,0 +1,98 @@
+import {
+    type NetworkDisplaySymbol,
+    type NetworkSymbol,
+    getNetworkDisplaySymbol,
+} from '@suite-common/wallet-config';
+import {
+    type StakeType,
+    type TokenAddress,
+    type TransactionType,
+} from '@suite-common/wallet-types';
+import {
+    Box,
+    CircularSpinner,
+    IconCircle,
+    type IconCircleIntent,
+    type IconCircleSize,
+} from '@suite-native/atoms';
+import { type IconName, TokenIcon } from '@suite-native/icons';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
+
+type TransactionIconProps = {
+    transactionType: TransactionType;
+    stakeOperationType?: StakeType;
+    symbol?: NetworkSymbol;
+    contractAddress?: TokenAddress;
+    tokenSymbol?: string;
+    isAnimated?: boolean;
+    intent?: IconCircleIntent;
+    size?: IconCircleSize;
+};
+
+const transactionIconMap: Record<TransactionType, IconName> = {
+    recv: 'arrowDown',
+    sent: 'arrowUp',
+    contract: 'circleDashed',
+    joint: 'shuffle',
+    self: 'arrowURightDown',
+    failed: 'prohibit',
+    unknown: 'circleDashed',
+};
+
+const stakeOperationIconMap: Record<StakeType, IconName> = {
+    stake: 'arrowUp',
+    unstake: 'arrowDown',
+    claim: 'arrowDown',
+    'change-delegate': 'arrowURightDown',
+};
+
+const cryptoIconStyle = prepareNativeStyle(utils => ({
+    position: 'absolute',
+    right: -utils.spacings.sp2,
+    bottom: -utils.spacings.sp2,
+    padding: utils.spacings.sp2,
+    backgroundColor: utils.colors.surfaceFillRaised,
+    borderRadius: utils.borders.radii.round,
+}));
+
+export const TransactionIcon = ({
+    symbol,
+    contractAddress,
+    tokenSymbol,
+    transactionType,
+    stakeOperationType,
+    intent,
+    size = 48,
+    isAnimated = false,
+}: TransactionIconProps) => {
+    const { applyStyle } = useNativeStyles();
+
+    let iconSymbol: NetworkSymbol | NetworkDisplaySymbol | undefined;
+
+    if (contractAddress) {
+        iconSymbol = symbol;
+    } else if (symbol) {
+        iconSymbol = getNetworkDisplaySymbol(symbol);
+    }
+
+    const iconName = stakeOperationType
+        ? stakeOperationIconMap[stakeOperationType]
+        : transactionIconMap[transactionType];
+
+    return (
+        <Box>
+            <IconCircle name={iconName} intent={intent} size={size} />
+            {isAnimated && <CircularSpinner size={size} color="elementFillWarningBold" width={3} />}
+            {iconSymbol && (
+                <Box style={applyStyle(cryptoIconStyle)}>
+                    <TokenIcon
+                        networkSymbol={iconSymbol}
+                        contractAddress={contractAddress}
+                        tokenSymbol={tokenSymbol}
+                        size="tiny"
+                    />
+                </Box>
+            )}
+        </Box>
+    );
+};

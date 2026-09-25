@@ -1,37 +1,48 @@
-import { AccountsStackRoutes, AppTabsRoutes } from '@suite-native/navigation';
+import { AccountsStackRoutes, AppTabsRoutes, type TabsOptions } from '@suite-native/navigation';
 
 import { enhanceTabOption } from './enhanceTabOption';
 
 const homeStack = enhanceTabOption({
     routeName: AppTabsRoutes.HomeStack,
-    iconName: 'home',
-    label: 'Home',
+    iconName: 'house',
+    focusedIconName: 'houseFilled',
 });
 
 const accountsStack = enhanceTabOption({
     routeName: AppTabsRoutes.AccountsStack,
     iconName: 'discover',
-    label: 'My assets',
+    focusedIconName: 'discoverFilled',
     params: {
         screen: AccountsStackRoutes.Accounts,
     },
 });
 
-const receiveStack = enhanceTabOption({
-    routeName: AppTabsRoutes.ReceiveStack,
-    label: 'Receive',
-    iconName: 'arrowDownLight',
+const earnStack = enhanceTabOption({
+    routeName: AppTabsRoutes.EarnStack,
+    iconName: 'piggyBank',
+    focusedIconName: 'piggyBankFilled',
 });
 
-const settingsStack = enhanceTabOption({
-    routeName: AppTabsRoutes.SettingsStack,
-    iconName: 'settings',
-    label: 'Settings',
+const tradeStack = enhanceTabOption({
+    routeName: AppTabsRoutes.TradeStack,
+    iconName: 'repeat',
+    focusedIconName: 'repeat',
 });
 
-export const rootTabsOptions = {
+const settings = enhanceTabOption({
+    routeName: AppTabsRoutes.Settings,
+    iconName: 'gear',
+    focusedIconName: 'gearFilled',
+});
+
+export const rootTabsOptionsWithoutEarn: TabsOptions = {
     ...homeStack,
     ...accountsStack,
-    ...receiveStack,
-    ...settingsStack,
+    ...tradeStack,
+    ...settings,
+};
+
+export const rootTabsOptions: TabsOptions = {
+    ...rootTabsOptionsWithoutEarn,
+    ...earnStack,
 };

@@ -1,62 +1,13 @@
 import { useEffect, useState } from 'react';
-import styled from 'styled-components';
-import { AnimatePresence, MotionProps, motion } from 'framer-motion';
-import { motionEasing } from '@trezor/components';
-import { spacings } from '@trezor/theme';
-import { Account } from '@suite-common/wallet-types';
-import { ACCOUNT_INFO_HEIGHT } from 'src/components/wallet/WalletLayout/AccountTopPanel/AccountTopPanel';
+
+import { selectRouteName } from '@suite/router';
+import { type Account } from '@suite-common/wallet-types';
+
+import { HEADER_HEIGHT } from 'src/constants/suite/layout';
+import { useSelector } from 'src/hooks/suite';
+import { useOptionalAccountHeaderContext } from 'src/support/suite/AccountHeaderProvider';
+
 import { AccountDetails } from './AccountDetails';
-import { SCROLL_WRAPPER_ID } from '../../../SuiteLayout';
-import { AccountLabelHeader } from './AccountLabelHeader';
-
-const AnimationContainer = styled(motion.div)`
-    display: flex;
-`;
-
-const detailsAnimConfig: MotionProps = {
-    initial: {
-        y: 50,
-        opacity: 0,
-        rotateX: '45deg',
-    },
-    animate: {
-        y: 0,
-        opacity: 1,
-        rotateX: '0deg',
-    },
-    exit: {
-        y: 50,
-        opacity: 0,
-        rotateX: '45deg',
-    },
-    transition: {
-        ease: motionEasing.transition,
-        rotateX: { duration: 0.2 },
-    },
-};
-
-const labelAnimConfig: MotionProps = {
-    initial: {
-        y: -50,
-        opacity: 0,
-        rotateX: '-45deg',
-    },
-    animate: {
-        y: 0,
-        opacity: 1,
-        rotateX: '0deg',
-    },
-    exit: {
-        y: -50,
-        opacity: 0,
-        rotateX: '-45deg',
-    },
-    transition: {
-        ease: motionEasing.transition,
-        duration: 0.3,
-        rotateX: { duration: 0.2 },
-    },
-};
 
 interface AccountNameProps {
     selectedAccount: Account;
@@ -64,38 +15,49 @@ interface AccountNameProps {
 
 export const AccountName = ({ selectedAccount }: AccountNameProps) => {
     const [isScrolled, setIsScrolled] = useState(false);
+    const routeName = useSelector(selectRouteName);
+    const accountHeaderContext = useOptionalAccountHeaderContext();
+    const balanceSectionRef = accountHeaderContext?.balanceSectionRef;
+    const isOverviewRoute = routeName === 'wallet-index';
 
     useEffect(() => {
-        const scrollContainer = document.getElementById(SCROLL_WRAPPER_ID);
+        if (!isOverviewRoute) {
+            setIsScrolled(true);
 
-        if (!scrollContainer) return;
+            return;
+        }
 
-        const handleScroll = (e: Event) => {
-            const target = e.target as HTMLElement;
-            //  ContentWrapper top padding + info height + AccountInfo bottom margin
-            const breakingPoint = spacings.lg + ACCOUNT_INFO_HEIGHT + spacings.lg;
+        const target = balanceSectionRef?.current;
+        if (!target) {
+            setIsScrolled(false);
 
-            setIsScrolled(target.scrollTop > breakingPoint);
-        };
+            return;
+        }
 
-        scrollContainer.addEventListener('scroll', handleScroll);
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry) {
+                    setIsScrolled(!entry.isIntersecting);
+                }
+            },
+            {
+                root: null,
+                threshold: 0,
+                rootMargin: `-${HEADER_HEIGHT} 0px 0px 0px`,
+            },
+        );
 
-        return () => {
-            scrollContainer.removeEventListener('scroll', handleScroll);
-        };
-    }, []);
+        observer.observe(target);
+
+        return () => observer.disconnect();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [balanceSectionRef?.current, isOverviewRoute]);
 
     return (
-        <AnimatePresence initial={false} mode="popLayout">
-            {isScrolled ? (
-                <AnimationContainer key="account-details" {...detailsAnimConfig}>
-                    <AccountDetails selectedAccount={selectedAccount} />
-                </AnimationContainer>
-            ) : (
-                <AnimationContainer key="account-label" {...labelAnimConfig}>
-                    <AccountLabelHeader selectedAccount={selectedAccount} />
-                </AnimationContainer>
-            )}
-        </AnimatePresence>
+        <AccountDetails
+            key={selectedAccount.key}
+            selectedAccount={selectedAccount}
+            isBalanceShown={isScrolled}
+        />
     );
 };

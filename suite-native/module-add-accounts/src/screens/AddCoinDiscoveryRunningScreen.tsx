@@ -1,0 +1,151 @@
+import { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
+
+import { useNavigation } from '@react-navigation/native';
+
+import { useServices } from '@suite-common/dependency-injection';
+import type { DeviceRootState } from '@suite-common/device';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { getNetwork } from '@suite-common/wallet-config';
+import {
+    type AccountsRootState,
+    changeCoinVisibilityThunk,
+    selectDeviceAccountsByNetworkSymbol,
+    selectDiscoveryForSelectedDevice,
+    selectHasRunningDiscovery,
+} from '@suite-common/wallet-core';
+import { type Account } from '@suite-common/wallet-types';
+import {
+    type AddCoinAccountNavigationProps,
+    useAddCoinAccount,
+} from '@suite-native/add-coin-account';
+import { Spinner, type SpinnerLoadingState, Text, VStack } from '@suite-native/atoms';
+import { selectDeviceEnabledDiscoveryNetworkSymbols } from '@suite-native/discovery';
+import { Translation } from '@suite-native/intl';
+import {
+    type AddCoinAccountStackParamList,
+    AddCoinAccountStackRoutes,
+    Screen,
+    type StackProps,
+} from '@suite-native/navigation';
+import { isPassphraseDiscoveryFailure } from '@suite-native/passphrase';
+
+export const AddCoinDiscoveryRunningScreen = ({
+    route,
+}: StackProps<AddCoinAccountStackParamList, AddCoinAccountStackRoutes.AddCoinDiscoveryRunning>) => {
+    const { networkSymbol, flowType, earnFlowParams } = route.params;
+    const { dispatch } = useServices(injectDispatch);
+    const navigation = useNavigation<AddCoinAccountNavigationProps>();
+    const accounts = useSelector((state: AccountsRootState & DeviceRootState) =>
+        selectDeviceAccountsByNetworkSymbol(state, networkSymbol),
+    );
+    const discoveryInfo = useSelector(selectDiscoveryForSelectedDevice);
+    const hasPassphraseFailure = isPassphraseDiscoveryFailure(discoveryInfo);
+    const hasDiscovery = useSelector(selectHasRunningDiscovery);
+    const enabledNetworkSymbols = useSelector(selectDeviceEnabledDiscoveryNetworkSymbols);
+    const { navigateToSuccessorScreen, clearNetworkWithTypeToBeAdded } = useAddCoinAccount();
+    const [loadingResult, setLoadingResult] = useState<SpinnerLoadingState>('idle');
+
+    const goToAccountDetail = ({ account }: { account: Account }) => {
+        navigateToSuccessorScreen({
+            flowType,
+            symbol: networkSymbol,
+            accountType: account.accountType,
+            accountIndex: account.index,
+            earnFlowParams,
+        });
+    };
+
+    const handleFinish = () => {
+        if (loadingResult === 'error') {
+            navigation.goBack();
+
+            return;
+        }
+
+        if (accounts.length === 0 || hasDiscovery) {
+            return;
+        }
+
+        setLoadingResult('success');
+
+        if (flowType === 'trade') {
+            navigation.popToTop();
+
+            return;
+        }
+
+        const normalAccounts = accounts.filter(a => a.accountType === 'normal');
+        const nonEmptyAccounts = accounts.filter(a => !a.empty);
+
+        if (nonEmptyAccounts.length > 0 && normalAccounts.length > 0) {
+            clearNetworkWithTypeToBeAdded();
+            navigation.replace(AddCoinAccountStackRoutes.AddCoinDiscoveryFinished, {
+                networkSymbol,
+                flowType,
+                earnFlowParams,
+            });
+
+            return;
+        }
+
+        const firstAccount = normalAccounts[0];
+        if (!firstAccount) return;
+        goToAccountDetail({ account: firstAccount });
+    };
+
+    useEffect(() => {
+        const isBlockedByPassphraseError = hasPassphraseFailure && loadingResult === 'error';
+        if (
+            networkSymbol &&
+            !enabledNetworkSymbols.includes(networkSymbol) &&
+            accounts.length === 0 &&
+            !hasDiscovery &&
+            !isBlockedByPassphraseError
+        ) {
+            dispatch(
+                changeCoinVisibilityThunk({
+                    symbol: networkSymbol,
+                    shouldBeVisible: true,
+                }),
+            );
+
+            return;
+        }
+
+        if (!hasDiscovery && hasPassphraseFailure) {
+            setLoadingResult('error');
+        }
+
+        if (accounts.length > 0 && !hasDiscovery) {
+            setLoadingResult('success');
+        }
+    }, [
+        accounts.length,
+        hasDiscovery,
+        dispatch,
+        enabledNetworkSymbols,
+        loadingResult,
+        networkSymbol,
+        hasPassphraseFailure,
+    ]);
+
+    return (
+        <Screen>
+            <VStack flex={1} justifyContent="center" alignItems="center" spacing="sp32">
+                <Spinner loadingState={loadingResult} onComplete={handleFinish} />
+                <VStack spacing="sp4">
+                    <Text variant="headline-sm" textAlign="center">
+                        <Translation
+                            id="moduleAddAccounts.coinDiscoveryRunningScreen.title"
+                            values={{ coin: getNetwork(networkSymbol).name }}
+                        />
+                    </Text>
+                    <Text variant="body-md" textAlign="center" color="contentSecondary">
+                        <Translation id="moduleAddAccounts.coinDiscoveryRunningScreen.subtitle" />
+                    </Text>
+                </VStack>
+            </VStack>
+        </Screen>
+    );
+};

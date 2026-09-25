@@ -1,36 +1,32 @@
-import styled from 'styled-components';
-import { breakpointMediaQueries } from '@trezor/styles';
-import { useLayout } from 'src/hooks/suite';
-import { AssetsView } from './components/AssetsView';
-import PortfolioCard from './components/PortfolioCard';
-import SecurityFeatures from './components/SecurityFeatures';
-import { PromoBanner } from './components/PromoBanner';
-import { T2B1PromoBanner } from './components/T2B1PromoBanner';
+import { ContextMessage } from '@suite/message-system';
+import { Context } from '@suite-common/message-system';
+import { Column } from '@trezor/components';
+
+import { OutOfQuotaBanner } from 'src/components/suite/banners/SuiteBanners/OutOfQuotaBanner';
 import { PageHeader } from 'src/components/suite/layouts/SuiteLayout';
-import { StakeEthCard } from './components/StakeEthCard/StakeEthCard';
+import { useLayout } from 'src/hooks/suite';
 
-const Wrapper = styled.div`
-    display: flex;
-    flex-direction: column;
-    gap: 64px;
-
-    ${breakpointMediaQueries.below_sm} {
-        /* for the promo banner */
-        margin-bottom: 52px;
-    }
-`;
+import { AssetsView } from './AssetsView/AssetsView';
+import { DashboardFooter } from './DashboardFooter';
+import { DashboardPromoBanner } from './DashboardPromoBanner/DashboardPromoBanner';
+import { OnboardingFeedbackBanner } from './OnboardingFeedbackBanner/OnboardingFeedbackBanner';
+import { PortfolioCard } from './PortfolioCard/PortfolioCard';
+import { useNotificationForDisconnectedDevice } from './useNotificationForDisconnectedDevice';
 
 export const Dashboard = () => {
-    useLayout('Home', PageHeader);
+    useLayout('Home', <PageHeader />, <DashboardFooter />);
+    useNotificationForDisconnectedDevice();
 
     return (
-        <Wrapper data-test="@dashboard/index">
-            <PortfolioCard />
-            <T2B1PromoBanner />
+        <Column gap={48} data-testid="@dashboard/index">
+            <Column gap={24}>
+                <OutOfQuotaBanner />
+                <ContextMessage context={Context.getGeneral('dashboard')} />
+                <PortfolioCard />
+                <OnboardingFeedbackBanner />
+            </Column>
+            <DashboardPromoBanner />
             <AssetsView />
-            <SecurityFeatures />
-            <StakeEthCard />
-            <PromoBanner />
-        </Wrapper>
+        </Column>
     );
 };

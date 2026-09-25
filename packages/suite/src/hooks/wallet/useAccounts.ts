@@ -1,77 +1,42 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 
 import type { AccountAddress } from '@trezor/connect';
-import * as accountUtils from '@suite-common/wallet-utils';
-import { selectDevice } from '@suite-common/wallet-core';
 
-import { useSelector } from 'src/hooks/suite';
-import type { Account, Discovery } from 'src/types/wallet';
+import type { Account } from 'src/types/wallet';
 
-export const useAccounts = (discovery?: Discovery) => {
-    const [accounts, setAccounts] = useState<Account[]>([]);
+export const useAccountAddressDictionary = (account: Account | undefined) => {
+    const { addresses, descriptor, networkType, path } = account ?? {};
+    const { unused: unusedAddresses = [], used: usedAddresses = [] } = addresses ?? {};
 
-    const device = useSelector(selectDevice);
-    const accountsState = useSelector(state => state.wallet.accounts);
-
-    useEffect(() => {
-        if (device) {
-            const deviceAccounts = accountUtils.getAllAccounts(device.state, accountsState);
-            const failedAccounts = discovery ? accountUtils.getFailedAccounts(discovery) : [];
-            const sortedAccounts = accountUtils.sortByCoin(deviceAccounts.concat(failedAccounts));
-            setAccounts(sortedAccounts);
-        }
-    }, [device, discovery, accountsState]);
-
-    return {
-        accounts,
-    };
-};
-
-export const useFastAccounts = () => {
-    const device = useSelector(selectDevice);
-    const accounts = useSelector(state => state.wallet.accounts);
-
-    const deviceAccounts = useMemo(
-        () => (device ? accountUtils.getAllAccounts(device.state, accounts) : []),
-        [accounts, device],
-    );
-
-    return deviceAccounts;
-};
-
-export const useAccountAddressDictionary = (account: Account | undefined) =>
-    useMemo(() => {
-        switch (account?.networkType) {
+    return useMemo(() => {
+        switch (networkType) {
             case 'cardano':
             case 'bitcoin': {
-                return (account?.addresses?.unused ?? [])
-                    .concat(account?.addresses?.used ?? [])
-                    .reduce(
-                        (previous, current) => {
-                            previous[current.address] = current;
+                return (unusedAddresses ?? []).concat(usedAddresses ?? []).reduce(
+                    (previous, current) => {
+                        previous[current.address] = current;
 
-                            return previous;
-                        },
-                        {} as { [address: string]: AccountAddress },
-                    );
+                        return previous;
+                    },
+                    {} as { [address: string]: AccountAddress },
+                );
             }
             case 'solana':
             case 'ripple':
+            case 'stellar':
+            case 'tron':
             case 'ethereum': {
+                if (!descriptor || path === undefined) return {};
+
                 return {
-                    [account.descriptor]: {
-                        address: account.descriptor,
-                        path: account.path,
+                    [descriptor]: {
+                        address: descriptor,
+                        path,
                     },
                 };
             }
             default:
                 return {};
         }
-    }, [
-        account?.addresses?.unused,
-        account?.addresses?.used,
-        account?.descriptor,
-        account?.networkType,
-        account?.path,
-    ]);
+    }, [unusedAddresses, usedAddresses, descriptor, networkType, path]);
+};

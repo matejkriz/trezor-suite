@@ -1,0 +1,27 @@
+import { TestStream } from '@trezor/e2e-utils';
+
+import { expect, test } from '../../support/fixtures';
+import { createTestAnnotation } from '../../support/reporters/annotations';
+
+test.describe('Passphrase', { tag: ['@T3W1', '@T3T1'] }, () => {
+    test.beforeEach(async ({ onboardingPage, settingsPage }) => {
+        await onboardingPage.completeOnboarding();
+        await settingsPage.navigateTo('device');
+    });
+
+    test(
+        'Enable Passphrase protection',
+        { annotation: createTestAnnotation({ stream: TestStream.Wallet }) },
+        async ({ page, device, devicePrompt }) => {
+            await page.getByTestId('@settings/device/passphrase-switch').click();
+            await devicePrompt.confirmOnDevicePromptIsShown();
+            await device.pressYes();
+            await devicePrompt.confirmOnDevicePromptIsHidden();
+
+            await test.step('Verifies notification toast is displayed and then disappears', async () => {
+                await expect(page.getByTestId('@toast/settings-applied')).toBeVisible();
+                await page.getByTestId('@toast/settings-applied').waitFor({ state: 'detached' });
+            });
+        },
+    );
+});

@@ -7,13 +7,17 @@
             "{workspaceRoot}/package.json"
         ],
         "default": ["{projectRoot}/**/*", "sharedGlobals"],
-        "prod": ["default", "!{projectRoot}/**/*.test.{ts,tsx}"]
+        "production": ["{projectRoot}/**/*", "!{projectRoot}/**/*.test.{ts,tsx}"]
+    },
+    "tui": {
+        "autoExit": true
     },
     "targetDefaults": {
         "build:lib": {
             "dependsOn": [],
             "inputs": [
-                "^prod",
+                "^production",
+                "default",
                 "{workspaceRoot}/tsconfig.base.json",
                 "{workspaceRoot}/tsconfig.lib.json"
             ],
@@ -28,7 +32,8 @@
                 "@suite-common/message-system:build:lib"
             ],
             "inputs": [
-                "^prod",
+                "^production",
+                "default",
                 "{workspaceRoot}/tsconfig.base.json",
                 "{workspaceRoot}/tsconfig.lib.json"
             ],
@@ -38,14 +43,26 @@
         "test:unit": {
             "dependsOn": ["@suite-common/message-system:build:lib"],
             "inputs": [
-                "^prod",
+                "^production",
+                "default",
                 "{workspaceRoot}/jest.config.base.js",
-                "{workspaceRoot}/jest.config.native.js"
+                "{workspaceRoot}/jest.config.base.swc.js",
+                "{workspaceRoot}/jest.config.native.js",
+                "{workspaceRoot}/jest.config.swc-transform.js",
+                "{workspaceRoot}/JestCustomEnv.js"
             ],
             "cache": true
         },
         "lint:js": {
-            "inputs": ["default", "{workspaceRoot}/.eslintrc.js"],
+            "inputs": [
+                "{projectRoot}/**/*",
+                "{workspaceRoot}/eslint.config.mjs",
+                "{workspaceRoot}/eslint-local-rules/**/*",
+                "{workspaceRoot}/packages/eslint/**/*",
+                {
+                    "env": "ESLINT_RUN_EXPENSIVE_CHECKS"
+                }
+            ],
             "outputs": ["{projectRoot}/.eslintcache"],
             "cache": true
         },
@@ -53,12 +70,15 @@
             "inputs": ["default", "{workspaceRoot}/.stylelintrc"],
             "outputs": ["{projectRoot}/.stylelintcache"],
             "cache": true
+        },
+        "depcheck": {
+            "inputs": ["default"],
+            "cache": true
         }
     },
-    "affected": {
-        "defaultBase": "origin/develop"
-    },
+    "defaultBase": "origin/develop",
     "$schema": "./node_modules/nx/schemas/nx-schema.json",
     "nxCloudAccessToken": "NmE2NmFlYTUtN2JhZi00ZmQ3LWEyYzMtYWRkNzc3MTg0YmUyfHJlYWQ=",
+    "analytics": false,
     "parallel": 3
 }

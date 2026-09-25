@@ -1,17 +1,15 @@
-import { Pressable, TouchableOpacity } from 'react-native';
-import { useSelector } from 'react-redux';
+import { useEffect } from 'react';
+import { Pressable } from 'react-native';
+
+import { useNavigation } from '@react-navigation/native';
 
 import { Box, HStack } from '@suite-native/atoms';
-import { Icon } from '@suite-common/icons';
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-import {
-    selectDeviceId,
-    selectAreAllDevicesDisconnectedOrAccountless,
-} from '@suite-common/wallet-core';
+import { Icon } from '@suite-native/icons';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
 
 import { SCREEN_HEADER_HEIGHT } from '../constants';
+import { DeviceSwitchContent } from './DeviceSwitchContent';
 import { useDeviceManager } from '../hooks/useDeviceManager';
-import { DeviceItemContent } from './DeviceItemContent';
 
 type SwitchStyleProps = { isDeviceManagerVisible: boolean };
 
@@ -21,12 +19,13 @@ const switchStyle = prepareNativeStyle<SwitchStyleProps>((utils, { isDeviceManag
     alignItems: 'center',
     justifyContent: 'space-between',
     height: SCREEN_HEADER_HEIGHT,
-    paddingVertical: utils.spacings.small,
-    paddingHorizontal: utils.spacings.medium,
-    borderColor: utils.colors.borderElevation2,
+    paddingVertical: utils.spacings.sp8,
+    paddingHorizontal: utils.spacings.sp16,
+    borderColor: utils.colors.surfaceBorderAction,
     borderWidth: utils.borders.widths.small,
-    borderRadius: utils.borders.radii.round,
-    backgroundColor: utils.colors.backgroundSurfaceElevation1,
+    borderRadius: utils.borders.radii.r16,
+    backgroundColor: utils.colors.surfaceFillAction,
+    ...utils.boxShadows.small,
 
     extends: {
         condition: isDeviceManagerVisible,
@@ -38,15 +37,12 @@ const switchStyle = prepareNativeStyle<SwitchStyleProps>((utils, { isDeviceManag
 
 const switchWrapperStyle = prepareNativeStyle(_ => ({
     flex: 1,
+    zIndex: 10,
 }));
 
 export const DeviceSwitch = () => {
+    const navigation = useNavigation();
     const { applyStyle } = useNativeStyles();
-
-    const areAllDevicesDisconnectedOrAccountless = useSelector(
-        selectAreAllDevicesDisconnectedOrAccountless,
-    );
-    const deviceId = useSelector(selectDeviceId);
 
     const { setIsDeviceManagerVisible, isDeviceManagerVisible } = useDeviceManager();
 
@@ -54,30 +50,22 @@ export const DeviceSwitch = () => {
         setIsDeviceManagerVisible(!isDeviceManagerVisible);
     };
 
+    useEffect(
+        () => navigation.addListener('blur', () => setIsDeviceManagerVisible(false)),
+        [navigation, setIsDeviceManagerVisible],
+    );
+
     return (
-        <Pressable onPress={toggleDeviceManager} style={applyStyle(switchWrapperStyle)}>
-            <HStack justifyContent="space-between" alignItems="center" spacing="medium">
+        <Pressable
+            onPress={toggleDeviceManager}
+            style={applyStyle(switchWrapperStyle)}
+            testID="@device-manager/device-switch"
+        >
+            <HStack justifyContent="space-between" alignItems="center" spacing="sp16">
                 <Box style={applyStyle(switchStyle, { isDeviceManagerVisible })}>
-                    <DeviceItemContent
-                        deviceId={areAllDevicesDisconnectedOrAccountless ? undefined : deviceId}
-                        headerTextVariant="highlight"
-                        isPortfolioLabelDisplayed={false}
-                    />
-                    {!isDeviceManagerVisible && (
-                        <Icon name="chevronUpAndDown" color="iconDefault" />
-                    )}
+                    <DeviceSwitchContent />
+                    <Icon name="caretUpDown" color="contentPrimary" />
                 </Box>
-                {isDeviceManagerVisible && (
-                    <TouchableOpacity
-                        onPress={toggleDeviceManager}
-                        accessibilityRole="button"
-                        accessibilityLabel="Close"
-                    >
-                        <Box paddingHorizontal="medium">
-                            <Icon name="close" size="mediumLarge" />
-                        </Box>
-                    </TouchableOpacity>
-                )}
             </HStack>
         </Pressable>
     );

@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo } from 'react';
+import { type AccessibilityProps } from 'react-native';
 import {
+    cancelAnimation,
     interpolate,
     useDerivedValue,
     useSharedValue,
@@ -9,29 +11,41 @@ import {
 
 import {
     Canvas,
-    vec,
-    RoundedRect,
-    LinearGradient,
     Group,
-    rrect,
+    LinearGradient,
+    RoundedRect,
     rect,
+    rrect,
+    vec,
 } from '@shopify/react-native-skia';
 
-import { useNativeStyles } from '@trezor/styles';
-import { nativeBorders } from '@trezor/theme';
+import { useNativeStyles } from '@trezor/styles-native';
+import { type Color, type NativeRadius } from '@trezor/theme';
+
+import { ENDLESS_ANIMATION_VALUE } from '../constants';
+import { type SurfaceElevation } from '../types';
+import { nativeRadiusToNumber } from '../utils';
 
 type BoxSkeletonProps = {
     height: number;
     width: number;
-    borderRadius?: number;
-};
+    elevation?: SurfaceElevation;
+    borderRadius?: NativeRadius | number;
+} & AccessibilityProps;
 
 const ANIMATION_DURATION = 1200;
+
+const elevationToGradientColors = {
+    0: ['surfaceFillPage', 'surfaceFillSunken', 'surfaceFillPage'],
+    1: ['surfaceFillRaised', 'surfaceFillSunken', 'surfaceFillRaised'],
+} as const satisfies Record<SurfaceElevation, Color[]>;
 
 export const BoxSkeleton = ({
     height,
     width,
-    borderRadius = nativeBorders.radii.small,
+    elevation = '1',
+    borderRadius = 'r8',
+    ...accessibilityProps
 }: BoxSkeletonProps) => {
     const {
         utils: { colors },
@@ -39,8 +53,13 @@ export const BoxSkeleton = ({
     const progress = useSharedValue(0);
 
     useEffect(() => {
-        progress.value = withRepeat(withTiming(width, { duration: ANIMATION_DURATION }), -1);
+        progress.value = withRepeat(
+            withTiming(width, { duration: ANIMATION_DURATION }),
+            ENDLESS_ANIMATION_VALUE,
+        );
     }, [width, progress]);
+
+    useEffect(() => () => cancelAnimation(progress), [progress]);
 
     const position = useDerivedValue(() => [
         {
@@ -50,21 +69,18 @@ export const BoxSkeleton = ({
 
     const rct = useMemo(() => {
         const coreRect = rect(0, 0, width, height);
+        const radius = nativeRadiusToNumber(borderRadius);
 
-        return rrect(coreRect, borderRadius, borderRadius);
+        return rrect(coreRect, radius, radius);
     }, [width, height, borderRadius]);
 
     const gradientColors = useMemo(
-        () => [
-            colors.backgroundSurfaceElevation1,
-            colors.backgroundSurfaceElevationNegative,
-            colors.backgroundSurfaceElevation1,
-        ],
-        [colors],
+        () => elevationToGradientColors[elevation].map(color => colors[color]),
+        [colors, elevation],
     );
 
     return (
-        <Canvas style={{ width, height }}>
+        <Canvas style={{ width, height }} {...accessibilityProps}>
             <Group clip={rct}>
                 <Group transform={position}>
                     <RoundedRect rect={rct}>

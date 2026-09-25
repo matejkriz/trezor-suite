@@ -1,97 +1,192 @@
-import styled from 'styled-components';
+import { useState } from 'react';
 
-import { Button, Tooltip } from '@trezor/components';
+import { Translation } from '@suite/intl';
+import { selectIsDeviceOrUiLocked } from '@suite/locks';
+import { closeModalAppThunk, gotoThunk } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { selectDeviceThunk } from '@suite-common/device';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { selectIsAnyNetworkEnabled, startAddWalletDiscoveryThunk } from '@suite-common/wallet-core';
+import { WalletType } from '@suite-common/wallet-types';
+import { Button, Card, Column, IconButton, Row, Text, Tooltip } from '@trezor/components';
+import { FolderOpenIcon, PlusCircleFilledIcon, PlusIcon, XIcon } from '@trezor/icons';
 
-import { Translation } from 'src/components/suite';
-import { TrezorDevice, AcquiredDevice } from 'src/types/suite';
 import { useSelector } from 'src/hooks/suite';
-import { SUITE } from 'src/actions/suite/constants';
-import { borders } from '@trezor/theme';
-
-const AddWallet = styled.div`
-    display: flex;
-    width: 100%;
-    margin-top: 10px;
-`;
-
-const StyledButton = styled(Button)`
-    padding: 16px;
-    justify-content: center;
-    border: 1px dashed ${({ theme }) => theme.STROKE_GREY};
-    border-radius: ${borders.radii.md};
-    background: transparent;
-
-    &:hover,
-    &:active,
-    &:focus {
-        background: ${({ theme }) => theme.BG_GREY_ALT};
-    }
-`;
-
-const StyledTooltip = styled(Tooltip)`
-    width: 100%;
-`;
+import { type AcquiredDevice, type ForegroundAppProps, type TrezorDevice } from 'src/types/suite';
 
 interface AddWalletButtonProps {
     device: TrezorDevice;
     instances: AcquiredDevice[];
-    addDeviceInstance: (instance: TrezorDevice) => Promise<void>;
-    selectDeviceInstance: (instance: TrezorDevice) => void;
+    onCancel?: ForegroundAppProps['onCancel'];
 }
 
-export const AddWalletButton = ({
-    device,
-    instances,
-    addDeviceInstance,
-    selectDeviceInstance,
-}: AddWalletButtonProps) => {
-    const hasAtLeastOneWallet = instances.find(d => d.state);
-    // Find a "standard wallet" among user's wallet instances. If no such wallet is found, the variable is undefined.
-    const emptyPassphraseWalletExists = instances.find(d => d.useEmptyPassphrase && d.state);
-    const locks = useSelector(state => state.suite.locks);
+export const AddWalletButton = ({ device, instances, onCancel }: AddWalletButtonProps) => {
+    // Standard wallet = useEmptyPassphrase not explicitly false (true, or undefined when not yet authorized).
+    // Mirrors useWalletLabel so the list and this button agree on what counts as a standard wallet.
+    const emptyPassphraseWalletExists = instances.find(
+        d => d.useEmptyPassphrase !== false && d.state,
+    );
 
-    // opportunity to bring useDeviceLocks back (extract it from useDevice hook)?
-    // useDevice hook is not really suited for this since we need to pass the device as a prop
-    // and there is no point in useDevice returning the same device object we would have passed
-    const isLocked =
-        !device ||
-        !device.connected ||
-        locks.includes(SUITE.LOCK_TYPE.DEVICE) ||
-        locks.includes(SUITE.LOCK_TYPE.UI);
+    const isDeviceOrUiLocked = useSelector(selectIsDeviceOrUiLocked);
+    const isAnyNetworkEnabled = useSelector(selectIsAnyNetworkEnabled);
+    const isPassphraseProtectionEnabled = Boolean(device?.features?.passphrase_protection);
+    const { dispatch } = useServices(injectDispatch);
+    const isLocked = !device || !device.connected || isDeviceOrUiLocked;
+    const isPassphraseAddDisabled = isLocked || !isAnyNetworkEnabled;
+    const showNoNetworksTooltip = !isLocked && !isAnyNetworkEnabled;
+    const [isPassphraseExpanded, setIsPassphraseExpanded] = useState(false);
 
-    const onAddWallet = () => {
-        if (hasAtLeastOneWallet) {
-            addDeviceInstance(device);
-        } else {
-            selectDeviceInstance(instances[0]);
-        }
+    const goToCoinsSettings = () => {
+        onCancel?.(false);
+        dispatch(closeModalAppThunk());
+        dispatch(gotoThunk({ routeName: 'settings-coins' }));
     };
 
-    return (
-        <AddWallet>
-            <StyledTooltip
-                content={isLocked && <Translation id="TR_TO_ACCESS_OTHER_WALLETS" />}
-                cursor="pointer"
+    const noNetworksTooltipContent = (
+        <Column gap={12} alignItems="flex-start" maxWidth={250} padding={4}>
+            <Translation id="TR_PASSPHRASE_WALLET_NEEDS_ENABLED_NETWORK" />
+            <Button
+                data-testid="@switch-device/passphrase-go-to-coins-settings"
+                intent="neutral"
+                priority="secondary"
+                size="small"
+                onClick={goToCoinsSettings}
             >
-                <StyledButton
-                    data-test={
-                        emptyPassphraseWalletExists
-                            ? '@switch-device/add-hidden-wallet-button'
-                            : '@switch-device/add-wallet-button'
-                    }
-                    variant="tertiary"
-                    isFullWidth
-                    icon="PLUS"
-                    isDisabled={isLocked}
-                    onClick={onAddWallet}
-                >
-                    {emptyPassphraseWalletExists ? (
+                <Translation id="TR_ENABLE_MORE_COINS" />
+            </Button>
+        </Column>
+    );
+
+    if (!isPassphraseProtectionEnabled && emptyPassphraseWalletExists) {
+        return null;
+    }
+
+    const onAddWallet = ({
+        walletType,
+        isExisting,
+    }: {
+        walletType: WalletType;
+        isExisting?: boolean;
+    }) => {
+        onCancel?.(false);
+        dispatch(selectDeviceThunk({ device }));
+        dispatch(closeModalAppThunk());
+        // TODO: when creating a new hidden wallet, we should not start discovery yet, but only after going through the best practices flow
+        dispatch(
+            startAddWalletDiscoveryThunk({
+                device,
+                isAddingHiddenWallet: walletType === WalletType.PASSPHRASE,
+                isAddingExistingWallet: isExisting,
+            }),
+        );
+        dispatch(gotoThunk({ routeName: 'suite-index' }));
+    };
+
+    const ExpandedPassphraseContainer = () => (
+        <Card paddingType="none" type="contrast">
+            <Column gap={12} padding={12}>
+                <Row alignItems="center" justifyContent="space-between">
+                    <Text>
                         <Translation id="TR_ADD_HIDDEN_WALLET" />
-                    ) : (
+                    </Text>
+                    <IconButton
+                        intent="neutral"
+                        priority="secondary"
+                        icon={XIcon}
+                        onClick={() => {
+                            setIsPassphraseExpanded(false);
+                        }}
+                        tooltip={{ content: <Translation id="TR_CLOSE" /> }}
+                    />
+                </Row>
+                <Column gap={8}>
+                    <Button
+                        data-testid="@switch-device/add-new-hidden-wallet-button"
+                        intent="brand"
+                        priority="secondary"
+                        size="large"
+                        iconLeft={PlusCircleFilledIcon}
+                        width="100%"
+                        isDisabled={isLocked}
+                        onClick={() =>
+                            onAddWallet({
+                                walletType: WalletType.PASSPHRASE,
+                            })
+                        }
+                    >
+                        <Translation id="TR_NEW_PASSPHRASE_WALLET" />
+                    </Button>
+                    <Button
+                        data-testid="@switch-device/add-existing-hidden-wallet-button"
+                        intent="neutral"
+                        priority="secondary"
+                        size="large"
+                        iconLeft={FolderOpenIcon}
+                        width="100%"
+                        isDisabled={isLocked}
+                        onClick={() =>
+                            onAddWallet({
+                                walletType: WalletType.PASSPHRASE,
+                                isExisting: true,
+                            })
+                        }
+                        shortcut={!isLocked ? ['ALT', 'KEY_P'] : undefined}
+                    >
+                        <Translation id="TR_OPEN_PREVIOUSLY_USED_WALLET" />
+                    </Button>
+                </Column>
+            </Column>
+        </Card>
+    );
+
+    return (
+        <Tooltip
+            content={isLocked && <Translation id="TR_TO_ACCESS_OTHER_WALLETS" />}
+            cursor="pointer"
+            placement="bottom"
+        >
+            <Column flex="1" gap={8} alignItems="center">
+                {!emptyPassphraseWalletExists && (
+                    <Button
+                        data-testid="@switch-device/add-wallet-button"
+                        intent="neutral"
+                        priority="secondary"
+                        width="100%"
+                        size="large"
+                        iconLeft={PlusIcon}
+                        isDisabled={isLocked}
+                        onClick={() => onAddWallet({ walletType: WalletType.STANDARD })}
+                    >
                         <Translation id="TR_ADD_WALLET" />
-                    )}
-                </StyledButton>
-            </StyledTooltip>
-        </AddWallet>
+                    </Button>
+                )}
+
+                {isPassphraseProtectionEnabled &&
+                    (isPassphraseExpanded ? (
+                        <ExpandedPassphraseContainer />
+                    ) : (
+                        <Tooltip
+                            isActive={showNoNetworksTooltip}
+                            content={showNoNetworksTooltip ? noNetworksTooltipContent : undefined}
+                            cursor="not-allowed"
+                            placement="right"
+                            width="100%"
+                        >
+                            <Button
+                                data-testid="@switch-device/add-hidden-wallet-button"
+                                intent="neutral"
+                                priority="secondary"
+                                width="100%"
+                                size="large"
+                                iconLeft={PlusIcon}
+                                isDisabled={isPassphraseAddDisabled}
+                                onClick={() => setIsPassphraseExpanded(true)}
+                            >
+                                <Translation id="TR_ADD_HIDDEN_WALLET" />
+                            </Button>
+                        </Tooltip>
+                    ))}
+            </Column>
+        </Tooltip>
     );
 };

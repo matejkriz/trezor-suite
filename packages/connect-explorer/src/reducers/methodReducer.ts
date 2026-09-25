@@ -1,274 +1,127 @@
 import {
-    TAB_CHANGE,
-    FIELD_CHANGE,
-    FIELD_DATA_CHANGE,
+    type MethodState,
+    initialState,
+    prepareBundle,
+    setAffectedValues,
+    updateParams,
+} from './methodCommon';
+import { getMethodState, getMethodStateFromSchema } from './methodInit';
+import type { MethodAction, TrezorConnectAction } from '../types/actions';
+import {
     ADD_BATCH,
+    FIELD_CHANGE,
     REMOVE_BATCH,
     RESPONSE,
-} from '../actions/methodActions';
-import { ON_LOCATION_CHANGE } from '../actions';
-import config from '../data/methods/index';
-import type { Action, Field, FieldWithBundle } from '../types';
+    SET_MANUAL_MODE,
+    SET_METHOD,
+    SET_METHOD_PROCESSING,
+    SET_SCHEMA,
+    SET_UNION,
+} from '../types/actions';
+import type { Field } from '../types/common';
+import { isFieldBasic } from '../types/common';
 
-export interface MethodState {
-    name?: string;
-    url?: string;
-    description?: string;
-    submitButton: any;
-    fields: (Field<any> | FieldWithBundle<any>)[];
-    params: any;
-    tab: string;
-    javascriptCode?: string;
-    response?: any;
-    addressValidation?: boolean;
-    docs?: string;
-}
+type Action = MethodAction | TrezorConnectAction;
 
-const initialState: MethodState = {
-    name: undefined,
-    url: undefined,
-    description: undefined,
-    submitButton: null,
-    fields: [],
-    params: {},
-    tab: 'code',
-    javascriptCode: undefined,
-    response: undefined,
-    addressValidation: false,
-    docs: undefined,
+export type MethodRootState = {
+    method: MethodState;
 };
 
-const getParam = (field: Field<any>, $params: Record<string, any> = {}) => {
-    const params = $params;
-    if (field.omit) {
-        return params;
-    }
-    if (field.optional && ((!field.value && field.value !== 0) || field.value === '')) {
-        return params;
-    }
-    if ('defaultValue' in field) {
-        if (field.defaultValue !== field.value) {
-            params[field.name] = field.value;
-        }
-    } else if (field.type === 'json') {
-        try {
-            if (typeof field.value === 'string' && field.value.length > 0) {
-                params[field.name] = JSON.parse(field.value);
-            } else {
-                params[field.name] = field.value;
-            }
-        } catch (error) {
-            params[field.name] = `Invalid json, ${error.toString()}`;
-        }
-    } else if (field.type === 'function') {
-        try {
-            if (typeof field.value !== 'function') {
-                throw new Error('Invalid function');
-            }
-            params[field.name] = field.value;
-        } catch (error) {
-            params[field.name] = `Invalid function, ${error.toString()}`;
-        }
-    } else if (field.type === 'number') {
-        if (!Number.isNaN(Number.parseInt(field.value, 10))) {
-            params[field.name] = Number.parseInt(field.value, 10);
-        }
-    } else {
-        params[field.name] = field.value;
+export const selectMethod = (state: MethodRootState) => state.method;
+
+// Recursively find a field in the schema (inner function)
+const findFieldsNested = (
+    schema: Field<any>[],
+    field: Field<any>,
+    currentDepth = 0,
+): Field<any> | undefined => {
+    if (!schema) return undefined;
+
+    const remainingPath = field.path?.slice(currentDepth);
+    if (!remainingPath || remainingPath.length === 0) {
+        return schema.find(f => f.name === field.name);
     }
 
-    return params;
-};
+    // @ts-expect-error: indexing with noUncheckedIndexedAccess
+    const nextFieldName: string = remainingPath[0];
+    const nextField = schema.find(f => f.name === nextFieldName);
+    // @ts-expect-error: indexing with noUncheckedIndexedAccess
+    const nextPathSegment: string | number = remainingPath[1];
+    if (nextField?.type === 'array' && typeof nextPathSegment === 'number') {
+        const { items } = nextField;
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const nestedItems: (typeof items)[number] = items[nextPathSegment];
 
-const updateJavascript = (state: MethodState) => {
-    const code =
-        Object.keys(state.params).length > 0
-            ? JSON.stringify(
-                  state.params,
-                  (_, value) => {
-                      if (Object.prototype.toString.call(value) === '[object ArrayBuffer]') {
-                          return 'ArrayBuffer';
-                      }
-
-                      return value;
-                  },
-                  2,
-              )
-            : '';
-
-    return {
-        ...state,
-        javascriptCode: `TrezorConnect.${state.name}(${code});`,
-    };
-};
-
-const updateParams = (state: MethodState) => {
-    const params: Record<string, any> = {};
-    state.fields.forEach(field => {
-        if (field.type === 'array') {
-            const arr: Record<string, any>[] = [];
-            field.items?.forEach(batch => {
-                const batchParams = {};
-                batch.forEach(batchField => {
-                    getParam(batchField, batchParams);
-                });
-                arr.push(batchParams);
-            });
-            params[field.name] = arr;
-        } else {
-            getParam(field, params);
-        }
-    });
-
-    return updateJavascript({
-        ...state,
-        params,
-    });
-};
-
-const setAffectedValues = (state: MethodState, field: any) => {
-    if (!field.affect) return field;
-
-    const data = field.data?.find(d => d.value === field.value);
-    if (data && data.affectedValue) {
-        const affectedFieldNames = !Array.isArray(field.affect) ? [field.affect] : field.affect;
-        const values = !Array.isArray(data.affectedValue)
-            ? [data.affectedValue]
-            : data.affectedValue;
-
-        let root;
-        if (typeof field.key === 'string') {
-            const key = field.key.split('-');
-            const bundle = state.fields.find(f => f.name === key[0]);
-            if (bundle) {
-                root = bundle.items?.find((_batch, index) => index === Number.parseInt(key[1], 10));
-            }
-        } else {
-            root = state.fields;
-        }
-
-        affectedFieldNames.forEach((af, index) => {
-            const affectedField = root.find(f => f.name === af);
-            if (affectedField) {
-                affectedField.value = values[index];
-                if (state.name === 'composeTransaction') {
-                    affectedField.value = values;
-                }
-            }
-        });
-    } else if (field.affect && typeof field.affect === 'string' && field.value) {
-        const affectedField = state.fields.find(f => f.name === field.affect);
-        if (affectedField) {
-            // @ts-expect-error todo: what is this?
-            affectedField.value = field.value;
-        }
+        return findFieldsNested(nestedItems, field, currentDepth + 2);
+    } else if (nextField?.type === 'union') {
+        return findFieldsNested(nextField.current, field, currentDepth + 1);
     }
-
-    return field;
 };
 
-const prepareBundle = (field: any) => {
-    if (field.type === 'array') {
-        field.items!.forEach((batch, index) => {
-            batch.forEach(batchField => {
-                batchField.key = `${field.name}-${index}`;
-            });
-        });
-    }
+// Find a field in the schema
+const findField = (state: MethodState, field: Field<any>) => findFieldsNested(state.fields, field);
 
-    return field;
-};
-
-const findField = (state: MethodState, field: any) => {
-    if (typeof field.key === 'string') {
-        const key = field.key.split('-');
-        const bundle = state.fields.find(f => f.name === key[0]);
-        const batch = bundle?.items?.find((_batch, index) => index === Number.parseInt(key[1], 10));
-
-        return batch.find(f => f.name === field.name);
-    }
-
-    return state.fields.find(f => f.name === field.name);
-};
-
-const onFieldChange = (state: MethodState, _field: any, value: any) => {
-    const newState = {
-        ...JSON.parse(JSON.stringify(state)),
-        ...state,
-    };
+// Update field value
+const onFieldChange = (state: MethodState, _field: Field<any>, value: any) => {
+    const newState = JSON.parse(JSON.stringify(state));
     const field = findField(newState, _field);
+    if (!field || !isFieldBasic(field)) return state;
     field.value = value;
-    if (field.affect) {
+    if (field.affect && !state.manualMode) {
         setAffectedValues(newState, field);
     }
 
-    return updateParams(newState);
+    return updateParams({ ...state, fields: newState.fields });
 };
 
-const onFieldDataChange = (state: MethodState, _field: any, data: any) => {
-    const newState = state;
-    const field = findField(newState, _field);
-    field.data = data;
-
-    return updateParams(newState);
-};
-
-// initialization
-const getMethodState = (url: string) => {
-    // find data in config
-    const method = config.find(m => m.url === url);
-    if (!method) return initialState;
-    // clone object
-    const state = {
-        ...JSON.parse(JSON.stringify(method)),
-        // ...method,
-    };
-
-    // set default values
-    state.fields = state.fields.map(f => setAffectedValues(state, prepareBundle(f)));
-    state.tab = initialState.tab;
-
-    // set method params
-    return updateParams(state);
-};
-
+// Add new batch
 const onAddBatch = (state: MethodState, _field: Field<any>, item: any) => {
     const newState = JSON.parse(JSON.stringify(state));
-    const field = newState.fields.find(f => f.name === _field.name);
+    const field = findField(newState, _field);
+    if (field?.type !== 'array') return state;
     field.items = [...field.items, item];
     prepareBundle(field);
 
     return updateParams(newState);
 };
 
-const onRemoveBatch = (state: MethodState, _field: any, _batch: any) => {
-    const field = state.fields.find(f => f.name === _field.name);
+// Remove batch
+const onRemoveBatch = (state: MethodState, _field: Field<any>, _batch: any) => {
+    const field = findField(state, _field);
+    if (field?.type !== 'array') return state;
     const items = field?.items?.filter(batch => batch !== _batch);
 
     const newState = JSON.parse(JSON.stringify(state));
-    const newField = newState.fields.find(f => f.name === field?.name);
+    const newField = findField(newState, field);
+    if (newField?.type !== 'array') return state;
+
     newField.items = items;
     prepareBundle(newField);
 
     return updateParams(newState);
 };
 
+// Set union current
+const onSetUnion = (state: MethodState, _field: Field<any>, current: any) => {
+    const newState = JSON.parse(JSON.stringify(state));
+    const field = findField(newState, _field);
+    if (field?.type !== 'union') return state;
+    field.current = current;
+    prepareBundle(field);
+
+    return updateParams(newState);
+};
+
 export default function method(state: MethodState = initialState, action: Action) {
     switch (action.type) {
-        case ON_LOCATION_CHANGE:
-            return getMethodState(action.payload.pathname);
+        case SET_METHOD:
+            return getMethodState(action.methodConfig);
 
-        case TAB_CHANGE:
-            return {
-                ...state,
-                tab: action.tab,
-            };
+        case SET_SCHEMA:
+            return getMethodStateFromSchema(action.method, action.schema);
 
         case FIELD_CHANGE:
             return onFieldChange(state, action.field, action.value);
-
-        case FIELD_DATA_CHANGE:
-            return onFieldDataChange(state, action.field, action.data);
 
         case ADD_BATCH:
             return onAddBatch(state, action.field, action.item);
@@ -276,12 +129,27 @@ export default function method(state: MethodState = initialState, action: Action
         case REMOVE_BATCH:
             return onRemoveBatch(state, action.field, action.batch);
 
+        case SET_UNION:
+            return onSetUnion(state, action.field, action.current);
+
         case RESPONSE:
             return {
                 ...state,
-                tab: 'response',
                 response: action.response,
             };
+
+        case SET_MANUAL_MODE:
+            return {
+                ...state,
+                manualMode: action.manualMode,
+            };
+
+        case SET_METHOD_PROCESSING:
+            return {
+                ...state,
+                processing: action.payload,
+            };
+
         default:
             return state;
     }

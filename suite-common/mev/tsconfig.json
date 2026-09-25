@@ -1,0 +1,11 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": { "outDir": "libDev" },
+    "references": [
+        { "path": "../device" },
+        { "path": "../message-system" },
+        { "path": "../redux-utils" },
+        { "path": "../suite-types" },
+        { "path": "../../packages/device-utils" }
+    ]
+}

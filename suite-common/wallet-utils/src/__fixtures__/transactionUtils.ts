@@ -1,10 +1,21 @@
-import { testMocks } from '@suite-common/test-utils';
-import { WalletAccountTransaction } from '@suite-common/wallet-types';
-import { AccountTransaction } from '@trezor/connect';
+import { asNetworkSymbol } from '@suite-common/wallet-config';
+import { type WalletAccountTransaction, asAccountDescriptor } from '@suite-common/wallet-types';
+import { mockWalletAccount } from '@suite-common/wallet-types/mocks';
+import { type TokenTransfer, type TransferType } from '@trezor/blockchain-link-types';
+import { type AccountTransaction } from '@trezor/connect';
 
 import { TXS } from './transactions';
 
-const { getWalletAccount } = testMocks;
+export const token: TokenTransfer = {
+    type: 'sent' as TransferType,
+    from: 'A',
+    to: 'B',
+    name: 'Token name',
+    symbol: 'TKNNME',
+    amount: '1',
+    decimals: 0,
+    contract: '0x0',
+};
 
 export const analyzeTransactions = [
     {
@@ -289,14 +300,14 @@ export const analyzeTransactions = [
 
 export const analyzeTransactionsPrepending = [
     {
-        description: 'pre-pending becomes confirmed (no confirmed)',
+        description: 'pre-pending becomes confirmed, upgraded in place (no confirmed)',
         fresh: [{ blockHeight: 1, blockHash: '1', txid: '1' }],
         known: [{ blockHeight: undefined, blockHash: '1', txid: '1', deadline: 2 }],
         blockHeight: 1,
         result: {
             newTransactions: [{ blockHeight: 1, blockHash: '1', txid: '1' }],
             add: [{ blockHeight: 1, blockHash: '1', txid: '1' }],
-            remove: [{ blockHeight: undefined, blockHash: '1', txid: '1', deadline: 2 }],
+            remove: [],
         },
     },
     {
@@ -347,7 +358,7 @@ export const analyzeTransactionsPrepending = [
         },
     },
     {
-        description: 'pre-pending becomes confirmed (has confirmed tx)',
+        description: 'pre-pending becomes confirmed, upgraded in place (has confirmed tx)',
         fresh: [
             { blockHeight: 3, blockHash: '3', txid: '3' },
             { blockHeight: 1, blockHash: '2', txid: '2' },
@@ -360,7 +371,21 @@ export const analyzeTransactionsPrepending = [
         result: {
             newTransactions: [{ blockHeight: 3, blockHash: '3', txid: '3' }],
             add: [{ blockHeight: 3, blockHash: '3', txid: '3' }],
-            remove: [{ blockHeight: undefined, blockHash: '3', txid: '3', deadline: 3 }],
+            remove: [],
+        },
+    },
+    {
+        description: 'pre-pending reaches mempool, upgraded in place without eviction',
+        fresh: [{ blockHeight: undefined, blockHash: '1', txid: '1' }],
+        known: [
+            { blockHeight: undefined, blockHash: '1', txid: '1', deadline: 2 },
+            { blockHeight: 1, blockHash: '2', txid: '2' },
+        ],
+        blockHeight: 1,
+        result: {
+            newTransactions: [],
+            add: [{ blockHeight: undefined, blockHash: '1', txid: '1' }],
+            remove: [],
         },
     },
     {
@@ -453,12 +478,12 @@ export const enhanceTransaction = [
                 totalOutput: '80719868',
             },
         },
-        account: getWalletAccount({
-            deviceState: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
-            descriptor:
+        account: mockWalletAccount({
+            deviceState: '1stTestnetAddress@device_id:0',
+            descriptor: asAccountDescriptor(
                 'zpub6rszzdAK6RuafeRwyN8z1cgWcXCuKbLmjjfnrW4fWKtcoXQ8787214pNJjnBG5UATyghuNzjn6Lfp5k5xymrLFJnCy46bMYJPyZsbpFGagT',
-            symbol: 'btc',
-            networkType: 'bitcoin',
+            ),
+            symbol: asNetworkSymbol('btc'),
         }),
         result: {
             amount: '123',
@@ -467,10 +492,10 @@ export const enhanceTransaction = [
             blockTime: 1565797979,
             descriptor:
                 'zpub6rszzdAK6RuafeRwyN8z1cgWcXCuKbLmjjfnrW4fWKtcoXQ8787214pNJjnBG5UATyghuNzjn6Lfp5k5xymrLFJnCy46bMYJPyZsbpFGagT',
-            deviceState: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
+            deviceState: '1stTestnetAddress@device_id:0',
             fee: '0.00002929',
             totalSpent: '123.00002929',
-            symbol: 'btc',
+            symbol: asNetworkSymbol('btc'),
             targets: [],
             tokens: [
                 {
@@ -545,12 +570,12 @@ export const enhanceTransaction = [
                 size: 255,
             },
         },
-        account: getWalletAccount({
-            deviceState: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
-            descriptor:
+        account: mockWalletAccount({
+            deviceState: '1stTestnetAddress@device_id:0',
+            descriptor: asAccountDescriptor(
                 'zpub6rszzdAK6RuafeRwyN8z1cgWcXCuKbLmjjfnrW4fWKtcoXQ8787214pNJjnBG5UATyghuNzjn6Lfp5k5xymrLFJnCy46bMYJPyZsbpFGagT',
-            symbol: 'btc',
-            networkType: 'bitcoin',
+            ),
+            symbol: asNetworkSymbol('btc'),
         }),
         result: {
             amount: '0.00006497',
@@ -559,10 +584,10 @@ export const enhanceTransaction = [
             blockTime: 1565797979,
             descriptor:
                 'zpub6rszzdAK6RuafeRwyN8z1cgWcXCuKbLmjjfnrW4fWKtcoXQ8787214pNJjnBG5UATyghuNzjn6Lfp5k5xymrLFJnCy46bMYJPyZsbpFGagT',
-            deviceState: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
+            deviceState: '1stTestnetAddress@device_id:0',
             fee: '0.00002929',
             totalSpent: '0.00009426',
-            symbol: 'btc',
+            symbol: asNetworkSymbol('btc'),
             targets: [
                 {
                     addresses: ['0x4f4f1488acb1ae1b46146ceff804f591dfe660ac'],
@@ -608,12 +633,12 @@ export const enhanceTransaction = [
                 size: 255,
             },
         },
-        account: getWalletAccount({
-            deviceState: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
-            descriptor:
+        account: mockWalletAccount({
+            deviceState: '1stTestnetAddress@device_id:0',
+            descriptor: asAccountDescriptor(
                 'zpub6rszzdAK6RuafeRwyN8z1cgWcXCuKbLmjjfnrW4fWKtcoXQ8787214pNJjnBG5UATyghuNzjn6Lfp5k5xymrLFJnCy46bMYJPyZsbpFGagT',
-            symbol: 'btc',
-            networkType: 'bitcoin',
+            ),
+            symbol: asNetworkSymbol('btc'),
         }),
         result: {
             amount: '0.00006497',
@@ -622,10 +647,10 @@ export const enhanceTransaction = [
             blockTime: 1565797979,
             descriptor:
                 'zpub6rszzdAK6RuafeRwyN8z1cgWcXCuKbLmjjfnrW4fWKtcoXQ8787214pNJjnBG5UATyghuNzjn6Lfp5k5xymrLFJnCy46bMYJPyZsbpFGagT',
-            deviceState: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
+            deviceState: '1stTestnetAddress@device_id:0',
             fee: '0.00002929',
             totalSpent: '0.00009426',
-            symbol: 'btc',
+            symbol: asNetworkSymbol('btc'),
             targets: [
                 {
                     addresses: ['0x4f4f1488acb1ae1b46146ceff804f591dfe660ac'],
@@ -644,205 +669,6 @@ export const enhanceTransaction = [
                 size: 255,
             },
         },
-    },
-];
-
-export const searchTransactions = [
-    {
-        description: 'Partial TXID search',
-        search: 'ade',
-        result: [
-            '17b013822da84cc39a0d2df8abc78ade03c8712d078a2d614889fb189c52c8f5',
-            '5986a3b46340a5999d70f86fee8caea6b9870500e602c30b630195ade281a833',
-            'bf20f5eea272056d439eb78db97a207f5a1bd3e8a29ff920744f2eb70b8d9425', // Address contains search
-            'dbe87d35c441d00cb2368b93a50ccd7ee8a984a838561a08b2cbc03b434338fb', // Address contains search
-            '5f8dbb7c7b3ddf297cc21abb66adbadeaede30d14c49f12ec1d42117b3e8c159',
-            '48ce7f7d6344b3cf0bf1f53356941d1df4cade3460fbd33800dcbdb635800d0e',
-            '85a198193021b1298b1a227eae89194502dadef90612b095ff059a579ff88d6c',
-        ],
-    },
-    {
-        description: 'Exact TXID search',
-        search: '93600f534749714165262774ab248a4a1c40e833238d9a4bbf539095213fa258',
-        result: ['93600f534749714165262774ab248a4a1c40e833238d9a4bbf539095213fa258'],
-    },
-    {
-        description: 'Partial Address search',
-        search: 'b1qgu',
-        result: [
-            '8796794aaa4563098325ef2cb08cafd97112b1d31baeed97e4d39efba6249be4',
-            '072d69d762f33ea5e4c4493e94ce4dcf927fe9d8cf6df5b8d40217336a05571e',
-            'a59a1761ad3fad987258c79850e397398ab8559f157bc6868a7ed4e8b742ef01',
-            'fbebc7273c3fdd61eef334687668c1152226d7361251460f0fb1c6ccacbbae78',
-            'e81dcd9aaa60d855fb219e977a260dc621d9c24e00ffbe2e1cae8aed36f7802f',
-            'ae0949b1b050ac6f92c7d9c1570f2f06c21a997eef8be9ef5edc2a38cb92a879',
-            'c6d86cd9872e98cc8f4f79846d91699e35f04ce81fad9c088384a11a319ab4cb',
-        ],
-    },
-    {
-        description: 'Exact Address search',
-        search: 'tb1qegw9kj8z3206neq9f09m9ahs67h4xq9tgvhjcj',
-        result: [
-            '93600f534749714165262774ab248a4a1c40e833238d9a4bbf539095213fa258',
-            '8c40061886e9815498b59b564be390beb8b7ff73d436b1d1c833475974bc3e5a',
-        ],
-    },
-    {
-        description: 'Partial Output label search',
-        search: 'Pota',
-        result: [
-            '62431e78bb13a4fdd9c87517db1ea70b4cb5763227327da35748c96497c6ea9a', // Potato
-            '4f9af222a7c53ea708f8f370583608eda85c49f9f58901c82f0c79c6ab998b18', // Not Potato
-        ],
-    },
-    {
-        description: 'Exact Output label search',
-        search: 'Not potato',
-        result: [
-            '4f9af222a7c53ea708f8f370583608eda85c49f9f58901c82f0c79c6ab998b18', // Not Potato
-        ],
-    },
-    {
-        description: 'Output label search (ignore casing)',
-        search: 'pOtAtO',
-        result: [
-            '62431e78bb13a4fdd9c87517db1ea70b4cb5763227327da35748c96497c6ea9a', // Potato
-            '4f9af222a7c53ea708f8f370583608eda85c49f9f58901c82f0c79c6ab998b18', // Not Potato
-        ],
-    },
-    {
-        description: 'Partial Address label search',
-        search: 'AAA',
-        result: [
-            '9438960e985b1de4e118cbcedf6122c2467477d768d262863ee13e981b6c2816', // AAA
-            '5be0cfd5b439c3112cfaea3cd05fdcea387433990885c86937d2488c59f1e692', // AAA
-            'f38d1ae79872985688d92dcec6a359ca563c48a506e8766488ad1d2aa8e4ea30', // AAAFEFSF
-            '905e181a3e3066a88bf848690ad32cd260ca53dc192d6f588c0344fa08363b11', // AAAFEFSF
-            '65b768dacccfb209eebd95a1fb80a04f1dd6a3abc6d7b41d5e9d9f91605b37d9', // AAAFEFSF
-            'e4b5b24159856ea18ab5819832da3b4a6330f9c3c0a46d96674e632df504b56b', // AAAFEFSF
-            'b4fc775f2bace65b68ba8c43423fab2f96c8743c54d5468b92923f70ca20ae2e', // AAAFEFSF
-            '70f9871eb03a38405cfd7a01e0e1448678132d815e2c9f552ad83ae23969509e', // AAAFEFSF
-            'f405b50dff7053f3697f485f95fe1c0f6a4f5e52446281b4ef470c2762a15dae', // AAAFEFSF
-            '575df1986c414f1d74bebc2229d794e423a2371fb51bac1d3b517e5cca51b5ea', // AAAFEFSF
-            '43d273d3caf41759ad843474f960fbf80ff2ec961135d018b61e9fab3ad1fc06', // AAAFEFSF
-            'e294c4c172c3d87991b0369e45d6af8584be92914d01e3060fad1ed31d12ff00', // AAAFEFSF
-        ],
-    },
-    {
-        description: 'Exact Address label search',
-        search: 'AAAFEFSF',
-        result: [
-            'f38d1ae79872985688d92dcec6a359ca563c48a506e8766488ad1d2aa8e4ea30', // AAAFEFSF
-            '905e181a3e3066a88bf848690ad32cd260ca53dc192d6f588c0344fa08363b11', // AAAFEFSF
-            '65b768dacccfb209eebd95a1fb80a04f1dd6a3abc6d7b41d5e9d9f91605b37d9', // AAAFEFSF
-            'e4b5b24159856ea18ab5819832da3b4a6330f9c3c0a46d96674e632df504b56b', // AAAFEFSF
-            'b4fc775f2bace65b68ba8c43423fab2f96c8743c54d5468b92923f70ca20ae2e', // AAAFEFSF
-            '70f9871eb03a38405cfd7a01e0e1448678132d815e2c9f552ad83ae23969509e', // AAAFEFSF
-            'f405b50dff7053f3697f485f95fe1c0f6a4f5e52446281b4ef470c2762a15dae', // AAAFEFSF
-            '575df1986c414f1d74bebc2229d794e423a2371fb51bac1d3b517e5cca51b5ea', // AAAFEFSF
-            '43d273d3caf41759ad843474f960fbf80ff2ec961135d018b61e9fab3ad1fc06', // AAAFEFSF
-            'e294c4c172c3d87991b0369e45d6af8584be92914d01e3060fad1ed31d12ff00', // AAAFEFSF
-        ],
-    },
-    {
-        description: 'Address label search (ignore casing)',
-        search: 'aaaFEFSF',
-        result: [
-            'f38d1ae79872985688d92dcec6a359ca563c48a506e8766488ad1d2aa8e4ea30', // AAAFEFSF
-            '905e181a3e3066a88bf848690ad32cd260ca53dc192d6f588c0344fa08363b11', // AAAFEFSF
-            '65b768dacccfb209eebd95a1fb80a04f1dd6a3abc6d7b41d5e9d9f91605b37d9', // AAAFEFSF
-            'e4b5b24159856ea18ab5819832da3b4a6330f9c3c0a46d96674e632df504b56b', // AAAFEFSF
-            'b4fc775f2bace65b68ba8c43423fab2f96c8743c54d5468b92923f70ca20ae2e', // AAAFEFSF
-            '70f9871eb03a38405cfd7a01e0e1448678132d815e2c9f552ad83ae23969509e', // AAAFEFSF
-            'f405b50dff7053f3697f485f95fe1c0f6a4f5e52446281b4ef470c2762a15dae', // AAAFEFSF
-            '575df1986c414f1d74bebc2229d794e423a2371fb51bac1d3b517e5cca51b5ea', // AAAFEFSF
-            '43d273d3caf41759ad843474f960fbf80ff2ec961135d018b61e9fab3ad1fc06', // AAAFEFSF
-            'e294c4c172c3d87991b0369e45d6af8584be92914d01e3060fad1ed31d12ff00', // AAAFEFSF
-        ],
-    },
-    {
-        description: 'Higher than amount search',
-        // TODO amounts in searchTransactions.json are wrongly in BTC instead of sats,
-        // but it's simpler to adjust it here than in the json
-        search: '> 0.0000000007',
-        result: [
-            'f457a1b85f84dcdaadc06f5dffb1436034bf6fa69a271a08d005f0a65aea7693', // 0.0794905 TEST
-            '121afe39eaeacd0f38ff1ed4ab34dbd34aa1239a82465a112dbcde1646b01ec7', // 0.07806848 TEST
-            'e294c4c172c3d87991b0369e45d6af8584be92914d01e3060fad1ed31d12ff00', // 1.29999867 TEST
-        ],
-    },
-    {
-        description: 'Lower than amount search',
-        search: '< -000000000.1',
-        result: [
-            'a59a1761ad3fad987258c79850e397398ab8559f157bc6868a7ed4e8b742ef01', // -0.22667356 TEST
-            'b4fc775f2bace65b68ba8c43423fab2f96c8743c54d5468b92923f70ca20ae2e', // -1.19999084 TEST
-            '43d273d3caf41759ad843474f960fbf80ff2ec961135d018b61e9fab3ad1fc06', // -0.1 TEST
-        ],
-    },
-    {
-        description: 'Exclude amount search',
-        search: '!= -0.0000000000999888',
-        notResult: [
-            '62431e78bb13a4fdd9c87517db1ea70b4cb5763227327da35748c96497c6ea9a', // -0.00999888 TEST
-        ],
-    },
-    {
-        description: 'Date search',
-        search: '2020-12-03',
-        result: [
-            '9438960e985b1de4e118cbcedf6122c2467477d768d262863ee13e981b6c2816',
-            '5be0cfd5b439c3112cfaea3cd05fdcea387433990885c86937d2488c59f1e692',
-        ],
-    },
-    {
-        description: 'After date search',
-        search: '> 2020-12-14',
-        result: [
-            '62431e78bb13a4fdd9c87517db1ea70b4cb5763227327da35748c96497c6ea9a', // 2020-12-27
-            'f5cea29dec1d4e8b83a81b61627caf36adc33085284bde2969ae5beb75bd413c', // 2020-12-14
-        ],
-    },
-    {
-        description: 'Before date search',
-        search: '< 2018-03-20',
-        result: [
-            '575df1986c414f1d74bebc2229d794e423a2371fb51bac1d3b517e5cca51b5ea', // 2020-03-16
-            '43d273d3caf41759ad843474f960fbf80ff2ec961135d018b61e9fab3ad1fc06', // 2020-03-02
-            'e294c4c172c3d87991b0369e45d6af8584be92914d01e3060fad1ed31d12ff00', // 2020-03-02
-        ],
-    },
-    {
-        description: 'Exclude date search',
-        search: '!= 2020-12-27',
-        notResult: [
-            '62431e78bb13a4fdd9c87517db1ea70b4cb5763227327da35748c96497c6ea9a', // 2020-12-27
-        ],
-    },
-    {
-        description: 'AND operator (incoming December transactions only)',
-        search: '> 2020-12-01 & < 2020-12-31 & > 0',
-        results: [
-            'f5cea29dec1d4e8b83a81b61627caf36adc33085284bde2969ae5beb75bd413c', // 2020-12-14 - 0.01 TEST
-            '5be0cfd5b439c3112cfaea3cd05fdcea387433990885c86937d2488c59f1e692', // 2020-12-03 - 0.00019199 TEST
-        ],
-    },
-    {
-        description: 'OR operator (December 14th and 3rd transactions only)',
-        search: '2020-12-14 | 2020-12-03 & > 0',
-        results: [
-            'f5cea29dec1d4e8b83a81b61627caf36adc33085284bde2969ae5beb75bd413c', // 2020-12-14 - 0.01 TEST
-            '9438960e985b1de4e118cbcedf6122c2467477d768d262863ee13e981b6c2816', // 2020-12-03 - -0.00002066 TEST
-            '5be0cfd5b439c3112cfaea3cd05fdcea387433990885c86937d2488c59f1e692', // 2020-12-03 - 0.00019199 TEST
-        ],
-    },
-    {
-        description: 'AND + OR operator (December 14th and 3rd incoming transactions only)',
-        search: '2020-12-14 | 2020-12-03 & > 0',
-        results: [
-            'f5cea29dec1d4e8b83a81b61627caf36adc33085284bde2969ae5beb75bd413c', // 2020-12-14 - 0.01 TEST
-            '5be0cfd5b439c3112cfaea3cd05fdcea387433990885c86937d2488c59f1e692', // 2020-12-03 - 0.00019199 TEST
-        ],
     },
 ];
 
@@ -990,6 +816,70 @@ export const getRbfParams = [
         result: undefined,
     },
     {
+        // A stranger's transfer out of the account is labelled 'sent' as well, but replacing it
+        // would re-sign at the stranger's nonce, so it must not be offered as replaceable.
+        description: 'ethereum tx signed by somebody else',
+        account: {
+            networkType: 'ethereum',
+            descriptor: '0x37567E60ab231b7D7f26B5b34FDD719098E4Ee1b',
+        },
+        tx: {
+            type: 'sent',
+            txid: '0xabcd',
+            rbf: true,
+            blockHeight: -1,
+            ethereumSpecific: { nonce: 45, gasLimit: 21000, gasPrice: '1000000000' },
+            details: {
+                vin: [{ addresses: ['0x0F6666bC699aec39b846E898473e9CAec5a6b821'] }],
+                vout: [{ isAddress: true, addresses: ['0xdead'] }],
+            },
+        },
+        result: undefined,
+    },
+    {
+        description: 'ethereum tx signed by the account itself',
+        account: {
+            networkType: 'ethereum',
+            symbol: asNetworkSymbol('eth'),
+            descriptor: '0x37567E60ab231b7D7f26B5b34FDD719098E4Ee1b',
+        },
+        tx: {
+            type: 'sent',
+            txid: '0xbeef',
+            rbf: true,
+            blockHeight: -1,
+            ethereumSpecific: { nonce: 45, gasLimit: 21000, gasPrice: '1000000000' },
+            details: {
+                // Lower-cased, as blockbook may report it — authorship must still match.
+                vin: [{ addresses: ['0x37567e60ab231b7d7f26b5b34fdd719098e4ee1b'] }],
+                vout: [
+                    {
+                        isAddress: true,
+                        addresses: ['0xfAEEEB8Fd7D41a6a8223DD36D347DBe56c13fe61'],
+                        value: '1000000000000000000',
+                    },
+                ],
+            },
+        },
+        result: {
+            type: 'ethereum',
+            txid: '0xbeef',
+            outputs: [
+                {
+                    type: 'payment',
+                    address: '0xfAEEEB8Fd7D41a6a8223DD36D347DBe56c13fe61',
+                    amount: '1000000000000000000',
+                    formattedAmount: '1',
+                },
+            ],
+            ethereumNonce: 45,
+            transactionData: '',
+            gasPrice: '1',
+            maxFeePerGas: '',
+            maxPriorityFeePerGas: '',
+        },
+    },
+    {
         description: 'invalid tx (rbf false)',
         account: { networkType: 'bitcoin' },
         tx: { type: 'sent', rbf: false },
@@ -1086,6 +976,7 @@ export const getRbfParams = [
             },
         },
         result: {
+            type: 'bitcoin',
             txid: '1A2b',
             baseFee: 166,
             feeRate: '2',
@@ -1147,6 +1038,7 @@ export const getRbfParams = [
             },
         },
         result: {
+            type: 'bitcoin',
             txid: '1A2b',
             baseFee: 366,
             feeRate: '4',
@@ -1219,6 +1111,7 @@ export const getRbfParams = [
             },
         },
         result: {
+            type: 'bitcoin',
             txid: '1A2b',
             baseFee: 366,
             feeRate: '4',
@@ -1261,11 +1154,12 @@ export const getAccountTransactions = [
     {
         testName: 'BTC account, 2txs',
         transactions: TXS,
-        account: getWalletAccount({
-            deviceState: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
-            descriptor:
+        account: mockWalletAccount({
+            deviceState: '1stTestnetAddress@device_id:0',
+            descriptor: asAccountDescriptor(
                 'zpub6rszzdAK6RuafeRwyN8z1cgWcXCuKbLmjjfnrW4fWKtcoXQ8787214pNJjnBG5UATyghuNzjn6Lfp5k5xymrLFJnCy46bMYJPyZsbpFGagT',
-            symbol: 'btc',
+            ),
+            symbol: asNetworkSymbol('btc'),
         }),
         result: [
             {
@@ -1275,10 +1169,10 @@ export const getAccountTransactions = [
                 blockTime: 1565797979,
                 descriptor:
                     'zpub6rszzdAK6RuafeRwyN8z1cgWcXCuKbLmjjfnrW4fWKtcoXQ8787214pNJjnBG5UATyghuNzjn6Lfp5k5xymrLFJnCy46bMYJPyZsbpFGagT',
-                deviceState: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
+                deviceState: '1stTestnetAddress@device_id:0',
                 fee: '0.00002929',
 
-                symbol: 'btc',
+                symbol: asNetworkSymbol('btc'),
                 targets: [
                     { addresses: ['36JkLACrdxARqXXffZk91V9W6SJvghKaVK'], amount: '0.00006497' },
                 ],
@@ -1293,10 +1187,10 @@ export const getAccountTransactions = [
                 blockTime: 1565797979,
                 descriptor:
                     'zpub6rszzdAK6RuafeRwyN8z1cgWcXCuKbLmjjfnrW4fWKtcoXQ8787214pNJjnBG5UATyghuNzjn6Lfp5k5xymrLFJnCy46bMYJPyZsbpFGagT',
-                deviceState: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
+                deviceState: '1stTestnetAddress@device_id:0',
                 fee: '0.00000166',
 
-                symbol: 'btc',
+                symbol: asNetworkSymbol('btc'),
                 targets: [
                     { addresses: ['3Bvy87TmQhhSBqfiCBh8w5yPx6usiDM8SY'], amount: '0.00319488' },
                 ],
@@ -1309,16 +1203,16 @@ export const getAccountTransactions = [
     {
         testName: 'XRP testnet account, 2',
         transactions: TXS,
-        account: getWalletAccount({
-            deviceState: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
-            descriptor: 'rNaqKtKrMSwpwZSzRckPf7S96DkimjkF4H',
-            symbol: 'txrp',
+        account: mockWalletAccount({
+            deviceState: '1stTestnetAddress@device_id:0',
+            descriptor: asAccountDescriptor('rNaqKtKrMSwpwZSzRckPf7S96DkimjkF4H'),
+            symbol: asNetworkSymbol('txrp'),
         }),
         result: [
             {
                 descriptor: 'rNaqKtKrMSwpwZSzRckPf7S96DkimjkF4H',
-                deviceState: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
-                symbol: 'txrp',
+                deviceState: '1stTestnetAddress@device_id:0',
+                symbol: asNetworkSymbol('txrp'),
                 type: 'recv',
                 txid: 'A62FDA65E3B84FA2BED47086DB9458CFF8AF475196E327FC51DA0143BD998A9B',
                 blockTime: 621951942,
@@ -1337,8 +1231,8 @@ export const getAccountTransactions = [
             },
             {
                 descriptor: 'rNaqKtKrMSwpwZSzRckPf7S96DkimjkF4H',
-                deviceState: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
-                symbol: 'txrp',
+                deviceState: '1stTestnetAddress@device_id:0',
+                symbol: asNetworkSymbol('txrp'),
                 type: 'recv',
                 txid: 'DFA960521E384047E56946F9A441FB717475D132E49737A347CA8B6C80AFC84B',
                 blockTime: 621951942,
@@ -1360,16 +1254,16 @@ export const getAccountTransactions = [
     {
         testName: 'eth account, 5 txs',
         transactions: TXS,
-        account: getWalletAccount({
-            deviceState: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
-            descriptor: '0xFA01a39f8Abaeb660c3137f14A310d0b414b2A15',
-            symbol: 'eth',
+        account: mockWalletAccount({
+            deviceState: '1stTestnetAddress@device_id:0',
+            descriptor: asAccountDescriptor('0xFA01a39f8Abaeb660c3137f14A310d0b414b2A15'),
+            symbol: asNetworkSymbol('eth'),
         }),
         result: [
             {
                 descriptor: '0xFA01a39f8Abaeb660c3137f14A310d0b414b2A15',
-                deviceState: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
-                symbol: 'eth',
+                deviceState: '1stTestnetAddress@device_id:0',
+                symbol: asNetworkSymbol('eth'),
                 type: 'recv',
                 txid: '0x63635c5ca1e21d13780d5a0a66cc16dfe0b49ffb9eff191f15b3da271b1ad1d3',
                 blockTime: 1495456394,
@@ -1391,8 +1285,8 @@ export const getAccountTransactions = [
             },
             {
                 descriptor: '0xFA01a39f8Abaeb660c3137f14A310d0b414b2A15',
-                deviceState: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
-                symbol: 'eth',
+                deviceState: '1stTestnetAddress@device_id:0',
+                symbol: asNetworkSymbol('eth'),
                 type: 'sent',
                 txid: '0x5f3cba8a6dee792594dcce71c5aa39a872bce57cb33e0da8db02d9f2f865806c',
                 blockTime: 1494938897,
@@ -1418,8 +1312,8 @@ export const getAccountTransactions = [
             },
             {
                 descriptor: '0xFA01a39f8Abaeb660c3137f14A310d0b414b2A15',
-                deviceState: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
-                symbol: 'eth',
+                deviceState: '1stTestnetAddress@device_id:0',
+                symbol: asNetworkSymbol('eth'),
                 type: 'sent',
                 txid: '0xfaae2e7927e97002f15300c6011ca792243cbd57d574db34ccb2a9c18c272b3e',
                 blockTime: 1493811343,
@@ -1450,8 +1344,8 @@ export const getAccountTransactions = [
             },
             {
                 descriptor: '0xFA01a39f8Abaeb660c3137f14A310d0b414b2A15',
-                deviceState: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
-                symbol: 'eth',
+                deviceState: '1stTestnetAddress@device_id:0',
+                symbol: asNetworkSymbol('eth'),
                 type: 'recv',
                 txid: '0x0833ce97c3f4ce6c170c94aff0acfa1cbfd528bf0d3faa06676cad7daddd2e5c',
                 blockTime: 1493811263,
@@ -1473,8 +1367,8 @@ export const getAccountTransactions = [
             },
             {
                 descriptor: '0xFA01a39f8Abaeb660c3137f14A310d0b414b2A15',
-                deviceState: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
-                symbol: 'eth',
+                deviceState: '1stTestnetAddress@device_id:0',
+                symbol: asNetworkSymbol('eth'),
                 type: 'recv',
                 txid: '0xcef7e6fbb7f61df35eb6dd5c26f75c15152f83298d060e4c6b6850a835e2d9cd',
                 blockTime: 1493721184,
@@ -1508,10 +1402,10 @@ export const getAccountTransactions = [
     {
         testName: 'eth account, 0 txs',
         transactions: TXS,
-        account: getWalletAccount({
-            deviceState: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
-            descriptor: '0xf69619a3dCAA63757A6BA0AF3628f5F6C42c50d2',
-            symbol: 'eth',
+        account: mockWalletAccount({
+            deviceState: '1stTestnetAddress@device_id:0',
+            descriptor: asAccountDescriptor('0xf69619a3dCAA63757A6BA0AF3628f5F6C42c50d2'),
+            symbol: asNetworkSymbol('eth'),
         }),
         result: [],
     },
@@ -1523,11 +1417,12 @@ export const isPending: Record<string, WalletAccountTransaction | AccountTransac
         blockHash: '00000000000000000017277948d61a631dae6cce1d7fb501301b825599189f51',
         blockHeight: 590093,
         blockTime: 1565797979,
-        descriptor:
+        descriptor: asAccountDescriptor(
             'zpub6rszzdAK6RuafeRwyN8z1cgWcXCuKbLmjjfnrW4fWKtcoXQ8787214pNJjnBG5UATyghuNzjn6Lfp5k5xymrLFJnCy46bMYJPyZsbpFGagT',
-        deviceState: '7dcccffe70d8bb8bb28a2185daac8e05639490eee913b326097ae1d73abc8b4f',
+        ),
+        deviceState: '1stTestnetAddress@device_id:0',
         fee: '0.00002929',
-        symbol: 'btc',
+        symbol: asNetworkSymbol('btc'),
         targets: [],
         tokens: [
             {
@@ -1577,10 +1472,11 @@ export const isPending: Record<string, WalletAccountTransaction | AccountTransac
         },
     },
     'Received and pending transaction': {
-        descriptor:
+        descriptor: asAccountDescriptor(
             'vpub5YoEd2jJofNDXriAXpt4fyX23uRhrViFG3721C1wRRKUvDS4P6St7tqFfDP4JZsRARVhaVcGvW5jerdWBVc1c3fgqZeAYt29QSTiafKdwck',
+        ),
         deviceState: 'mvAmt1x3QTsSmJrR4tbPtMpYnLbi3gDEBu@912734FCB107274D3CC465EC:1',
-        symbol: 'test',
+        symbol: asNetworkSymbol('test'),
         type: 'recv',
         txid: '70ad253c25aa8a76ebcdb7fded56f2f57ec9b40967b7e79937b4f44445968c93',
         blockTime: 1665050077,
@@ -1633,3 +1529,95 @@ export const isPending: Record<string, WalletAccountTransaction | AccountTransac
         },
     },
 };
+
+export const getCardanoStakingAmount: {
+    description: string;
+    cardanoSpecific: NonNullable<WalletAccountTransaction['cardanoSpecific']>;
+    result: string;
+}[] = [
+    {
+        description: 'deregistration with rewards adds the refunded deposit to the rewards',
+        cardanoSpecific: {
+            subtype: 'stake_deregistration',
+            deposit: '2',
+            withdrawal: '0.140366',
+        },
+        result: '2.140366',
+    },
+    {
+        description: 'deregistration without rewards is just the refunded deposit',
+        cardanoSpecific: { subtype: 'stake_deregistration', deposit: '2' },
+        result: '2',
+    },
+    {
+        description: 'rewards withdrawal is the withdrawn amount',
+        cardanoSpecific: { subtype: 'withdrawal', withdrawal: '0.140366' },
+        result: '0.140366',
+    },
+    {
+        description: 'registration is the paid deposit',
+        cardanoSpecific: { subtype: 'stake_registration', deposit: '2' },
+        result: '2',
+    },
+    {
+        description: 'delegation moves nothing',
+        cardanoSpecific: { subtype: 'stake_delegation' },
+        result: '0',
+    },
+    {
+        description: 'governance delegation moves nothing',
+        cardanoSpecific: { subtype: 'governance_delegation' },
+        result: '0',
+    },
+];
+
+const mockCardanoStakingTx = (
+    cardanoSpecific: NonNullable<WalletAccountTransaction['cardanoSpecific']>,
+    fee: string,
+): WalletAccountTransaction => ({
+    symbol: asNetworkSymbol('ada'),
+    type: 'self',
+    txid: 'e0f3b5f2a3ee6d6e5b2b4a4b1a51b2ff2c1a4de0f2c9d7b7f8b1a2c3d4e5f6a7',
+    deviceState: '1stTestnetAddress@device_id:0',
+    descriptor: asAccountDescriptor(
+        'stake_test1uzrmpvz9pv4kv3fgs3wl6vfhkbz4jm5lmxr3q0k7z0t3fzgs6f9lm',
+    ),
+    amount: fee,
+    fee,
+    targets: [],
+    tokens: [],
+    internalTransfers: [],
+    details: { vin: [], vout: [], size: 0, totalInput: '0', totalOutput: '0' },
+    cardanoSpecific,
+});
+
+export const sumTransactionsCardanoStaking: {
+    description: string;
+    transactions: WalletAccountTransaction[];
+    result: string;
+}[] = [
+    {
+        description: 'a registration pays the deposit',
+        transactions: [
+            mockCardanoStakingTx({ subtype: 'stake_registration', deposit: '2000000' }, '179537'),
+        ],
+        result: '-2.179537',
+    },
+    {
+        description: 'a deregistration refunds the deposit',
+        transactions: [
+            mockCardanoStakingTx({ subtype: 'stake_deregistration', deposit: '2000000' }, '175489'),
+        ],
+        result: '1.824511',
+    },
+    {
+        description: 'a deregistration that withdrew rewards refunds the deposit and adds them',
+        transactions: [
+            mockCardanoStakingTx(
+                { subtype: 'stake_deregistration', deposit: '2000000', withdrawal: '140366' },
+                '175489',
+            ),
+        ],
+        result: '1.964877',
+    },
+];

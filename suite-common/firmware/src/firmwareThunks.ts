@@ -1,0 +1,174 @@
+import { type DeviceRootState, selectSelectedDevice } from '@suite-common/device';
+import { type WithServices, createThunk } from '@suite-common/redux-utils';
+import {
+    type GetBinFilesBaseUrlDep,
+    type GetLanguageDep,
+    type ReportSecurityCheckDep,
+    type TrezorDevice,
+} from '@suite-common/suite-types';
+import TrezorConnect, { FirmwareType } from '@trezor/connect';
+import { hasBitcoinOnlyFirmware, isBitcoinOnlyDevice } from '@trezor/device-utils';
+
+import { FIRMWARE_MODULE_PREFIX, firmwareActions } from './firmwareActions';
+import { type FirmwareRootState, selectFirmware } from './firmwareReducer';
+
+export type FirmwareUpdateProps = {
+    firmwareType?: FirmwareType;
+    binary?: ArrayBuffer;
+    // used on mobile, we don't have any FWs locally
+    ignoreBaseUrl?: boolean;
+};
+
+export type FirmwareUpdateResult = {
+    device?: TrezorDevice;
+    toFwVersion?: string;
+    toBtcOnly?: boolean;
+    error?: string;
+    connectResponse?: Awaited<ReturnType<typeof TrezorConnect.firmwareUpdate>>;
+};
+
+export type FirmwareUpdateThunkState = DeviceRootState & FirmwareRootState;
+
+export type FirmwareUpdateThunkDeps = WithServices<
+    GetBinFilesBaseUrlDep & GetLanguageDep & ReportSecurityCheckDep
+>;
+
+export const firmwareUpdateThunk = createThunk<
+    FirmwareUpdateResult,
+    FirmwareUpdateProps,
+    {
+        rejectValue: FirmwareUpdateResult;
+        state: FirmwareUpdateThunkState;
+        extra: FirmwareUpdateThunkDeps;
+    }
+>(
+    `${FIRMWARE_MODULE_PREFIX}/firmwareUpdate`,
+    async (
+        { firmwareType, binary, ignoreBaseUrl = false },
+        { dispatch, getState, extra, fulfillWithValue, rejectWithValue },
+    ) => {
+        dispatch(firmwareActions.setStatus('started'));
+
+        // Temporarily save target firmware type so that it can be displayed during installation.
+        if (firmwareType) {
+            dispatch(firmwareActions.setTargetType(firmwareType));
+        }
+
+        const {
+            services: { getBinFilesBaseUrl, getLanguage, reportSecurityCheck },
+        } = extra;
+
+        const device = selectSelectedDevice(getState());
+        const binFilesBaseUrl = getBinFilesBaseUrl();
+        const suiteLanguage = getLanguage();
+        const { useDevkit, cachedDevice, error } = selectFirmware(getState());
+
+        if (error) {
+            dispatch(firmwareActions.setFirmwareUpdateError(undefined));
+        }
+
+        if (!device) {
+            dispatch(firmwareActions.setStatus('error'));
+            dispatch(firmwareActions.setFirmwareUpdateError('Device not connected'));
+
+            return rejectWithValue({
+                error: 'Device not connected',
+            });
+        }
+
+        // Cache device when firmware installation starts so that we can reference the original firmware version and type during the installation process.
+        // This action is dispatched twice in manual update flow and we only want to cache the device during the first dispatch when it is not yet in bootloader mode.
+        if (!cachedDevice) {
+            dispatch(firmwareActions.cacheDevice(device));
+        }
+
+        const baseUrl = ignoreBaseUrl
+            ? undefined
+            : `${binFilesBaseUrl}${useDevkit ? '/devkit' : ''}`;
+
+        // update to same variant as is currently installed or to the regular one if device does not have any fw (new/wiped device),
+        // unless the user wants to switch firmware type
+        const getTargetFirmwareType = () => {
+            if (firmwareType) {
+                return firmwareType;
+            }
+
+            return hasBitcoinOnlyFirmware(device) || isBitcoinOnlyDevice(device)
+                ? FirmwareType.BitcoinOnly
+                : FirmwareType.Universal;
+        };
+
+        const targetFirmwareType = getTargetFirmwareType();
+        const toBitcoinOnlyFirmware = targetFirmwareType === FirmwareType.BitcoinOnly;
+        const targetTranslationLanguage = Object.keys(
+            device.firmwareReleaseConfigInfo?.translations ?? [],
+        ).find(language => language.startsWith(suiteLanguage));
+
+        const firmwareUpdateResponse = await TrezorConnect.firmwareUpdate({
+            device,
+            btcOnly: toBitcoinOnlyFirmware,
+            binary,
+            baseUrl,
+        });
+
+        // Firmware language should only be set during the initial firmware installation.
+        if (device.firmware === 'none' && targetTranslationLanguage) {
+            await TrezorConnect.changeLanguage({
+                language: targetTranslationLanguage,
+            });
+        }
+
+        const targetProperties = binary
+            ? {}
+            : {
+                  toFwVersion: device?.firmwareReleaseConfigInfo?.release.version.join('.'),
+                  toBtcOnly: toBitcoinOnlyFirmware,
+              };
+
+        if (!firmwareUpdateResponse.success) {
+            dispatch(firmwareActions.setStatus('error'));
+            dispatch(firmwareActions.setFirmwareUpdateError(firmwareUpdateResponse.error.message));
+
+            return rejectWithValue({
+                device,
+                ...targetProperties,
+                error: firmwareUpdateResponse.error.message,
+                connectResponse: firmwareUpdateResponse,
+            });
+        } else {
+            const {
+                versionCheck,
+                bootloaderVersion,
+                binaryVersion,
+                installedVersion,
+                releaseVersion,
+            } = firmwareUpdateResponse.payload;
+
+            dispatch(firmwareActions.setStatus('done'));
+
+            // TODO: Add to the if-else block above and add handle in UI.
+            if (!binary && !versionCheck) {
+                reportSecurityCheck({
+                    level: 'error',
+                    checkType: 'Firmware version',
+                    contextData: {
+                        model: device.features?.internal_model,
+                        revision: device.features?.revision,
+                        vendor: device.features?.fw_vendor,
+                        bootloaderVersion,
+                        binaryVersion,
+                        installedVersion,
+                        releaseVersion,
+                        error: 'Unexpected firmware version change during firmware update.',
+                    },
+                });
+            }
+
+            return fulfillWithValue({
+                device,
+                ...targetProperties,
+                connectResponse: firmwareUpdateResponse,
+            });
+        }
+    },
+);

@@ -1,0 +1,45 @@
+import React from 'react';
+import Zoom from 'react-medium-image-zoom';
+
+import { useRouter } from 'next/router';
+import { createGlobalStyle, styled, useTheme } from 'styled-components';
+
+import 'react-medium-image-zoom/dist/styles.css';
+
+export type ZoomableIllustrationProps = React.ImgHTMLAttributes<HTMLImageElement> & {
+    $darkMode?: boolean;
+};
+
+// Automatically invert colors of the image when darkMode is enabled
+const DarkModeImg = styled.img<{ $darkMode?: boolean }>`
+    filter: ${({ $darkMode }) => ($darkMode ? 'invert(1) hue-rotate(180deg)' : 'invert(0)')};
+`;
+
+// Handle dark mode styles in react-medium-image-zoom
+const ReactMediumImageZoomStyle = createGlobalStyle<{ $darkMode?: boolean }>`
+  html.dark [data-rmiz-modal-overlay="visible"] {
+    background-color: rgb(0, 0, 0);
+  }
+
+  [data-rmiz-modal-img] {
+    filter: ${({ $darkMode }) => ($darkMode ? 'invert(1) hue-rotate(180deg)' : 'invert(0)')};
+  }
+`;
+
+export const ZoomableIllustration = (props: ZoomableIllustrationProps) => {
+    const router = useRouter();
+    const theme = useTheme();
+    const darkMode = props.$darkMode && theme.mode === 'dark';
+
+    // Automatic absolute path handling
+    const src = (props?.src as string)?.startsWith('/') ? router.basePath + props.src : props.src;
+
+    return (
+        <Zoom>
+            <ReactMediumImageZoomStyle $darkMode={darkMode} />
+            <DarkModeImg {...props} src={src} $darkMode={darkMode} />
+        </Zoom>
+    );
+};
+
+export default ZoomableIllustration;

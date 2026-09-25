@@ -1,0 +1,205 @@
+import { type ReactNode } from 'react';
+import { useSelector } from 'react-redux';
+
+import { useFormatters } from '@suite-common/formatters';
+import { type TokenDefinitionsRootState } from '@suite-common/token-definitions';
+import {
+    type FiatRatesRootState,
+    type PhishingRootState,
+    type TransactionsRootState,
+    selectIsPhishingTransaction,
+    selectTransactionBlockTimeById,
+} from '@suite-common/wallet-core';
+import {
+    type AccountKey,
+    type StakeType,
+    type TransactionType,
+    type WalletAccountTransaction,
+} from '@suite-common/wallet-types';
+import { isPending } from '@suite-common/wallet-utils';
+import { Badge, Box, DiscreetText, HStack, PressableOpacity, Text } from '@suite-native/atoms';
+import { Translation } from '@suite-native/intl';
+import { useNavigateToTransactionDetail } from '@suite-native/navigation';
+import { type TypedTokenTransfer } from '@suite-native/tokens';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
+
+import { InstantStakeBanner } from './InstantStakeBanner';
+import { TransactionIcon } from './TransactionIcon';
+import { TransactionName } from './TransactionName';
+
+type TransactionListItemStyleProps = {
+    isFirst: boolean;
+    isLast: boolean;
+};
+
+export const transactionListItemContainerStyle = prepareNativeStyle<TransactionListItemStyleProps>(
+    (utils, { isFirst, isLast }) => ({
+        flexDirection: 'column',
+        backgroundColor: utils.colors.surfaceFillRaised,
+        marginHorizontal: utils.spacings.sp16,
+        paddingHorizontal: utils.spacings.sp16,
+        paddingTop: utils.spacings.sp12,
+        paddingBottom: utils.spacings.sp12,
+        extend: [
+            {
+                condition: isFirst,
+                style: {
+                    paddingTop: utils.spacings.sp16,
+                    borderTopLeftRadius: utils.borders.radii.r12,
+                    borderTopRightRadius: utils.borders.radii.r12,
+                },
+            },
+            {
+                condition: isLast,
+                style: {
+                    paddingBottom: utils.spacings.sp16,
+                    borderBottomLeftRadius: utils.borders.radii.r12,
+                    borderBottomRightRadius: utils.borders.radii.r12,
+                },
+            },
+        ],
+    }),
+);
+
+const titleStyle = prepareNativeStyle(utils => ({
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 1,
+    gap: utils.spacings.sp8,
+}));
+
+const transactionNameStyle = prepareNativeStyle(_ => ({
+    flexShrink: 1,
+}));
+
+const descriptionBoxStyle = prepareNativeStyle(_ => ({
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+}));
+
+export const valuesContainerStyle = prepareNativeStyle(utils => ({
+    flexShrink: 0,
+    alignItems: 'flex-end',
+    marginLeft: utils.spacings.sp8,
+    maxWidth: '40%',
+}));
+
+type TransactionListItemContainerProps = {
+    children: ReactNode;
+    transaction: WalletAccountTransaction;
+    accountKey: AccountKey;
+    hasTokensCount: number;
+    isFirst?: boolean;
+    isLast?: boolean;
+    tokenTransfer?: TypedTokenTransfer;
+    transactionType: TransactionType;
+    stakeOperationType?: StakeType;
+};
+
+export const TransactionListItemContainer = ({
+    children,
+    transaction,
+    accountKey,
+    isFirst = false,
+    isLast = false,
+    hasTokensCount,
+    transactionType,
+    stakeOperationType,
+    tokenTransfer,
+}: TransactionListItemContainerProps) => {
+    const { applyStyle } = useNativeStyles();
+    const navigateToTransactionDetail = useNavigateToTransactionDetail();
+
+    const { txid, symbol } = transaction;
+
+    const handleNavigateToTransactionDetail = () => {
+        navigateToTransactionDetail({
+            txid,
+            accountKey,
+            tokenContract: tokenTransfer?.contract,
+        });
+    };
+
+    const hasTokens = hasTokensCount > 0;
+    const tokensLabel = `+${hasTokensCount} coin${hasTokensCount > 1 ? 's' : ''}`;
+
+    const { DateTimeFormatter } = useFormatters();
+    const transactionBlockTime = useSelector((state: TransactionsRootState) =>
+        selectTransactionBlockTimeById(state, accountKey, txid),
+    );
+
+    const isTransactionPending = isPending(transaction);
+    const { isPhishing: isPhishingTransaction } = useSelector(
+        (
+            state: TokenDefinitionsRootState &
+                TransactionsRootState &
+                FiatRatesRootState &
+                PhishingRootState,
+        ) => selectIsPhishingTransaction(state, txid, accountKey),
+    );
+
+    const coinSymbol = isPhishingTransaction ? undefined : symbol;
+    const contractAddress = isPhishingTransaction ? undefined : tokenTransfer?.contract;
+
+    const DateTextComponent = isPhishingTransaction ? DiscreetText : Text;
+
+    return (
+        <PressableOpacity
+            onPress={handleNavigateToTransactionDetail}
+            style={applyStyle(transactionListItemContainerStyle, { isFirst, isLast })}
+        >
+            <Box
+                testID={`@transactions/item/${txid}`}
+                flexDirection="row"
+                alignItems="center"
+                justifyContent="space-between"
+            >
+                <Box style={applyStyle(descriptionBoxStyle)}>
+                    <TransactionIcon
+                        symbol={coinSymbol}
+                        contractAddress={contractAddress}
+                        tokenSymbol={tokenTransfer?.symbol || tokenTransfer?.name}
+                        transactionType={transactionType}
+                        stakeOperationType={stakeOperationType}
+                        isAnimated={isTransactionPending}
+                    />
+                    <Box marginLeft="sp16" flex={1}>
+                        <HStack alignItems="center" spacing="sp4">
+                            <Box style={applyStyle(titleStyle)}>
+                                <TransactionName
+                                    transaction={transaction}
+                                    isPending={isTransactionPending}
+                                    numberOfLines={2}
+                                    style={applyStyle(transactionNameStyle)}
+                                />
+                                {isPhishingTransaction && (
+                                    <Badge
+                                        label={<Translation id="transactions.phishing.badge" />}
+                                        size="small"
+                                        icon="warning"
+                                        intent="critical"
+                                    />
+                                )}
+                            </Box>
+                            {hasTokens && <Badge label={tokensLabel} size="small" />}
+                        </HStack>
+
+                        <DateTextComponent
+                            isForcedDiscreetMode={isPhishingTransaction}
+                            variant="body-sm"
+                            color="contentSecondary"
+                        >
+                            {DateTimeFormatter.format(transactionBlockTime)}
+                        </DateTextComponent>
+                    </Box>
+                </Box>
+                <Box style={applyStyle(valuesContainerStyle)}>{children}</Box>
+            </Box>
+
+            {!!stakeOperationType && (
+                <InstantStakeBanner accountKey={accountKey} transaction={transaction} />
+            )}
+        </PressableOpacity>
+    );
+};

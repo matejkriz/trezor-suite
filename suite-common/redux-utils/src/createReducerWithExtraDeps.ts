@@ -1,25 +1,52 @@
-/* eslint-disable @typescript-eslint/ban-types */
-import { ActionReducerMapBuilder, createReducer } from '@reduxjs/toolkit';
+import { type ActionReducerMapBuilder, type EnhancedStore, createReducer } from '@reduxjs/toolkit';
+import type { ThunkDispatch } from 'redux-thunk';
 
-import { ExtraDependencies } from './extraDependenciesType';
-
+// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
 type NotFunction<T> = T extends Function ? never : T;
 
-type ExtraDependenciesForReducer = Pick<ExtraDependencies, 'actionTypes' | 'actions' | 'reducers'>;
+type InjectedReducer = (state: any, action: { type: any; payload: any }) => void;
+
+export type ActionTypesDep<TName extends string> = {
+    actionTypes: Record<TName, string>;
+};
+
+export type ReducersDep<TName extends string> = {
+    reducers: Record<TName, InjectedReducer>;
+};
+
+type ReducerExtra<TExtra> = [TExtra] extends [void] ? Record<never, never> : TExtra;
+type PrepareReducerExtra<TExtra> = [TExtra] extends [void] ? unknown : TExtra;
+
+type EnhancedStoreState<TStore extends EnhancedStore<any, any>> = ReturnType<TStore['getState']>;
+type EnhancedStoreAction<TStore extends EnhancedStore<any, any>> =
+    TStore extends EnhancedStore<any, infer TAction> ? TAction : never;
 
 export const createReducerWithExtraDeps =
-    <S extends NotFunction<any>>(
+    <S extends NotFunction<any>, TExtra = void>(
         initialState: S | (() => S),
-        builderCallback: (
-            builder: ActionReducerMapBuilder<S>,
-            extra: ExtraDependenciesForReducer,
-        ) => void,
+        builderCallback: (builder: ActionReducerMapBuilder<S>, extra: ReducerExtra<TExtra>) => void,
     ) =>
-    (extraDeps: ExtraDependencies) =>
+    (extraDeps: PrepareReducerExtra<TExtra>) =>
         createReducer(initialState, builder =>
-            builderCallback(builder, {
-                actionTypes: extraDeps.actionTypes,
-                actions: extraDeps.actions,
-                reducers: extraDeps.reducers,
-            }),
+            builderCallback(builder, extraDeps as ReducerExtra<TExtra>),
         );
+
+// Adds the thunk dispatch type that configureStore cannot infer through the extra middleware factory.
+export const castExtraStore = <TExtra, TStore extends EnhancedStore<any, any>>(
+    store: TStore,
+    extra: TExtra | null,
+): {
+    store: TStore & {
+        dispatch: ThunkDispatch<EnhancedStoreState<TStore>, TExtra, EnhancedStoreAction<TStore>>;
+    };
+    extra: NonNullable<TExtra>;
+} => {
+    if (!extra) {
+        throw new Error('castExtraStore: Extra dependencies not initialized');
+    }
+
+    return {
+        store,
+        extra,
+    };
+};

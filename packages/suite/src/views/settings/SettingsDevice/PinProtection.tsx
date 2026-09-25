@@ -1,27 +1,28 @@
-import { analytics, EventType } from '@trezor/suite-analytics';
+import { events, injectDesktopAnalytics } from '@suite/analytics';
+import { useDevice } from '@suite/device';
+import { Translation } from '@suite/intl';
+import { Anchor, SettingsAnchor } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { Switch, Tooltip } from '@trezor/components';
+import { ActionColumn, SectionItem, TextColumn } from '@trezor/product-components';
 
-import { ActionColumn, SectionItem, TextColumn, Translation } from 'src/components/suite';
-import { Switch } from '@trezor/components';
-import { useDevice, useDispatch } from 'src/hooks/suite';
-import { changePin } from 'src/actions/settings/deviceSettingsActions';
-import { useAnchor } from 'src/hooks/suite/useAnchor';
-import { SettingsAnchor } from 'src/constants/suite/anchors';
+import { changePinThunk } from 'src/actions/settings/deviceSettingsActions';
 
 interface PinProtectionProps {
     isDeviceLocked: boolean;
 }
 
 export const PinProtection = ({ isDeviceLocked }: PinProtectionProps) => {
-    const dispatch = useDispatch();
     const { device } = useDevice();
-    const { anchorRef, shouldHighlight } = useAnchor(SettingsAnchor.PinProtection);
+    const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
 
     const pinProtection = device?.features?.pin_protection ?? null;
 
     const handleChange = () => {
-        dispatch(changePin({ remove: !!pinProtection }));
+        dispatch(changePinThunk({ remove: !!pinProtection }));
         analytics.report({
-            type: EventType.SettingsDeviceChangePinProtection,
+            type: events.settingsDeviceChangePinProtectionEvent.name,
             payload: {
                 remove: pinProtection,
             },
@@ -29,23 +30,34 @@ export const PinProtection = ({ isDeviceLocked }: PinProtectionProps) => {
     };
 
     return (
-        <SectionItem
-            data-test="@settings/device/pin-protection"
-            ref={anchorRef}
-            shouldHighlight={shouldHighlight}
-        >
-            <TextColumn
-                title={<Translation id="TR_DEVICE_SETTINGS_PIN_PROTECTION_TITLE" />}
-                description={<Translation id="TR_DEVICE_SETTINGS_PIN_PROTECTION_DESC" />}
-            />
-            <ActionColumn>
-                <Switch
-                    isChecked={!!pinProtection}
-                    onChange={handleChange}
-                    isDisabled={isDeviceLocked}
-                    dataTest="@settings/device/pin-switch"
-                />
-            </ActionColumn>
-        </SectionItem>
+        <Anchor anchorId={SettingsAnchor.PinProtection}>
+            {({ anchorId, anchorRef, shouldHighlight }) => (
+                <SectionItem
+                    data-testid={anchorId}
+                    ref={anchorRef}
+                    shouldHighlight={shouldHighlight}
+                >
+                    <TextColumn
+                        title={<Translation id="TR_DEVICE_SETTINGS_PIN_PROTECTION_TITLE" />}
+                        description={<Translation id="TR_DEVICE_SETTINGS_PIN_PROTECTION_DESC" />}
+                    />
+                    <ActionColumn>
+                        <Tooltip
+                            isActive={isDeviceLocked}
+                            content={
+                                <Translation id="TR_SETTINGS_DEVICE_BANNER_TITLE_REMEMBERED" />
+                            }
+                        >
+                            <Switch
+                                isChecked={!!pinProtection}
+                                onChange={handleChange}
+                                isDisabled={isDeviceLocked}
+                                data-testid="@settings/device/pin-switch"
+                            />
+                        </Tooltip>
+                    </ActionColumn>
+                </SectionItem>
+            )}
+        </Anchor>
     );
 };

@@ -1,34 +1,34 @@
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-import { CSSColor } from '@trezor/theme';
+import { View } from 'react-native';
 
-import { Box } from './Box';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
+import { clamp } from '@trezor/utils';
 
-type ProgressBarProps = {
-    value: number; // Percentage value
-    color: CSSColor;
+export type ProgressBarProps = {
+    value: number;
+    max?: number;
 };
 
-const PROGRESS_BAR_WIDTH = 82;
-const progressBarStyle = prepareNativeStyle(utils => ({
-    height: 3,
-    width: PROGRESS_BAR_WIDTH,
-    backgroundColor: utils.colors.backgroundSurfaceElevationNegative,
+const trackStyle = prepareNativeStyle(utils => ({
+    height: 6,
+    borderRadius: utils.borders.radii.r4,
+    backgroundColor: utils.colors.elementFillBrandSofter,
+    overflow: 'hidden',
 }));
 
-const progressFillStyle = prepareNativeStyle<{ width: number; color: CSSColor }>(
-    (_, { width, color }) => ({
-        width: (width / 100) * PROGRESS_BAR_WIDTH,
-        height: 3,
-        backgroundColor: color,
-    }),
-);
+const fillStyle = prepareNativeStyle((utils, { ratio }: { ratio: number }) => ({
+    height: '100%',
+    width: `${clamp(ratio * 100, 0, 100).toFixed(0)}%` as `${number}%`,
+    backgroundColor: utils.colors.contentBrand,
+    borderRadius: utils.borders.radii.r4,
+}));
 
-export const ProgressBar = ({ value, color }: ProgressBarProps) => {
+export const ProgressBar = ({ value, max = 100 }: ProgressBarProps) => {
     const { applyStyle } = useNativeStyles();
+    const ratio = max > 0 ? value / max : 0;
 
     return (
-        <Box style={applyStyle(progressBarStyle)}>
-            <Box style={applyStyle(progressFillStyle, { width: value, color })} />
-        </Box>
+        <View style={applyStyle(trackStyle)}>
+            <View style={applyStyle(fillStyle, { ratio })} />
+        </View>
     );
 };

@@ -1,40 +1,28 @@
-import { Translation, TroubleshootingTips, WebUsbButton } from 'src/components/suite';
-import {
-    TROUBLESHOOTING_TIP_BRIDGE_STATUS,
-    TROUBLESHOOTING_TIP_BRIDGE_USE,
-    TROUBLESHOOTING_TIP_CABLE,
-    TROUBLESHOOTING_TIP_USB,
-    TROUBLESHOOTING_TIP_DIFFERENT_COMPUTER,
-    TROUBLESHOOTING_TIP_UDEV,
-} from 'src/components/suite/troubleshooting/tips';
+import { events, injectDesktopAnalytics } from '@suite/analytics';
+import { toggleConnectionModal } from '@suite/device';
+import { Translation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { Button, Column } from '@trezor/components';
 
-interface DeviceConnectProps {
-    isWebUsbTransport: boolean;
-}
+export const DeviceConnect = () => {
+    const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
 
-export const DeviceConnect = ({ isWebUsbTransport }: DeviceConnectProps) => {
-    const items = isWebUsbTransport
-        ? [
-              TROUBLESHOOTING_TIP_UDEV,
-              TROUBLESHOOTING_TIP_CABLE,
-              TROUBLESHOOTING_TIP_USB,
-              TROUBLESHOOTING_TIP_BRIDGE_USE,
-          ]
-        : [
-              TROUBLESHOOTING_TIP_BRIDGE_STATUS,
-              TROUBLESHOOTING_TIP_UDEV,
-              TROUBLESHOOTING_TIP_CABLE,
-              TROUBLESHOOTING_TIP_USB,
-              TROUBLESHOOTING_TIP_DIFFERENT_COMPUTER,
-          ];
+    const handleConnect = () => {
+        dispatch(toggleConnectionModal());
+        analytics.report({
+            type: events.deviceConnectionConnectButtonEvent.name,
+            payload: {
+                option: 'dashboard',
+            },
+        });
+    };
 
     return (
-        <TroubleshootingTips
-            label={<Translation id="TR_STILL_DONT_SEE_YOUR_TREZOR" />}
-            items={items}
-            offerWebUsb={isWebUsbTransport}
-            cta={isWebUsbTransport ? <WebUsbButton data-test="@webusb-button" /> : undefined}
-            data-test="@connect-device-prompt/no-device-detected"
-        />
+        <Column alignItems="center" margin={{ bottom: 40 }}>
+            <Button minWidth={240} size="large" onClick={handleConnect}>
+                <Translation id="TR_CONNECT" />
+            </Button>
+        </Column>
     );
 };

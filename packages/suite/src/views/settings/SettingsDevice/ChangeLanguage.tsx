@@ -1,67 +1,72 @@
-import React from 'react';
-import {
-    ActionColumn,
-    ActionSelect,
-    SectionItem,
-    TextColumn,
-    Translation,
-} from 'src/components/suite';
-import { useAnchor } from '../../../hooks/suite/useAnchor';
-import { SettingsAnchor } from '../../../constants/suite/anchors';
-import { useDevice, useDispatch } from '../../../hooks/suite';
-import { changeLanguage } from '../../../actions/settings/deviceSettingsActions';
-import { LANGUAGES } from '../../../config/suite';
-import { Locale } from '../../../config/suite/languages';
+import { useMemo } from 'react';
 
-const BASE_TRANSLATIONS = [{ value: 'en-US', label: LANGUAGES['en'].name }];
+import { useDevice } from '@suite/device';
+import { Translation } from '@suite/intl';
+import { Anchor, SettingsAnchor } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { selectSupportedDeviceLanguages } from '@suite-common/device';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { type Locale } from '@suite-common/suite-types';
+import { ActionColumn, ActionSelect, SectionItem, TextColumn } from '@trezor/product-components';
 
-interface Props {
+import { changeLanguageThunk } from 'src/actions/settings/deviceSettingsActions';
+import { useSelector } from 'src/hooks/suite';
+
+interface ChangeLanguageProps {
     isDeviceLocked: boolean;
 }
 
-export const ChangeLanguage = ({ isDeviceLocked }: Props) => {
-    const { anchorRef, shouldHighlight } = useAnchor(SettingsAnchor.FirmwareLanguage);
+export const ChangeLanguage = ({ isDeviceLocked }: ChangeLanguageProps) => {
     const { device } = useDevice();
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
+
+    const supportedDeviceLanguages = useSelector(selectSupportedDeviceLanguages);
 
     const onChange = ({ value }: { value: Locale }) => {
-        dispatch(changeLanguage({ device, language: `${value}` }));
+        dispatch(changeLanguageThunk({ device, language: value }));
     };
 
-    const isSupportedDevice = device?.features?.capabilities?.includes('Capability_Translations');
+    const languageOptions = useMemo(
+        () =>
+            supportedDeviceLanguages.map(({ value, label, isBeta }) => ({
+                value,
+                label: label + (isBeta ? ' (beta)' : ''),
+            })),
+        [supportedDeviceLanguages],
+    );
 
-    const deviceSupportedTranslations = (device?.availableTranslations ?? []).map(it => ({
-        value: it,
-        label: `${LANGUAGES[it.split('-')[0] as Locale].name} (beta)`,
-    }));
-
-    if (isSupportedDevice !== true || deviceSupportedTranslations.length === 0) {
+    if (supportedDeviceLanguages.length <= 1) {
         return null;
     }
-
-    const languageOptions = BASE_TRANSLATIONS.concat(deviceSupportedTranslations);
 
     const selectedValue = languageOptions.find(
         option => option.value === device?.features?.language,
     );
 
     return (
-        <SectionItem
-            data-test="@settings/device/language"
-            ref={anchorRef}
-            shouldHighlight={shouldHighlight}
-        >
-            <TextColumn title={<Translation id="TR_LANGUAGE" />} />
-            <ActionColumn>
-                <ActionSelect
-                    useKeyPressScroll
-                    value={selectedValue}
-                    options={languageOptions}
-                    onChange={onChange}
-                    isDisabled={isDeviceLocked}
-                    data-test="@settings/device/firmware-language-select"
-                />
-            </ActionColumn>
-        </SectionItem>
+        <Anchor anchorId={SettingsAnchor.FirmwareLanguage}>
+            {({ anchorId, anchorRef, shouldHighlight }) => (
+                <SectionItem
+                    data-testid={anchorId}
+                    ref={anchorRef}
+                    shouldHighlight={shouldHighlight}
+                >
+                    <TextColumn title={<Translation id="TR_LANGUAGE" />} />
+                    <ActionColumn>
+                        <ActionSelect
+                            value={selectedValue}
+                            options={languageOptions}
+                            onChange={onChange}
+                            isDisabled={isDeviceLocked}
+                            isTooltipActive={isDeviceLocked}
+                            tooltipContent={
+                                <Translation id="TR_SETTINGS_DEVICE_BANNER_TITLE_REMEMBERED" />
+                            }
+                            data-testid="@settings/device/firmware-language-select"
+                        />
+                    </ActionColumn>
+                </SectionItem>
+            )}
+        </Anchor>
     );
 };

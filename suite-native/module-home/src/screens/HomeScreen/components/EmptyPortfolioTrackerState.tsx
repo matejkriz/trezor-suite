@@ -1,28 +1,35 @@
-import { Dimensions } from 'react-native';
-import { useMemo } from 'react';
+import { Dimensions, View } from 'react-native';
 
 import { useNavigation } from '@react-navigation/native';
 
-import { Text, Card, Image, VStack, Button } from '@suite-native/atoms';
-import { useActiveColorScheme } from '@suite-native/theme';
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-import { Translation, useTranslate } from '@suite-native/intl';
+import { Button, Card, Image, Text, VStack } from '@suite-native/atoms';
+import { Translation } from '@suite-native/intl';
 import {
     AccountsImportStackRoutes,
-    HomeStackParamList,
-    HomeStackRoutes,
-    RootStackParamList,
+    type HomeStackParamList,
+    type HomeStackRoutes,
+    type RootStackParamList,
     RootStackRoutes,
-    StackToTabCompositeNavigationProp,
+    type StackToTabCompositeNavigationProp,
 } from '@suite-native/navigation';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
 
 const SCREEN_HEIGHT = Dimensions.get('screen').height;
 
+const cardStyle = prepareNativeStyle(utils => ({
+    paddingTop: utils.spacings.sp32,
+    paddingBottom: utils.spacings.sp16,
+    paddingVertical: utils.spacings.sp16,
+}));
 const imageStyle = prepareNativeStyle(_ => ({
     maxHeight: SCREEN_HEIGHT * 0.25,
     width: '100%',
     height: 180,
     alignItems: 'center',
+}));
+
+const buttonWrapperStyle = prepareNativeStyle(() => ({
+    width: '100%',
 }));
 
 type NavigationProp = StackToTabCompositeNavigationProp<
@@ -35,18 +42,6 @@ export const EmptyPortfolioTrackerState = () => {
     const { applyStyle } = useNativeStyles();
     const navigation = useNavigation<NavigationProp>();
 
-    const { translate } = useTranslate();
-
-    const colorScheme = useActiveColorScheme();
-
-    const image = useMemo(() => {
-        if (colorScheme === 'dark') {
-            return require('../../../assets/darkDashboard.png');
-        }
-
-        return require('../../../assets/dashboard.png');
-    }, [colorScheme]);
-
     const handleSyncMyCoins = () => {
         navigation.navigate(RootStackRoutes.AccountsImport, {
             screen: AccountsImportStackRoutes.SelectNetwork,
@@ -54,36 +49,42 @@ export const EmptyPortfolioTrackerState = () => {
     };
 
     return (
-        <VStack spacing="extraLarge">
+        <VStack spacing="sp32">
             <Card
-                alertVariant="info"
-                alertTitle={translate('moduleHome.emptyState.portfolioTracker.alert')}
+                alertProps={{
+                    title: <Translation id="moduleHome.emptyState.portfolioTracker.alert" />,
+                    intent: 'info',
+                }}
+                style={applyStyle(cardStyle)}
             >
-                <VStack
-                    spacing="extraLarge"
-                    paddingTop="medium"
-                    paddingBottom="medium"
-                    alignItems="center"
-                    justifyContent="center"
-                >
+                <VStack spacing="sp32" alignItems="center" justifyContent="center">
                     <VStack
-                        spacing="medium"
-                        paddingTop="small"
-                        paddingBottom="small"
+                        spacing="sp16"
+                        paddingTop="sp8"
+                        paddingBottom="sp8"
                         alignItems="center"
                         justifyContent="center"
                     >
-                        <Text variant="titleMedium">
+                        <Text variant="headline-md">
                             <Translation id="moduleHome.emptyState.portfolioTracker.title" />
                         </Text>
-                        <Text color="textSubdued" textAlign="center">
+                        <Text color="contentSecondary" textAlign="center">
                             <Translation id="moduleHome.emptyState.portfolioTracker.subtitle" />
                         </Text>
                     </VStack>
-                    <Image source={image} contentFit="contain" style={applyStyle(imageStyle)} />
-                    <Button onPress={handleSyncMyCoins}>
-                        {translate('moduleHome.emptyState.portfolioTracker.primaryButton')}
-                    </Button>
+                    <Image
+                        source={require('../../../assets/dashboard.png')}
+                        contentFit="contain"
+                        style={applyStyle(imageStyle)}
+                    />
+                    <View style={applyStyle(buttonWrapperStyle)}>
+                        <Button
+                            onPress={handleSyncMyCoins}
+                            testID="@home/portfolio/sync-coins-button"
+                        >
+                            <Translation id="moduleHome.emptyState.portfolioTracker.primaryButton" />
+                        </Button>
+                    </View>
                 </VStack>
             </Card>
         </VStack>

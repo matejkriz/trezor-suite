@@ -1,0 +1,16 @@
+export const ENABLE = '@metadata/enable' as const;
+export const DISABLE = '@metadata/disable' as const;
+export const SET_DEVICE_METADATA = '@metadata/set-device-metadata' as const;
+export const SET_DEVICE_METADATA_PASSWORDS = '@metadata/set-device-metadata-passwords' as const;
+export const ADD_PROVIDER = '@metadata/add-provider' as const;
+export const REMOVE_PROVIDER = '@metadata/remove-provider' as const;
+export const ACCOUNT_ADD = '@metadata/account-add' as const;
+export const SET_EDITING = '@metadata/set-editing' as const;
+export const SET_INITIATING = '@metadata/set-initiating' as const;
+export const SET_DATA = '@metadata/set-data' as const;
+export const SET_SELECTED_PROVIDER = '@metadata/set-selected-provider' as const;
+export const SET_ERROR_FOR_DEVICE = '@metadata/set-error-for-device' as const;
+export const SET_LEGACY_LABELS_MIGRATION_FOR_WALLET =
+    '@metadata/set-legacy-labels-migration-for-wallet' as const;
+export const EXPORT_METADATA_TO_BIP329_FILE = '@metadata/exportMetadataToBip329File';
+export const MODULE_PREFIX = '@suite/metadata';

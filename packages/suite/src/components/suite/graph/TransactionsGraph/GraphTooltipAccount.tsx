@@ -1,47 +1,47 @@
-import styled from 'styled-components';
-import { TooltipProps } from 'recharts';
+import { type TooltipProps } from 'recharts';
+
+import { type Formatters, useFormatters } from '@suite-common/formatters';
+import { type SignOperator } from '@suite-common/suite-types';
+import { type NetworkSymbol } from '@suite-common/wallet-config';
+import { type BaseCurrencyAmount } from '@suite-common/wallet-types';
+import { Row } from '@trezor/components';
+
 import { FormattedCryptoAmount } from 'src/components/suite/FormattedCryptoAmount';
-import { NetworkSymbol } from 'src/types/wallet';
+import type { CryptoGraphProps } from 'src/components/suite/graph/types';
+import { type CommonAggregatedHistory, type GraphRange } from 'src/types/wallet/graph';
 
-import { Formatters, useFormatters } from '@suite-common/formatters';
-
-import type { CryptoGraphProps } from './TransactionsGraph';
 import { GraphTooltipBase } from './GraphTooltipBase';
-import { CommonAggregatedHistory, GraphRange } from 'src/types/wallet/graph';
-import { SignOperator } from '@suite-common/suite-types';
-
-const StyledCryptoAmount = styled(FormattedCryptoAmount)`
-    margin-right: 2px;
-`;
 
 const formatAmount = (
     amount: string | undefined,
     symbol: NetworkSymbol,
-    fiatAmount: string | undefined,
+    fiatAmount: BaseCurrencyAmount | undefined,
     localCurrency: string | undefined,
     sign: SignOperator,
     formatters: Formatters,
 ) => {
-    const { FiatAmountFormatter } = formatters;
+    const { BaseCurrencyAmountFormatter } = formatters;
 
     return (
-        <>
+        <Row>
             {amount && (
-                <StyledCryptoAmount
-                    value={amount}
-                    symbol={symbol}
-                    signValue={sign}
-                    disableHiddenPlaceholder
-                />
+                <Row margin={{ right: 4 }}>
+                    <FormattedCryptoAmount
+                        value={amount}
+                        symbol={symbol}
+                        signValue={sign}
+                        disableHiddenPlaceholder
+                    />
+                </Row>
             )}
 
             {fiatAmount && localCurrency && (
                 <>
                     (
-                    <FiatAmountFormatter currency={localCurrency} value={fiatAmount} />)
+                    <BaseCurrencyAmountFormatter currency={localCurrency} value={fiatAmount} />)
                 </>
             )}
-        </>
+        </Row>
     );
 };
 
@@ -73,13 +73,20 @@ export const GraphTooltipAccount = ({
         return null;
     }
 
-    const balance = balanceValueFn(payload[0].payload);
-    const receivedAmountString = receivedValueFn(payload[0].payload);
-    const sentAmountString = sentValueFn(payload[0].payload);
+    const firstPayload = payload[0]?.payload;
 
-    const receivedFiat: string | undefined =
-        payload[0].payload.receivedFiat[localCurrency] ?? undefined;
-    const sentFiat: string | undefined = payload[0].payload.sentFiat[localCurrency] ?? undefined;
+    if (!firstPayload) {
+        return null;
+    }
+
+    const balance = balanceValueFn(firstPayload);
+    const receivedAmountString = receivedValueFn(firstPayload);
+    const sentAmountString = sentValueFn(firstPayload);
+
+    const receivedFiat: BaseCurrencyAmount | undefined =
+        firstPayload.receivedFiat[localCurrency] ?? undefined;
+    const sentFiat: BaseCurrencyAmount | undefined =
+        firstPayload.sentFiat[localCurrency] ?? undefined;
 
     return (
         <GraphTooltipBase
@@ -103,11 +110,7 @@ export const GraphTooltipAccount = ({
                 formatters,
             )}
             balance={
-                <FormattedCryptoAmount
-                    disableHiddenPlaceholder
-                    value={balance as string}
-                    symbol={symbol}
-                />
+                <FormattedCryptoAmount disableHiddenPlaceholder value={balance} symbol={symbol} />
             }
         />
     );

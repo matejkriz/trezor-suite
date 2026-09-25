@@ -1,0 +1,76 @@
+import { selectDeviceLabelOrNameById } from '@suite-common/device';
+import { Row, ShortcutBadge, TOOLTIP_DELAY_LONG, Tooltip } from '@trezor/components';
+import { type DeviceModelInternal, getDeviceColorVariant } from '@trezor/device-utils';
+import { RotateDeviceImage } from '@trezor/product-components';
+
+import { useSelector } from 'src/hooks/suite';
+import { type TrezorDevice } from 'src/types/suite';
+import { DeviceDetail } from 'src/views/suite/SwitchDevice/DeviceItem/DeviceDetail';
+import { DeviceStatusText } from 'src/views/suite/SwitchDevice/DeviceItem/DeviceStatusText';
+
+type DeviceStatusProps = {
+    deviceModel: DeviceModelInternal;
+    deviceNeedsRefresh?: boolean;
+    device?: TrezorDevice;
+    forceConnectionInfo?: boolean;
+    isDeviceDetailVisible?: boolean;
+};
+
+export const DeviceStatus = ({
+    deviceModel,
+    deviceNeedsRefresh = false,
+    device,
+    forceConnectionInfo = false,
+    isDeviceDetailVisible = true,
+}: DeviceStatusProps) => {
+    const deviceLabel = useSelector(state => selectDeviceLabelOrNameById(state, device?.id));
+
+    const image = (
+        <Row justifyContent="center" width={24} opacity={deviceNeedsRefresh ? 0.4 : 1}>
+            {device && (
+                <RotateDeviceImage
+                    deviceModel={deviceModel}
+                    deviceColor={getDeviceColorVariant(device)}
+                    height={34}
+                />
+            )}
+        </Row>
+    );
+
+    const content = device && (
+        <DeviceDetail label={deviceLabel}>
+            <DeviceStatusText
+                device={device}
+                forceConnectionInfo={forceConnectionInfo}
+                deviceNeedsRefresh={deviceNeedsRefresh}
+            />
+        </DeviceDetail>
+    );
+
+    return (
+        <>
+            {isDeviceDetailVisible ? (
+                <Row justifyContent="space-between" gap={12} overflow="hidden">
+                    {image}
+                    {content}
+                </Row>
+            ) : (
+                <Row justifyContent="center">
+                    <Tooltip
+                        cursor="inherit"
+                        placement="right"
+                        delayShow={TOOLTIP_DELAY_LONG}
+                        content={
+                            <Row gap={16} alignItems="center">
+                                {content}
+                                <ShortcutBadge shortcut={['ALT', 'KEY_W']} />
+                            </Row>
+                        }
+                    >
+                        {image}
+                    </Tooltip>
+                </Row>
+            )}
+        </>
+    );
+};

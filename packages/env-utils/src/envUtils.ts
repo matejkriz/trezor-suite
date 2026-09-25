@@ -1,8 +1,5 @@
-import UAParser from 'ua-parser-js';
-
-import { publicKey } from '@suite-common/wallet-constants';
-
-import { EnvUtils, Environment } from './types';
+import { publicKey } from './jws';
+import { type EnvUtils, type Environment } from './types';
 
 export const isWeb = () => process.env.SUITE_TYPE === 'web';
 
@@ -16,40 +13,16 @@ export const getEnvironment = (): Environment => {
     return 'desktop';
 };
 
-let userAgentParser: UAParser;
-
 /* This way, we can override simple utils, which helps to polyfill methods which are not available in react-native. */
 const getUserAgent = () => window.navigator.userAgent;
-
-const getUserAgentParser = () => {
-    if (!userAgentParser) {
-        const ua = getUserAgent();
-        userAgentParser = new UAParser(ua);
-    }
-
-    return userAgentParser;
-};
 
 const isAndroid = () => /Android/.test(getUserAgent());
 
 const isChromeOs = () => /CrOS/.test(getUserAgent());
 
-const getBrowserVersion = () => getUserAgentParser().getBrowser().version || '';
-
 const getCommitHash = () => process.env.COMMITHASH || '';
 
-/* Not correct for Linux as there is many different distributions in different versions */
-const getOsVersion = () => getUserAgentParser().getOS().version || '';
-
 const getSuiteVersion = () => process.env.VERSION || '';
-
-const getBrowserName = () => {
-    const browserName = getUserAgentParser().getBrowser().name;
-
-    return browserName?.toLowerCase() || '';
-};
-
-const isFirefox = () => getBrowserName() === 'firefox';
 
 // List of platforms https://docker.apachezone.com/blog/74
 const getPlatform = () => window.navigator.platform;
@@ -72,28 +45,28 @@ const getProcessPlatform = () => (typeof process !== 'undefined' ? process.platf
 
 const isMacOs = () => {
     if (getProcessPlatform() === 'darwin') return true;
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined') return false;
 
-    return getPlatform().startsWith('Mac');
+    return getPlatform().toLowerCase().startsWith('mac');
 };
 
 const isWindows = () => {
     if (getProcessPlatform() === 'win32') return true;
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined') return false;
 
-    return getPlatform().startsWith('Win');
+    return getPlatform().toLowerCase().startsWith('win');
 };
 
 const isIOs = () => ['iPhone', 'iPad', 'iPod'].includes(getPlatform());
 
 const isLinux = () => {
     if (getProcessPlatform() === 'linux') return true;
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined') return false;
 
     // exclude Android and Chrome OS as window.navigator.platform of those OS is Linux
     if (isAndroid() || isChromeOs()) return false;
 
-    return getPlatform().startsWith('Linux');
+    return getPlatform().toLowerCase().startsWith('linux');
 };
 
 const isCodesignBuild = () => process.env.IS_CODESIGN_BUILD === 'true';
@@ -109,23 +82,6 @@ const getOsName = () => {
     return '';
 };
 
-const getOsNameWeb = () => getUserAgentParser().getOS().name;
-
-const getOsFamily = () => {
-    const osName = getUserAgentParser().getOS().name;
-
-    if (osName === 'Windows') {
-        return 'Windows';
-    }
-    if (osName === 'Mac OS') {
-        return 'MacOS';
-    }
-
-    return 'Linux';
-};
-
-const getDeviceType = () => getUserAgentParser().getDevice().type;
-
 export const getJWSPublicKey = () => (isCodesignBuild() ? publicKey.codesign : publicKey.dev);
 
 export const envUtils: EnvUtils = {
@@ -136,13 +92,8 @@ export const envUtils: EnvUtils = {
     getUserAgent,
     isAndroid,
     isChromeOs,
-    getOsVersion,
-    getBrowserName,
-    getBrowserVersion,
     getCommitHash,
-    getDeviceType,
     getSuiteVersion,
-    isFirefox,
     getPlatform,
     getPlatformLanguages,
     getScreenWidth,
@@ -158,7 +109,5 @@ export const envUtils: EnvUtils = {
     isLinux,
     isCodesignBuild,
     getOsName,
-    getOsNameWeb,
-    getOsFamily,
     getJWSPublicKey,
 };

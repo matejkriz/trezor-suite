@@ -1,10 +1,9 @@
 # schema version '3' does not support 'extends' keyword anymore
 # https://stackoverflow.com/questions/52587643/how-to-extend-service-in-docker-compose-v3
 
-version: "3.9"
 services:
   trezor-user-env-unix:
-    image: ghcr.io/trezor/trezor-user-env
+    image: ghcr.io/trezor/trezor-user-env:0126ecbed6edc132a4210803707a66fd04add700
     environment:
       - DISPLAY=$DISPLAY
       - QT_X11_NO_MITSHM=1

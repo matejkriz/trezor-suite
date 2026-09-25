@@ -1,55 +1,24 @@
-import styled, { useTheme } from 'styled-components';
-import { useDispatch } from 'src/hooks/suite';
-import { transparentize } from 'polished';
-
-import { Button, Icon, variables } from '@trezor/components';
+import { Translation } from '@suite/intl';
+import { closeModal } from '@suite/modal';
+import { gotoThunk, selectRouterParams } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
 import { selectAccountByKey } from '@suite-common/wallet-core';
-import { WalletParams } from '@suite-common/wallet-types';
-import { goto } from 'src/actions/suite/routerActions';
-import { useSelector } from 'src/hooks/suite/useSelector';
-import { selectRouterParams } from 'src/reducers/suite/routerReducer';
-import { onCancel as closeModal } from 'src/actions/suite/modalActions';
-import { Modal, Translation } from 'src/components/suite';
+import { type AccountKey, type WalletParams } from '@suite-common/wallet-types';
+import { Column, H3, Modal, Paragraph } from '@trezor/components';
+import { ArrowsInIcon } from '@trezor/icons';
 
-const StyledModal = styled(Modal)`
-    width: 435px;
-`;
+import { useSelector } from 'src/hooks/suite';
 
-const StyledButton = styled(Button)`
-    flex: 1;
-`;
-
-const StyledIcon = styled(Icon)`
-    width: 84px;
-    height: 84px;
-    margin: 12px auto 32px;
-    border-radius: 50%;
-    background: ${({ theme }) => transparentize(0.9, theme.BG_GREEN)};
-`;
-
-const Heading = styled.h3`
-    margin-bottom: 22px;
-    font-size: 32px;
-    line-height: 32px;
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-    color: ${({ theme }) => theme.TYPE_GREEN};
-`;
-
-const Text = styled.p`
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-`;
-
-interface CoinjoinSuccessModalProps {
-    relatedAccountKey: string;
-}
+type CoinjoinSuccessModalProps = {
+    relatedAccountKey: AccountKey;
+};
 
 export const CoinjoinSuccessModal = ({ relatedAccountKey }: CoinjoinSuccessModalProps) => {
     const routerParams = useSelector(selectRouterParams);
     const relatedAccount = useSelector(state => selectAccountByKey(state, relatedAccountKey));
 
-    const theme = useTheme();
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
 
     if (!relatedAccount) {
         return null;
@@ -61,7 +30,8 @@ export const CoinjoinSuccessModal = ({ relatedAccountKey }: CoinjoinSuccessModal
     const navigateToRelatedAccount = () => {
         dispatch(closeModal());
         dispatch(
-            goto('wallet-index', {
+            gotoThunk({
+                routeName: 'wallet-index',
                 params: {
                     symbol,
                     accountIndex: index,
@@ -81,28 +51,31 @@ export const CoinjoinSuccessModal = ({ relatedAccountKey }: CoinjoinSuccessModal
         symbolParam === symbol && indexParam === index && accountTypeParam === accountType;
 
     return (
-        <StyledModal
-            bottomBarComponents={
+        <Modal
+            onCancel={close}
+            bottomContent={
                 <>
-                    <StyledButton variant="secondary" onClick={close}>
-                        <Translation id="TR_DISMISS" />
-                    </StyledButton>
                     {!isOnAccountPage && (
-                        <StyledButton onClick={navigateToRelatedAccount}>
+                        <Modal.Button onClick={navigateToRelatedAccount}>
                             <Translation id="TR_VIEW_ACCOUNT" />
-                        </StyledButton>
+                        </Modal.Button>
                     )}
+                    <Modal.Button intent="neutral" priority="secondary" onClick={close}>
+                        <Translation id="TR_CLOSE" />
+                    </Modal.Button>
                 </>
             }
+            width={600}
+            icon={ArrowsInIcon}
         >
-            <StyledIcon icon="CONFETTI_SUCCESS" size={32} color={theme.TYPE_GREEN} />
-
-            <Heading>
-                <Translation id="TR_COINJOIN_COMPLETED" />
-            </Heading>
-            <Text>
-                <Translation id="TR_COINJOIN_COMPLETED_DESCRIPTION" />
-            </Text>
-        </StyledModal>
+            <Column gap={4}>
+                <H3>
+                    <Translation id="TR_COINJOIN_COMPLETED" />
+                </H3>
+                <Paragraph intent="neutral" priority="secondary">
+                    <Translation id="TR_COINJOIN_COMPLETED_DESCRIPTION" />
+                </Paragraph>
+            </Column>
+        </Modal>
     );
 };

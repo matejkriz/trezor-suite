@@ -1,55 +1,50 @@
-import { MiddlewareAPI } from 'redux';
-
-import { deviceActions, selectDevice } from '@suite-common/wallet-core';
-import { TRANSPORT, DEVICE } from '@trezor/connect';
+import { torActions } from '@suite/tor';
+import { deviceActions } from '@suite-common/device';
+import { geolocationActions } from '@suite-common/geolocation';
 import {
-    messageSystemActions,
     categorizeMessages,
+    getValidExperimentIds,
     getValidMessages,
+    messageSystemActions,
+    selectMessageSystemConfig,
 } from '@suite-common/message-system';
+import { createMiddleware } from '@suite-common/redux-utils';
+import { changeNetworks } from '@suite-common/wallet-core';
+import { DEVICE, TRANSPORT } from '@trezor/connect';
 
-import { SUITE } from 'src/actions/suite/constants';
-import * as walletSettingsActions from 'src/actions/settings/walletSettingsActions';
-import { getIsTorEnabled } from 'src/utils/suite/tor';
-import type { AppState, Action, Dispatch } from 'src/types/suite';
+import { selectMessageSystemValidationParams } from 'src/selectors/suite/selectMessageSystemValidationParams';
 
 // actions which can affect message system messages
-const actions = [
+const actions: string[] = [
     deviceActions.selectDevice.type,
-    SUITE.TOR_STATUS,
+    torActions.setTorStatus.type,
     messageSystemActions.fetchSuccessUpdate.type,
-    walletSettingsActions.changeNetworks.type,
+    messageSystemActions.addMessage.type,
+    messageSystemActions.removeMessage.type,
+    messageSystemActions.addExperiment.type,
+    messageSystemActions.removeExperiment.type,
+    changeNetworks.type,
     TRANSPORT.START,
     DEVICE.CONNECT,
+    geolocationActions.setCountryCode.type,
 ];
 
-const messageSystemMiddleware =
-    (api: MiddlewareAPI<Dispatch, AppState>) =>
-    (next: Dispatch) =>
-    (action: Action): Action => {
-        next(action);
+const messageSystemMiddleware = createMiddleware((action, { next, dispatch, getState }) => {
+    next(action);
 
-        if (actions.includes(action.type)) {
-            const { config } = api.getState().messageSystem;
-            const { transport, torStatus } = api.getState().suite;
-            const device = selectDevice(api.getState());
-            const { enabledNetworks } = api.getState().wallet.settings;
+    if (actions.includes(action.type)) {
+        const config = selectMessageSystemConfig(getState());
+        const validationParams = selectMessageSystemValidationParams(getState());
 
-            const validMessages = getValidMessages(config, {
-                device,
-                transport,
-                settings: {
-                    tor: getIsTorEnabled(torStatus),
-                    enabledNetworks,
-                },
-            });
+        const validMessages = getValidMessages(config, validationParams);
+        const validExperimentIds = getValidExperimentIds(config, validationParams);
+        const categorizedValidMessages = categorizeMessages(validMessages);
 
-            const categorizedValidMessages = categorizeMessages(validMessages);
+        dispatch(messageSystemActions.updateValidMessages(categorizedValidMessages));
+        dispatch(messageSystemActions.updateValidExperiments(validExperimentIds));
+    }
 
-            api.dispatch(messageSystemActions.updateValidMessages(categorizedValidMessages));
-        }
-
-        return action;
-    };
+    return action;
+});
 
 export default messageSystemMiddleware;

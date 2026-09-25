@@ -1,7 +1,7 @@
 import {
     CardanoNativeScriptHashDisplayFormat,
     CardanoTxSigningMode,
-} from '@trezor/protobuf/src/messages-schema';
+} from '@trezor/protobuf/src/definitions';
 
 export const cardanoDerivationType = {
     name: 'derivationType',
@@ -18,8 +18,8 @@ export const cardanoNativeScriptHashDisplayFormat = {
     name: 'displayFormat',
     type: 'select',
     value: CardanoNativeScriptHashDisplayFormat.POLICY_ID,
-    data: Object.keys(CardanoNativeScriptHashDisplayFormat).map(key => ({
-        value: CardanoNativeScriptHashDisplayFormat[key],
+    data: Object.entries(CardanoNativeScriptHashDisplayFormat).map(([key, value]) => ({
+        value,
         label: key,
     })),
 };
@@ -28,8 +28,8 @@ export const cardanoTxSigningMode = {
     name: 'signingMode',
     type: 'select',
     value: CardanoTxSigningMode.ORDINARY_TRANSACTION,
-    data: Object.keys(CardanoTxSigningMode).map(key => ({
-        value: CardanoTxSigningMode[key],
+    data: Object.entries(CardanoTxSigningMode).map(([key, value]) => ({
+        value,
         label: key,
     })),
 };

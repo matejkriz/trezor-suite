@@ -1,32 +1,29 @@
 import styled from 'styled-components';
 
-import { variables } from '@trezor/components';
-import { ChainedTransactions } from '@suite-common/wallet-types';
+import { TrezorLink } from '@suite/external-links';
+import { Translation } from '@suite/intl';
+import { type AccountType, type Network } from '@suite-common/wallet-config';
+import { type ChainedTransactions, createAccountKey } from '@suite-common/wallet-types';
+import { typography } from '@trezor/theme';
 
-import { TrezorLink, Translation } from 'src/components/suite';
 import { TransactionItem } from 'src/components/wallet/TransactionItem/TransactionItem';
-import { Network } from 'src/types/wallet';
-import { AffectedTransactionItem } from './ChangeFee/AffectedTransactionItem';
+
+import { AffectedTransactionItem } from './AffectedTransactions/AffectedTransactionItem';
 
 const Wrapper = styled.div`
     text-align: left;
-    margin-top: 25px;
+    margin-top: 24px;
 `;
 
 const Header = styled.div`
-    color: ${({ theme }) => theme.TYPE_DARK_GREY};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-    font-size: ${variables.FONT_SIZE.SMALL};
+    color: ${({ theme }) => theme.contentPrimary};
+    ${typography['body-sm']}
     padding: 0 20px;
 `;
 
 const Label = styled(Header)`
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
+    color: ${({ theme }) => theme.contentSecondary};
     padding: 12px 20px;
-`;
-
-const StyledTrezorLink = styled(TrezorLink)`
-    width: 100%;
 `;
 
 const ChainedTransactionItem = styled(TransactionItem)`
@@ -35,7 +32,7 @@ const ChainedTransactionItem = styled(TransactionItem)`
     border-left: 0;
 
     &:hover {
-        background: ${({ theme }) => theme.BG_GREY};
+        background: ${({ theme }) => theme.surfaceFillRaised};
     }
 `;
 
@@ -46,17 +43,18 @@ const StyledAffectedTransactionItem = styled(AffectedTransactionItem)`
     border-radius: 12px;
 
     &:hover {
-        background: ${({ theme }) => theme.BG_GREY};
+        background: ${({ theme }) => theme.surfaceFillRaised};
     }
 `;
 
 interface ChainedTxsProps {
     txs: ChainedTransactions;
     network: Network;
+    accountType: AccountType;
     explorerUrl: string;
 }
 
-export const ChainedTxs = ({ txs, network, explorerUrl }: ChainedTxsProps) => (
+export const ChainedTxs = ({ txs, network, accountType, explorerUrl }: ChainedTxsProps) => (
     <Wrapper>
         <Header>
             <Translation id="TR_AFFECTED_TXS_HEADER" />
@@ -68,17 +66,22 @@ export const ChainedTxs = ({ txs, network, explorerUrl }: ChainedTxsProps) => (
             </Label>
         )}
         {txs.own.map((tx, index) => (
-            <StyledTrezorLink key={tx.txid} href={`${explorerUrl}${tx.txid}`} variant="nostyle">
+            <TrezorLink key={tx.txid} href={`${explorerUrl}${tx.txid}`}>
                 <ChainedTransactionItem
                     key={tx.txid}
                     transaction={tx}
                     network={network}
+                    accountType={accountType}
                     isPending
                     isActionDisabled
-                    accountKey={`${tx.descriptor}-${tx.symbol}-${tx.deviceState}`}
+                    accountKey={createAccountKey({
+                        accountDescriptor: tx.descriptor,
+                        networkSymbol: tx.symbol,
+                        deviceStaticSessionId: tx.deviceState,
+                    })}
                     index={index}
                 />
-            </StyledTrezorLink>
+            </TrezorLink>
         ))}
 
         {txs.others.length > 0 && (
@@ -87,9 +90,9 @@ export const ChainedTxs = ({ txs, network, explorerUrl }: ChainedTxsProps) => (
             </Label>
         )}
         {txs.others.map(tx => (
-            <StyledTrezorLink key={tx.txid} href={`${explorerUrl}${tx.txid}`} variant="nostyle">
+            <TrezorLink key={tx.txid} href={`${explorerUrl}${tx.txid}`}>
                 <StyledAffectedTransactionItem tx={tx} />
-            </StyledTrezorLink>
+            </TrezorLink>
         ))}
     </Wrapper>
 );

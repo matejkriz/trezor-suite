@@ -1,41 +1,35 @@
-import styled from 'styled-components';
-import { desktopApi } from '@trezor/suite-desktop-api';
-import { ActionButton, ActionColumn, TextColumn, Translation } from 'src/components/suite';
-import { Card } from '@trezor/components';
-import { useSelector } from 'src/hooks/suite/useSelector';
-import { useAnchor } from 'src/hooks/suite/useAnchor';
-import { CoinjoinLogsAnchor } from 'src/constants/suite/anchors';
-import { anchorOutlineStyles } from 'src/utils/suite/anchor';
+import { selectIsDebugModeActive } from '@suite/debug';
+import { injectDesktopApi } from '@suite/desktop-app-api';
+import { Translation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { Card, Column } from '@trezor/components';
+import { ActionButton, ActionColumn, TextColumn } from '@trezor/product-components';
 
-const SetupCard = styled(Card)<{ $shouldHighlight?: boolean }>`
-    position: relative;
-    overflow: hidden;
-    flex-direction: row;
-
-    ${anchorOutlineStyles}
-`;
+import { useSelector } from 'src/hooks/suite';
 
 export const CoinjoinLogs = () => {
-    const showDebugMenu = useSelector(state => state.suite.settings.debug.showDebugMenu);
-    const { anchorRef, shouldHighlight } = useAnchor(CoinjoinLogsAnchor);
+    const { desktopApi } = useServices(injectDesktopApi);
+    const isDebug = useSelector(selectIsDebugModeActive);
 
-    if (!showDebugMenu) return null;
+    if (!isDebug) return null;
 
     return (
-        <SetupCard ref={anchorRef} $shouldHighlight={shouldHighlight}>
-            <TextColumn
-                title={<Translation id="TR_COINJOIN_LOGS_TITLE" />}
-                description={<Translation id="TR_COINJOIN_LOGS_DESCRIPTION" />}
-            />
-            <ActionColumn>
-                <ActionButton
-                    onClick={() => {
-                        desktopApi.openUserDataDirectory('/logs');
-                    }}
-                >
-                    <Translation id="TR_COINJOIN_LOGS_ACTION" />
-                </ActionButton>
-            </ActionColumn>
-        </SetupCard>
+        <Card>
+            <Column>
+                <TextColumn
+                    title={<Translation id="TR_COINJOIN_LOGS_TITLE" />}
+                    description={<Translation id="TR_COINJOIN_LOGS_DESCRIPTION" />}
+                />
+                <ActionColumn>
+                    <ActionButton
+                        onClick={() => {
+                            desktopApi.openUserDataDirectory('/logs');
+                        }}
+                    >
+                        <Translation id="TR_COINJOIN_LOGS_ACTION" />
+                    </ActionButton>
+                </ActionColumn>
+            </Column>
+        </Card>
     );
 };

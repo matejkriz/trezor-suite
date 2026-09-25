@@ -1,4 +1,5 @@
 import styled from 'styled-components';
+
 import { Spinner } from '@trezor/components';
 
 const LoaderWrapper = styled.div`
@@ -15,7 +16,7 @@ type LoadingProps = {
 };
 
 export const Loading = ({ className }: LoadingProps) => (
-    <LoaderWrapper data-test="@suite/loading" className={className}>
-        <Spinner size={80} isGrey={false} />
+    <LoaderWrapper data-testid="@suite/loading" className={className}>
+        <Spinner size={48} hasStartAnimation={true} />
     </LoaderWrapper>
 );

@@ -1,10 +1,10 @@
 {
     "name": "@trezor/blockchain-link",
-    "version": "2.1.28",
+    "version": "10.0.0",
+    "type": "module",
     "author": "Trezor <info@trezor.io>",
     "homepage": "https://github.com/trezor/trezor-suite/tree/develop/packages/blockchain-link",
     "description": "High-level javascript interface for blockchain communication",
-    "npmPublishAccess": "public",
     "license": "SEE LICENSE IN LICENSE.md",
     "repository": {
         "type": "git",
@@ -22,29 +22,34 @@
     "files": [
         "lib/",
         "!lib/ui",
-        "!**/*.map"
+        "CHANGELOG.md"
+    ],
+    "sideEffects": [
+        "./src/ui/**"
     ],
     "main": "src/index.ts",
     "browser": {
-        "socks-proxy-agent": "./src/utils/socks-proxy-agent.ts",
-        "ws": "./src/utils/ws.ts"
+        "socks-proxy-agent": "./src/utils/socks-proxy-agent.ts"
     },
     "react-native": {
         "__comment__": "Hotfix for issue where RN metro bundler resolve relatives paths wrong",
-        "ws": "@trezor/blockchain-link/src/utils/ws-native.ts",
         "socks-proxy-agent": "@trezor/blockchain-link/src/utils/socks-proxy-agent.ts"
     },
     "publishConfig": {
         "main": "./lib/index.js",
-        "types": "lib/index.d.ts",
-        "typings": "lib/index.d.ts",
+        "types": "./lib/index.d.ts",
+        "exports": {
+            ".": {
+                "types": "./lib/index.d.ts",
+                "default": "./lib/index.js"
+            },
+            "./lib/*": "./lib/*"
+        },
         "browser": {
-            "socks-proxy-agent": "./lib/utils/socks-proxy-agent.js",
-            "ws": "./lib/utils/ws.js"
+            "socks-proxy-agent": "./lib/utils/socks-proxy-agent.js"
         },
         "react-native": {
             "__comment__": "Hotfix for issue where RN metro bundler resolve relatives paths wrong",
-            "ws": "@trezor/blockchain-link/lib/utils/ws-native.js",
             "socks-proxy-agent": "@trezor/blockchain-link/lib/utils/socks-proxy-agent.js"
         }
     },
@@ -52,42 +57,40 @@
         "dev": "webpack serve --config ./webpack/dev.js",
         "dev:electrum": "yarn g:tsx watch ./src/workers/electrum/devrun.ts",
         "dev:module": "USE_MODULES=true webpack serve --config ./webpack/dev.js",
-        "build:lib": "yarn g:rimraf lib && yarn g:tsc --build tsconfig.lib.json && ../../scripts/replace-imports.sh ./lib",
+        "build:lib": "yarn g:rimraf ./lib && yarn g:tsc --build tsconfig.lib.json && ../../scripts/publish/replace-imports.sh ./lib",
         "build:workers": "yarn g:rimraf build && yarn build:workers-web && yarn build:workers-module",
         "build:workers-web": "webpack --config ./webpack/workers.web.js",
         "build:workers-module": "webpack --config ./webpack/workers.module.js",
-        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "test:unit": "yarn g:jest --verbose -c jest.config.unit.js",
-        "test:integration": "yarn g:jest -c jest.config.integration.js",
+        "test:unit": "yarn g:jest -c jest.config.unit.cjs",
+        "test:integration": "yarn g:jest -c jest.config.integration.cjs",
         "type-check": "yarn g:tsc --build tsconfig.json",
-        "prepublishOnly": "yarn tsx ../../scripts/prepublishNPM.js",
-        "prepublish": "yarn tsx ../../scripts/prepublish.js"
+        "depcheck": "yarn g:depcheck",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'"
     },
     "devDependencies": {
         "@trezor/e2e-utils": "workspace:*",
+        "@trezor/eslint": "workspace:*",
         "@trezor/type-utils": "workspace:*",
-        "fs-extra": "^11.2.0",
-        "html-webpack-plugin": "^5.6.0",
+        "@types/jest": "30.0.0",
+        "@types/node": "22.13.10",
+        "html-webpack-plugin": "5.6.8",
         "tiny-worker": "^2.3.0",
-        "tsx": "^4.7.0",
-        "webpack": "^5.90.1",
-        "webpack-cli": "^5.1.4",
-        "webpack-dev-server": "^4.15.1",
+        "webpack": "5.110.1",
         "worker-loader": "^3.0.8"
     },
     "dependencies": {
-        "@solana/buffer-layout": "^4.0.1",
-        "@solana/web3.js": "^1.90.0",
         "@trezor/blockchain-link-types": "workspace:*",
         "@trezor/blockchain-link-utils": "workspace:*",
+        "@trezor/env-utils": "workspace:*",
+        "@trezor/network-ripple": "workspace:*",
+        "@trezor/network-solana": "workspace:*",
+        "@trezor/network-stellar": "workspace:*",
         "@trezor/utils": "workspace:*",
         "@trezor/utxo-lib": "workspace:*",
-        "@types/web": "^0.0.138",
-        "bignumber.js": "^9.1.2",
-        "events": "^3.3.0",
-        "ripple-lib": "^1.10.1",
-        "socks-proxy-agent": "6.1.1",
-        "ws": "^8.16.0"
+        "@trezor/websocket-client": "workspace:*",
+        "@types/web": "^0.0.345",
+        "socks-proxy-agent": "8.0.5",
+        "viem": "^2.54.1"
     },
     "peerDependencies": {
         "tslib": "^2.6.2"

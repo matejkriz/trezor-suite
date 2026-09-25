@@ -1,0 +1,48 @@
+name: "[Test] trezor-user-env-link e2e"
+
+on:
+  schedule:
+    # Runs at midnight UTC every day at 01:00 AM CET
+    - cron: "0 0 * * *"
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - ".github/workflows/test-trezor-user-env-link-e2e.yml"
+      - "packages/trezor-user-env/**"
+      - "packages/trezor-user-env-link/**"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-test-trezor-user-env-link:
+    if: github.repository == 'trezor/trezor-suite'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          ref: ${{github.event.after}}
+          fetch-depth: 2
+      - name: Setup node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version-file: ".nvmrc"
+          cache: yarn
+      - name: Install SafeDep PMG
+        uses: safedep/pmg@be0a93f10fbec6a5c94dd78bc722abf1b7fbfc2d # v0.26.0
+        continue-on-error: true
+        with:
+          version: v0.19.1
+      - name: Install dependencies
+        run: |
+          echo -e "\nenableHardenedMode: false" >> .yarnrc.yml
+          yarn workspaces focus @trezor/trezor-user-env-link
+
+      - name: Run e2e tests
+        run: |
+          docker run -d --network=host ghcr.io/trezor/trezor-user-env:0126ecbed6edc132a4210803707a66fd04add700
+          yarn workspace @trezor/trezor-user-env-link test:e2e

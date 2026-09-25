@@ -7,15 +7,20 @@
     "sideEffects": false,
     "license": "MIT",
     "scripts": {
-        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "type-check": "yarn g:tsc --build"
+        "depcheck": "yarn g:depcheck",
+        "type-check": "yarn g:tsc --build",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'"
     },
     "dependencies": {
-        "@shopify/react-native-skia": "0.1.234",
-        "@types/react": "18.2.55",
-        "react": "18.2.0",
-        "react-native": "0.73.2",
-        "react-native-gesture-handler": "2.15.0",
-        "react-native-reanimated": "3.7.0-nightly-20240101-9d365ae7b"
+        "@shopify/react-native-skia": "2.6.2",
+        "@trezor/utils": "workspace:*",
+        "@types/react": "19.2.14",
+        "react": "19.2.3",
+        "react-native": "0.86.0",
+        "react-native-gesture-handler": "~2.32.0",
+        "react-native-reanimated": "4.5.0"
+    },
+    "devDependencies": {
+        "@trezor/eslint": "workspace:*"
     }
 }

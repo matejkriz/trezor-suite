@@ -1,0 +1,132 @@
+import { Callout } from 'nextra/components';
+
+import {
+    EthereumSignTypedData,
+    EthereumSignTypedHash,
+} from '@trezor/connect-common/src/types/api/ethereum/common';
+
+import { ApiPlayground } from '../../../components/ApiPlayground';
+import { CommonParamsLink } from '../../../components/CommonParamsLink';
+import { ParamsTable } from '../../../components/ParamsTable';
+import signTypedData from '../../../data/methods/ethereum/signTypedData.ts';
+
+<ApiPlayground
+    options={[
+        { title: 'Sign typed data', legacyConfig: signTypedData[0] },
+        {
+            title: 'Advanced schema',
+            method: 'ethereumSignTypedData',
+            schema: EthereumSignTypedData,
+        },
+        {
+            title: 'Advanced schema (hash)',
+            method: 'ethereumSignTypedData',
+            schema: EthereumSignTypedHash,
+        },
+    ]}
+/>
+
+export const paramDescriptions = {
+    path: 'minimum length is `3`. [read more](/details/path)',
+    data: 'type of [`EthereumSignTypedDataMessage`](https://github.com/trezor/trezor-suite/blob/develop/packages/connect-common/src/types/api/ethereum/common.ts). A JSON Schema definition can be found in the [EIP-712 spec](https://eips.ethereum.org/EIPS/eip-712).',
+    metamask_v4_compat:
+        "set to `true` for compatibility with [MetaMask's signTypedData_v4](https://docs.metamask.io/guide/signing-data.html#sign-typed-data-v4).",
+    domain_separator_hash: 'hex-encoded 32-byte hash of the EIP-712 domain.',
+    message_hash: 'hex-encoded 32-byte hash of the EIP-712 message.',
+    show_message_hash:
+        'set to `true` to also display the message hash on the device for additional confirmation on newer Trezor models.',
+};
+
+## Ethereum: Sign Typed Data
+
+Asks device to sign an [EIP-712](https://eips.ethereum.org/EIPS/eip-712) typed data message using the private key derived by given BIP32 path.
+
+User is asked to confirm all signing details on T2T1.
+
+```javascript
+const result = await TrezorConnect.ethereumSignTypedData(params);
+```
+
+<Callout type="warning">**Supported only by T2T1 with Firmware 2.4.3 or higher!**</Callout>
+<Callout type="warning">
+    **Blind signing is supported only on T1B1 with Firmware 1.10.5 or higher!**
+</Callout>
+
+### Params
+
+<CommonParamsLink />
+
+#### EthereumSignTypedData
+
+<ParamsTable schema={EthereumSignTypedData} descriptions={paramDescriptions} />
+
+#### EthereumSignTypedHash
+
+<ParamsTable schema={EthereumSignTypedHash} descriptions={paramDescriptions} />
+
+### Example
+
+```javascript
+const eip712Data = {
+    types: {
+        EIP712Domain: [
+            {
+                name: 'name',
+                type: 'string',
+            },
+        ],
+        Message: [
+            {
+                name: 'Best Wallet',
+                type: 'string',
+            },
+            {
+                name: 'Number',
+                type: 'uint64',
+            },
+        ],
+    },
+    primaryType: 'Message',
+    domain: {
+        name: 'example.trezor.io',
+    },
+    message: {
+        'Best Wallet': 'Trezor Model T',
+        // be careful with JavaScript numbers: MAX_SAFE_INTEGER is quite low
+        Number: `${2n ** 55n}`,
+    },
+};
+
+// `domain_separator_hash` and `message_hash` are computed internally when the
+// device requires them (T1B1 firmware). Pass `data` directly for all models.
+TrezorConnect.ethereumSignTypedData({
+    path: "m/44'/60'/0'",
+    data: eip712Data,
+    metamask_v4_compat: true,
+});
+```
+
+### Result
+
+[EthereumMessageSignature type](https://github.com/trezor/trezor-suite/blob/develop/packages/protobuf/src/definitions/messages-ethereum.ts)
+
+```javascript
+{
+    success: true,
+    payload: {
+        address: string,
+        signature: string, // hexadecimal string with "0x" prefix
+    }
+}
+```
+
+Error
+
+```javascript
+{
+    success: false,
+    error: {
+        message: string // error message
+    }
+}
+```

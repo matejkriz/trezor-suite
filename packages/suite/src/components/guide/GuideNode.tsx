@@ -1,85 +1,60 @@
-import { ReactNode } from 'react';
-import styled, { useTheme } from 'styled-components';
-import { analytics, EventType } from '@trezor/suite-analytics';
-import { resolveStaticPath } from '@suite-common/suite-utils';
+import { type ReactNode } from 'react';
 
-import { Icon, variables } from '@trezor/components';
-import { useDispatch, useSelector } from 'src/hooks/suite';
+import styled from 'styled-components';
+
+import { events, injectDesktopAnalytics } from '@suite/analytics';
+import { selectLanguage } from '@suite/settings';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { type GuideNode as GuideNodeType } from '@suite-common/suite-types';
+import { CardList, Column, Icon, IconCircle, Row, Text } from '@trezor/components';
+import { type IconComponent } from '@trezor/components';
+import { resolveStaticPath } from '@trezor/env-utils';
+import {
+    ArrowsLeftRightFilledIcon,
+    CaretRightIcon,
+    CheckCircleIcon,
+    CoinsIcon,
+    CurrencyBtcIcon,
+    GearIcon,
+    PiggyBankIcon,
+} from '@trezor/icons';
+
 import { openNode } from 'src/actions/suite/guideActions';
-import { GuideNode as GuideNodeType } from '@suite-common/suite-types';
+import { useSelector } from 'src/hooks/suite';
 import { getNodeTitle } from 'src/utils/suite/guide';
-import { borders } from '@trezor/theme';
-import { selectLanguage } from 'src/reducers/suite/suiteReducer';
 
-const NodeButton = styled.button`
-    display: flex;
-    align-items: center;
-    border-radius: ${borders.radii.xs};
-    border: 0;
-    width: 100%;
-    background: ${({ theme }) => theme.backgroundSurfaceElevation1};
-    padding: 10px;
-    cursor: pointer;
-    line-height: 1.57;
-    transition: ${({ theme }) =>
-        `background ${theme.HOVER_TRANSITION_TIME} ${theme.HOVER_TRANSITION_EFFECT}`};
+import { GuideItem } from './GuideItem';
 
-    &:hover,
-    &:focus {
-        background: ${({ theme }) => theme.backgroundTertiaryPressedOnElevation1};
-    }
+const CategoryImage = styled.img`
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
 `;
 
-const PageNodeButton = styled(NodeButton)`
-    text-align: left;
-`;
-
-const PageNodeButtonIcon = styled(Icon)`
-    margin: 0 18px 0 0;
-`;
-
-const Label = styled.div<{ $isBold: boolean }>`
-    width: 100%;
-    font-size: ${variables.FONT_SIZE.SMALL};
-    font-weight: ${({ $isBold }) =>
-        $isBold ? variables.FONT_WEIGHT.DEMI_BOLD : variables.FONT_WEIGHT.MEDIUM};
-    color: ${({ theme }) => theme.TYPE_DARK_GREY};
-    overflow: hidden;
-    line-height: 16px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-`;
-
-const CategoryNodeButton = styled(NodeButton)`
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    min-width: 140px;
-    text-align: center;
-    height: 150px;
-    flex: 1;
-`;
-
-const Image = styled.img`
-    width: 64px;
-`;
+const guideCategoryIcons: Partial<Record<string, IconComponent>> = {
+    arrowsLeftRightFilled: ArrowsLeftRightFilledIcon,
+    checkCircle: CheckCircleIcon,
+    coins: CoinsIcon,
+    currencyBtc: CurrencyBtcIcon,
+    gear: GearIcon,
+    piggyBank: PiggyBankIcon,
+};
 
 type GuideNodeProps = {
     node: GuideNodeType;
     description?: ReactNode;
+    itemVariant?: 'default' | 'cardList';
 };
 
-export const GuideNode = ({ node, description }: GuideNodeProps) => {
+export const GuideNode = ({ node, description, itemVariant = 'cardList' }: GuideNodeProps) => {
     const language = useSelector(selectLanguage);
-    const dispatch = useDispatch();
-
-    const theme = useTheme();
+    const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
 
     const navigateToNode = () => {
         dispatch(openNode(node));
         analytics.report({
-            type: EventType.GuideNodeNavigation,
+            type: events.guideNodeNavigationEvent.name,
             payload: {
                 type: node.type,
                 id: node.id,
@@ -87,30 +62,77 @@ export const GuideNode = ({ node, description }: GuideNodeProps) => {
         });
     };
 
-    const label = (
-        <Label $isBold={!description}>
-            {getNodeTitle(node, language)}
-            {description}
-        </Label>
-    );
-
     if (node.type === 'page') {
         return (
-            <PageNodeButton data-test={`@guide/node${node.id}`} onClick={navigateToNode}>
-                <PageNodeButtonIcon icon="ARTICLE" size={20} color={theme.TYPE_LIGHT_GREY} />
-                {label}
-            </PageNodeButton>
+            <CardList.Item
+                paddingType="medium"
+                onClick={navigateToNode}
+                data-testid={`@guide/node${node.id}`}
+            >
+                <Column
+                    flex="1"
+                    gap={description ? 4 : 0}
+                    overflow="hidden"
+                    alignItems="flex-start"
+                >
+                    <Text
+                        typographyStyle={description ? 'body-sm-strong' : 'body-md'}
+                        as="div"
+                        maxWidth="100%"
+                    >
+                        {getNodeTitle(node, language)}
+                    </Text>
+                    {description && (
+                        <Text
+                            typographyStyle="body-sm"
+                            intent="neutral"
+                            priority="secondary"
+                            as="div"
+                            maxWidth="100%"
+                        >
+                            {description}
+                        </Text>
+                    )}
+                </Column>
+                <Icon as={CaretRightIcon} size={20} intent="neutral" priority="secondary" />
+            </CardList.Item>
         );
     }
 
     if (node.type === 'category') {
+        const icon = node.icon ? guideCategoryIcons[node.icon] : undefined;
+        const categoryIcon = icon ? (
+            <IconCircle icon={icon} size={32} intent="neutral" />
+        ) : (
+            node.image && <CategoryImage src={resolveStaticPath(node.image)} />
+        );
+
+        if (itemVariant === 'default') {
+            return (
+                <GuideItem
+                    onClick={navigateToNode}
+                    data-testid={`@guide/category${node.id}`}
+                    icon={categoryIcon}
+                >
+                    {getNodeTitle(node, language)}
+                </GuideItem>
+            );
+        }
+
         return (
-            <CategoryNodeButton data-test={`@guide/category${node.id}`} onClick={navigateToNode}>
-                {node.image && <Image src={resolveStaticPath(node.image)} />}
-                {label}
-            </CategoryNodeButton>
+            <CardList.Item
+                paddingType="medium"
+                onClick={navigateToNode}
+                data-testid={`@guide/category${node.id}`}
+            >
+                <Row gap={12} alignItems="center" flex="1" overflow="hidden">
+                    {categoryIcon}
+                    <Text typographyStyle="body-md" as="div" maxWidth="100%">
+                        {getNodeTitle(node, language)}
+                    </Text>
+                </Row>
+                <Icon as={CaretRightIcon} size={20} intent="neutral" priority="secondary" />
+            </CardList.Item>
         );
     }
-
-    return null;
 };

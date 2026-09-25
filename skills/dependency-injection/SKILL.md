@@ -1,0 +1,160 @@
+---
+name: dependency-injection
+description: Dependency Injection pattern for service definitions, factories, and composition roots. Use when working with packages that use the DI pattern.
+---
+
+# Dependency injection
+
+Some parts of the codebase use the Dependency Injection (DI) pattern. Instead of importing dependencies directly, pass them to the service as parameters. This allows better testability and separation of concerns.
+
+## Skill boundaries
+
+Use this skill mainly for packages that directly mention this skill.
+
+## Service definition standard
+
+The unified pattern for defining services is as follows.
+
+Define in this order for consistency:
+
+### 1: Service dependencies
+
+Use the same key (`serviceName`) everywhere. This is important so `Dep`, `Deps`, and composition root wiring stay consistent.
+
+```ts
+export type ServiceNameDeps = OtherServiceDep | AnotherServiceDep;
+```
+
+### 2. Service shape:
+
+```ts
+export type ServiceParams = {
+    id: string;
+    // ...
+};
+
+// Usually a function, but it can also be an object with multiple methods.
+export type ServiceName = (params: ServiceParams) => ServiceResult;
+```
+
+### 3. Dependency shape for other services:
+
+```ts
+export type ServiceNameDeps = {
+    serviceName: ServiceName;
+};
+```
+
+### 4. Service factory:
+
+Do not repeat `ServiceParams` in factory (`(params)` only). It is inferred from `ServiceName`.
+
+Service factory:
+
+File shall be named: `createServiceName.ts`.
+
+```ts
+export const createServiceName =
+    (deps: ServiceNameDeps): ServiceName =>
+    params => {
+        // params is inferred from ServiceName type
+        return deps.serviceName(params);
+    };
+```
+
+### 5. Dependency injector:
+
+Name it `injectServiceName`, after the `ServiceNameDep` it returns. `inject` keeps it apart from
+Redux state selectors, which own the `select` prefix.
+
+```ts
+export const injectServiceName = (services: any): ServiceNameDep => ({
+    serviceName: services.serviceName,
+});
+```
+
+### Dependency access
+
+Take the dependency object whole and read it as `deps.serviceName`. Never destructure it, neither in
+the parameter list nor in the body.
+
+```ts
+// bad
+export const createServiceName =
+    ({ otherService }: ServiceNameDeps): ServiceName =>
+    params =>
+        otherService(params);
+
+// also bad
+export const createServiceName =
+    (deps: ServiceNameDeps): ServiceName =>
+    params => {
+        const { otherService } = deps;
+
+        return otherService(params);
+    };
+
+// good
+export const createServiceName =
+    (deps: ServiceNameDeps): ServiceName =>
+    params =>
+        deps.otherService(params);
+```
+
+The `deps.` prefix is the point: it tells the reader at a glance that the value is an injected
+service rather than a local variable, a parameter or an import.
+
+### Multiple implementations of a shared contract
+
+Mark shared contracts with `@serviceContract` to allow differently named factories.
+Unmarked contracts must match the factory name.
+
+```ts
+/** @serviceContract */
+export interface PlatformEncryption {
+    encrypt: (value: string) => Promise<string>;
+    decrypt: (value: string) => Promise<string>;
+}
+```
+
+Both `createNativePlatformEncryption` and `createElectronPlatformEncryption` return this contract.
+Their dependencies remain `NativePlatformEncryptionDeps` and `ElectronPlatformEncryptionDeps`.
+
+## Composition root
+
+This is the place where the tree of dependencies is created and wired together.
+
+- We have top-level composition roots for Desktop, Web, and Native.
+- There may be some module/package level composition roots. Think of them as simply another
+  service factory, but the service in this case is the whole module/package.
+
+Composition root:
+
+```ts
+// Composition root may have its own dependencies
+type CompositionRootDeps = ADep;
+
+export const createCompositionRoot = (deps: CompositionRootDeps) => {
+    const otherService = createOtherService(deps);
+    const serviceName = createServiceName({ otherService });
+
+    return {
+        serviceName, // expose only `serviceName`; `otherService` is module-private in this case
+    };
+};
+```
+
+## Testing services
+
+Tests MUST use the service's declared dependency type: annotate object literals (`const deps: ServiceDeps`)
+or pass it to `createMockDeps<ServiceDeps>`. Use `createMockDeps` and `mock` wherever possible. See
+[Dependencies in tests](../tests/SKILL.md#dependencies-in-tests).
+
+## React service injection
+
+`useServices` accepts multiple injectors. Prefer one call with all needed injectors instead of
+multiple `useServices` calls when a component or hook needs several services.
+
+```ts
+const { serviceName, otherService } = useServices(injectServiceName, injectOtherService);
+```

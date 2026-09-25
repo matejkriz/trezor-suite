@@ -1,72 +1,219 @@
-import styled from 'styled-components';
-import { CoinLogo, variables } from '@trezor/components';
-import { Modal, Translation } from 'src/components/suite';
-import { NETWORKS } from 'src/config/wallet';
-import { NetworkSymbol } from 'src/types/wallet';
-import { CustomBackends } from './CustomBackends/CustomBackends';
-import { TranslationKey } from '@suite-common/intl-types';
+import { useState } from 'react';
 
-const Section = styled.div`
-    display: flex;
-    flex-direction: column;
-`;
+import { Translation } from '@suite/intl';
+import { selectHasExperimentalFeature } from '@suite/settings';
+import { selectIsTorEnabled } from '@suite/tor';
+import { TorModal, type TorResult, toggleTorThunk } from '@suite/tor-desktop';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { type NetworkSymbol, getNetwork } from '@suite-common/wallet-config';
+import { selectNetworkExplorers } from '@suite-common/wallet-core';
+import {
+    Badge,
+    Banner,
+    Card,
+    CollapsibleBox,
+    Column,
+    Input,
+    Modal,
+    Paragraph,
+    Row,
+    Text,
+} from '@trezor/components';
 
-const Heading = styled.div`
-    display: flex;
-    align-items: center;
-    line-height: initial;
+import { useBackendsForm } from 'src/hooks/settings/backends';
+import { useExplorerForm } from 'src/hooks/settings/useExplorerForm';
+import { useGapLimitForm } from 'src/hooks/settings/useGapLimitForm';
+import { useSelector } from 'src/hooks/suite';
 
-    > * + * {
-        margin-left: 16px;
-    }
-`;
+import { BackendUrls } from './BackendUrls/BackendUrls';
+import { BackendTypeSelect } from './CustomBackends/BackendTypeSelect';
+import ConnectionInfo from './CustomBackends/ConnectionInfo';
+import { ExplorerConfigForm } from './ExplorerConfigForm';
 
-const Header = styled.div`
-    display: flex;
-    flex-direction: column;
-`;
-
-const Subheader = styled.span`
-    font-size: ${variables.FONT_SIZE.NORMAL};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-`;
-
-interface AdvancedCoinSettingsModalProps {
-    coin: NetworkSymbol;
+type AdvancedCoinSettingsModalProps = {
+    symbol: NetworkSymbol;
     onCancel: () => void;
-}
+    onBackClick?: () => void;
+};
 
-export const AdvancedCoinSettingsModal = ({ coin, onCancel }: AdvancedCoinSettingsModalProps) => {
-    const network = NETWORKS.find(network => network.symbol === coin);
+export const AdvancedCoinSettingsModal = ({
+    symbol,
+    onCancel,
+    onBackClick,
+}: AdvancedCoinSettingsModalProps) => {
+    const network = getNetwork(symbol);
+    const isTorEnabled = useSelector(selectIsTorEnabled);
+    const { dispatch } = useServices(injectDispatch);
+    const [torModalOpen, setTorModalOpen] = useState(false);
 
-    if (!network) {
-        return null;
+    const explorer = useSelector(state => selectNetworkExplorers(state, symbol));
+    const usesCustomExplorer = explorer.custom !== undefined;
+
+    const isBitcoinNetwork = network.networkType === 'bitcoin';
+    const isGapLimitEnabled = useSelector(selectHasExperimentalFeature('gap-limit'));
+
+    const gapLimitForm = useGapLimitForm(symbol);
+    const explorerForm = useExplorerForm(symbol);
+    const backendsForm = useBackendsForm(symbol);
+
+    const onSaveClick = async () => {
+        explorerForm.save();
+
+        if (isBitcoinNetwork && isGapLimitEnabled) {
+            gapLimitForm.save();
+        }
+
+        if (!isTorEnabled && backendsForm.hasOnlyOnions()) {
+            setTorModalOpen(true);
+        } else {
+            const success = await backendsForm.save();
+
+            if (success) {
+                onCancel();
+            }
+        }
+    };
+
+    const onTorResult = async (result: TorResult) => {
+        switch (result) {
+            case 'enable-tor':
+                await dispatch(toggleTorThunk(true));
+
+                setTorModalOpen(false);
+                backendsForm.save().then(success => {
+                    if (success) {
+                        onCancel();
+                    }
+                });
+
+                break;
+            case 'use-defaults':
+                backendsForm.changeType('default');
+                setTorModalOpen(false);
+
+            // no default
+        }
+    };
+
+    const isEditable = backendsForm.type !== 'default';
+    const isSubmitButtonDisabled =
+        (isEditable && !!backendsForm.input.error) ||
+        !explorerForm.isValid ||
+        (isBitcoinNetwork && isGapLimitEnabled && !!gapLimitForm.error) ||
+        backendsForm.isValidating;
+
+    if (torModalOpen) {
+        return <TorModal onResult={onTorResult} />;
     }
 
     return (
         <Modal
-            isCancelable
             onCancel={onCancel}
+            onBackClick={onBackClick}
             heading={
-                <Heading>
-                    <CoinLogo symbol={network.symbol} />
-
-                    <Header>
-                        <span>{network.name}</span>
-
-                        {network.label && (
-                            <Subheader>
-                                <Translation id={network.label as TranslationKey} />
-                            </Subheader>
-                        )}
-                    </Header>
-                </Heading>
+                <Text as="p">
+                    {network.name} <Translation id="TR_BACKENDS" />
+                </Text>
+            }
+            width={600}
+            bottomContent={
+                <>
+                    <Modal.Button
+                        onClick={onSaveClick}
+                        isDisabled={isSubmitButtonDisabled}
+                        isLoading={backendsForm.isValidating}
+                        data-testid="@settings/advance/button/save"
+                    >
+                        <Translation
+                            id={backendsForm.isValidating ? 'TR_VALIDATING' : 'TR_CONFIRM'}
+                        />
+                    </Modal.Button>
+                    <Modal.Button onClick={onCancel} intent="neutral" priority="secondary">
+                        <Translation id="TR_CANCEL" />
+                    </Modal.Button>
+                </>
             }
         >
-            <Section>
-                <CustomBackends network={network} onCancel={onCancel} />
-            </Section>
+            <Column gap={20}>
+                <Paragraph intent="neutral" priority="secondary" typographyStyle="body-sm">
+                    <Translation id="SETTINGS_BACKEND_SETTINGS_DESCRIPTION" />
+                </Paragraph>
+                <Card
+                    header={
+                        <BackendTypeSelect
+                            network={network}
+                            value={backendsForm.type}
+                            onChange={backendsForm.changeType}
+                        />
+                    }
+                >
+                    <BackendUrls
+                        symbol={symbol}
+                        isEditable={isEditable}
+                        input={backendsForm.input}
+                        urls={backendsForm.urls}
+                        addUrl={backendsForm.addUrl}
+                        removeUrl={backendsForm.removeUrl}
+                    />
+                </Card>
+
+                {backendsForm.validationError && (
+                    <Banner
+                        intent="critical"
+                        description={<Text>{backendsForm.validationError}</Text>}
+                    />
+                )}
+
+                <CollapsibleBox
+                    heading={
+                        <Row gap={12}>
+                            <Translation id="TR_EXPLORER" />
+
+                            {usesCustomExplorer ? (
+                                <Badge intent="warning">
+                                    <Translation id="TR_EXPLORER_CUSTOM" />
+                                </Badge>
+                            ) : (
+                                <Badge intent="brand">
+                                    <Translation id="TR_EXPLORER_DEFAULT" />
+                                </Badge>
+                            )}
+                        </Row>
+                    }
+                >
+                    <ExplorerConfigForm form={explorerForm} />
+                </CollapsibleBox>
+
+                {isBitcoinNetwork && isGapLimitEnabled && (
+                    <CollapsibleBox
+                        heading={<Translation id="SETTINGS_BACKEND_SETTINGS_CUSTOM_GAP_LIMIT" />}
+                    >
+                        <Column gap={12} alignItems="flex-start">
+                            <Input
+                                type="number"
+                                value={gapLimitForm.value}
+                                size="small"
+                                onChange={e => gapLimitForm.setValue(e.target.value)}
+                                hasError={!!gapLimitForm.error}
+                                bottomText={
+                                    gapLimitForm.error ? (
+                                        <Translation
+                                            id={gapLimitForm.error.id}
+                                            values={gapLimitForm.error.values}
+                                        />
+                                    ) : undefined
+                                }
+                                width={125}
+                            />
+                        </Column>
+                    </CollapsibleBox>
+                )}
+
+                <CollapsibleBox heading={<Translation id="SETTINGS_ADV_COIN_CONN_INFO_TITLE" />}>
+                    <ConnectionInfo symbol={symbol} />
+                </CollapsibleBox>
+            </Column>
         </Modal>
     );
 };

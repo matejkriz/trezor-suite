@@ -1,14 +1,15 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
 import {
+    CloneType,
     JavaScriptTypeBuilder,
-    Static,
-    TSchema,
-    TObject,
-    Optional,
     Kind,
-    TypeClone,
+    Optional,
+    OptionalKind,
+    type Static,
+    type TObject,
+    type TSchema,
 } from '@sinclair/typebox';
-import { ValueErrorType, Errors, ValueError } from '@sinclair/typebox/errors';
+import { Errors, type ValueError, ValueErrorType } from '@sinclair/typebox/errors';
 import { Mixin } from 'ts-mixer';
 
 import { ArrayBufferBuilder, BufferBuilder, KeyofEnumBuilder, UintBuilder } from './custom-types';
@@ -28,7 +29,7 @@ export function Validate<T extends TSchema>(schema: T, value: unknown): value is
         Assert(schema, value);
 
         return true;
-    } catch (e) {
+    } catch {
         return false;
     }
 }
@@ -47,9 +48,10 @@ function FindErrorInUnion(error: ValueError) {
                     propertySchema.const && propertySchema.const !== currentValue[property],
             );
         });
-        if (possibleMatchesByLiterals.length === 1) {
+        const singleMatch = possibleMatchesByLiterals[0];
+        if (possibleMatchesByLiterals.length === 1 && singleMatch) {
             // There is only one possible match
-            Assert(possibleMatchesByLiterals[0], currentValue);
+            Assert(singleMatch, currentValue);
         } else if (possibleMatchesByLiterals.length > 1) {
             // Find match with least amount of errors
             const errorsOfPossibleMatches = possibleMatchesByLiterals.map(
@@ -61,8 +63,10 @@ function FindErrorInUnion(error: ValueError) {
             const sortedErrors = errorsOfPossibleMatches.sort(
                 (a, b) => a.errors.length - b.errors.length,
             );
-            const [bestMatch] = sortedErrors;
-            Assert(bestMatch.schema, currentValue);
+            const bestMatch = sortedErrors[0];
+            if (bestMatch) {
+                Assert(bestMatch.schema, currentValue);
+            }
         }
 
         throw new InvalidParameter(error.message, error.path, error.type, error.value);
@@ -75,7 +79,7 @@ export function Assert<T extends TSchema>(schema: T, value: unknown): asserts va
     while (error) {
         if (error.path === '/' && errors.length > 1) {
             // This might be a nested error, try to find the root cause
-        } else if (error.value == null && error.schema[Optional] === 'Optional') {
+        } else if (error.value == null && error.schema[OptionalKind] === 'Optional') {
             // Optional can also accept null values
         } else if (error.type === ValueErrorType.Union) {
             // Drill down into the union
@@ -99,25 +103,6 @@ export function Assert<T extends TSchema>(schema: T, value: unknown): asserts va
     }
 }
 
-export function AssertWeak<T extends TSchema>(
-    schema: T,
-    value: unknown,
-): asserts value is Static<T> {
-    try {
-        Assert(schema, value);
-    } catch (e) {
-        if (e instanceof InvalidParameter) {
-            if (e.type === ValueErrorType.ObjectRequiredProperty) {
-                // We consider this error to be serious
-                throw e;
-            }
-            console.warn('Method params validation failed', e);
-        } else {
-            throw e;
-        }
-    }
-}
-
 export const Type = new CustomTypeBuilder();
-export { Optional, TypeClone };
-export type { Static, TObject, TSchema };
+export { Optional, CloneType };
+export type * from '@sinclair/typebox';

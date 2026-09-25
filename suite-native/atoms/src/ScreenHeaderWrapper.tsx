@@ -1,32 +1,38 @@
-import { ReactNode } from 'react';
-import { EdgeInsets, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { type ReactNode } from 'react';
+import { type EdgeInsets, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
 
-import { Box, BoxProps } from './Box';
+import { Box, type BoxProps } from './Box';
 
 type ScreenHeaderWrapperProps = {
     children: ReactNode;
+    noBottomPadding?: boolean;
 } & BoxProps;
 
-const screenHeaderWrapperStyle = prepareNativeStyle<{ insets: EdgeInsets }>(
-    (utils, { insets }) => ({
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingLeft: Math.max(insets.left, utils.spacings.medium),
-        paddingRight: Math.max(insets.right, utils.spacings.medium),
-        paddingVertical: utils.spacings.medium,
-        paddingBottom: utils.spacings.extraSmall * 3,
-    }),
-);
+const screenHeaderWrapperStyle = prepareNativeStyle<{
+    insets: EdgeInsets;
+    noBottomPadding: boolean;
+}>((utils, { insets, noBottomPadding }) => ({
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingLeft: Math.max(insets.left, utils.spacings.sp16),
+    paddingRight: Math.max(insets.right, utils.spacings.sp16),
+    paddingTop: utils.spacings.sp8,
+    paddingBottom: noBottomPadding ? 0 : utils.spacings.sp16,
+}));
 
-export const ScreenHeaderWrapper = ({ children, ...rest }: ScreenHeaderWrapperProps) => {
+export const ScreenHeaderWrapper = ({
+    children,
+    noBottomPadding = false,
+    ...rest
+}: ScreenHeaderWrapperProps) => {
     const { applyStyle } = useNativeStyles();
     const insets = useSafeAreaInsets();
 
     return (
-        <Box style={applyStyle(screenHeaderWrapperStyle, { insets })} {...rest}>
+        <Box style={applyStyle(screenHeaderWrapperStyle, { insets, noBottomPadding })} {...rest}>
             {children}
         </Box>
     );

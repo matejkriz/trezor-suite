@@ -1,55 +1,108 @@
-import styled from 'styled-components';
+import { useDevice } from '@suite/device';
+import { Translation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import {
+    cancelDiscoveryThunk,
+    startAddWalletDiscoveryThunk,
+    switchToDuplicatedWalletThunk,
+} from '@suite-common/wallet-core';
+import { type DiscoveryStatus } from '@suite-common/wallet-types';
+import { Button, Column, H3, Text, Tooltip } from '@trezor/components';
 
-import { authorizeDevice, switchDuplicatedDevice } from '@suite-common/wallet-core';
-import { Button, Image } from '@trezor/components';
-
-import { Translation, Modal } from 'src/components/suite';
-import { useDevice, useDispatch } from 'src/hooks/suite';
-import { TrezorDevice } from 'src/types/suite';
-
-const StyledImage = styled(Image)`
-    margin: 14px 0;
-`;
+import { type TrezorDevice } from 'src/types/suite';
+import { CardWithDevice } from 'src/views/suite/SwitchDevice/CardWithDevice';
+import { SwitchDeviceModal } from 'src/views/suite/SwitchDevice/SwitchDeviceModal';
 
 type PassphraseDuplicateModalProps = {
     device: TrezorDevice;
-    duplicate: TrezorDevice;
+    discovery: Extract<DiscoveryStatus, { status: 'passphrase-duplicate' }>;
 };
 
-export const PassphraseDuplicateModal = ({ device, duplicate }: PassphraseDuplicateModalProps) => {
-    const dispatch = useDispatch();
+export const PassphraseDuplicateModal = ({
+    discovery,
+    device, // <- currently selected device
+}: PassphraseDuplicateModalProps) => {
     const { isLocked } = useDevice();
+    const { dispatch } = useServices(injectDispatch);
 
     const isDeviceLocked = isLocked();
 
-    const handleSwitchDevice = () => dispatch(switchDuplicatedDevice({ device, duplicate }));
-    const handleAuthorizeDevice = () => dispatch(authorizeDevice());
+    const handleDuplicateDevicePassphrase = () => {
+        dispatch(switchToDuplicatedWalletThunk());
+    };
+
+    const onTryDifferentPassphrase = () => {
+        dispatch(cancelDiscoveryThunk(device));
+        dispatch(
+            startAddWalletDiscoveryThunk({
+                device,
+                isAddingHiddenWallet: true,
+                isAddingExistingWallet: discovery.isAddingExistingWallet,
+            }),
+        );
+    };
+
+    const onBack = () => {
+        dispatch(cancelDiscoveryThunk(device));
+        dispatch(
+            startAddWalletDiscoveryThunk({
+                device,
+                isAddingHiddenWallet: discovery.isAddingHiddenWallet,
+                isAddingExistingWallet: discovery.isAddingExistingWallet,
+            }),
+        );
+    };
 
     return (
-        <Modal
-            heading={<Translation id="TR_WALLET_DUPLICATE_TITLE" />}
-            description={<Translation id="TR_WALLET_DUPLICATE_DESC" />}
-            data-test="@passphrase-duplicate"
-            bottomBarComponents={
-                <>
-                    <Button
-                        variant="primary"
-                        onClick={handleSwitchDevice}
-                        isDisabled={isDeviceLocked}
+        <SwitchDeviceModal>
+            <CardWithDevice device={device} onBackButtonClick={onBack}>
+                <Column gap={8}>
+                    <H3 data-testid="@passphrase-duplicate-header">
+                        <Translation id="TR_WALLET_DUPLICATE_TITLE" />
+                    </H3>
+                    <Text
+                        data-testid="@passphrase-duplicate-description"
+                        intent="neutral"
+                        priority="secondary"
                     >
-                        <Translation id="TR_WALLET_DUPLICATE_SWITCH" />
-                    </Button>
-                    <Button
-                        variant="tertiary"
-                        onClick={handleAuthorizeDevice}
-                        isDisabled={isDeviceLocked}
-                    >
-                        <Translation id="TR_WALLET_DUPLICATE_RETRY" />
-                    </Button>
-                </>
-            }
-        >
-            <StyledImage image="UNI_WARNING" width="160" />
-        </Modal>
+                        <Translation id="TR_WALLET_DUPLICATE_DESC" />
+                    </Text>
+                    <Column gap={8} margin={{ top: 20 }} alignItems="stretch">
+                        <Tooltip
+                            isActive={isDeviceLocked}
+                            content={
+                                <Translation id="TR_SETTINGS_DEVICE_BANNER_TITLE_REMEMBERED" />
+                            }
+                        >
+                            <Button
+                                intent="brand"
+                                onClick={handleDuplicateDevicePassphrase}
+                                isDisabled={isDeviceLocked}
+                                width="100%"
+                            >
+                                <Translation id="TR_WALLET_DUPLICATE_SWITCH" />
+                            </Button>
+                        </Tooltip>
+                        <Tooltip
+                            isActive={isDeviceLocked}
+                            content={
+                                <Translation id="TR_SETTINGS_DEVICE_BANNER_TITLE_REMEMBERED" />
+                            }
+                        >
+                            <Button
+                                intent="neutral"
+                                priority="secondary"
+                                onClick={onTryDifferentPassphrase}
+                                isDisabled={isDeviceLocked}
+                                width="100%"
+                            >
+                                <Translation id="TR_WALLET_DUPLICATE_RETRY" />
+                            </Button>
+                        </Tooltip>
+                    </Column>
+                </Column>
+            </CardWithDevice>
+        </SwitchDeviceModal>
     );
 };

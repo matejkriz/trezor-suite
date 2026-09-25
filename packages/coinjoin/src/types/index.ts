@@ -1,4 +1,5 @@
-import { CoinjoinPrisonInmate } from './client';
+import type { AffiliationId } from './coordinator';
+import type { CoinjoinPrisonInmate } from './prison';
 
 interface BaseSettings {
     network: 'btc' | 'test' | 'regtest';
@@ -18,12 +19,15 @@ export interface CoinjoinClientSettings extends BaseSettings {
     coordinatorUrl: string;
     coordinatorName: string; // identifier used in commitment data and ownership proof
     middlewareUrl: string;
+    affiliationId?: AffiliationId;
     prison?: CoinjoinPrisonInmate[];
 }
 
 export type { ScanAccountProgress, ScanAccountCheckpoint, ScanProgressInfo } from './backend';
 
-export * from './account';
-export * from './client';
-export * from './round';
-export * from './logger';
+export type * from './account';
+export type * from './alice';
+export type * from './client';
+export type * from './prison';
+export type * from './round';
+export type * from './logger';

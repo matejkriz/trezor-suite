@@ -2,12 +2,15 @@
     "extends": "../../tsconfig.base.json",
     "compilerOptions": { "outDir": "libDev" },
     "references": [
-        { "path": "../intl-types" },
         { "path": "../redux-utils" },
         { "path": "../suite-constants" },
         { "path": "../suite-types" },
         { "path": "../test-utils" },
         { "path": "../wallet-config" },
-        { "path": "../../packages/connect" }
+        { "path": "../wallet-types" },
+        { "path": "../../packages/connect" },
+        {
+            "path": "../../networks/network-module/network-module-suite-common-types"
+        }
     ]
 }

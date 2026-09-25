@@ -1,31 +1,6 @@
-import { ReactNode } from 'react';
-import styled from 'styled-components';
+import { type JSX, type ReactNode } from 'react';
 
-import { Checkbox, variables } from '@trezor/components';
-
-const { FONT_SIZE } = variables;
-
-const StyledCheckbox = styled(Checkbox)`
-    padding-left: 0;
-    align-items: flex-start;
-
-    & + & {
-        margin-top: 16px;
-    }
-`;
-
-const CheckboxRight = styled.div`
-    text-align: left;
-`;
-
-const CheckboxTitle = styled.div`
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-`;
-
-const CheckboxText = styled.div`
-    font-size: ${FONT_SIZE.SMALL};
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-`;
+import { Checkbox, Column, Paragraph } from '@trezor/components';
 
 interface CheckItemProps {
     title: ReactNode;
@@ -43,11 +18,15 @@ export const CheckItem = ({
     onClick,
     ...rest
 }: CheckItemProps) => (
-    <StyledCheckbox isChecked={isChecked} onClick={onClick} {...rest}>
-        <CheckboxRight>
-            <CheckboxTitle>{title}</CheckboxTitle>
-            {description && <CheckboxText>{description}</CheckboxText>}
+    <Checkbox isChecked={isChecked} onChange={onClick} {...rest}>
+        <Column alignItems="flex-start" gap={8}>
+            <Paragraph>{title}</Paragraph>
+            {description && (
+                <Paragraph intent="neutral" priority="secondary" typographyStyle="body-sm">
+                    {description}
+                </Paragraph>
+            )}
             {link && link}
-        </CheckboxRight>
-    </StyledCheckbox>
+        </Column>
+    </Checkbox>
 );

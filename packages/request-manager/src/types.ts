@@ -5,6 +5,11 @@ export interface TorConnectionOptions {
     torDataDir: string;
 }
 
+export interface TorExternalConnectionOptions {
+    host: string;
+    port: number;
+}
+
 export type TorCommandResponse =
     | {
           success: true;
@@ -52,6 +57,15 @@ export type InterceptedEvent =
     | {
           type: 'ERROR';
           error: Error;
+      }
+    | {
+          type: 'SET_WHITELISTED_DOMAINS_FOR_CUSTOM_BACKENDS';
+          coin: string;
+          domains: string[];
+      }
+    | {
+          type: 'ADD_WHITELISTED_DOMAIN';
+          domain: string;
       };
 
 export type TorSettings = {
@@ -64,12 +78,14 @@ export type InterceptorOptions = {
     handler: (event: InterceptedEvent) => void;
     getTorSettings: () => TorSettings;
     allowTorBypass?: boolean;
-    whitelistedHosts?: string[];
+    notRequiredTorDomainsList?: string[];
+    getWhitelistedDomains: () => string[];
 };
 
 export const TOR_CONTROLLER_STATUS = {
     Bootstrapping: 'Bootstrapping',
     Stopped: 'Stopped',
     CircuitEstablished: 'CircuitEstablished',
+    ExternalTorRunning: 'ExternalTorRunning',
 } as const;
 export type TorControllerStatus = keyof typeof TOR_CONTROLLER_STATUS;

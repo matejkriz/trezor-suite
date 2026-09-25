@@ -1,0 +1,176 @@
+import { getWeakRandomNumberInRange } from '@trezor/utils';
+
+import {
+    getAffiliateRequest,
+    getCommitmentData,
+    getRoundParams,
+    getSigningSendDeadline,
+    readTimeSpan,
+    scheduleDelay,
+    transformStatus,
+} from './roundUtils';
+import {
+    ROUND_CREATION_EVENT,
+    STATUS_EVENT,
+    STATUS_TRANSFORMED,
+} from '../__fixtures__/round.fixture';
+import type { CoinjoinRoundParameters } from '../types/coordinator';
+
+// mock random delay function
+jest.mock('@trezor/utils', () => {
+    const originalModule = jest.requireActual('@trezor/utils');
+
+    return {
+        __esModule: true,
+        ...originalModule,
+        getWeakRandomNumberInRange: jest.fn(originalModule.getWeakRandomNumberInRange),
+    };
+});
+
+describe('roundUtils', () => {
+    afterEach(() => {
+        jest.restoreAllMocks();
+    });
+
+    it('getCommitmentData', () => {
+        expect(getCommitmentData('CoinJoinCoordinatorIdentifier', '001234')).toEqual(
+            '1d436f696e4a6f696e436f6f7264696e61746f724964656e746966696572001234',
+        );
+    });
+
+    it('readTimeSpan', () => {
+        expect(readTimeSpan('0d 0h 0m 1s')).toEqual(1000);
+        expect(readTimeSpan('1d 0h 0m 0s')).toEqual(24 * 60 * 60000);
+        expect(readTimeSpan('1d 2h 0m 0s')).toEqual(26 * 60 * 60000);
+        expect(readTimeSpan('1d 2h 3m 30s')).toEqual(26 * 60 * 60000 + 3 * 60000 + 30000);
+        expect(readTimeSpan('d h m s')).toEqual(0);
+    });
+
+    describe('transformStatus', () => {
+        it('transform correctly', () => {
+            const status = transformStatus(STATUS_EVENT);
+
+            expect(status).toEqual(STATUS_TRANSFORMED);
+        });
+    });
+
+    it('getRoundParams', () => {
+        const response = getRoundParams(
+            {
+                CoordinationFeeRate: {
+                    Rate: 0.005,
+                    PlebsDontPayThreshold: 1000000,
+                },
+                AllowedInputAmounts: {
+                    Min: 5000,
+                    Max: 134375000000,
+                },
+            } as any, // incomplete roundParams);
+        );
+        expect(response).toEqual({
+            fee_rate: 500000,
+            min_registrable_amount: 5000,
+            no_fee_threshold: 1000000,
+        });
+    });
+
+    // fixtures: https://github.com/trezor/coinjoin-affiliate-server/blob/coordinator-integration/tests/test_response.py
+    it('getAffiliateRequest', () => {
+        const response = getAffiliateRequest(
+            Buffer.from(
+                '03026113a614bd0b3b193ab33de3b0376d48bf1f87931b08543bfd23d7a0616f65106bf94e6c325e3f9a8627ac6a8ebe71f322edcde26b43add515d81fc306a309a914ff0e7cfc75b05fc1cddbb60f0f5594642991a23f19b4a4794000d4169db20101',
+                'hex',
+            ).toString('base64'),
+        );
+        expect(response).toEqual({
+            mask_public_key: '03026113a614bd0b3b193ab33de3b0376d48bf1f87931b08543bfd23d7a0616f65',
+            signature:
+                '106bf94e6c325e3f9a8627ac6a8ebe71f322edcde26b43add515d81fc306a309a914ff0e7cfc75b05fc1cddbb60f0f5594642991a23f19b4a4794000d4169db2',
+            coinjoin_flags_array: [1, 1],
+        });
+    });
+
+    it('scheduleDelay', () => {
+        const resultInRange = (result: number, min: number, max: number) => {
+            expect(result).toBeGreaterThanOrEqual(min);
+            expect(result).toBeLessThanOrEqual(max);
+            expect(getWeakRandomNumberInRange).toHaveBeenLastCalledWith(min, max);
+        };
+
+        // default (no min, no max) range 0-10 sec.
+        resultInRange(scheduleDelay(60000), 0, 10000);
+
+        // min 3 sec., range 3-10 sec.
+        resultInRange(scheduleDelay(20000, 3000), 3000, 10000);
+
+        // deadline < ROUND_MAXIMUM_REQUEST_DELAY, immediate
+        resultInRange(scheduleDelay(1000, 3000), 0, 0);
+
+        // Keep one second of randomness when the minimum exceeds the maximum delay.
+        resultInRange(scheduleDelay(60000, 61000), 9000, 10000);
+
+        // Keep one second of randomness when both requested delays exceed the budget.
+        resultInRange(scheduleDelay(60000, 61000, 62000), 49000, 50000);
+
+        // Use the available window when less than one second remains after the reservation.
+        resultInRange(scheduleDelay(10500, 45000, 95000), 0, 500);
+
+        // No delay is possible when only the request reservation remains.
+        resultInRange(scheduleDelay(10000, 45000, 95000), 0, 0);
+
+        // deadline > min && deadline < max, range 3-20 sec.
+        resultInRange(scheduleDelay(30000, 3000, 50000), 3000, 20000);
+
+        // min < 0 && deadline < max && deadline > ROUND_MAXIMUM_REQUEST_DELAY, range 0-2.5 sec.
+        resultInRange(scheduleDelay(12500, -3000, 50000), 0, 2500);
+
+        // min < 0 && max < 0 && deadline > ROUND_MAXIMUM_REQUEST_DELAY, immediate
+        resultInRange(scheduleDelay(12500, -10000, -5000), 0, 0);
+
+        // min < 0 && max < 0 && deadline < ROUND_MAXIMUM_REQUEST_DELAY, immediate
+        resultInRange(scheduleDelay(7500, -10000, -5000), 0, 0);
+    });
+
+    it('scheduleDelay keeps sends randomized when the requested minimum exceeds the available budget', () => {
+        // With 20 seconds left, reserving 10 seconds for the request leaves no room for the
+        // requested 22-second minimum. Preserve a privacy spread within the remaining window.
+        jest.spyOn(Math, 'random').mockReturnValueOnce(0.25).mockReturnValueOnce(0.75);
+
+        const delays = [scheduleDelay(20000, 22000, 72000), scheduleDelay(20000, 22000, 72000)];
+
+        // A collapsed interval would give both sends the same 10-second delay.
+        expect(delays).toEqual([9250, 9750]);
+    });
+
+    describe('getSigningSendDeadline', () => {
+        const SIGNING_TIMEOUT = 60_000; // fixture TransactionSigningTimeout = '0d 0h 1m 0s'
+        const roundParameters = ROUND_CREATION_EVENT.RoundParameters as CoinjoinRoundParameters;
+
+        it('anchors the send deadline to phaseStartLowerBound + TransactionSigningTimeout', () => {
+            // the lower bound (previous committed poll) is <= the real phase start, so the send
+            // deadline stays below the poll-lagged phaseDeadline and a witness is never scheduled
+            // past the coordinator's real signing-phase end (which would ban the input)
+            const phaseStartLowerBound = 1_000_000;
+            const phaseDeadline = phaseStartLowerBound + SIGNING_TIMEOUT + 15_000; // inflated ~15s
+            expect(
+                getSigningSendDeadline({ phaseStartLowerBound, phaseDeadline, roundParameters }),
+            ).toBe(phaseStartLowerBound + SIGNING_TIMEOUT);
+        });
+
+        it('never exceeds the optimistic phaseDeadline (defensive min)', () => {
+            const phaseStartLowerBound = 1_000_000;
+            const phaseDeadline = phaseStartLowerBound + 10_000; // shorter than the signing timeout
+            expect(
+                getSigningSendDeadline({ phaseStartLowerBound, phaseDeadline, roundParameters }),
+            ).toBe(phaseDeadline);
+        });
+
+        it('falls back to phaseDeadline when the phase start is unknown', () => {
+            const phaseStartLowerBound = undefined;
+            const phaseDeadline = 1_234_567;
+            expect(
+                getSigningSendDeadline({ phaseStartLowerBound, phaseDeadline, roundParameters }),
+            ).toBe(phaseDeadline);
+        });
+    });
+});

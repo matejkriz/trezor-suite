@@ -1,20 +1,40 @@
 {
     "extends": "../../tsconfig.base.json",
     "compilerOptions": {
-        "types": ["chrome"],
-        "noImplicitAny": false,
-        "outDir": "./libDev"
+        "types": ["web", "node", "chrome"],
+        "lib": ["dom", "dom.iterable", "esnext"],
+        "emitDeclarationOnly": false,
+        "noEmit": true,
+        "paths": {
+            "@suite-common/icons/src/icons": [
+                "./src/icons/minimalIcons.ts"
+            ]
+        },
+        "plugins": [
+            { "name": "typescript-styled-plugin" }
+        ]
     },
     "include": [
-        ".",
-        "../connect-popup/webpack/prod.webpack.config",
-        "../connect-iframe/webpack/prod.webpack.config,"
+        "next-env.d.ts",
+        "**/*.ts",
+        "**/*.tsx"
     ],
     "references": [
         { "path": "../components" },
+        { "path": "../connect-common" },
+        { "path": "../connect-data" },
+        { "path": "../connect-explorer-theme" },
+        { "path": "../connect-mobile" },
         { "path": "../connect-web" },
         { "path": "../connect-webextension" },
+        { "path": "../device-authenticity" },
+        { "path": "../icons" },
         { "path": "../protobuf" },
-        { "path": "../utils" }
+        { "path": "../schema-utils" },
+        { "path": "../theme" },
+        { "path": "../urls" },
+        { "path": "../utils" },
+        { "path": "../eslint" },
+        { "path": "../requirements" }
     ]
 }

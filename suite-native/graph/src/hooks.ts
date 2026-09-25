@@ -1,159 +1,104 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useCallback, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 
+import { type PrimitiveAtom, useSetAtom } from 'jotai';
+
+import { useServices } from '@suite-common/dependency-injection';
+import { selectIsDeviceAuthorized } from '@suite-common/device';
+import { type AccountItem, type FiatGraphPoint } from '@suite-common/graph';
+import { injectDispatch, returnStableArrayIfEmpty } from '@suite-common/redux-utils';
+import { type NetworkSymbol } from '@suite-common/wallet-config';
 import {
-    AccountItem,
-    CommonUseGraphParams,
-    useGetTimeFrameForHistoryHours,
-    useGraphForAccounts,
-} from '@suite-common/graph';
-import {
-    AccountsRootState,
-    BlockchainRootState,
-    selectAccountByKey,
-    selectDeviceMainnetAccounts,
+    type BlockchainRootState,
+    selectBaseCurrency,
     selectIsElectrumBackendSelected,
 } from '@suite-common/wallet-core';
-import { AccountKey } from '@suite-common/wallet-types';
-import { analytics, EventType } from '@suite-native/analytics';
-import { NetworkSymbol } from '@suite-common/wallet-config';
 
-import { timeSwitchItems } from './components/TimeSwitch';
-import { TimeframeHoursValue } from './types';
-import {
-    GraphSliceRootState,
-    selectAccountGraphTimeframe,
-    selectPortfolioGraphTimeframe,
-    setAccountGraphTimeframe,
-    setPortfolioGraphTimeframe,
-} from './slice';
+import { type RefetchGraphThunkParams } from './graphThunkTypes';
+import { refetchGraphThunk } from './graphThunks';
 
-const useWatchTimeframeChangeForAnalytics = (
-    timeframeHours: TimeframeHoursValue,
-    networkSymbol?: NetworkSymbol,
-) => {
-    const isFirstRender = useRef(true);
+/**
+ * Watches graph fetch inputs and refetches graph data whenever any of them changes.
+ * Graph display components subscribe to the atoms directly, so only command callbacks are passed down.
+ */
+export type RefetchGraphParams = {
+    forceRefetch?: boolean;
+};
+
+type UseGraphDataParams = Omit<
+    RefetchGraphThunkParams,
+    'accounts' | 'baseCurrencyCode' | 'forceRefetch' | 'isElectrumBackend'
+> & {
+    accounts?: AccountItem[];
+    backendSymbol: NetworkSymbol;
+    isEnabled?: boolean;
+};
+
+export const useGraphData = ({
+    instanceId,
+    accounts,
+    eventsAccount,
+    isDiscoveryRunning,
+    timeframeHours,
+    backendSymbol,
+    isEnabled = true,
+}: UseGraphDataParams) => {
+    const { dispatch } = useServices(injectDispatch);
+    const isDeviceAuthorized = useSelector(selectIsDeviceAuthorized);
+    const baseCurrencyCode = useSelector(selectBaseCurrency);
+    const isElectrumBackend = useSelector((state: BlockchainRootState) =>
+        selectIsElectrumBackendSelected(state, backendSymbol),
+    );
+    const graphAccounts = accounts ?? returnStableArrayIfEmpty<AccountItem>();
+
+    const refetchGraph = useCallback(
+        ({ forceRefetch }: RefetchGraphParams = {}) =>
+            dispatch(
+                refetchGraphThunk({
+                    instanceId,
+                    accounts: graphAccounts,
+                    eventsAccount,
+                    isDiscoveryRunning,
+                    timeframeHours,
+                    baseCurrencyCode,
+                    isElectrumBackend,
+                    forceRefetch,
+                }),
+            ),
+        [
+            baseCurrencyCode,
+            dispatch,
+            eventsAccount,
+            graphAccounts,
+            instanceId,
+            isDiscoveryRunning,
+            isElectrumBackend,
+            timeframeHours,
+        ],
+    );
 
     useEffect(() => {
-        if (isFirstRender.current) {
-            // Do not report default value on first render.
-            isFirstRender.current = false;
+        if (!isEnabled || !isDeviceAuthorized) return;
 
-            return;
-        }
+        refetchGraph();
+    }, [isEnabled, isDeviceAuthorized, refetchGraph]);
 
-        const timeframeLabel = timeSwitchItems.find(
-            item => item.valueBackInHours === timeframeHours,
-        )?.label;
-
-        if (timeframeLabel) {
-            if (networkSymbol) {
-                // TODO: Report tokenSymbol and tokenAddress if displaying ERC20 token account graph.
-                // related to issue: https://github.com/trezor/trezor-suite/issues/7839
-                analytics.report({
-                    type: EventType.AssetDetailTimeframeChange,
-                    payload: { timeframe: timeframeLabel, assetSymbol: networkSymbol },
-                });
-            } else {
-                analytics.report({
-                    type: EventType.WatchPortfolioTimeframeChange,
-                    payload: { timeframe: timeframeLabel },
-                });
-            }
-        }
-    }, [timeframeHours, networkSymbol, isFirstRender]);
+    return { refetchGraph };
 };
 
-export const useGraphForSingleAccount = ({
-    accountKey,
-    fiatCurrency,
-}: CommonUseGraphParams & { accountKey: AccountKey }) => {
-    const dispatch = useDispatch();
-    const account = useSelector((state: AccountsRootState) =>
-        selectAccountByKey(state, accountKey),
-    );
-    const accountGraphTimeframe = useSelector((state: GraphSliceRootState) =>
-        selectAccountGraphTimeframe(state, accountKey),
-    );
+/**
+ * Provides the swipe gesture callbacks of a graph, writing the point under the user's
+ * finger into the given atom. The selected point is null while there is no gesture.
+ */
+export const useGraphGestureHandlers = <TGraphPoint extends FiatGraphPoint>(
+    selectedPointAtom: PrimitiveAtom<TGraphPoint | null>,
+) => {
+    const setSelectedPoint = useSetAtom(selectedPointAtom);
 
-    const handleSelectAccountTimeframe = useCallback(
-        (timeframeHours: TimeframeHoursValue) =>
-            dispatch(setAccountGraphTimeframe({ accountKey, timeframeHours })),
-        [dispatch, accountKey],
-    );
+    // Make sure no point stays selected when the graph unmounts mid-gesture.
+    useEffect(() => () => setSelectedPoint(null), [setSelectedPoint]);
 
-    const { startOfTimeFrameDate, endOfTimeFrameDate } =
-        useGetTimeFrameForHistoryHours(accountGraphTimeframe);
+    const handleGestureEnd = useCallback(() => setSelectedPoint(null), [setSelectedPoint]);
 
-    const accounts = useMemo(() => {
-        if (!account) return [];
-
-        return [
-            {
-                coin: account.symbol,
-                descriptor: account.descriptor,
-            },
-        ] as AccountItem[];
-    }, [account]);
-
-    useWatchTimeframeChangeForAnalytics(accountGraphTimeframe, account?.symbol);
-
-    const isElectrumBackend = useSelector((state: BlockchainRootState) =>
-        selectIsElectrumBackendSelected(state, account?.symbol ?? 'btc'),
-    );
-
-    return {
-        ...useGraphForAccounts({
-            accounts,
-            fiatCurrency,
-            startOfTimeFrameDate,
-            endOfTimeFrameDate,
-            isPortfolioGraph: false,
-            isElectrumBackend,
-        }),
-        timeframe: accountGraphTimeframe,
-        onSelectTimeFrame: handleSelectAccountTimeframe,
-    };
-};
-
-export const useGraphForAllDeviceAccounts = ({ fiatCurrency }: CommonUseGraphParams) => {
-    const dispatch = useDispatch();
-    const accounts = useSelector(selectDeviceMainnetAccounts);
-    const portfolioGraphTimeframe = useSelector(selectPortfolioGraphTimeframe);
-    const isElectrumBackend = useSelector((state: BlockchainRootState) =>
-        selectIsElectrumBackendSelected(state, 'btc'),
-    );
-
-    const { startOfTimeFrameDate, endOfTimeFrameDate } =
-        useGetTimeFrameForHistoryHours(portfolioGraphTimeframe);
-
-    const accountItems = useMemo(
-        () =>
-            accounts.map(account => ({
-                coin: account.symbol,
-                descriptor: account.descriptor,
-            })),
-        [accounts],
-    );
-
-    const handleSelectPortfolioTimeframe = useCallback(
-        (timeframeHours: TimeframeHoursValue) =>
-            dispatch(setPortfolioGraphTimeframe({ timeframeHours })),
-        [dispatch],
-    );
-
-    useWatchTimeframeChangeForAnalytics(portfolioGraphTimeframe);
-
-    return {
-        ...useGraphForAccounts({
-            accounts: accountItems,
-            fiatCurrency,
-            startOfTimeFrameDate,
-            endOfTimeFrameDate,
-            isPortfolioGraph: true,
-            isElectrumBackend,
-        }),
-        timeframe: portfolioGraphTimeframe,
-        onSelectTimeFrame: handleSelectPortfolioTimeframe,
-    };
+    return { setSelectedPoint, handleGestureEnd };
 };

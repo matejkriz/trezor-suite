@@ -1,20 +1,23 @@
-import { useMemo } from 'react';
-import { useDispatch, useSelector, useLayoutSize } from 'src/hooks/suite';
+import { events, injectDesktopAnalytics } from '@suite/analytics';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+
 import { close, open } from 'src/actions/suite/guideActions';
-import { usePreferredModal } from '../suite/usePreferredModal';
+import { useLayoutSize, useSelector } from 'src/hooks/suite';
+import { selectIsGuideOpen } from 'src/selectors/suite/guideSelectors';
+
+import { usePreferredModal } from '../suite';
 
 export const GUIDE_ANIMATION_DURATION_MS = 300;
 
 export const useGuide = () => {
-    const isGuideOpen = useSelector(state => state.guide.open);
-    const dispatch = useDispatch();
+    const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
+    const isGuideOpen = useSelector(selectIsGuideOpen);
 
-    const { layoutSize } = useLayoutSize();
+    const { isBelowLaptop } = useLayoutSize();
 
-    const isGuideOnTop = useMemo(
-        () => ['NORMAL', 'SMALL', 'TINY'].includes(layoutSize),
-        [layoutSize],
-    );
+    // The guide should be on top for smaller screens (below laptop size)
+    const isGuideOnTop = isBelowLaptop;
 
     const isModalOpen = usePreferredModal().type !== 'none';
 
@@ -22,7 +25,13 @@ export const useGuide = () => {
         isGuideOpen,
         isGuideOnTop,
         isModalOpen,
-        openGuide: () => dispatch(open()),
+        openGuide: () => {
+            analytics.report({
+                type: events.menuGuideEvent.name,
+            });
+
+            return dispatch(open());
+        },
         closeGuide: () => dispatch(close()),
     };
 };

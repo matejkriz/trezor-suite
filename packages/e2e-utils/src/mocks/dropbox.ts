@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 
-import express, { Express } from 'express';
+import express, { type Express } from 'express';
 
 const port = 30002;
 
@@ -22,11 +22,37 @@ export class DropboxMock {
         app.use(express.json());
 
         app.use((req, res, next) => {
+            if (req.method === 'OPTIONS') {
+                res.setHeader('Access-Control-Allow-Origin', '*');
+                res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+                res.setHeader(
+                    'Access-Control-Allow-Headers',
+                    'Content-Type, Authorization, dropbox-api-arg',
+                );
+                res.setHeader('Access-Control-Allow-Credentials', 'true');
+                res.setHeader('Access-Control-Max-Age', '86400');
+
+                return res.status(200).end();
+            }
+
+            // Handle normal requests
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+            res.setHeader(
+                'Access-Control-Allow-Headers',
+                'Content-Type, Authorization, dropbox-api-arg',
+            );
+            res.setHeader(
+                'Access-Control-Expose-Headers',
+                'dropbox-api-result, Content-Type, Authorization',
+            );
+            res.setHeader('Access-Control-Allow-Credentials', 'true');
+
             this.requests.push(req.url);
 
             if (this.nextResponse.length) {
                 const response = this.nextResponse.shift();
-                console.log('[dropboxMock]', response);
+                console.log('[mockDropbox]: response', response);
                 // @ts-expect-error
                 res.writeHeader(response.status, response.headers);
                 res.write(JSON.stringify(response!.body));
@@ -44,8 +70,7 @@ export class DropboxMock {
 
         // https://api.dropboxapi.com/oauth2/token
         app.post('/oauth2/token', (req, res) => {
-            console.log('[dropbox]: token');
-
+            console.log('[mockDropbox]: token');
             const { grant_type } = req.query;
             if (grant_type === 'authorization_code') {
                 return res.send({
@@ -149,17 +174,17 @@ export class DropboxMock {
             const name = path.replace('/apps/trezor', '');
 
             const file = this.files[name];
-
             if (file) {
                 // @ts-expect-error
                 res.writeHeader(200, {
                     'Content-Type': 'application/octet-stream',
-                    'Dropbox-Api-Result': `{"name": "${name}", "path_lower": "${path}", "path_display": "/Apps/TREZOR/${name}", "id": "id:foo-bar", "client_modified": "2020-10-07T09:52:45Z", "server_modified": "2020-10-07T09:52:45Z", "rev": "foo-bar", "size": 666, "is_downloadable": true, "content_hash": "foo-bar"}`,
+                    'Content-Length': Buffer.byteLength(file),
+                    'Dropbox-Api-Result': `{"name": "${name}", "path_lower": "${path}", "path_display": "/Apps/TREZOR/${name}", "id": "id:foo-bar", "client_modified": "2020-10-07T09:52:45Z", "server_modified": "2020-10-07T09:52:45Z", "rev": "foo-bar", "size": ${Buffer.byteLength(file)}, "is_downloadable": true, "content_hash": "foo-bar"}`,
                 });
 
                 res.write(file, 'binary');
             } else {
-                console.error('[dropboxMock]: no such file found', file);
+                console.error('[dropboxMock]: no such file found', name);
             }
 
             return res.end();
@@ -191,21 +216,36 @@ export class DropboxMock {
 
         console.log('[mockDropbox]: start');
 
-        return new Promise(resolve => {
-            // @ts-expect-error
-            this.app!.listen(port, server => {
-                console.log(`[mockDropbox] listening at http://localhost:${port}`);
+        return new Promise<void>(resolve => {
+            const server = this.app!.listen(port, () => {
+                console.log(`[mockDropbox]: listening at http://localhost:${port}`);
                 this.running = true;
                 this.server = server;
-                resolve(undefined);
+                resolve();
             });
         });
     }
 
-    stop() {
+    async stop() {
         console.log('[mockDropbox]: stop');
         if (this.server) {
-            this.server.close();
+            await new Promise<void>((resolve, reject) => {
+                this.server.close((err: Error | undefined) => {
+                    if (err) {
+                        console.error('[mockDropbox]: Error stopping server', err);
+
+                        return reject(err);
+                    }
+                    console.log('[mockDropbox]: Server stopped successfully');
+                    this.running = false;
+                    this.server = null;
+                    resolve();
+                });
+
+                this.server.closeAllConnections();
+            });
+        } else {
+            console.log('[mockDropbox]: Server is not running');
         }
     }
 
@@ -214,5 +254,10 @@ export class DropboxMock {
         this.files = {};
         this.nextResponse = [];
         this.requests = [];
+    }
+
+    setFile(name: string, content: Buffer) {
+        console.log('[mockDropbox]: setFile', name);
+        this.files[name] = content;
     }
 }

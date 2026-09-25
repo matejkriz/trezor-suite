@@ -1,4 +1,10 @@
-import { TypeRegistry, Kind, TSchema, JavaScriptTypeBuilder } from '@sinclair/typebox';
+import {
+    CreateType,
+    JavaScriptTypeBuilder,
+    Kind,
+    type TSchema,
+    TypeRegistry,
+} from '@sinclair/typebox';
 
 export interface TArrayBuffer extends TSchema {
     [Kind]: 'ArrayBuffer';
@@ -9,6 +15,6 @@ TypeRegistry.Set('ArrayBuffer', (_: TArrayBuffer, value: unknown) => value insta
 
 export class ArrayBufferBuilder extends JavaScriptTypeBuilder {
     ArrayBuffer(options?: TSchema): TArrayBuffer {
-        return this.Create({ ...options, [Kind]: 'ArrayBuffer', type: 'ArrayBuffer' });
+        return CreateType({ [Kind]: 'ArrayBuffer', type: 'ArrayBuffer' }, options) as never;
     }
 }

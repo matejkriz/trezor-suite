@@ -1,33 +1,46 @@
-import BigNumber from 'bignumber.js';
-import { toWei } from 'web3-utils';
-import { isDesktop } from '@trezor/env-utils';
-import type { State } from 'src/reducers/wallet/settingsReducer';
-import type { CustomBackend, BlockbookUrl } from 'src/types/wallet/backend';
-import type { Network } from 'src/types/wallet';
-
-import type { BackendSettings } from '@suite-common/wallet-types';
-import type { OnUpgradeFunc } from '@trezor/suite-storage';
-import type { DBWalletAccountTransaction, SuiteDBSchema } from '../definitions';
 import {
+    type NetworkSymbol,
+    asNetworkSymbol,
+    getNetwork,
+    getSupportedNetworks,
+    isNetworkSymbol,
+} from '@suite-common/wallet-config';
+import {
+    type AccountKey,
+    type BackendSettings,
+    type WalletSettings,
+    createAccountKey,
+} from '@suite-common/wallet-types';
+import {
+    convertAmountUnitsToSubunits,
     formatNetworkAmount,
-    networkAmountToSatoshi,
-    amountToSatoshi,
+    fromGwei,
+    networkAmountToSmallestUnit,
 } from '@suite-common/wallet-utils';
+import { parseAsset } from '@trezor/blockchain-link-utils/src/blockfrost';
+import { type DeviceState, FirmwareType } from '@trezor/connect';
+import { DeviceModelInternal } from '@trezor/device-utils';
+import { isDesktop } from '@trezor/env-utils';
+import type { OnUpgradeFunc } from '@trezor/suite-storage';
+import { BigNumber } from '@trezor/utils';
+
+import { migrateToV56 } from 'src/storage/migrations/legacyVersions/migrateToV56';
+import { migrationOfBnbNetwork } from 'src/storage/migrations/networks/bnb';
+import type { BlockbookUrl, CustomBackend } from 'src/types/wallet/backend';
+
 import { updateAll } from './utils';
-import { DeviceModelInternal, FirmwareType } from '@trezor/connect';
+import type { DBWalletAccountTransaction, SuiteDBSchema } from '../definitions';
 
 type WalletWithBackends = {
-    backends?: Partial<{
-        [coin in Network['symbol']]: Omit<CustomBackend, 'coin'>;
-    }>;
+    backends?: Record<NetworkSymbol, Omit<CustomBackend, 'coin'>>;
 };
 
-type DBWalletAccountTransactionCompatible = {
+export type DBWalletAccountTransactionCompatible = {
     order: DBWalletAccountTransaction['order'];
     tx: DBWalletAccountTransaction['tx'] & { totalSpent: string };
 };
 
-export const migrate: OnUpgradeFunc<SuiteDBSchema> = async (
+export const runLegacyMigrations: OnUpgradeFunc<SuiteDBSchema> = async (
     db,
     oldVersion,
     newVersion,
@@ -64,9 +77,6 @@ export const migrate: OnUpgradeFunc<SuiteDBSchema> = async (
         });
         accountsStore.createIndex('deviceState', 'deviceState', { unique: false });
 
-        // object store for discovery
-        db.createObjectStore('discovery', { keyPath: 'deviceState' });
-
         db.createObjectStore('analytics');
     }
 
@@ -95,7 +105,11 @@ export const migrate: OnUpgradeFunc<SuiteDBSchema> = async (
                 outputLabels: {},
                 addressLabels: {},
             };
-            account.key = `${account.descriptor}-${account.symbol}-${account.deviceState}`;
+            account.key = createAccountKey({
+                accountDescriptor: account.descriptor,
+                networkSymbol: account.symbol,
+                deviceStaticSessionId: account.deviceState,
+            });
 
             return account;
         });
@@ -121,6 +135,7 @@ export const migrate: OnUpgradeFunc<SuiteDBSchema> = async (
     }
 
     if (oldVersion < 17) {
+        // @ts-expect-error coinmarketTrades doesn't exists anymore
         db.createObjectStore('coinmarketTrades', { keyPath: 'key' });
     }
 
@@ -133,13 +148,7 @@ export const migrate: OnUpgradeFunc<SuiteDBSchema> = async (
     }
 
     if (oldVersion < 19) {
-        // @ts-expect-error fiatRates doesn't exists anymore
-        if (db.objectStoreNames.contains('fiatRates')) {
-            // @ts-expect-error fiatRates doesn't exists anymore
-            db.deleteObjectStore('fiatRates');
-        }
-        // @ts-expect-error fiatRates doesn't exists anymore
-        db.createObjectStore('fiatRates');
+        // no-op - this migration code became obsolete
     }
 
     if (oldVersion < 20) {
@@ -212,16 +221,6 @@ export const migrate: OnUpgradeFunc<SuiteDBSchema> = async (
                 return account;
             }
         });
-
-        await updateAll(transaction, 'discovery', d => {
-            // reset discovery
-            if (d.networks.includes('ltc')) {
-                d.index = 0;
-                d.loaded = 0;
-
-                return d;
-            }
-        });
     }
 
     if (oldVersion < 23) {
@@ -235,7 +234,7 @@ export const migrate: OnUpgradeFunc<SuiteDBSchema> = async (
     if (oldVersion < 25) {
         await updateAll<
             'walletSettings',
-            State & {
+            WalletSettings & {
                 blockbookUrls?: BlockbookUrl[];
             } & WalletWithBackends
         >(transaction, 'walletSettings', settings => {
@@ -269,34 +268,27 @@ export const migrate: OnUpgradeFunc<SuiteDBSchema> = async (
                 return account;
             }
         });
-
-        await updateAll(transaction, 'discovery', d => {
-            // reset discovery
-            if (d.networks.includes('vtc')) {
-                d.index = 0;
-                d.loaded = 0;
-
-                return d;
-            }
-        });
     }
 
     if (oldVersion < 27) {
         const backendSettings = db.createObjectStore('backendSettings');
 
-        await updateAll<'walletSettings', State & WalletWithBackends>(
+        await updateAll<'walletSettings', WalletSettings & WalletWithBackends>(
             transaction,
             'walletSettings',
             settings => {
                 const { backends = {}, ...rest } = settings;
-                Object.entries(backends).forEach(([coin, { type, urls }]) => {
+                Object.entries(backends).forEach(([symbol, { type, urls }]) => {
                     const settings: BackendSettings = {
                         selected: type,
                         urls: {
                             [type]: urls,
                         },
                     };
-                    backendSettings.add(settings, coin as Network['symbol']);
+
+                    if (isNetworkSymbol(symbol)) {
+                        backendSettings.add(settings, symbol);
+                    }
                 });
 
                 return rest;
@@ -306,7 +298,8 @@ export const migrate: OnUpgradeFunc<SuiteDBSchema> = async (
 
     if (oldVersion < 28) {
         await updateAll(transaction, 'devices', device => {
-            if (device.state?.includes('undefined')) {
+            if ((device.state as string)?.includes('undefined')) {
+                // @ts-expect-error
                 device.state = device.state.replace('undefined', '0');
 
                 return device;
@@ -324,8 +317,9 @@ export const migrate: OnUpgradeFunc<SuiteDBSchema> = async (
         accountsStoreNew.createIndex('deviceState', 'deviceState', { unique: false });
 
         accounts.forEach(account => {
+            // @ts-expect-error
             account.deviceState = account.deviceState.replace('undefined', '0');
-            account.key = account.key.replace('undefined', '0');
+            account.key = account.key.replace('undefined', '0') as AccountKey;
             accountsStoreNew.add(account);
         });
 
@@ -346,6 +340,7 @@ export const migrate: OnUpgradeFunc<SuiteDBSchema> = async (
         });
 
         txs.forEach(tx => {
+            // @ts-expect-error
             tx.tx.deviceState = tx.tx.deviceState.replace('undefined', '0');
             txsStoreNew.add(tx);
         });
@@ -366,20 +361,9 @@ export const migrate: OnUpgradeFunc<SuiteDBSchema> = async (
         graphStoreNew.createIndex('deviceState', 'account.deviceState');
 
         graphs.forEach(graph => {
+            // @ts-expect-error
             graph.account.deviceState = graph.account.deviceState.replace('undefined', '0');
             graphStoreNew.add(graph);
-        });
-
-        // discovery
-        const discoveryStoreOld = transaction.objectStore('discovery');
-        const discoveries = await discoveryStoreOld.getAll();
-        db.deleteObjectStore('discovery');
-
-        const discoveryStoreNew = db.createObjectStore('discovery', { keyPath: 'deviceState' });
-
-        discoveries.forEach(discovery => {
-            discovery.deviceState = discovery.deviceState.replace('undefined', '0');
-            discoveryStoreNew.add(discovery);
         });
     }
 
@@ -422,7 +406,8 @@ export const migrate: OnUpgradeFunc<SuiteDBSchema> = async (
             transaction,
             'txs',
             ({ order, tx: origTx }) => {
-                const unformat = (amount: string) => networkAmountToSatoshi(amount, origTx.symbol);
+                const unformat = (amount: string) =>
+                    networkAmountToSmallestUnit(amount, origTx.symbol);
                 const unformatIfDefined = (amount: string | undefined) =>
                     amount ? unformat(amount) : amount;
 
@@ -433,7 +418,7 @@ export const migrate: OnUpgradeFunc<SuiteDBSchema> = async (
                     totalSpent: unformat(origTx.totalSpent),
                     tokens: origTx.tokens.map(tok => ({
                         ...tok,
-                        amount: amountToSatoshi(tok.amount, tok.decimals),
+                        amount: convertAmountUnitsToSubunits(tok.amount, tok.decimals),
                     })),
                     targets: origTx.targets.map(target => ({
                         ...target,
@@ -442,7 +427,7 @@ export const migrate: OnUpgradeFunc<SuiteDBSchema> = async (
                     ethereumSpecific: origTx.ethereumSpecific
                         ? {
                               ...origTx.ethereumSpecific,
-                              gasPrice: toWei(origTx.ethereumSpecific?.gasPrice ?? '0', 'gwei'),
+                              gasPrice: fromGwei(origTx.ethereumSpecific?.gasPrice ?? '0').toWei(),
                           }
                         : undefined,
                     cardanoSpecific: origTx.cardanoSpecific
@@ -475,11 +460,9 @@ export const migrate: OnUpgradeFunc<SuiteDBSchema> = async (
             const { features } = device;
 
             device.firmwareType =
-                features &&
-                features.capabilities &&
-                !features.capabilities.includes('Capability_Bitcoin_like')
+                features?.capabilities && !features.capabilities.includes('Capability_Bitcoin_like')
                     ? FirmwareType.BitcoinOnly
-                    : FirmwareType.Regular;
+                    : FirmwareType.Universal;
 
             return device;
         });
@@ -531,7 +514,6 @@ export const migrate: OnUpgradeFunc<SuiteDBSchema> = async (
     if (oldVersion < 36) {
         // remove trop network transactions, change token address to contract
         await updateAll(transaction, 'txs', tx => {
-            // @ts-expect-error
             if (tx.tx.symbol === 'trop') {
                 return null;
             }
@@ -547,7 +529,6 @@ export const migrate: OnUpgradeFunc<SuiteDBSchema> = async (
 
         // remove trop network accounts, change token address to contract
         await updateAll(transaction, 'accounts', account => {
-            // @ts-expect-error
             if (account.symbol === 'trop') {
                 return null;
             }
@@ -564,28 +545,16 @@ export const migrate: OnUpgradeFunc<SuiteDBSchema> = async (
         // remove trop from coin settings
         await updateAll(transaction, 'walletSettings', walletSettings => {
             walletSettings.enabledNetworks = walletSettings.enabledNetworks.filter(
-                // @ts-expect-error
                 network => network !== 'trop',
             );
 
             return walletSettings;
         });
 
-        await updateAll(transaction, 'discovery', discovery => {
-            // remove trop from discovery networks
-            discovery.networks = discovery.networks.filter(
-                // @ts-expect-error
-                network => network !== 'trop',
-            );
-            discovery.failed = [];
-
-            return discovery;
-        });
-
         // remove trop from backend settings
         const backendSettings = transaction.objectStore('backendSettings');
         // @ts-expect-error
-        backendSettings.delete('trop');
+        await backendSettings.delete('trop');
     }
 
     if (oldVersion < 37) {
@@ -724,6 +693,9 @@ export const migrate: OnUpgradeFunc<SuiteDBSchema> = async (
 
     if (oldVersion < 41) {
         await updateAll(transaction, 'metadata', metadata => {
+            if (!metadata.selectedProvider) {
+                metadata.selectedProvider = { labels: '', passwords: '' };
+            }
             metadata.selectedProvider.passwords = '';
 
             return metadata;
@@ -756,7 +728,6 @@ export const migrate: OnUpgradeFunc<SuiteDBSchema> = async (
     if (oldVersion < 44) {
         // remove tgor network transactions
         await updateAll(transaction, 'txs', tx => {
-            // @ts-expect-error
             if (tx.tx.symbol === 'tgor') {
                 return null;
             }
@@ -766,7 +737,6 @@ export const migrate: OnUpgradeFunc<SuiteDBSchema> = async (
 
         // remove tgor network accounts
         await updateAll(transaction, 'accounts', account => {
-            // @ts-expect-error
             if (account.symbol === 'tgor') {
                 return null;
             }
@@ -777,22 +747,10 @@ export const migrate: OnUpgradeFunc<SuiteDBSchema> = async (
         // remove tgor from coin settings
         await updateAll(transaction, 'walletSettings', walletSettings => {
             walletSettings.enabledNetworks = walletSettings.enabledNetworks.filter(
-                // @ts-expect-error
                 network => network !== 'tgor',
             );
 
             return walletSettings;
-        });
-
-        await updateAll(transaction, 'discovery', discovery => {
-            // remove tgor from discovery networks
-            discovery.networks = discovery.networks.filter(
-                // @ts-expect-error
-                network => network !== 'tgor',
-            );
-            discovery.failed = [];
-
-            return discovery;
         });
 
         // remove tgor from backend settings
@@ -800,4 +758,436 @@ export const migrate: OnUpgradeFunc<SuiteDBSchema> = async (
         // @ts-expect-error
         backendSettings.delete('tgor');
     }
+
+    if (oldVersion < 45) {
+        db.createObjectStore('historicRates');
+
+        await updateAll(transaction, 'txs', tx => {
+            // @ts-expect-error
+            delete tx.tx.rates;
+
+            return tx;
+        });
+
+        await updateAll(transaction, 'walletSettings', walletSettings => {
+            // @ts-expect-error
+            Object.keys(walletSettings.lastUsedFeeLevel).forEach(coin => {
+                // @ts-expect-error
+                if (walletSettings.lastUsedFeeLevel[coin].label === 'low') {
+                    // @ts-expect-error
+                    delete walletSettings.lastUsedFeeLevel[coin];
+                }
+            });
+
+            return walletSettings;
+        });
+
+        await updateAll(transaction, 'suiteSettings', suiteSettings => {
+            // @ts-expect-error
+            delete suiteSettings.flags.showDashboardT2B1PromoBanner;
+
+            return suiteSettings;
+        });
+    }
+
+    if (oldVersion < 46) {
+        db.createObjectStore('tokenManagement');
+
+        await updateAll(transaction, 'devices', device => {
+            device.passwords = {};
+
+            return device;
+        });
+
+        await updateAll(transaction, 'accounts', account => {
+            if (account.networkType === 'cardano') {
+                account.tokens = account.tokens?.map(token => {
+                    const { policyId } = parseAsset(token.contract);
+
+                    return {
+                        balance: token.balance,
+                        contract: token.contract,
+                        name: token.symbol,
+                        symbol: token.symbol,
+                        decimals: token.decimals,
+                        fingerprint: token.name,
+                        policyId,
+                        standard: token.standard,
+                    };
+                });
+            }
+
+            return account;
+        });
+
+        await updateAll(transaction, 'txs', tx => {
+            if (tx.tx.symbol === 'ada') {
+                tx.tx.tokens = tx.tx.tokens?.map(token => {
+                    const { policyId } = parseAsset(token.contract);
+
+                    return {
+                        amount: token.amount,
+                        contract: token.contract,
+                        decimals: token.decimals,
+                        from: token.from,
+                        name: token.symbol || '',
+                        symbol: token.symbol,
+                        fingerprint: token.name,
+                        to: token.to,
+                        type: token.type,
+                        policyId,
+                    };
+                });
+            }
+
+            return tx;
+        });
+
+        await updateAll(transaction, 'suiteSettings', suiteSettings => suiteSettings);
+    }
+
+    if (oldVersion < 47) {
+        //  migrate matic to pol
+
+        await updateAll(transaction, 'walletSettings', walletSettings => {
+            // @ts-expect-error
+            const indexOfMatic = walletSettings.enabledNetworks.indexOf('matic');
+            if (indexOfMatic !== -1) {
+                walletSettings.enabledNetworks[indexOfMatic] = asNetworkSymbol('pol');
+            }
+
+            return walletSettings;
+        });
+
+        await updateAll(transaction, 'suiteSettings', suiteSettings => {
+            if (
+                // @ts-expect-error
+                typeof suiteSettings.evmSettings?.confirmExplanationModalClosed?.matic == 'boolean'
+            ) {
+                suiteSettings.evmSettings.confirmExplanationModalClosed[asNetworkSymbol('pol')] =
+                    // @ts-expect-error
+                    suiteSettings.evmSettings.confirmExplanationModalClosed.matic;
+                // @ts-expect-error
+                delete suiteSettings.evmSettings.confirmExplanationModalClosed.matic;
+            }
+
+            if (
+                // @ts-expect-error
+                typeof suiteSettings.evmSettings?.explanationBannerClosed?.matic == 'boolean'
+            ) {
+                suiteSettings.evmSettings.explanationBannerClosed[asNetworkSymbol('pol')] =
+                    // @ts-expect-error
+                    suiteSettings.evmSettings.explanationBannerClosed.matic;
+                // @ts-expect-error
+                delete suiteSettings.evmSettings.explanationBannerClosed.matic;
+            }
+
+            return suiteSettings;
+        });
+
+        const backendSettings = transaction.objectStore('backendSettings');
+        // @ts-expect-error
+        const maticBackendSettings = await backendSettings.get('matic');
+        if (maticBackendSettings) {
+            backendSettings.add(maticBackendSettings, asNetworkSymbol('pol'));
+            // @ts-expect-error
+            backendSettings.delete('matic');
+        }
+
+        const tokenManagement = transaction.objectStore('tokenManagement');
+        const maticTokenManagementShow = await tokenManagement.get('matic-coin-show');
+        if (maticTokenManagementShow) {
+            tokenManagement.add(maticTokenManagementShow, 'pol-coin-show');
+            tokenManagement.delete('matic-coin-show');
+        }
+
+        const maticTokenManagementHide = await tokenManagement.get('matic-coin-hide');
+        if (maticTokenManagementHide) {
+            tokenManagement.add(maticTokenManagementHide, 'pol-coin-hide');
+            tokenManagement.delete('matic-coin-hide');
+        }
+
+        const accounts = transaction.objectStore('accounts');
+        let accountsCursor = await accounts.openCursor();
+        while (accountsCursor) {
+            const account = accountsCursor.value;
+            if (account.symbol === 'matic') {
+                const newAccount = {
+                    ...account,
+                    symbol: asNetworkSymbol('pol'),
+                    key: account.key.replace('matic', 'pol') as AccountKey,
+                };
+                await accountsCursor.delete();
+                await accounts.add(newAccount);
+            }
+
+            accountsCursor = await accountsCursor.continue();
+        }
+
+        await updateAll(transaction, 'walletSettings', walletSettings => {
+            // @ts-expect-error
+            if (walletSettings.lastUsedFeeLevel['matic']) {
+                // @ts-expect-error
+                walletSettings.lastUsedFeeLevel = {
+                    // @ts-expect-error
+                    ...walletSettings.lastUsedFeeLevel,
+                    // @ts-expect-error
+                    pol: { ...walletSettings.lastUsedFeeLevel['matic'] },
+                };
+
+                // @ts-expect-error
+                delete walletSettings.lastUsedFeeLevel['matic'];
+            }
+
+            return walletSettings;
+        });
+
+        await updateAll(transaction, 'txs', tx => {
+            if (tx.tx.symbol === 'matic') {
+                tx.tx = { ...tx.tx, symbol: asNetworkSymbol('pol') };
+            }
+
+            return tx;
+        });
+
+        const graphs = transaction.objectStore('graph');
+        let graphCursor = await graphs.openCursor();
+        while (graphCursor) {
+            const graph = graphCursor.value;
+            if (graph.account.symbol === 'matic') {
+                const newGraph = {
+                    ...graph,
+                    account: { ...graph.account, symbol: asNetworkSymbol('pol') },
+                };
+                await graphCursor.delete();
+                await graphs.add(newGraph);
+            }
+
+            graphCursor = await graphCursor.continue();
+        }
+
+        await updateAll(transaction, 'historicRates', rates => {
+            const rate = Object.keys(rates).reduce((newRates, key) => {
+                const newKey = key.replace('matic', 'pol');
+                // @ts-expect-error
+                newRates[newKey] = rates[key];
+
+                return newRates;
+            }, {});
+
+            return rate;
+        });
+
+        const historicRates = transaction.objectStore('historicRates');
+        const historicRatesKeys = await historicRates.getAllKeys();
+        const historicRatesKeysWithMatic = historicRatesKeys.filter(key => key.includes('matic'));
+
+        historicRatesKeysWithMatic.forEach(async key => {
+            const rate = await historicRates.get(key);
+            if (rate) {
+                historicRates.add(rate, key.replace('matic', 'pol'));
+            }
+            historicRates.delete(key);
+        });
+
+        const sendFormDrafts = transaction.objectStore('sendFormDrafts');
+        const sendFormDraftsKeys = await sendFormDrafts.getAllKeys();
+        const sendFormDraftsKeysWithMatic = sendFormDraftsKeys.filter(key => key.includes('matic'));
+
+        sendFormDraftsKeysWithMatic.forEach(async key => {
+            const draft = await sendFormDrafts.get(key);
+            if (draft) {
+                sendFormDrafts.add(draft, key.replace('matic', 'pol') as AccountKey);
+            }
+            sendFormDrafts.delete(key);
+        });
+
+        const formDrafts = transaction.objectStore('formDrafts');
+        const formDraftsKeys = await formDrafts.getAllKeys();
+        const formDraftsKeysWithMatic = formDraftsKeys.filter(key => key.includes('matic'));
+
+        formDraftsKeysWithMatic.forEach(async key => {
+            const draft = await formDrafts.get(key);
+            if (draft) {
+                formDrafts.add(draft, key.replace('matic', 'pol'));
+            }
+            formDrafts.delete(key);
+        });
+
+        await updateAll(transaction, 'formDrafts', draft => {
+            if (draft.cryptoSelect?.label === 'MATIC') {
+                draft.cryptoSelect = {
+                    ...draft.cryptoSelect,
+                    label: 'POL',
+                    value: 'polygon-ecosystem-token',
+                };
+            }
+
+            if (draft.receiveCryptoSelect?.label === 'MATIC') {
+                draft.receiveCryptoSelect = {
+                    ...draft.receiveCryptoSelect,
+                    label: 'POL',
+                    value: 'polygon-ecosystem-token',
+                };
+            }
+
+            if (draft.sendCryptoSelect?.label === 'MATIC') {
+                draft.sendCryptoSelect = {
+                    ...draft.sendCryptoSelect,
+                    label: 'POL',
+                    value: 'polygon-ecosystem-token',
+                };
+            }
+
+            return draft;
+        });
+    }
+
+    if (oldVersion < 48) {
+        // Migrate device state to new object format
+        await updateAll(transaction, 'devices', device => {
+            if (typeof device.state === 'string') {
+                const legacyDevice = device as typeof device & { _state?: DeviceState };
+                if (typeof legacyDevice?._state?.staticSessionId === 'string') {
+                    // Has _state property, migrate to that
+                    device.state = legacyDevice._state;
+                } else {
+                    // No _state property, create new object
+                    device.state = {
+                        staticSessionId: device.state,
+                    };
+                }
+            }
+
+            return device;
+        });
+    }
+
+    if (oldVersion < 49) {
+        // TODO(#30572): Migrations run before Redux network metadata is loaded.
+        // Keep the legacy ordering until migration inputs are supplied independently.
+        const supportedNetworks = getSupportedNetworks();
+
+        await updateAll(transaction, 'walletSettings', walletSettings => {
+            walletSettings.enabledNetworks.sort(
+                (a, b) => supportedNetworks.indexOf(a) - supportedNetworks.indexOf(b),
+            );
+
+            return walletSettings;
+        });
+
+        await updateAll(transaction, 'txs', tx => {
+            if (['sol', 'dsol'].includes(tx.tx.symbol)) {
+                tx.tx.amount = new BigNumber(tx.tx.amount).abs().toString();
+            }
+
+            return tx;
+        });
+    }
+
+    if (oldVersion < 50) {
+        await migrationOfBnbNetwork(db, oldVersion, newVersion, transaction);
+    }
+
+    if (oldVersion < 51) {
+        await updateAll(transaction, 'accounts', account => {
+            if (account.networkType === 'cardano') {
+                account.misc.staking.drep = null;
+
+                return account;
+            }
+        });
+
+        await updateAll(transaction, 'accounts', account => {
+            if (account.networkType === 'ethereum' && account.symbol !== 'eth') {
+                const { chainId } = getNetwork(account.symbol);
+                account.metadata.key = `${account.descriptor}-${chainId}`;
+
+                return account;
+            }
+
+            return account;
+        });
+    }
+
+    if (oldVersion < 52) {
+        // Deprecate Vertcoin (VTC) and other networks
+        const deprecatedNetworks = ['vtc', 'btg', 'nmc', 'dgb', 'dash'];
+
+        // Remove transactions related to deprecated networks
+        await updateAll(transaction, 'txs', tx => {
+            if (deprecatedNetworks.includes(tx.tx.symbol)) {
+                return null; // Delete transaction
+            }
+
+            return tx;
+        });
+
+        // Remove accounts related to deprecated networks
+        await updateAll(transaction, 'accounts', account => {
+            if (deprecatedNetworks.includes(account.symbol)) {
+                return null; // Delete account
+            }
+
+            return account;
+        });
+
+        // Remove deprecated networks from enabled networks in wallet settings
+        await updateAll(transaction, 'walletSettings', walletSettings => {
+            walletSettings.enabledNetworks = walletSettings.enabledNetworks.filter(
+                network => !deprecatedNetworks.includes(network), // Exclude deprecated networks from enabled networks
+            );
+
+            return walletSettings;
+        });
+
+        // Remove deprecated networks from backend settings
+        const backendSettings = transaction.objectStore('backendSettings');
+        for (const network of deprecatedNetworks) {
+            await backendSettings.delete(network as NetworkSymbol); // Delete backend settings for each deprecated network
+        }
+
+        // remove ripple network transactions
+        const accountsToUpdate = ['xrp', 'txrp'];
+
+        await updateAll<'txs', DBWalletAccountTransactionCompatible>(transaction, 'txs', tx => {
+            if (accountsToUpdate.includes(tx.tx.symbol)) {
+                return null;
+            }
+
+            return tx;
+        });
+
+        // force to fetch ripple network transactions again
+        await updateAll(transaction, 'accounts', account => {
+            if (accountsToUpdate.includes(account.symbol)) {
+                account.history = { total: 0, unconfirmed: 0, tokens: 0 };
+
+                return account;
+            }
+        });
+
+        // @ts-expect-error security no longer exists
+        db.createObjectStore('security');
+    }
+
+    if (oldVersion < 53) {
+        await updateAll(transaction, 'walletSettings', walletSettings => {
+            // @ts-expect-error
+            delete walletSettings.lastUsedFeeLevel;
+
+            return walletSettings;
+        });
+    }
+
+    if (oldVersion < 54) {
+        db.createObjectStore('connect');
+    }
+
+    if (oldVersion < 56) {
+        await migrateToV56(db, oldVersion, newVersion, transaction);
+    }
+
+    // !!! DO NOT ADD ANY MORE MIGRATION CODE BELOW !!!
+    // These are legacy migrations, instead follow the instructions in /suite/idb-migration-utils/MIGRATION.md
 };

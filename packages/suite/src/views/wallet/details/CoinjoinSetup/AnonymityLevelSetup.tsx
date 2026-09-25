@@ -1,13 +1,26 @@
 import { useMemo, useState } from 'react';
-import { AnimatePresence, HTMLMotionProps, motion } from 'framer-motion';
-import styled, { useTheme } from 'styled-components';
 
-import { Translation } from 'src/components/suite';
+import { AnimatePresence, type MotionProps, motion } from 'framer-motion';
+import styled from 'styled-components';
+
+import { coinjoinAccountUpdateAnonymity } from '@suite/coinjoin';
+import { Translation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { Banner, Icon, motionEasing } from '@trezor/components';
+import { UserIcon, UsersFourIcon, UsersIcon, UsersThreeIcon } from '@trezor/icons';
+
 import { AnonymityStatus } from 'src/constants/suite/coinjoin';
-import { useAnonymityStatus, useDispatch } from 'src/hooks/suite';
-import { Icon, Warning, motionEasing } from '@trezor/components';
-import { coinjoinAccountUpdateAnonymity } from 'src/actions/wallet/coinjoinAccountActions';
+import { useAnonymityStatus } from 'src/hooks/suite';
+
 import { SetupSlider } from './SetupSlider/SetupSlider';
+import {
+    GRADIENT_SLIDER_GREEN_END,
+    GRADIENT_SLIDER_GREEN_START,
+    GRADIENT_SLIDER_RED_END,
+    GRADIENT_SLIDER_YELLOW_END,
+    GRADIENT_SLIDER_YELLOW_START,
+} from './consts';
 
 const Label = styled.span`
     display: flex;
@@ -18,10 +31,10 @@ const Label = styled.span`
 
 const RedText = styled.span`
     margin-right: 2px;
-    color: ${({ theme }) => theme.TYPE_RED};
+    color: ${({ theme }) => theme.contentCritical};
 `;
 
-const expandAnimation: HTMLMotionProps<'div'> = {
+const expandAnimation: Partial<MotionProps> = {
     initial: { height: 0, marginTop: 0, opacity: 0 },
     animate: { height: 'auto', marginTop: 24, opacity: 1 },
     exit: { height: 0, marginTop: 0, opacity: 0 },
@@ -51,22 +64,20 @@ interface AnonymityLevelSetupProps {
 export const AnonymityLevelSetup = ({ accountKey, targetAnonymity }: AnonymityLevelSetupProps) => {
     const [sliderPosition, setSliderPosition] = useState(getPosition(targetAnonymity));
 
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
 
     const { anonymityStatus } = useAnonymityStatus();
-
-    const theme = useTheme();
 
     const isErrorDisplayed = anonymityStatus === AnonymityStatus.Bad;
 
     const trackStyle = {
         background: `\
             linear-gradient(270deg,\
-                ${theme.GRADIENT_SLIDER_GREEN_START} 0%,\
-                ${theme.GRADIENT_SLIDER_GREEN_END} 60%,\
-                ${theme.GRADIENT_SLIDER_YELLOW_START} 70%,\
-                ${theme.GRADIENT_SLIDER_YELLOW_END} 85%,\
-                ${theme.GRADIENT_SLIDER_RED_END} 100%\
+                ${GRADIENT_SLIDER_GREEN_START} 0%,\
+                ${GRADIENT_SLIDER_GREEN_END} 60%,\
+                ${GRADIENT_SLIDER_YELLOW_START} 70%,\
+                ${GRADIENT_SLIDER_YELLOW_END} 85%,\
+                ${GRADIENT_SLIDER_RED_END} 100%\
             );`,
     };
 
@@ -81,46 +92,51 @@ export const AnonymityLevelSetup = ({ accountKey, targetAnonymity }: AnonymityLe
         () => [
             {
                 value: 1,
+                max: 1,
                 component: (
                     <Label>
-                        <Icon icon="ONE_USER" size={14} color={theme.TYPE_DARK_GREY} /> 1
+                        <Icon as={UserIcon} size={14} intent="neutral" /> 1
                     </Label>
                 ),
             },
             {
                 value: 3,
+                max: 3,
                 component: (
                     <Label>
-                        <Icon icon="TWO_USERS" size={14} color={theme.TYPE_DARK_GREY} /> 3
+                        <Icon as={UsersIcon} size={14} intent="neutral" /> 3
                     </Label>
                 ),
             },
             {
                 value: 10,
+                max: 10,
                 component: (
                     <Label>
-                        <Icon icon="THREE_USERS" size={14} color={theme.TYPE_DARK_GREY} /> 10
+                        <Icon as={UsersThreeIcon} size={14} intent="neutral" /> 10
                     </Label>
                 ),
             },
             {
                 value: 30,
+                max: 30,
                 component: (
                     <Label>
-                        <Icon icon="FOUR_USERS" size={14} color={theme.TYPE_DARK_GREY} /> 30
+                        <Icon as={UsersFourIcon} size={14} intent="neutral" /> 30
                     </Label>
                 ),
             },
             {
                 value: 100,
+                max: 100,
                 component: (
                     <Label>
-                        <Icon icon="FOUR_USERS" size={14} color={theme.TYPE_DARK_GREY} /> 100
+                        <Icon as={UsersFourIcon} size={14} intent="neutral" /> 100
                     </Label>
                 ),
             },
         ],
-        [theme],
+        [],
     );
 
     return (
@@ -139,14 +155,18 @@ export const AnonymityLevelSetup = ({ accountKey, targetAnonymity }: AnonymityLe
             <AnimatePresence initial={!isErrorDisplayed}>
                 {isErrorDisplayed && (
                     <motion.div {...expandAnimation}>
-                        <Warning withIcon variant="destructive">
-                            <Translation
-                                values={{
-                                    red: chunks => <RedText>{chunks}</RedText>,
-                                }}
-                                id="TR_LOW_ANONYMITY_WARNING"
-                            />
-                        </Warning>
+                        <Banner
+                            icon
+                            intent="critical"
+                            description={
+                                <Translation
+                                    values={{
+                                        red: chunks => <RedText>{chunks}</RedText>,
+                                    }}
+                                    id="TR_LOW_ANONYMITY_WARNING"
+                                />
+                            }
+                        />
                     </motion.div>
                 )}
             </AnimatePresence>

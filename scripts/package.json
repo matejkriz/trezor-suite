@@ -2,23 +2,28 @@
     "name": "@trezor/scripts",
     "version": "1.0.0",
     "private": true,
+    "type": "module",
     "scripts": {
+        "depcheck": "yarn g:depcheck",
         "type-check": "yarn g:tsc --build",
-        "run:analytics": "tsx githubAnalytics.ts"
-    },
-    "dependencies": {
-        "@mobily/ts-belt": "^3.13.1",
-        "chalk": "^4.1.2",
-        "dotenv": "^16.4.1",
-        "fs-extra": "^11.2.0",
-        "minimatch": "^9.0.3",
-        "octokit": "3.1.2",
-        "prettier": "3.2.5",
-        "sort-package-json": "^1.57.0",
-        "yargs": "17.7.2"
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
+        "generate-package": "tsx generatePackage.ts"
     },
     "devDependencies": {
-        "@types/fs-extra": "^11.0.4",
-        "@types/prettier": "^3.0.0"
+        "@babel/cli": "7.29.7",
+        "@mobily/ts-belt": "^3.13.1",
+        "@trezor/eslint": "workspace:*",
+        "@types/semver": "^7.7.0",
+        "chalk": "^6.0.0",
+        "cross-fetch": "^4.1.0",
+        "fs-extra": "^11.3.1",
+        "minimatch": "^10.2.4",
+        "prettier": "^3.9.6",
+        "rollup": "^4.62.2",
+        "rollup-plugin-dts": "^6.4.1",
+        "semver": "^7.7.1",
+        "sort-package-json": "^4.0.0",
+        "tsx": "^4.21.0",
+        "yargs": "^18.1.0"
     }
 }

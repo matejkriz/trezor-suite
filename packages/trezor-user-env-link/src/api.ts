@@ -1,4 +1,11 @@
-interface SetupEmu {
+/* eslint-disable no-console */
+
+import { TypedEmitter, resolveAfter } from '@trezor/utils';
+
+import { type Firmwares, Model } from './types';
+import { WebsocketClient, type WebsocketClientEvents } from './websocket-client';
+
+export interface SetupEmu {
     mnemonic?: string;
     pin?: string;
     passphrase_protection?: boolean;
@@ -6,199 +13,395 @@ interface SetupEmu {
     needs_backup?: boolean;
 }
 
-interface StartEmu {
+export interface StartEmu {
     version?: string;
     wipe?: boolean;
     save_screenshots?: boolean;
+    model?: Model;
 }
+
+interface StartEmuType {
+    type: 'emulator-start';
+    version?: string;
+    wipe: boolean;
+    model: Model;
+}
+
+interface StartEmuFromUrl {
+    url: string;
+    model: Model;
+    wipe: boolean;
+}
+
+interface StartEmuFromUrlType extends StartEmuFromUrl {
+    type: 'emulator-start-from-url';
+}
+
+interface StartEmuFromBranch {
+    branch: string;
+    btcOnly: boolean;
+    model: Model;
+    wipe: boolean;
+}
+
+interface StartEmuFromBranchType extends StartEmuFromBranch {
+    type: 'emulator-start-from-branch';
+}
+
+export type EmuStartOptsType = StartEmuType | StartEmuFromUrlType | StartEmuFromBranchType;
 
 interface ClickEmu {
     x: number;
     y: number;
 }
 
-interface SendToAddressAndMineBlock {
+export interface SendToAddressAndMineBlock {
     address: string;
     btc_amount: number;
 }
 
-interface MineBlocks {
+export interface MineBlocks {
     block_amount: number;
 }
 
-interface GenerateBlock {
+export interface GenerateBlock {
     address: string;
     txids: string[];
 }
 
-interface ApplySettings {
+export interface ApplySettings {
     passphrase_always_on_device?: boolean;
 }
 
-interface ReadAndConfirmShamirMnemonicEmu {
+export interface ReadAndConfirmShamirMnemonicEmu {
     shares: number;
     threshold: number;
 }
 
-export const api = (controller: any) => ({
-    setupEmu: async (options: SetupEmu) => {
+export interface ReadAndConfirmAtomicShamirMnemonicEmu {
+    shares: number;
+    threshold: number;
+}
+
+type StartBridgeVersion = 'node-bridge' | 'local-suite-node-bridge' | '2.0.33' | '2.0.32';
+
+export const MNEMONICS = {
+    mnemonic_all: 'all all all all all all all all all all all all',
+    mnemonic_12: 'alcohol woman abuse must during monitor noble actual mixed trade anger aisle',
+    mnemonic_abandon:
+        'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about',
+    mnemonic_immune: 'immune enlist rule measure fan swarm mandate track point menu security fan',
+    mnemonic_academic:
+        'academic again academic academic academic academic academic academic academic academic academic academic academic academic academic academic academic pecan provide remember',
+};
+
+export const DEFAULT_BRIDGE_VERSION = 'node-bridge';
+
+// There's an ongoing problem with debug link & button requests race conditions
+// Adding a delay to workaround this issue temporarily
+// https://github.com/trezor/trezor-suite/issues/23270
+const EMU_RACE_CONDITION_WORKAROUND_DELAY = 200;
+
+export class TrezorUserEnvLinkClass extends TypedEmitter<WebsocketClientEvents> {
+    private client: WebsocketClient;
+    public firmwares?: Firmwares;
+    public defaultModel: Model = Model.T2T1;
+
+    public currentEmulatorSetup?: Partial<SetupEmu> = {};
+    public currentEmulatorSettings: Partial<ApplySettings> = {};
+
+    // todo: remove later, used in some of the tests
+    public send: WebsocketClient['send'];
+
+    constructor() {
+        super();
+        this.client = new WebsocketClient();
+
+        this.client.on('firmwares', (firmwares: Firmwares) => {
+            this.firmwares = firmwares;
+        });
+
+        this.client.on('disconnected', () => this.emit('disconnected'));
+
+        // todo: legacy api, should be removed
+        this.send = this.client.send.bind(this.client);
+    }
+    public async setupEmu(options?: SetupEmu) {
         const defaults = {
-            // some random empty seed. most of the test don't need any account history so it is better not to slow them down with all all seed
-            mnemonic:
-                'alcohol woman abuse must during monitor noble actual mixed trade anger aisle',
             pin: '',
             passphrase_protection: false,
             label: 'My Trevor',
             needs_backup: false,
         };
 
+        // fallback to empty seed. most of the test don't need any account history so it is better not to slow them down with all all seed
+        const mnemonic =
+            typeof options?.mnemonic === 'string' && options.mnemonic.indexOf(' ') > 0
+                ? options.mnemonic
+                : //   @ts-expect-error
+                  MNEMONICS[options?.mnemonic] || MNEMONICS.mnemonic_12;
+
+        const finalOptions = {
+            ...defaults,
+            ...options,
+            mnemonic,
+        };
+
+        if (JSON.stringify(this.currentEmulatorSetup) === JSON.stringify(finalOptions)) {
+            console.log('Emulator already set up with the same options, skipping setup');
+
+            return Promise.resolve();
+        }
+
         // before setup, stop bridge and start it again after it. it has no performance hit
         // and avoids 'wrong previous session' errors from bridge. actual setup is done
         // through udp transport if bridge transport is not available
-        await controller.send({ type: 'bridge-stop' });
-        await controller.send({
+        await this.client.send({ type: 'bridge-stop' });
+
+        await this.client.send({
             type: 'emulator-setup',
-            ...defaults,
-            ...options,
+            ...finalOptions,
         });
 
+        this.currentEmulatorSetup = options;
+
         return null;
-    },
-    sendToAddressAndMineBlock: async (options: SendToAddressAndMineBlock) => {
-        await controller.send({
+    }
+    async sendToAddressAndMineBlock(options: SendToAddressAndMineBlock) {
+        await this.client.send({
             type: 'regtest-send-to-address',
             ...options,
         });
 
         return null;
-    },
-    mineBlocks: async (options: MineBlocks) => {
-        await controller.send({
+    }
+    async mineBlocks(options: MineBlocks) {
+        await this.client.send({
             type: 'regtest-mine-blocks',
             ...options,
         });
 
         return null;
-    },
-    generateBlock: async (options: GenerateBlock) => {
-        await controller.send({
+    }
+    async generateBlock(options: GenerateBlock) {
+        await this.client.send({
             type: 'regtest-generateblock',
             ...options,
         });
 
         return null;
-    },
-    startBridge: async (version?: string) => {
-        await controller.send({ type: 'bridge-start', version });
+    }
+    async startBridge(version: StartBridgeVersion = DEFAULT_BRIDGE_VERSION) {
+        await this.client.send({ type: 'bridge-start', version });
 
         return null;
-    },
-    stopBridge: async () => {
-        await controller.send({ type: 'bridge-stop' });
+    }
+    async stopBridge() {
+        await this.client.send({ type: 'bridge-stop' });
 
         return null;
-    },
-    startEmu: (arg?: StartEmu) => {
+    }
+    async startEmu(arg?: StartEmu) {
+        const defaultV1Firmware = process.env.CANARY_FIRMWARE ? '1-main' : '1-latest';
+        const defaultV2Firmware = process.env.CANARY_FIRMWARE ? '2-main' : '2-latest';
+
         const params = {
             type: 'emulator-start',
-            version: '2-latest',
+            model: this.defaultModel,
+            version: arg?.model === Model.T1B1 ? defaultV1Firmware : defaultV2Firmware,
             ...arg,
         };
 
-        return controller.send(params);
-    },
-    startEmuFromUrl: ({ url, model, wipe }: { url: string; model: string; wipe?: boolean }) =>
-        controller.send({
+        console.log('Starting emulator with params', JSON.stringify(params));
+        await this.client.send(params);
+
+        if (params.wipe) {
+            this.currentEmulatorSettings = {};
+            this.currentEmulatorSetup = {};
+        }
+
+        return null;
+    }
+    async startEmuFromUrl({ url, model, wipe }: StartEmuFromUrl) {
+        await this.client.send({
             type: 'emulator-start-from-url',
             url,
             model,
             wipe,
-        }),
-    stopEmu: async () => {
-        await controller.send({ type: 'emulator-stop' });
+        });
 
         return null;
-    },
-    wipeEmu: async () => {
-        await controller.send({ type: 'emulator-wipe' });
+    }
+    async startEmuFromBranch({ branch, btcOnly = false, model, wipe }: StartEmuFromBranch) {
+        await this.client.send({
+            type: 'emulator-start-from-branch',
+            branch,
+            btc_only: btcOnly,
+            model,
+            wipe,
+        });
 
         return null;
-    },
-    pressYes: async () => {
-        await controller.send({ type: 'emulator-press-yes' });
+    }
+    async stopEmu() {
+        await this.client.send({ type: 'emulator-stop' });
 
         return null;
-    },
-    pressNo: async () => {
-        await controller.send({ type: 'emulator-press-no' });
+    }
+    async wipeEmu() {
+        this.currentEmulatorSettings = {};
+        this.currentEmulatorSetup = {};
+        await this.client.send({ type: 'emulator-wipe' });
 
         return null;
-    },
-    swipeEmu: async (direction: 'up' | 'down' | 'left' | 'right') => {
-        await controller.send({ type: 'emulator-swipe', direction });
+    }
+    async pressYes() {
+        await resolveAfter(EMU_RACE_CONDITION_WORKAROUND_DELAY);
+        await this.client.send({ type: 'emulator-press-yes' });
 
         return null;
-    },
-    inputEmu: async (value: string) => {
-        await controller.send({ type: 'emulator-input', value });
+    }
+    async pressNo() {
+        await resolveAfter(EMU_RACE_CONDITION_WORKAROUND_DELAY);
+        await this.client.send({ type: 'emulator-press-no' });
 
         return null;
-    },
-    clickEmu: async (options: ClickEmu) => {
-        await controller.send({ type: 'emulator-click', ...options });
+    }
+    async swipeEmu(direction: 'up' | 'down' | 'left' | 'right') {
+        await resolveAfter(EMU_RACE_CONDITION_WORKAROUND_DELAY);
+        await this.client.send({ type: 'emulator-swipe', direction });
 
         return null;
-    },
-    resetDevice: async (options: any) => {
-        await controller.send({ type: 'emulator-reset-device', ...options });
+    }
+    async inputEmu(value: string) {
+        await resolveAfter(EMU_RACE_CONDITION_WORKAROUND_DELAY);
+        await this.client.send({ type: 'emulator-input', value });
 
         return null;
-    },
-    readAndConfirmMnemonicEmu: async () => {
-        await controller.send({ type: 'emulator-read-and-confirm-mnemonic' });
+    }
+    async clickEmu(options: ClickEmu) {
+        await resolveAfter(EMU_RACE_CONDITION_WORKAROUND_DELAY);
+        await this.client.send({ type: 'emulator-click', ...options });
 
         return null;
-    },
-    readAndConfirmShamirMnemonicEmu: async (options: ReadAndConfirmShamirMnemonicEmu) => {
-        await controller.send({
+    }
+    async resetDevice(options: any) {
+        await resolveAfter(EMU_RACE_CONDITION_WORKAROUND_DELAY);
+        await this.client.send({ type: 'emulator-reset-device', ...options });
+
+        return null;
+    }
+    async readAndConfirmMnemonicEmu() {
+        await resolveAfter(EMU_RACE_CONDITION_WORKAROUND_DELAY);
+        await this.client.send({ type: 'emulator-read-and-confirm-mnemonic' });
+
+        return null;
+    }
+    async readAndConfirmShamirMnemonicEmu(options: ReadAndConfirmShamirMnemonicEmu) {
+        await resolveAfter(EMU_RACE_CONDITION_WORKAROUND_DELAY);
+        await this.client.send({
             type: 'emulator-read-and-confirm-shamir-mnemonic',
             ...options,
         });
 
         return null;
-    },
-    applySettings: async (options: ApplySettings) => {
-        await controller.send({
-            type: 'emulator-apply-settings',
+    }
+    async readAndConfirmAtomicShamirMnemonicEmu(options: ReadAndConfirmAtomicShamirMnemonicEmu) {
+        await resolveAfter(EMU_RACE_CONDITION_WORKAROUND_DELAY);
+        await this.client.send({
+            type: 'emulator-read-and-confirm-atomic-shamir-mnemonic',
             ...options,
         });
 
         return null;
-    },
-    selectNumOfWordsEmu: async (num: number) => {
-        await controller.send({ type: 'emulator-select-num-of-words', num });
+    }
+    async readAndConfirmSingleShamirMnemonicEmu() {
+        await resolveAfter(EMU_RACE_CONDITION_WORKAROUND_DELAY);
+        await this.client.send({ type: 'emulator-read-and-confirm-single-shamir-mnemonic' });
 
         return null;
-    },
-    getDebugState: async () => {
-        const { response } = await controller.send({ type: 'emulator-get-debug-state' });
+    }
+    async applySettings(options: ApplySettings) {
+        if (JSON.stringify(this.currentEmulatorSettings) === JSON.stringify(options)) {
+            console.log('Emulator already has the same settings applied, skipping setup');
+
+            return Promise.resolve();
+        }
+        await this.client.send({
+            type: 'emulator-apply-settings',
+            ...options,
+        });
+        this.currentEmulatorSettings = options;
+
+        return null;
+    }
+    async allowUnsafePaths() {
+        await this.client.send({ type: 'emulator-allow-unsafe-paths' });
+
+        return null;
+    }
+    async inputPin(pin: string) {
+        await resolveAfter(EMU_RACE_CONDITION_WORKAROUND_DELAY);
+        await this.client.send({ type: 'emulator-input-pin', pin });
+
+        return null;
+    }
+    async selectNumOfWordsEmu(num: number) {
+        await resolveAfter(EMU_RACE_CONDITION_WORKAROUND_DELAY * 2);
+        await this.client.send({ type: 'emulator-select-num-of-words', num });
+
+        return null;
+    }
+    async getScreenContent() {
+        const { response } = await this.client.send({ type: 'emulator-get-screen-content' });
 
         return response;
-    },
+    }
+    async getDebugState() {
+        await resolveAfter(EMU_RACE_CONDITION_WORKAROUND_DELAY);
+        const { response } = await this.client.send({ type: 'emulator-get-debug-state' });
 
-    logTestDetails: async (text: string) => {
-        await controller.send({ type: 'log', text });
+        return response;
+    }
+    async getPairingInfo(thp_channel_id: string, nfcData?: string) {
+        // user-env expects something, cannot be undefined
+        const d = nfcData ? Buffer.from(nfcData, 'hex') : undefined;
+        const [nfc_secret_host, handshake_hash] = d
+            ? [d.subarray(0, 16), d.subarray(16)].map(b => b.toString('hex'))
+            : [null, null];
+
+        const { response } = await this.client.send({
+            type: 'emulator-get-pairing-info',
+            thp_channel_id,
+            handshake_hash,
+            nfc_secret_host,
+        });
+
+        return {
+            ...response,
+            code_entry_code: Number(response.code_entry_code).toString().padStart(6, '0'),
+        };
+    }
+    async logTestDetails(text: string) {
+        await this.client.send({ type: 'log', text });
 
         return null;
-    },
-    trezorUserEnvConnect: async () => {
-        await controller.connect();
+    }
+    async connect() {
+        await this.client.connect();
 
         return null;
-    },
-    trezorUserEnvDisconnect: async () => {
-        await controller.disconnect();
+    }
+    async disconnect() {
+        await this.client.disconnect();
 
         return null;
-    },
-});
+    }
+
+    // legacy api, should be removed probably
+    dispose() {
+        this.disconnect();
+    }
+}
+
+export const TrezorUserEnvLink = new TrezorUserEnvLinkClass();

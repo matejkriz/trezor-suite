@@ -1,40 +1,71 @@
+import { DEFAULT_FLAGSHIP_MODEL } from '@suite-common/suite-constants';
+import { type AcquiredDevice, type TrezorDevice } from '@suite-common/suite-types';
 import {
-    Device,
-    UnavailableCapability,
-    FirmwareRelease,
-    DeviceModelInternal,
+    DEVICE,
+    type Device,
+    type DeviceEvent,
+    type DeviceMode,
+    type KnownDevice,
+    type PROTO,
+    type UnavailableCapability,
 } from '@trezor/connect';
-import { TrezorDevice, AcquiredDevice } from '@suite-common/suite-types';
+import { DeviceModelInternal, getNarrowedDeviceModelInternal } from '@trezor/device-utils';
+import { exhaustive } from '@trezor/type-utils';
 import * as URLS from '@trezor/urls';
+import { hasProp, isArrayMember, unique } from '@trezor/utils';
 
-/**
- * Used in Welcome step in Onboarding
- * Status 'ok' or 'initialized' is what we expect, 'bootloader', 'seedless' and 'unreadable' are no go
- *
- * @param {(TrezorDevice | undefined)} device
- * @returns
- */
-export const getConnectedDeviceStatus = (device: TrezorDevice | undefined) => {
-    if (!device) return null;
+export type DeviceStatus =
+    | 'acquired'
+    | 'unacquired'
+    | 'unreadable'
+    | 'disconnected'
+    | 'unavailable'
+    | 'bootloader'
+    | 'initialize'
+    | 'seedless'
+    | 'firmware-required'
+    | 'used-in-other-window'
+    | 'was-used-in-other-window'
+    | 'firmware-recommended'
+    | 'connected'
+    | 'device-busy'
+    | 'device-rebooting'
+    | 'device-bootloader-locked'
+    | 'device-hard-locked'
+    | 'device-pin-locked'
+    | 'device-thp-locked'
+    | 'firmware-corrupted'
+    | 'unknown';
 
-    const isInBlWithFwPresent =
-        device.mode === 'bootloader' && device.features?.firmware_present === true;
+export const getStatus = (device: TrezorDevice): DeviceStatus => {
+    if (!device.connected) {
+        return 'disconnected';
+    }
+    if (device.status === 'busy') {
+        return 'device-busy';
+    }
+    if (device.status === 'thp-locked') {
+        return 'device-thp-locked';
+    }
+    if (device.status === 'rebooting') {
+        return 'device-rebooting';
+    }
+    if (device.status === 'bootloader-locked') {
+        return 'device-bootloader-locked';
+    }
+    if (device.status === 'hard-locked') {
+        return 'device-hard-locked';
+    }
+    if (device.status === 'pin-locked') {
+        return 'device-pin-locked';
+    }
 
-    if (isInBlWithFwPresent) return 'bootloader';
-    if (device.features?.initialized) return 'initialized';
-    if (device.features?.no_backup) return 'seedless';
-    if (device.type === 'unreadable') return 'unreadable';
-
-    return 'ok';
-};
-
-export const getStatus = (device: TrezorDevice) => {
     if (device.type === 'acquired') {
-        if (!device.connected) {
-            return 'disconnected';
-        }
         if (!device.available) {
             return 'unavailable';
+        }
+        if (device.features?.firmware_corrupted) {
+            return 'firmware-corrupted';
         }
         if (device.mode === 'bootloader') {
             return 'bootloader';
@@ -64,6 +95,7 @@ export const getStatus = (device: TrezorDevice) => {
     if (device.type === 'unacquired') {
         return 'unacquired';
     }
+
     if (device.type === 'unreadable') {
         return 'unreadable';
     }
@@ -71,57 +103,73 @@ export const getStatus = (device: TrezorDevice) => {
     return 'unknown';
 };
 
-export const deviceNeedsAttention = (deviceStatus: ReturnType<typeof getStatus>) => {
+export const isDevicePerceivedAsNew = (device: TrezorDevice | null | undefined) => {
+    if (!device) {
+        return false;
+    }
+
+    const deviceStatus = getStatus(device);
+
+    // NOTE: when a new device is bought and connected = bootloader, when wiped = initialize
+    return deviceStatus === 'bootloader' || deviceStatus === 'initialize';
+};
+
+export const deviceNeedsAttention = (deviceStatus: DeviceStatus): boolean => {
     switch (deviceStatus) {
-        // case 'firmware-recommended':
-        // case 'unavailable': // this case is already solved in Account view @wallet-components/AccountMode/DeviceUnavailable
-        case 'bootloader':
+        case 'bootloader': // note: this is also state when the device is completely new
         case 'initialize':
         case 'seedless':
         case 'used-in-other-window':
         case 'was-used-in-other-window':
         case 'unacquired':
         case 'firmware-required':
+        case 'firmware-corrupted':
         case 'unreadable':
+        case 'device-busy':
+        case 'device-bootloader-locked':
+        case 'device-hard-locked':
+        case 'device-pin-locked':
+        case 'device-thp-locked':
             return true;
-        default:
+
+        case 'disconnected':
+        case 'unavailable': // this case is already solved in Account view @wallet-components/AccountMode/DeviceUnavailable
+        case 'firmware-recommended':
+        case 'connected':
+        case 'device-rebooting':
+        case 'unknown':
+        case 'acquired':
             return false;
-    }
-};
 
-export const getDeviceNeedsAttentionMessage = (deviceStatus: ReturnType<typeof getStatus>) => {
-    switch (deviceStatus) {
-        // case 'firmware-recommended':
-        case 'bootloader':
-            return 'TR_NEEDS_ATTENTION_BOOTLOADER';
-        case 'initialize':
-            return 'TR_NEEDS_ATTENTION_INITIALIZE';
-        case 'seedless':
-            return 'TR_NEEDS_ATTENTION_SEEDLESS';
-        case 'used-in-other-window':
-            return 'TR_NEEDS_ATTENTION_USED_IN_OTHER_WINDOW';
-        case 'was-used-in-other-window':
-            return 'TR_NEEDS_ATTENTION_WAS_USED_IN_OTHER_WINDOW';
-        case 'unacquired':
-            return 'TR_NEEDS_ATTENTION_UNACQUIRED';
-        case 'firmware-required':
-            return 'TR_NEEDS_ATTENTION_FIRMWARE_REQUIRED';
-        case 'unavailable':
-            return 'TR_NEEDS_ATTENTION_UNAVAILABLE';
-        case 'unreadable':
-            return 'TR_NEEDS_ATTENTION_UNREADABLE';
         default:
-            return null;
+            return exhaustive(deviceStatus);
     }
 };
 
-export const isDeviceRemembered = (device?: TrezorDevice): boolean => !!device?.remember;
+export const shouldDisplayInitialWarningIcon = (deviceStatus: DeviceStatus | null) => {
+    if (!deviceStatus) {
+        return false;
+    }
 
-export const isDeviceAccessible = (device?: TrezorDevice) => {
-    if (!device || !device.features) return false;
-
-    return device.mode === 'normal' && device.firmware !== 'required';
+    switch (deviceStatus) {
+        case 'bootloader':
+        case 'initialize':
+        case 'device-thp-locked':
+        case 'device-rebooting':
+            return false;
+        default:
+            return true;
+    }
 };
+
+export const getIsDeviceRemembered = (device?: TrezorDevice): boolean => !!device?.remember;
+
+// Is a Suite extended device acquired (corresponds to Connect "known")
+export const isDeviceAcquired = (device?: TrezorDevice): device is AcquiredDevice =>
+    !!device?.features;
+
+// Is a Connect device known (corresponds to Suite "acquired")
+export const isDeviceKnown = (device?: Device): device is KnownDevice => !!device?.features;
 
 export const isSelectedInstance = (selected?: TrezorDevice, device?: TrezorDevice) =>
     !!(
@@ -141,8 +189,8 @@ export const isSelectedDevice = (selected?: TrezorDevice | Device, device?: Trez
     return selected.id === device.id;
 };
 
-export const getFwUpdateVersion = (device: AcquiredDevice) =>
-    device.firmwareRelease?.release?.version?.join('.') || null;
+export const getFwUpdateVersion = (device: TrezorDevice) =>
+    device.firmwareReleaseConfigInfo?.release?.version?.join('.') || null;
 
 export const getCoinUnavailabilityMessage = (reason: UnavailableCapability) => {
     switch (reason) {
@@ -156,32 +204,15 @@ export const getCoinUnavailabilityMessage = (reason: UnavailableCapability) => {
 
 /**
  * Generate new instance number
- * @param {TrezorDevice[]} devices
- * @param {AcquiredDevice} device
- * @returns number
  */
-export const getNewInstanceNumber = (devices: TrezorDevice[], device: TrezorDevice | Device) => {
-    if (!device.features) return undefined;
-    // find all instances with device "device_id"
-    // and sort them by instance number
-    const affectedDevices = devices
-        .filter(d => d.features && d.id === device.id)
-        .sort((a, b) => {
-            if (!a.instance) {
-                return -1;
-            }
-
-            return !b.instance || a.instance > b.instance ? 1 : -1;
-        });
-
-    // calculate new instance number
-    const instance = affectedDevices.reduce(
-        (inst, dev) => (dev.instance ? dev.instance + 1 : inst + 1),
-        0,
+export const getNewInstanceNumber = (devices: TrezorDevice[], device: Pick<KnownDevice, 'id'>) =>
+    devices.reduce(
+        (instance, d) =>
+            d.id === device.id
+                ? Math.max(instance ?? 0, d.instance ? d.instance + 1 : 1)
+                : instance,
+        undefined as number | undefined,
     );
-
-    return instance > 0 ? instance : undefined;
-};
 
 export const getNewWalletNumber = (devices: TrezorDevice[], device: TrezorDevice) => {
     const relevantDevices = devices
@@ -200,12 +231,15 @@ export const getNewWalletNumber = (devices: TrezorDevice[], device: TrezorDevice
  */
 export const findInstanceIndex = (draft: TrezorDevice[], device: AcquiredDevice) =>
     draft.findIndex(
-        d => d.features && d.id && d.id === device.id && d.instance === device.instance,
+        d =>
+            d.features &&
+            d.instance === device.instance &&
+            (d.id ? d.id === device.id : d.path === device.path && d.mode === device.mode), // if id is not present, e.g. in bootloader, fall back to path+mode
     );
 
 /**
  * Utility for retrieving fresh data from the "devices" reducer
- * It's used for keep "suite" reducer synchronized via `suiteMiddleware > suiteActions.observeSelectedDevice`
+ * It's used for keep "suite" reducer synchronized via `suiteMiddleware > suiteActions.observeSelectedDeviceThunk`
  * @param {(TrezorDevice)} device
  * @param {TrezorDevice[]} devices
  * @returns {TrezorDevice | undefined }
@@ -227,11 +261,7 @@ export const getSelectedDevice = (
         }
 
         // special case we need to use after wipe device (which changes device_id)
-        if (d.instance === instance && d.path.length > 0 && d.path === device.path) {
-            return true;
-        }
-
-        return false;
+        return d.instance === instance && d.path.length > 0 && d.path === device.path;
     });
 };
 
@@ -250,31 +280,33 @@ export const getChangelogUrl = (device: TrezorDevice, revision?: string | null) 
 export const getCheckBackupUrl = (device?: TrezorDevice) => {
     const deviceModelInternal = device?.features?.internal_model;
 
-    if (!deviceModelInternal) {
-        return '';
+    if (!deviceModelInternal || deviceModelInternal === DeviceModelInternal.UNKNOWN) {
+        return undefined;
     }
 
-    return URLS[`HELP_CENTER_DRY_RUN_${deviceModelInternal}_URL`];
+    return URLS[`HELP_CENTER_DRY_RUN_${getNarrowedDeviceModelInternal(deviceModelInternal)}_URL`];
 };
 
 export const getPackagingUrl = (device?: TrezorDevice) => {
     const deviceModelInternal = device?.features?.internal_model;
 
-    if (!deviceModelInternal) {
+    if (!deviceModelInternal || deviceModelInternal === DeviceModelInternal.UNKNOWN) {
         return '';
     }
 
-    return URLS[`HELP_CENTER_PACKAGING_${deviceModelInternal}_URL`];
+    return URLS[`HELP_CENTER_PACKAGING_${getNarrowedDeviceModelInternal(deviceModelInternal)}_URL`];
 };
 
 export const getFirmwareDowngradeUrl = (device?: TrezorDevice) => {
     const deviceModelInternal = device?.features?.internal_model;
 
-    if (!deviceModelInternal) {
-        return '';
+    if (!deviceModelInternal || deviceModelInternal === DeviceModelInternal.UNKNOWN) {
+        return undefined;
     }
 
-    return URLS[`HELP_CENTER_FW_DOWNGRADE_${deviceModelInternal}_URL`];
+    return URLS[
+        `HELP_CENTER_FW_DOWNGRADE_${getNarrowedDeviceModelInternal(deviceModelInternal)}_URL`
+    ];
 };
 
 /**
@@ -294,13 +326,12 @@ export const sortByTimestamp = (devices: TrezorDevice[]): TrezorDevice[] =>
         return b.ts - a.ts;
     });
 
-export const sortByPriority = (a: TrezorDevice, b: TrezorDevice) => {
+const sortByPriority = (a: TrezorDevice, b: TrezorDevice) => {
     // sort by priority:
     // 1. unacquired
-    // 2. force remembered
-    // 3. unexpected mode
-    // 4. outdated firmware
-    // 5. timestamp
+    // 2. unexpected mode
+    // 3. outdated firmware
+    // 4. timestamp
 
     // 1
     if (!b.features && !a.features) return 0;
@@ -308,27 +339,33 @@ export const sortByPriority = (a: TrezorDevice, b: TrezorDevice) => {
     if (!b.features || !a.features) return -1;
 
     // 2
-    if (a.forceRemember !== b.forceRemember) {
-        if (!a.forceRemember && b.forceRemember) return 1;
-        if (a.forceRemember && !b.forceRemember) return -1;
-    }
-
-    // 3
     if (a.mode !== 'normal' && b.mode !== 'normal') return 0;
     if (b.mode !== 'normal') return 1;
     if (a.mode !== 'normal') return -1;
 
-    // 4
+    // 3
     if (a.firmware !== 'valid' && b.firmware !== 'valid') return 0;
     if (b.firmware !== 'valid') return 1;
     if (a.firmware !== 'valid') return -1;
 
-    // 5
+    // 4
     if (!b.ts && !a.ts) return 0;
     if (!b.ts && a.ts) return -1;
     if (!b.ts || !a.ts) return 1;
 
     return b.ts - a.ts;
+};
+
+export const sortDevicesForDeviceList = (a: TrezorDevice, b: TrezorDevice) => {
+    // sort by priority:
+    // 1. when the device was first connected - oldests come first
+    // when device is "ejected" / completely forgotten, it is last in the list
+
+    if (!b.firstConnectedTimestamp && !a.firstConnectedTimestamp) return 0;
+    if (!b.firstConnectedTimestamp && a.firstConnectedTimestamp) return -1;
+    if (!b.firstConnectedTimestamp || !a.firstConnectedTimestamp) return 1;
+
+    return a.firstConnectedTimestamp - b.firstConnectedTimestamp;
 };
 
 /**
@@ -343,7 +380,7 @@ export const getDeviceInstances = (
     devices: TrezorDevice[],
     exclude = false,
 ): AcquiredDevice[] => {
-    if (!device || !device.features || !device.id) return [];
+    if (!isDeviceAcquired(device) || !device.id) return [];
 
     return devices
         .filter(
@@ -361,11 +398,41 @@ export const getDeviceInstances = (
 };
 
 /**
+ * Returns all device instances sorted by `instance` field for all connected and remembered devices
+ * * @param {TrezorDevice[]} devices
+ * @returns {AcquiredDevice[][]}
+ */
+export const getDeviceInstancesGroupedByDeviceId = (devices: TrezorDevice[]): TrezorDevice[][] =>
+    devices.reduce((deviceGroups, device) => {
+        if (!isDeviceAcquired(device) || !device.id) {
+            deviceGroups.push([device]);
+        } else {
+            const existingGroupIndex = deviceGroups.findIndex(group => group[0]?.id === device.id);
+            if (existingGroupIndex === -1) {
+                // If the device ID is not yet in the accumulator, add a new group
+                const newGroup = getDeviceInstances(device, devices);
+                if (newGroup.length > 0) {
+                    deviceGroups.push(newGroup);
+                }
+            }
+        }
+
+        return deviceGroups;
+    }, [] as TrezorDevice[][]);
+
+/**
  * Returns first available instance for each device sorted by priority
  * @param {TrezorDevice[]} devices
  * @returns {TrezorDevice[]}
  */
-export const getFirstDeviceInstance = (devices: TrezorDevice[]) =>
+export const getFirstDeviceInstance = (
+    devices: TrezorDevice[],
+    options: {
+        sortingFn: (a: TrezorDevice, b: TrezorDevice) => number;
+    } = {
+        sortingFn: sortByPriority,
+    },
+) =>
     // filter device instances
     devices
         .reduce((result, dev) => {
@@ -376,33 +443,120 @@ export const getFirstDeviceInstance = (devices: TrezorDevice[]) =>
             const alreadyExists = result.find(r => r.features && dev.features && r.id === dev.id);
             if (alreadyExists) return result;
 
-            // base (np passphrase) or first passphrase instance
-            return result.concat(instances[0]);
+            // base (no passphrase) or first passphrase instance
+            const firstInstance = instances[0];
+            if (firstInstance) {
+                return result.concat(firstInstance);
+            }
+
+            return result;
         }, [] as TrezorDevice[])
-        .sort(sortByPriority);
+        .sort(options.sortingFn);
 
-export const getPhysicalDeviceUniqueIds = (devices: Device[]) =>
-    [...new Set(devices.map(d => d.id))].filter(id => id) as string[];
+export const getPhysicalDeviceUniqueIds = (devices: TrezorDevice[]) =>
+    unique(devices.map(d => d.id).filter((id): id is string => !!id));
 
-export const getPhysicalDeviceCount = (devices: Device[]) =>
+export const getPhysicalDeviceCount = (devices: TrezorDevice[]) =>
     getPhysicalDeviceUniqueIds(devices).length;
 
-export const parseFirmwareChangelog = (release?: FirmwareRelease) => {
-    if (!release?.changelog?.length || !release) {
-        return null;
+export const getSortedDevicesWithoutInstances = (
+    devices: TrezorDevice[],
+    excludedDeviceId: string | null,
+) =>
+    getDeviceInstancesGroupedByDeviceId(devices)
+        .flatMap(group => {
+            const first = group[0];
+            if (!first) return [];
+
+            return first;
+        })
+        .filter(d => d.id !== excludedDeviceId)
+        .sort((a, b) => {
+            if (!a.connected) return -1;
+            if (!b.connected) return 1;
+
+            return 0;
+        });
+
+export const isDeviceWithButtonOnlyNoTouchscreen = (deviceModel: DeviceModelInternal): boolean => {
+    // Technically, the `B` in the DeviceModelInternal means buttons, but let's not rely on this.
+    // As it may not be reliable in the future.
+
+    const map: Record<DeviceModelInternal, boolean> = {
+        T1B1: true,
+        T2B1: true,
+        T2T1: false,
+        T3B1: true,
+        T3T1: false,
+        T3W1: false,
+        UNKNOWN: false,
+    };
+
+    return map[deviceModel];
+};
+
+export const isAnyDeviceEventAction = (action: unknown): action is DeviceEvent => {
+    if (!hasProp(action, 'type') || typeof action.type !== 'string') {
+        return false;
     }
 
-    // Default changelog format is a long string where individual changes are separated by "*" symbol.
-    const changelog = release.changelog
-        .trim()
-        .split('*')
-        .map(l => l.trim())
-        .filter(l => l.length);
-
-    return {
-        url: release.url,
-        notes: release.notes,
-        changelog,
-        versionString: release.version.join('.'),
-    };
+    return isArrayMember(action.type, Object.values(DEVICE));
 };
+
+export const getDeviceInternalModel = (
+    device?: Pick<Device, 'features' | 'thp'> | undefined,
+): DeviceModelInternal =>
+    device?.features?.internal_model ??
+    (device?.thp?.properties?.internal_model as DeviceModelInternal) ??
+    DeviceModelInternal.UNKNOWN;
+
+export const getDeviceModelWithFlagshipFallback = (
+    device?: Pick<Device, 'features' | 'thp'>,
+): DeviceModelInternal => {
+    const deviceModel = getDeviceInternalModel(device);
+
+    return deviceModel === DeviceModelInternal.UNKNOWN ? DEFAULT_FLAGSHIP_MODEL : deviceModel;
+};
+
+export const getIsThpDevice = <T extends Device | TrezorDevice>(
+    device: T,
+): device is T & { thp: NonNullable<Device['thp']> } => device.thp !== undefined;
+
+export const getIsDeviceInitialized = ({
+    deviceMode,
+    deviceFeatures,
+}: {
+    deviceMode?: DeviceMode | null;
+    deviceFeatures?: PROTO.Features;
+}) => deviceMode !== 'initialize' && deviceMode !== 'seedless' && !!deviceFeatures?.initialized;
+
+export const getIsDeviceConnectedAndAuthorized = ({
+    deviceState,
+    deviceFeatures,
+}: {
+    deviceState: TrezorDevice['state'];
+    deviceFeatures?: PROTO.Features;
+}) => !!deviceState && !!deviceFeatures;
+
+export const getIsDeviceDescriptorApiTypeBluetooth = (device: Device | TrezorDevice) =>
+    device.descriptor?.apiType === 'bluetooth';
+
+export const getIsDeviceConnectedViaBluetooth = (device?: TrezorDevice): boolean =>
+    !!device?.connected && getIsDeviceDescriptorApiTypeBluetooth(device);
+
+export const getIsDevicePinProtected = (device?: Device | TrezorDevice): boolean | null =>
+    device?.features?.pin_protection ?? null;
+
+export const getDeviceLanguage = (device?: Device | TrezorDevice): string | null =>
+    device?.features?.language ?? null;
+
+export const getDeviceMode = (device?: Device | TrezorDevice): DeviceMode | null =>
+    device?.mode ?? null;
+
+type DeviceComparisonParams = { prevDevice: TrezorDevice; nextDevice: TrezorDevice };
+
+export const getIsDeviceBecomingAcquired = ({ prevDevice, nextDevice }: DeviceComparisonParams) =>
+    !isDeviceAcquired(prevDevice) && isDeviceAcquired(nextDevice);
+
+export const getIsDeviceBecomingConnected = ({ prevDevice, nextDevice }: DeviceComparisonParams) =>
+    !prevDevice.connected && nextDevice.connected;

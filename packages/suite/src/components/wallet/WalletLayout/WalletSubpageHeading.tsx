@@ -1,36 +1,22 @@
-import { ReactNode } from 'react';
-import styled from 'styled-components';
-import { H2 } from '@trezor/components';
-import type { ExtendedMessageDescriptor } from 'src/types/suite';
-import { Translation } from 'src/components/suite';
-import { spacingsPx } from '@trezor/theme';
+import { type ReactNode } from 'react';
 
-const HeaderWrapper = styled.div`
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: ${spacingsPx.lg};
-`;
-
-const HeaderActions = styled.div`
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: ${spacingsPx.xxs};
-    flex: 1;
-`;
-
+import { Translation, type TranslationKey } from '@suite/intl';
+import { H2, Row } from '@trezor/components';
 type WalletSubpageHeadingProps = {
-    title: ExtendedMessageDescriptor['id'];
+    title: TranslationKey;
     children?: ReactNode;
+    'data-testid'?: string;
 };
 
-export const WalletSubpageHeading = ({ title, children }: WalletSubpageHeadingProps) => (
-    <HeaderWrapper>
-        <H2>
+export const WalletSubpageHeading = ({
+    title,
+    children,
+    'data-testid': dataTestId,
+}: WalletSubpageHeadingProps) => (
+    <Row justifyContent="space-between">
+        <H2 data-testid={dataTestId}>
             <Translation id={title} />
         </H2>
-
-        <HeaderActions>{children}</HeaderActions>
-    </HeaderWrapper>
+        <Row gap={8}>{children}</Row>
+    </Row>
 );

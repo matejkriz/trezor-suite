@@ -1,0 +1,92 @@
+import { useEffect, useState } from 'react';
+
+import { Translation } from '@suite/intl';
+import { getDisplaySymbol } from '@suite-common/wallet-config';
+import {
+    type SolanaStakingLimit,
+    estimateSolanaStakingLimit,
+    getOutputTxAmount,
+    getSolanaDeactivatedRentReserves,
+    selectBlockchainUrlBySymbol,
+} from '@suite-common/wallet-core';
+import { type Account, type PrecomposedLevels } from '@suite-common/wallet-types';
+import { formatNetworkAmount } from '@suite-common/wallet-utils';
+import { Banner } from '@trezor/components';
+import { getSuiteVersion } from '@trezor/env-utils';
+import { MAX_DEACTIVATE_ACCOUNTS_WITH_SPLIT } from '@trezor/network-solana/constants';
+
+import { useSelector } from 'src/hooks/suite';
+
+interface SolanaStakingLimitBannerProps {
+    account: Account;
+    composedLevels?: PrecomposedLevels;
+    type: 'claim' | 'unstake';
+}
+
+const NO_LIMIT: SolanaStakingLimit = { isLimitExceeded: false, estimatedAmount: '0' };
+
+export const SolanaStakingLimitBanner = ({
+    account,
+    composedLevels,
+    type,
+}: SolanaStakingLimitBannerProps) => {
+    const blockchainUrl = useSelector(state => selectBlockchainUrlBySymbol(state, account.symbol));
+
+    const [limit, setLimit] = useState<SolanaStakingLimit>(NO_LIMIT);
+
+    useEffect(() => {
+        if (account.networkType !== 'solana') {
+            return;
+        }
+
+        const outputTxAmount = getOutputTxAmount(composedLevels);
+        if (!outputTxAmount || !blockchainUrl) return;
+
+        let isActive = true;
+
+        estimateSolanaStakingLimit({
+            descriptor: account.descriptor,
+            deactivatedRentReserves: getSolanaDeactivatedRentReserves(account),
+            blockchainUrl,
+            userAgent: `Trezor Suite ${getSuiteVersion()}`,
+            type,
+            outputAmount: outputTxAmount.toString(),
+        })
+            .then(resolved => {
+                if (isActive) {
+                    setLimit(resolved);
+                }
+            })
+            .catch(() => {
+                if (isActive) {
+                    setLimit(NO_LIMIT);
+                }
+            });
+
+        return () => {
+            isActive = false;
+        };
+    }, [account, composedLevels, blockchainUrl, type]);
+
+    if (!limit.isLimitExceeded) return null;
+
+    return (
+        <Banner
+            intent="info"
+            description={
+                <Translation
+                    id={
+                        type === 'claim'
+                            ? 'TR_STAKE_CAN_CLAIM_FROM_ACCOUNTS'
+                            : 'TR_STAKE_CAN_UNSTAKE_FROM_ACCOUNTS'
+                    }
+                    values={{
+                        limit: MAX_DEACTIVATE_ACCOUNTS_WITH_SPLIT,
+                        amount: formatNetworkAmount(limit.estimatedAmount, account.symbol),
+                        symbol: getDisplaySymbol(account.symbol),
+                    }}
+                />
+            }
+        />
+    );
+};

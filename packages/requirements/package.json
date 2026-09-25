@@ -1,0 +1,25 @@
+{
+    "name": "@trezor/requirements",
+    "version": "1.0.0",
+    "main": "src/index",
+    "license": "See LICENSE.md in repo root",
+    "private": true,
+    "sideEffects": false,
+    "scripts": {
+        "depcheck": "yarn g:depcheck",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
+        "type-check": "yarn g:tsc --build",
+        "test:unit": "yarn g:jest",
+        "requirements:verify": "tsx src/run.ts verify",
+        "requirements:fix": "tsx src/run.ts fix"
+    },
+    "dependencies": {
+        "@trezor/node-utils": "workspace:*",
+        "@trezor/utils": "workspace:*",
+        "chalk": "^6.0.0",
+        "semver": "^7.7.1"
+    },
+    "devDependencies": {
+        "tsx": "^4.21.0"
+    }
+}

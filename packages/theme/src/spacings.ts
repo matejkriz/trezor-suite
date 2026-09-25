@@ -1,38 +1,55 @@
-export const spacings = {
-    xxxs: 2,
-    xxs: 4,
-    xs: 8,
-    sm: 12,
-    md: 16,
-    lg: 20,
-    xl: 24,
-    xxl: 32,
-    xxxl: 40,
-    xxxxl: 48,
-} as const;
+export const spacingValues = [
+    0, 2, 4, 6, 8, 10, 12, 14, 16, 20, 24, 28, 32, 40, 48, 64, 80, 96, 128, 160,
+] as const;
 
-type SpacingSize = keyof typeof spacings;
+export type SpacingValue = (typeof spacingValues)[number];
 
-export const spacingsPx = (Object.keys(spacings) as Array<SpacingSize>).reduce(
-    (result, key) => {
-        (result as Record<SpacingSize, string>)[key] = `${spacings[key]}px`;
+export type NegativeSpacingValue =
+    | -2
+    | -4
+    | -6
+    | -8
+    | -10
+    | -12
+    | -14
+    | -16
+    | -20
+    | -24
+    | -28
+    | -32
+    | -40
+    | -48
+    | -64
+    | -80
+    | -96
+    | -128
+    | -160;
+export type SignedSpacingValue = SpacingValue | NegativeSpacingValue;
 
-        return result;
-    },
-    {} as { [K in SpacingSize]: `${(typeof spacings)[K]}px` },
-);
-
-export type Spacings = typeof spacings;
-export type Spacing = keyof typeof spacings;
+type NativeSpacingValue =
+    1 | 2 | 4 | 6 | 8 | 10 | 12 | 16 | 18 | 20 | 24 | 32 | 36 | 40 | 48 | 44 | 52 | 56 | 64;
 
 export const nativeSpacings = {
-    extraSmall: 4,
-    small: 8,
-    medium: 16,
-    large: 24,
-    extraLarge: 32,
-    xxl: 64,
-} as const;
+    sp1: 1,
+    sp2: 2,
+    sp4: 4,
+    sp6: 6,
+    sp8: 8,
+    sp12: 12,
+    sp10: 10,
+    sp16: 16,
+    sp18: 18,
+    sp20: 20,
+    sp24: 24,
+    sp32: 32,
+    sp36: 36,
+    sp40: 40,
+    sp48: 48,
+    sp44: 44,
+    sp52: 52,
+    sp56: 56,
+    sp64: 64,
+} as const satisfies { [V in NativeSpacingValue as `sp${V}`]: V };
 
 export type NativeSpacings = typeof nativeSpacings;
 export type NativeSpacing = keyof typeof nativeSpacings;

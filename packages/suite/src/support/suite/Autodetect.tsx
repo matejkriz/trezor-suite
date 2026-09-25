@@ -1,31 +1,60 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
+
+import { injectDesktopApi } from '@suite/desktop-app-api';
+import {
+    selectAutodetectLanguage,
+    selectAutodetectTheme,
+    selectLanguage,
+    selectTheme,
+    suiteSettingsActions,
+} from '@suite/settings';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { type Locale } from '@suite-common/suite-types';
+
+import { useSelector } from 'src/hooks/suite';
 import { getOsTheme, watchOsTheme } from 'src/utils/suite/env';
 import { getOsLocale, watchOsLocale } from 'src/utils/suite/l10n';
-import { useActions, useSelector } from 'src/hooks/suite';
-import { setTheme as setThemeAction } from 'src/actions/suite/suiteActions';
-import * as languageActions from 'src/actions/settings/languageActions';
 
 const Autodetect = () => {
-    const autodetectTheme = useSelector(state => state.suite.settings.autodetect.theme);
-    const autodetectLanguage = useSelector(state => state.suite.settings.autodetect.language);
-    const currentTheme = useSelector(state => state.suite.settings.theme.variant);
-    const currentLanguage = useSelector(state => state.suite.settings.language);
+    const autodetectTheme = useSelector(selectAutodetectTheme);
+    const autodetectLanguage = useSelector(selectAutodetectLanguage);
+    const currentTheme = useSelector(selectTheme);
+    const currentLanguage = useSelector(selectLanguage);
 
-    const { setTheme, setLanguage } = useActions({
-        setTheme: setThemeAction,
-        setLanguage: languageActions.setLanguage,
-    });
+    const { desktopApi, dispatch } = useServices(injectDispatch, injectDesktopApi);
+
+    const setLanguage = useCallback(
+        (language: Locale) => {
+            dispatch(suiteSettingsActions.setLanguage(language));
+        },
+        [dispatch],
+    );
+
+    const setTheme = useCallback(
+        (theme: 'dark' | 'light') => {
+            dispatch(suiteSettingsActions.setTheme(theme));
+        },
+        [dispatch],
+    );
 
     useEffect(() => {
         if (!autodetectTheme) return;
         const osTheme = getOsTheme();
         if (osTheme !== currentTheme) {
-            setTheme(osTheme);
+            dispatch(suiteSettingsActions.setTheme(osTheme));
         }
         const unwatch = watchOsTheme(setTheme);
 
         return () => unwatch();
-    }, [autodetectTheme, currentTheme, setTheme]);
+    }, [autodetectTheme, currentTheme, dispatch, setTheme]);
+
+    useEffect(() => {
+        if (!autodetectTheme || !desktopApi.available) return;
+        desktopApi.on('theme/system-change', setTheme);
+
+        return () => desktopApi.removeAllListeners('theme/system-change');
+    }, [desktopApi, autodetectTheme, setTheme]);
 
     useEffect(() => {
         if (!autodetectLanguage) return;
@@ -36,7 +65,7 @@ const Autodetect = () => {
         const unwatch = watchOsLocale(setLanguage);
 
         return () => unwatch();
-    }, [autodetectLanguage, currentLanguage, setLanguage]);
+    }, [autodetectLanguage, currentLanguage, dispatch, setLanguage]);
 
     return null;
 };

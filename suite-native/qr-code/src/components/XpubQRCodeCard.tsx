@@ -1,5 +1,9 @@
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-import { Box, Card, Text } from '@suite-native/atoms';
+import { Pressable } from 'react-native';
+
+import { Card, Text } from '@suite-native/atoms';
+import { useCopyToClipboard } from '@suite-native/clipboard';
+import { useTranslate } from '@suite-native/intl';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
 
 import { QRCode } from './QRCode';
 import { XpubOverlayWarning } from './XpubQRCodeWarningOverlay';
@@ -10,8 +14,14 @@ const xpubCardStyle = prepareNativeStyle(utils => ({
     height: XPUB_CARD_HEIGHT,
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: utils.spacings.small,
-    marginTop: utils.spacings.small,
+    marginHorizontal: utils.spacings.sp8,
+    marginTop: utils.spacings.sp8,
+}));
+
+const xpubCardTextContainerStyle = prepareNativeStyle(utils => ({
+    marginTop: utils.spacings.sp8,
+    alignItems: 'center',
+    justifyContent: 'center',
 }));
 
 export const XpubQRCodeCard = ({
@@ -22,15 +32,24 @@ export const XpubQRCodeCard = ({
     qrCodeData: string;
 }) => {
     const { applyStyle } = useNativeStyles();
+    const copyToClipboard = useCopyToClipboard();
+    const { translate } = useTranslate();
+
+    const handleCopy = () => {
+        copyToClipboard(qrCodeData, translate('qrCode.addressCopied'));
+    };
 
     return (
         <Card style={applyStyle(xpubCardStyle)}>
             {isXpubShown ? (
                 <>
                     <QRCode data={qrCodeData} />
-                    <Box margin="small" alignItems="center" justifyContent="center">
+                    <Pressable
+                        onLongPress={handleCopy}
+                        style={applyStyle(xpubCardTextContainerStyle)}
+                    >
                         <Text textAlign="center">{qrCodeData}</Text>
-                    </Box>
+                    </Pressable>
                 </>
             ) : (
                 <XpubOverlayWarning />

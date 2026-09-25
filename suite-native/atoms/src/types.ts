@@ -1,9 +1,10 @@
 export type TestProps = {
     ['data-testid']?: never;
     ['data-test']?: never;
-    ['data-test-id']?: never;
     ['data-testId']?: never;
-    ['data-testID']?: string;
+    ['data-testID']?: never;
+    ['testID']?: string;
 };
 
-export type SurfaceElevation = '0' | '1';
+export const SURFACE_ELEVATIONS = ['0', '1'] as const;
+export type SurfaceElevation = (typeof SURFACE_ELEVATIONS)[number];

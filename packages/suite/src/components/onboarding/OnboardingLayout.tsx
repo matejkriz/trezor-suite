@@ -1,188 +1,111 @@
-import { useMemo, ReactNode } from 'react';
+import { type ReactNode } from 'react';
+
 import styled from 'styled-components';
 
-import { TrezorLogo, Button, variables } from '@trezor/components';
+import { Translation } from '@suite/intl';
+import { TRAFFIC_LIGHT_DEFAULT_OFFSET } from '@suite/macos';
+import { MODAL_CONTEXT_USER } from '@suite/modal';
+import { Box, Button, Column, Row } from '@trezor/components';
+import { isDesktop, isMacOs } from '@trezor/env-utils';
+import { XIcon } from '@trezor/icons';
 import { TREZOR_SUPPORT_URL } from '@trezor/urls';
-import { TrezorLink, Translation } from 'src/components/suite';
-import { OnboardingProgressBar } from 'src/components/onboarding';
-import { useSelector, useOnboarding } from 'src/hooks/suite';
-import { MAX_ONBOARDING_WIDTH } from 'src/constants/suite/layout';
-import steps from 'src/config/onboarding/steps';
+
 import { GuideButton, GuideRouter } from 'src/components/guide';
-import { selectBannerMessage } from '@suite-common/message-system';
-import { MessageSystemBanner } from 'src/components/suite/banners';
-import { ModalContextProvider } from 'src/support/suite/ModalContext';
-import { spacingsPx, zIndices } from '@trezor/theme';
+import { OnboardingProgressBar } from 'src/components/onboarding/OnboardingProgressBar';
+import { SuiteBanners } from 'src/components/suite/banners';
+import { ReduxModal } from 'src/components/suite/modals/ReduxModal/ReduxModal';
+import { MAX_ONBOARDING_WIDTH } from 'src/constants/suite/layout';
+import { useFilteredModal } from 'src/hooks/suite';
 
-const Wrapper = styled.div`
-    display: flex;
-    width: 100%;
-    height: 100%;
-    flex-direction: column;
-    background: ${({ theme }) => theme.backgroundSurfaceElevation2};
-`;
+import {
+    OnboardingCancelButtonContext,
+    useOnboardingCancelButtonContext,
+} from './OnboardingCancelButtonContext';
+import { SmallDeviceItem } from '../../views/suite/SwitchDevice/DeviceItem/SmallDeviceItem';
+import { ConnectionGlobalModalManager } from '../connection/ConnectionGlobalModalManager';
 
-const Body = styled.div`
-    justify-content: center;
-    display: flex;
-    width: 100%;
-    height: 100%;
-`;
-
-const ScrollingWrapper = styled.div`
-    position: relative;
-    display: flex;
+const OnboardingSpacer = styled.div`
+    height: ${TRAFFIC_LIGHT_DEFAULT_OFFSET}px;
     width: 100%;
 `;
 
-const ContentWrapper = styled.div`
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    align-items: center;
-    overflow: auto;
-`;
-
-const Header = styled.div`
-    position: sticky;
-    top: 0;
-    display: flex;
-    width: 100%;
-    padding: ${spacingsPx.sm};
-    justify-content: space-between;
-    align-items: center;
-    flex-direction: column;
-    max-width: ${MAX_ONBOARDING_WIDTH}px;
-    background: ${({ theme }) => theme.backgroundSurfaceElevation2};
-    box-shadow: 0 ${spacingsPx.md} ${spacingsPx.sm} ${spacingsPx.xxs}
-        ${({ theme }) => theme.backgroundSurfaceElevation2};
-    margin-bottom: ${spacingsPx.md};
-    z-index: ${zIndices.base};
-
-    ${variables.SCREEN_QUERY.BELOW_LAPTOP} {
-        padding: 0 ${spacingsPx.lg};
-    }
-
-    ${variables.SCREEN_QUERY.MOBILE} {
-        /* low width screen (mobile) */
-        margin-bottom: ${spacingsPx.xl};
-    }
-
-    @media all and (max-height: ${variables.SCREEN_SIZE.SM}) {
-        /* low height screen */
-        padding: 0 ${spacingsPx.lg};
-        margin-bottom: ${spacingsPx.xl};
-    }
-`;
-
-const LogoHeaderRow = styled.div`
-    display: flex;
-    width: 100%;
-    justify-content: space-between;
-    margin-top: ${spacingsPx.lg};
-    margin-bottom: ${spacingsPx.xxl};
-
-    ${variables.SCREEN_QUERY.MOBILE} {
-        display: none;
-    }
-`;
-
-const ProgressBarRow = styled.div`
-    width: 100%;
-    margin-bottom: ${spacingsPx.lg};
-
-    ${variables.SCREEN_QUERY.MOBILE} {
-        margin-bottom: 0;
-    }
-`;
-
-const Content = styled.div`
-    display: flex;
-    flex-direction: column;
-    color: ${({ theme }) => theme.textSubdued};
-    justify-content: center;
-    align-items: center;
-    max-width: ${MAX_ONBOARDING_WIDTH}px;
-    width: 100%;
-    padding: 0 ${spacingsPx.lg} ${spacingsPx.xxxxl} ${spacingsPx.lg};
-`;
-
-const progressBarSteps = [
-    {
-        key: 'device',
-        label: <Translation id="TR_DEVICE" />,
-    },
-    {
-        key: 'wallet',
-        label: <Translation id="TR_ONBOARDING_STEP_WALLET" />,
-    },
-    {
-        key: 'pin',
-        label: <Translation id="TR_PIN" />,
-    },
-    {
-        key: 'coins',
-        label: <Translation id="TR_COINS" />,
-    },
-    {
-        key: 'final',
-    },
-];
-
-interface OnboardingLayoutProps {
+type OnboardingContentProps = {
     children: ReactNode;
-}
+};
 
-export const OnboardingLayout = ({ children }: OnboardingLayoutProps) => {
-    const bannerMessage = useSelector(selectBannerMessage);
-    const { activeStepId } = useOnboarding();
-
-    const activeStep = useMemo(() => steps.find(step => step.id === activeStepId)!, [activeStepId]);
+const OnboardingContent = ({ children }: OnboardingContentProps) => {
+    const { onCancelHandler } = useOnboardingCancelButtonContext();
 
     return (
-        <Wrapper>
-            {bannerMessage && <MessageSystemBanner message={bannerMessage} />}
+        <Column gap={40}>
+            <Column gap={32}>
+                <Row justifyContent="space-between">
+                    <SmallDeviceItem />
+                    <Row gap={12}>
+                        <Button
+                            intent="neutral"
+                            priority="secondary"
+                            size="small"
+                            href={TREZOR_SUPPORT_URL}
+                        >
+                            <Translation id="TR_HELP" />
+                        </Button>
+                        {onCancelHandler !== null ? (
+                            <Button
+                                intent="neutral"
+                                priority="secondary"
+                                iconRight={XIcon}
+                                size="small"
+                                onClick={onCancelHandler}
+                            >
+                                <Translation id="TR_CANCEL" />
+                            </Button>
+                        ) : null}
+                    </Row>
+                </Row>
+                <OnboardingProgressBar />
+            </Column>
+            <Box>{children}</Box>
+        </Column>
+    );
+};
 
-            <Body data-test="@onboarding-layout/body">
-                <ScrollingWrapper>
-                    <ModalContextProvider>
-                        <ContentWrapper id="layout-scroll">
-                            <Header>
-                                <LogoHeaderRow>
-                                    <TrezorLogo type="suite" width="128px" />
+type OnboardingLayoutProps = {
+    children: ReactNode;
+};
 
-                                    <TrezorLink
-                                        type="hint"
-                                        variant="nostyle"
-                                        href={TREZOR_SUPPORT_URL}
-                                    >
-                                        <Button
-                                            variant="tertiary"
-                                            icon="EXTERNAL_LINK"
-                                            iconAlignment="right"
-                                            size="small"
-                                        >
-                                            <Translation id="TR_HELP" />
-                                        </Button>
-                                    </TrezorLink>
-                                </LogoHeaderRow>
+export const OnboardingLayout = ({ children }: OnboardingLayoutProps) => {
+    const isMac = isMacOs();
+    const isDesktopApp = isDesktop();
 
-                                <ProgressBarRow>
-                                    <OnboardingProgressBar
-                                        steps={progressBarSteps}
-                                        activeStep={activeStep.stepGroup}
-                                    />
-                                </ProgressBarRow>
-                            </Header>
+    const allowedModal = useFilteredModal(
+        [MODAL_CONTEXT_USER],
+        ['advanced-coin-settings', 'disable-tor'],
+    );
 
-                            <Content>{children}</Content>
-                        </ContentWrapper>
-                    </ModalContextProvider>
-                </ScrollingWrapper>
-
+    return (
+        <>
+            <ConnectionGlobalModalManager />
+            {allowedModal !== null ? <ReduxModal {...allowedModal} /> : null}
+            <Row width="100%" height="100%">
+                <Column width="100%" height="100%" overflow="auto" alignItems="center">
+                    {isMac && isDesktopApp && <OnboardingSpacer />}
+                    <Column
+                        data-testid="@onboarding-layout/body"
+                        gap={20}
+                        maxWidth={MAX_ONBOARDING_WIDTH}
+                        width="100%"
+                        padding={{ horizontal: 20, top: 32, bottom: 48 }}
+                    >
+                        <SuiteBanners isOnboarding />
+                        <OnboardingCancelButtonContext>
+                            <OnboardingContent>{children}</OnboardingContent>
+                        </OnboardingCancelButtonContext>
+                    </Column>
+                </Column>
                 <GuideButton />
                 <GuideRouter />
-            </Body>
-        </Wrapper>
+            </Row>
+        </>
     );
 };

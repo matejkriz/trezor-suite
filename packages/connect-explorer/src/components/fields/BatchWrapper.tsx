@@ -1,26 +1,22 @@
-import { ReactNode } from 'react';
+import { type ReactNode } from 'react';
+
 import styled from 'styled-components';
-import { THEME, Icon } from '@trezor/components';
+
+import { Card, Icon } from '@trezor/components';
+import { XIcon } from '@trezor/icons';
 
 interface BatchWrapperProps {
     children: ReactNode;
     onRemove: () => void;
 }
 
-const Wrapper = styled.div`
-    display: flex;
-    flex-direction: row;
-    border-bottom: 1px solid ${THEME.light.STROKE_GREY};
-    margin: 16px;
-`;
-
 const Fields = styled.div`
     flex: 1;
 `;
 
 export const BatchWrapper = ({ children, onRemove }: BatchWrapperProps) => (
-    <Wrapper>
+    <Card paddingType="small">
+        <Icon as={XIcon} onClick={() => onRemove()} size={20} />
         <Fields>{children}</Fields>
-        <Icon icon="CROSS" onClick={() => onRemove()} />
-    </Wrapper>
+    </Card>
 );

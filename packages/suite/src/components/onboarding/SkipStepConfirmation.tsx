@@ -1,74 +1,92 @@
-import styled from 'styled-components';
+import { type ReactNode } from 'react';
+
+import { Translation } from '@suite/intl';
+import { Modal } from '@trezor/components';
 
 import * as STEP from 'src/constants/onboarding/steps';
-import { AnyStepId } from 'src/types/onboarding';
-import { Button } from '@trezor/components';
-import { Translation, Modal } from 'src/components/suite';
 import { useOnboarding } from 'src/hooks/suite';
-import { typography } from '@trezor/theme';
+import { type AnyStepId } from 'src/types/onboarding';
 
-const Wrapper = styled.div`
-    display: flex;
-    width: 100%;
-    color: ${({ theme }) => theme.textDefault};
-    ${typography.body};
-    padding: 16px 0;
-`;
-
-const StyledModal = styled(Modal)`
-    width: 600px;
-    ${Modal.BottomBar} {
-        > * {
-            flex: 1;
-        }
-    }
-`;
-
-interface SkipStepConfirmationProps {
+type SkipStepConfirmationProps = {
     onCancel: () => void;
-}
+    onConfirm?: () => void;
+};
 
-export const SkipStepConfirmation = ({ onCancel }: SkipStepConfirmationProps) => {
-    const { activeStepId, goToNextStep } = useOnboarding();
+type SkipModalContent = {
+    heading?: ReactNode;
+    secondaryButtonText?: ReactNode;
+    body?: ReactNode;
+    nextStep?: AnyStepId;
+};
 
-    let text;
-    let nextStep: AnyStepId;
+const getModalContent = (
+    activeStepId: AnyStepId,
+    resolveNextAfterSkipped: (stepId: AnyStepId) => AnyStepId | undefined,
+): SkipModalContent => {
     switch (activeStepId) {
+        case STEP.ID_FIRMWARE_STEP:
+            return {
+                heading: <Translation id="TR_SKIP_UPDATE" />,
+                secondaryButtonText: <Translation id="TR_SKIP_UPDATE" />,
+                body: <Translation id="TR_SKIP_UPDATE_DESCRIPTION" />,
+            };
         case STEP.ID_SECURITY_STEP:
-        case STEP.ID_BACKUP_STEP:
-            text = <Translation id="TR_SKIP_BACKUP" />;
-            nextStep = STEP.ID_SET_PIN_STEP;
-            break;
+            return {
+                heading: <Translation id="TR_SKIP_BACKUP_HEADER" />,
+                secondaryButtonText: <Translation id="TR_SKIP_BACKUP" />,
+                body: <Translation id="TR_SKIP_BACKUP_DESCRIPTION" />,
+                nextStep: resolveNextAfterSkipped(STEP.ID_SET_PIN_STEP),
+            };
         case STEP.ID_SET_PIN_STEP:
-            text = <Translation id="TR_SKIP_PIN" />;
-            break;
+            return {
+                heading: <Translation id="TR_SKIP_PIN" />,
+                secondaryButtonText: <Translation id="TR_SKIP_PIN" />,
+                body: <Translation id="TR_SKIP_PIN_DESCRIPTION" />,
+            };
         default:
-            throw new Error(`Unexpected step to skip: ${activeStepId}`);
+            return {};
     }
+};
+
+export const SkipStepConfirmation = ({ onCancel, onConfirm }: SkipStepConfirmationProps) => {
+    const { activeStepId, goToNextStep, resolveNextAfterSkipped } = useOnboarding();
+    const { heading, secondaryButtonText, body, nextStep } = getModalContent(
+        activeStepId,
+        resolveNextAfterSkipped,
+    );
+
+    if (!heading) return;
+
+    const handleSkipStepConfirm = () => {
+        if (onConfirm) {
+            onConfirm();
+        } else {
+            goToNextStep(nextStep);
+        }
+    };
 
     return (
-        <StyledModal
-            isCancelable
-            heading={text}
+        <Modal
+            heading={heading}
             onCancel={onCancel}
-            bottomBarComponents={
+            width={600}
+            bottomContent={
                 <>
-                    <Button variant="primary" onClick={onCancel}>
+                    <Modal.Button onClick={onCancel}>
                         <Translation id="TR_DONT_SKIP" />
-                    </Button>
-                    <Button
-                        variant="tertiary"
-                        data-test="@onboarding/skip-button-confirm"
-                        onClick={() => goToNextStep(nextStep)}
+                    </Modal.Button>
+                    <Modal.Button
+                        intent="neutral"
+                        priority="secondary"
+                        data-testid="@onboarding/skip-button-confirm"
+                        onClick={handleSkipStepConfirm}
                     >
-                        {text}
-                    </Button>
+                        {secondaryButtonText}
+                    </Modal.Button>
                 </>
             }
         >
-            <Wrapper>
-                <Translation id="TR_DO_YOU_REALLY_WANT_TO_SKIP" />
-            </Wrapper>
-        </StyledModal>
+            {body}
+        </Modal>
     );
 };

@@ -6,14 +6,21 @@
     "sideEffects": false,
     "main": "src/index",
     "scripts": {
-        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "type-check": "yarn g:tsc --build"
+        "depcheck": "yarn g:depcheck",
+        "type-check": "yarn g:tsc --build",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'"
     },
     "dependencies": {
+        "@storybook/react-native": "^10.2.1",
+        "@suite-common/analytics": "workspace:*",
+        "@suite-common/dependency-injection": "workspace:*",
+        "@suite-native/analytics": "workspace:*",
         "@suite-native/toasts": "workspace:*",
-        "@trezor/styles": "workspace:*",
+        "@trezor/styles-native": "workspace:*",
         "@trezor/theme": "workspace:*",
-        "react": "18.2.0"
+        "@trezor/urls": "workspace:*",
+        "react": "19.2.3",
+        "type-fest": "5.5.0"
     },
     "peerDependencies": {
         "react-native": "*",

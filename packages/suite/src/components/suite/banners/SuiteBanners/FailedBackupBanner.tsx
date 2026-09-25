@@ -1,23 +1,38 @@
-import { Translation } from 'src/components/suite';
-import { goto } from 'src/actions/suite/routerActions';
-import { useDispatch } from 'src/hooks/suite';
-import { Banner } from '../Banner';
-import { SettingsAnchor } from 'src/constants/suite/anchors';
+import { useState } from 'react';
+
+import { useDevice } from '@suite/device';
+import { Translation } from '@suite/intl';
+import { Banner } from '@trezor/components';
+import { isDeviceInBootloaderMode } from '@trezor/device-utils';
+
+import { WipeDeviceModal } from 'src/views/settings/SettingsDevice/WipeDevice/WipeDeviceModal';
 
 export const FailedBackup = () => {
-    const dispatch = useDispatch();
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const { device } = useDevice();
+    const isBootloaderMode = isDeviceInBootloaderMode(device);
 
-    const action = {
-        label: <Translation id="TR_CONTINUE" />,
-        onClick: () => dispatch(goto('settings-device', { anchor: SettingsAnchor.BackupFailed })),
-        'data-test': '@notification/failed-backup/cta',
-    };
+    const buttonTranslation = isBootloaderMode
+        ? 'TR_DEVICE_SETTINGS_FACTORY_RESET'
+        : 'TR_DEVICE_SETTINGS_WIPE_DEVICE';
 
     return (
-        <Banner
-            variant="destructive"
-            body={<Translation id="TR_FAILED_BACKUP" />}
-            action={action}
-        />
+        <>
+            {isModalOpen && <WipeDeviceModal onCancel={() => setIsModalOpen(false)} />}
+            <Banner
+                icon
+                intent="critical"
+                data-testid="@notification/failed-backup"
+                rightContent={
+                    <Banner.Button
+                        onClick={() => setIsModalOpen(true)}
+                        data-testid="@notification/failed-backup/continue-button"
+                    >
+                        <Translation id={buttonTranslation} />
+                    </Banner.Button>
+                }
+                description={<Translation id="TR_FAILED_BACKUP" />}
+            />
+        </>
     );
 };

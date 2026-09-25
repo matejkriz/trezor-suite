@@ -1,0 +1,10 @@
+{
+    "ignore-patterns": ["libDev", "lib"],
+    "ignores": [
+        "node-loader",
+        "@playwright/browser-chromium",
+        "@playwright/browser-firefox",
+        "@playwright/browser-webkit",
+        "@suite/desktop-app"
+    ]
+}

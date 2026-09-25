@@ -1,135 +1,230 @@
 import UDP from 'dgram';
-import { isNotUndefined } from '@trezor/utils';
 
-import { AbstractApi, AbstractApiConstructorParams } from './abstract';
-import { AsyncResultWithTypedError, ResultWithTypedError } from '../types';
+import {
+    AbstractApi,
+    type AbstractApiArgs,
+    type AbstractApiAwaitedResult,
+    type AbstractApiConstructorParams,
+    DEVICE_TYPE,
+    type DescriptorApiLevel,
+    TRANSPORT_ERROR as ERRORS,
+    PathInternal,
+    error,
+    readMessageBuffer,
+    success,
+} from '@trezor/transport-common';
+import { arrayPartition, isNotUndefined, resolveAfter } from '@trezor/utils';
 
-import * as ERRORS from '../errors';
+const PING = Buffer.from('PINGPING');
+const PONG = Buffer.from('PONGPONG');
 
 export class UdpApi extends AbstractApi {
-    interface = UDP.createSocket('udp4');
-    protected communicating = false;
+    chunkSize = 64;
 
-    constructor({ logger }: AbstractApiConstructorParams) {
-        super({ logger });
+    protected devices: DescriptorApiLevel[] = [];
+    private listenAbortController = new AbortController();
+    protected interface = UDP.createSocket({
+        type: 'udp4',
+        signal: this.listenAbortController.signal,
+    });
+    private debugLink?: boolean;
+    private readBuffer: ReturnType<typeof readMessageBuffer>;
+
+    constructor({
+        logger,
+        debugLink,
+    }: Omit<AbstractApiConstructorParams, 'type'> & { debugLink?: boolean }) {
+        super({ logger, type: 'udp' });
+        this.debugLink = debugLink;
+        this.readBuffer = readMessageBuffer();
+
+        const onMessage = (message: Buffer, info: UDP.RemoteInfo) => {
+            if (message.compare(PONG) === 0) {
+                return;
+            }
+
+            const id = `${info.address}:${info.port}`;
+            this.readBuffer.onMessage(id, message);
+            this.logger?.debug('udp: globalOnMessage log:', message.toString('hex'));
+        };
+        this.interface.addListener('message', onMessage);
     }
 
-    public write(path: string, buffer: Buffer) {
-        const [hostname, port] = path.split(':');
+    listen() {
+        if (this.listening) return;
+        this.listening = true;
+        this.listenLoop();
+    }
 
-        return new Promise<
-            ResultWithTypedError<
-                undefined,
-                typeof ERRORS.INTERFACE_DATA_TRANSFER | typeof ERRORS.UNEXPECTED_ERROR
-            >
-        >(resolve => {
-            this.interface.send(buffer, Number.parseInt(port, 10), hostname, err => {
+    private async listenLoop() {
+        while (this.listening) {
+            await resolveAfter(500);
+            if (!this.listening) break;
+            await this.enumerate(this.listenAbortController.signal);
+        }
+    }
+
+    public write(...[path, buffer, options]: AbstractApiArgs<'write'>) {
+        const parts = path.split(':');
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const hostname: string = parts[0];
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const port: string = parts[1];
+        const signal = options?.signal;
+
+        return new Promise<AbstractApiAwaitedResult<'write'>>(resolve => {
+            const listener = () => {
+                resolve(
+                    error({
+                        code: ERRORS.ABORTED_BY_SIGNAL,
+                    }),
+                );
+            };
+            signal?.addEventListener('abort', listener);
+
+            let chunk;
+            if (buffer.compare(PING) === 0) {
+                // PINGPING is expected to be 8 bytes
+                chunk = buffer;
+            } else {
+                // other messages are expected to be 64 bytes
+                chunk = Buffer.alloc(this.chunkSize);
+                buffer.copy(chunk);
+            }
+
+            this.interface.send(chunk, Number.parseInt(port, 10), hostname, err => {
+                signal?.removeEventListener('abort', listener);
+
+                if (signal?.aborted) {
+                    return;
+                }
+
                 if (err) {
-                    this.logger.error(err.message);
+                    this.logger?.error(err.message);
 
-                    return resolve(
-                        this.error({
-                            error: ERRORS.INTERFACE_DATA_TRANSFER,
+                    resolve(
+                        error({
+                            code: ERRORS.INTERFACE_DATA_TRANSFER,
                             message: err.message,
                         }),
                     );
                 }
 
-                return resolve(this.success(undefined));
+                resolve(success(undefined));
             });
         });
     }
 
-    public read(
-        _path: string,
-    ): AsyncResultWithTypedError<
-        ArrayBuffer,
-        | typeof ERRORS.DEVICE_NOT_FOUND
-        | typeof ERRORS.INTERFACE_UNABLE_TO_OPEN_DEVICE
-        | typeof ERRORS.INTERFACE_DATA_TRANSFER
-        | typeof ERRORS.DEVICE_DISCONNECTED_DURING_ACTION
-        | typeof ERRORS.UNEXPECTED_ERROR
-        | typeof ERRORS.ABORTED_BY_TIMEOUT
-    > {
-        this.communicating = true;
-
-        return new Promise<
-            ResultWithTypedError<
-                ArrayBuffer,
-                typeof ERRORS.INTERFACE_DATA_TRANSFER | typeof ERRORS.ABORTED_BY_TIMEOUT
-            >
-        >(resolve => {
-            const onError = (err: Error) => {
-                this.logger.error(err.message);
-
-                resolve(
-                    this.error({
-                        error: ERRORS.INTERFACE_DATA_TRANSFER,
-                        message: err.message,
-                    }),
-                );
-                this.interface.removeListener('error', onError);
-                // eslint-disable-next-line @typescript-eslint/no-use-before-define
-                this.interface.removeListener('message', onMessage);
-            };
-            const onMessage = (message: Buffer, _info: UDP.RemoteInfo) => {
-                if (message.toString() === 'PONGPONG') {
-                    return;
-                }
-                this.interface.removeListener('error', onError);
-                this.interface.removeListener('message', onMessage);
-                resolve(this.success(message));
-            };
-            this.interface.addListener('error', onError);
-            this.interface.addListener('message', onMessage);
-        }).finally(() => {
-            this.communicating = false;
-        });
+    public read(...[path, options]: AbstractApiArgs<'read'>) {
+        return this.readBuffer.read(path, options?.signal);
     }
 
-    private async ping(path: string) {
-        await this.write(path, Buffer.from('PINGPING'));
+    private async ping(path: PathInternal, signal?: AbortSignal) {
+        await this.write(path, PING, { signal });
+        if (signal?.aborted) {
+            throw new Error(ERRORS.ABORTED_BY_SIGNAL);
+        }
 
         const pinged = new Promise<boolean>(resolve => {
+            /* eslint-disable @typescript-eslint/no-use-before-define */
+            const onClear = () => {
+                this.interface.removeListener('error', onError);
+                this.interface.removeListener('message', onMessage);
+                clearTimeout(timeout);
+                signal?.removeEventListener('abort', onError);
+            };
+            /* eslint-enable @typescript-eslint/no-use-before-define */
+            const onError = () => {
+                resolve(false);
+                onClear();
+            };
             const onMessage = (message: Buffer, _info: UDP.RemoteInfo) => {
-                if (message.toString() === 'PONGPONG') {
+                if (message.compare(PONG) === 0) {
                     resolve(true);
-                    this.interface.removeListener('message', onMessage);
-                    // eslint-disable-next-line @typescript-eslint/no-use-before-define
-                    clearTimeout(timeout);
+                    onClear();
                 }
             };
+
+            signal?.addEventListener('abort', onError);
+            this.interface.addListener('error', onError);
             this.interface.addListener('message', onMessage);
 
-            const timeout = setTimeout(
-                () => {
-                    this.interface.removeListener('message', onMessage);
-                    resolve(false);
-                },
-                this.communicating ? 10000 : 500,
-            );
+            // TODO temporarily increased from 1s to 4s until success screen is solved on fw side
+            const timeout = setTimeout(onError, 4000);
         });
 
         return pinged;
     }
 
-    public async enumerate() {
+    public async enumerate(signal?: AbortSignal) {
         // in theory we could support multiple devices, but we don't yet
-        const paths = ['127.0.0.1:21324'];
+        const paths = this.debugLink
+            ? [PathInternal('127.0.0.1:21325')]
+            : [PathInternal('127.0.0.1:21324')];
 
-        const enumerateResult = await Promise.all(
-            paths.map(path => this.ping(path).then(pinged => (pinged ? path : undefined))),
-        ).then(res => res.filter(isNotUndefined));
+        try {
+            const enumerateResult = await Promise.all(
+                paths.map(path =>
+                    this.ping(path, signal).then(pinged =>
+                        pinged
+                            ? {
+                                  path,
+                                  type: DEVICE_TYPE.TypeEmulator,
+                                  product: 0,
+                                  vendor: 0,
+                                  id: path,
+                                  apiType: this.type,
+                              }
+                            : undefined,
+                    ),
+                ),
+            ).then(res => res.filter(isNotUndefined));
+            this.handleDevicesChange(enumerateResult);
 
-        return this.success(enumerateResult);
+            return success(enumerateResult);
+        } catch {
+            this.handleDevicesChange([]);
+
+            return error({ code: ERRORS.ABORTED_BY_SIGNAL });
+        }
     }
 
-    public openDevice(_path: string, _first: boolean) {
+    private handleDevicesChange(devices: DescriptorApiLevel[]) {
+        const [known, unknown] = arrayPartition(
+            devices,
+            device => !!this.devices.find(d => d.path === device.path),
+        );
+
+        // find all disconnected devices and cancel reading (if any)
+        const [disconnected] = arrayPartition(
+            this.devices,
+            device => !devices.some(d => d.path === device.path),
+        );
+        disconnected.forEach(d => this.readBuffer.cancelRead(d.path));
+
+        if (known.length !== this.devices.length || unknown.length > 0) {
+            this.devices = devices;
+            if (this.listening) {
+                this.emit('transport-interface-change', this.devices);
+            }
+        }
+    }
+
+    public openDevice(...[_path]: AbstractApiArgs<'openDevice'>) {
         // todo: maybe ping?
-        return Promise.resolve(this.success(undefined));
+        return Promise.resolve(success(undefined));
     }
 
-    public closeDevice(_path: string) {
-        return Promise.resolve(this.success(undefined));
+    public closeDevice(...[path]: AbstractApiArgs<'closeDevice'>) {
+        this.readBuffer.cancelRead(path);
+
+        return Promise.resolve(success(undefined));
+    }
+
+    public dispose() {
+        this.interface.removeAllListeners();
+        this.interface.close();
+        this.listening = false;
+        this.listenAbortController.abort();
     }
 }

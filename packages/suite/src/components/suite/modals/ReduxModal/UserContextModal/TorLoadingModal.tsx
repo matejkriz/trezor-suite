@@ -1,12 +1,5 @@
-import styled from 'styled-components';
-
-import { UserContextPayload } from '@suite-common/suite-types';
-
-import { TorLoader, Modal } from 'src/components/suite';
-
-const SmallModal = styled(Modal)`
-    width: 560px;
-`;
+import { TorLoader } from '@suite/tor-desktop';
+import { type UserContextPayload } from '@suite-common/suite-types';
 
 type TorLoadingModalProps = Omit<Extract<UserContextPayload, { type: 'tor-loading' }>, 'type'> & {
     onCancel: () => void;
@@ -18,5 +11,5 @@ export const TorLoadingModal = ({ onCancel, decision }: TorLoadingModalProps) =>
         decision.resolve(result);
     };
 
-    return <TorLoader ModalWrapper={SmallModal} callback={callback} />;
+    return <TorLoader callback={callback} />;
 };

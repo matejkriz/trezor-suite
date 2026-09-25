@@ -1,15 +1,17 @@
 import { useMemo } from 'react';
-import BigNumber from 'bignumber.js';
-import { AccountUtxo } from '@trezor/connect';
 
-import { getUtxoOutpoint } from '@suite-common/wallet-utils';
-import { Account } from '@suite-common/wallet-types';
-import { useSelector, useTranslation } from 'src/hooks/suite';
-import { WabiSabiProtocolErrorCode } from 'src/types/wallet/coinjoin';
 import {
+    WabiSabiProtocolErrorCode,
     selectCoinjoinAccountByKey,
     selectCoinjoinClient,
-} from 'src/reducers/wallet/coinjoinReducer';
+} from '@suite/coinjoin';
+import { useTranslation } from '@suite/intl';
+import { type Account } from '@suite-common/wallet-types';
+import { getUtxoOutpoint } from '@suite-common/wallet-utils';
+import { type AccountUtxo } from '@trezor/connect';
+import { BigNumber } from '@trezor/utils';
+
+import { useSelector } from 'src/hooks/suite';
 
 interface UseCoinjoinUnavailableUtxosProps {
     account: Account;
@@ -45,5 +47,5 @@ export const useCoinjoinUnavailableUtxos = ({
         if (amountBN.gt(coinjoinClient.allowedInputAmounts.max)) {
             return translationString('TR_AMOUNT_TOO_BIG_FOR_COINJOIN');
         }
-    }, [utxo, coinjoinAccount?.prison, coinjoinClient?.allowedInputAmounts, translationString]);
+    }, [utxo, coinjoinAccount?.prison, coinjoinClient, translationString]);
 };

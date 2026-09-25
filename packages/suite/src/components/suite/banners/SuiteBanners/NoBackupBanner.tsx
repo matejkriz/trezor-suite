@@ -1,21 +1,30 @@
-import { Translation } from 'src/components/suite';
-import { goto } from 'src/actions/suite/routerActions';
-import { useDispatch, useTranslation } from 'src/hooks/suite';
-import { Banner } from '../Banner';
+import { Translation, useTranslation } from '@suite/intl';
+import { gotoThunk } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { Banner } from '@trezor/components';
 
 export const NoBackup = () => {
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
     const { translationString } = useTranslation();
-
-    const action = {
-        label: <Translation id="TR_CREATE_BACKUP" />,
-        onClick: () => dispatch(goto('backup-index')),
-        'data-test': '@notification/no-backup/button',
-    };
 
     const translation = `${translationString(
         'TR_YOUR_TREZOR_IS_NOT_BACKED_UP',
     )} ${translationString('TR_IF_YOUR_DEVICE_IS_EVER_LOST')}`;
 
-    return <Banner variant="destructive" body={translation} action={action} />;
+    return (
+        <Banner
+            icon
+            intent="critical"
+            rightContent={
+                <Banner.Button
+                    onClick={() => dispatch(gotoThunk({ routeName: 'backup-index' }))}
+                    data-testid="@notification/no-backup/button"
+                >
+                    <Translation id="TR_CREATE_BACKUP" />
+                </Banner.Button>
+            }
+            description={translation}
+        />
+    );
 };

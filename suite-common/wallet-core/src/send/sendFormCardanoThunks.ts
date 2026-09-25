@@ -1,0 +1,212 @@
+import { createThunk } from '@suite-common/redux-utils';
+import { notificationsActions } from '@suite-common/toast-notifications';
+import {
+    AddressDisplayOptions,
+    type PrecomposedLevelsCardano,
+    type PrecomposedTransactionCardano,
+} from '@suite-common/wallet-types';
+import {
+    formatMaxOutputAmount,
+    getAddressParameters,
+    getDerivationType,
+    getNetworkId,
+    getProtocolMagic,
+    getUnusedChangeAddress,
+    isTestnet,
+    transformUserOutputs,
+} from '@suite-common/wallet-utils';
+import TrezorConnect, { PROTO, type PrecomposedTransactionFinalCardano } from '@trezor/connect';
+
+import { SEND_MODULE_PREFIX } from './sendFormConstants';
+import {
+    type ComposeFeeLevelsError,
+    type ComposeTransactionThunkArguments,
+    type SignTransactionError,
+    type SignTransactionThunkArguments,
+} from './sendFormTypes';
+import {
+    type WalletSettingsRootState,
+    selectAddressDisplayType,
+} from '../settings/walletSettingsReducer';
+
+type ComposeCardanoTransactionFeeLevelsThunkState = void;
+
+export const composeCardanoTransactionFeeLevelsThunk = createThunk<
+    PrecomposedLevelsCardano,
+    ComposeTransactionThunkArguments,
+    { rejectValue: ComposeFeeLevelsError; state: ComposeCardanoTransactionFeeLevelsThunkState }
+>(
+    `${SEND_MODULE_PREFIX}/composeCardanoTransactionFeeLevelsThunk`,
+    async ({ formState, composeContext }, { dispatch, rejectWithValue }) => {
+        const { account, feeInfo } = composeContext;
+        const changeAddress = getUnusedChangeAddress(account);
+        if (!changeAddress || !account.utxo || !account.addresses)
+            return rejectWithValue({
+                error: 'fee-levels-compose-failed',
+                message: 'Change address, utxos or addresses are missing.',
+            });
+
+        const predefinedLevels = feeInfo.levels.filter(l => l.label !== 'custom');
+        if (formState.selectedFee === 'custom') {
+            predefinedLevels.push({
+                label: 'custom',
+                feePerUnit: formState.feePerUnit,
+                blocks: -1,
+            });
+        }
+
+        const outputs = transformUserOutputs(
+            formState.outputs,
+            account.tokens,
+            account.symbol,
+            formState.setMaxOutputId,
+        );
+
+        const addressParameters = getAddressParameters(account, changeAddress.path);
+
+        const response = await TrezorConnect.cardanoComposeTransaction({
+            feeLevels: predefinedLevels,
+            outputs,
+            account: {
+                descriptor: account.descriptor,
+                utxo: account.utxo,
+            },
+            changeAddress,
+            addressParameters,
+            testnet: isTestnet(account.symbol),
+        });
+
+        if (!response.success) {
+            if (response.error.code !== 'Method_InvalidParameter') {
+                dispatch(
+                    notificationsActions.addToast({
+                        type: 'sign-tx-error',
+                        error: response.error.message,
+                    }),
+                );
+            }
+
+            return rejectWithValue({
+                error: 'fee-levels-compose-failed',
+                message: response.error.message,
+            });
+        }
+
+        const resultLevels: PrecomposedLevelsCardano = {};
+        response.payload.forEach((t, index) => {
+            const tx: PrecomposedTransactionCardano = t;
+            switch (tx.type) {
+                case 'final':
+                    // convert from lovelace units to ADA
+                    tx.max = formatMaxOutputAmount(
+                        tx.max,
+                        outputs.find(o => o.setMax),
+                        account,
+                    );
+                    break;
+                case 'nonfinal':
+                    // convert lovelace to ADA (for ADA outputs only)
+                    tx.max = formatMaxOutputAmount(
+                        tx.max,
+                        outputs.find(o => o.setMax && o.assets.length === 0),
+                        account,
+                    );
+                    break;
+                case 'error':
+                    switch (tx.error) {
+                        case 'UTXO_BALANCE_INSUFFICIENT':
+                            tx.errorMessage = { id: 'AMOUNT_IS_NOT_ENOUGH' };
+                            break;
+                        case 'UTXO_VALUE_TOO_SMALL':
+                            tx.errorMessage = { id: 'AMOUNT_IS_TOO_LOW' };
+                            break;
+                        default:
+                            dispatch(
+                                notificationsActions.addToast({
+                                    type: 'sign-tx-error',
+                                    error: tx.error,
+                                }),
+                            );
+                            break;
+                    }
+                    break;
+                // no default
+            }
+
+            // @ts-expect-error: indexing with noUncheckedIndexedAccess
+            const predefinedLevel: (typeof predefinedLevels)[number] = predefinedLevels[index];
+            const feeLabel = predefinedLevel.label;
+            resultLevels[feeLabel] = tx;
+        });
+
+        return resultLevels;
+    },
+);
+
+type SignCardanoTransactionThunkArguments = Omit<
+    SignTransactionThunkArguments,
+    'formState' | 'precomposedTransaction' | 'accountStatus'
+> & {
+    precomposedTransaction: PrecomposedTransactionFinalCardano;
+};
+
+type SignCardanoSendFormTransactionThunkState = WalletSettingsRootState;
+
+export const signCardanoSendFormTransactionThunk = createThunk<
+    { serializedTx: string },
+    SignCardanoTransactionThunkArguments,
+    {
+        rejectValue: SignTransactionError;
+        state: SignCardanoSendFormTransactionThunkState;
+    }
+>(
+    `${SEND_MODULE_PREFIX}/signCardanoSendFormTransactionThunk`,
+    async (
+        { precomposedTransaction, selectedAccount, device, paymentRequests },
+        { getState, rejectWithValue },
+    ) => {
+        const { symbol, accountType } = selectedAccount;
+
+        if (selectedAccount.networkType !== 'cardano')
+            return rejectWithValue({
+                error: 'sign-transaction-failed',
+                message: 'Account network type is not Cardano.',
+            });
+
+        const payment_req = paymentRequests?.[0];
+        const addressDisplayType = selectAddressDisplayType(getState());
+
+        // todo: add chunkify once we allow it for Cardano
+        const response = await TrezorConnect.cardanoSignTransaction({
+            signingMode: PROTO.CardanoTxSigningMode.ORDINARY_TRANSACTION,
+            device: {
+                path: device.path,
+                instance: device.instance,
+                state: device.state,
+                useEmptyPassphrase: device.useEmptyPassphrase,
+            },
+            inputs: precomposedTransaction.inputs,
+            outputs: precomposedTransaction.outputs,
+            unsignedTx: precomposedTransaction.unsignedTx,
+            tagCborSets: true,
+            testnet: isTestnet(symbol),
+            protocolMagic: getProtocolMagic(symbol),
+            networkId: getNetworkId(),
+            fee: precomposedTransaction.fee,
+            ttl: precomposedTransaction.ttl?.toString(),
+            derivationType: getDerivationType(accountType),
+            payment_req,
+            chunkify: addressDisplayType == AddressDisplayOptions.CHUNKED,
+        });
+
+        if (!response.success) {
+            return rejectWithValue({
+                error: 'sign-transaction-failed',
+                errorCode: response.error.code,
+                message: response.error.message,
+            });
+        }
+
+        return { serializedTx: response.payload.serializedTx };
+    },
+);

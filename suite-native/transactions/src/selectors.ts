@@ -1,25 +1,46 @@
-import { memoizeWithArgs } from 'proxy-memoize';
 import { A, G, pipe } from '@mobily/ts-belt';
 
+import { createWeakMapSelector } from '@suite-common/redux-utils';
 import {
-    FiatRatesRootState,
-    selectTransactionByTxidAndAccountKey,
+    type TokenDefinitionsRootState,
+    getSimpleCoinDefinitionsByNetwork,
+    isTokenDefinitionKnown,
+    selectTokenDefinitions,
+} from '@suite-common/token-definitions';
+import { type NetworkSymbol, getNetworkType } from '@suite-common/wallet-config';
+import {
+    type AccountsRootState,
+    type FiatRatesRootState,
+    type TransactionsRootState,
+    type WalletSettingsRootState,
+    createSimpleTargetId,
+    selectAccountNetworkType,
+    selectAccountTransactions,
+    selectBaseCurrency,
+    selectHasAccountTransactionHistory,
+    selectHistoricFiatRatesByTimestamp,
+    selectTransactionByAccountKeyAndTxid,
     selectTransactionTargets,
-    TransactionsRootState,
 } from '@suite-common/wallet-core';
-import { AccountKey, TokenAddress, TokenSymbol } from '@suite-common/wallet-types';
-import { getNetworkType, NetworkSymbol } from '@suite-common/wallet-config';
-import { selectEthereumTokenHasFiatRates } from '@suite-native/ethereum-tokens';
-import { SettingsSliceRootState } from '@suite-native/module-settings';
+import {
+    type AccountKey,
+    type Timestamp,
+    type TokenAddress,
+    type TokenSymbol,
+    type WalletAccountTransaction,
+} from '@suite-common/wallet-types';
+import { getFiatRateKey } from '@suite-common/wallet-utils';
 
+import { type AddressesType, type VinVoutAddress } from './types';
 import { mapTransactionInputsOutputsToAddresses, sortTargetAddressesToBeginning } from './utils';
-import { AddressesType, VinVoutAddress } from './types';
 
-const selectTransactionTargetAddresses = memoizeWithArgs(
-    (state: TransactionsRootState, txid: string, accountKey: AccountKey) => {
-        const transaction = selectTransactionByTxidAndAccountKey(state, txid, accountKey);
+const createMemoizedSelector = createWeakMapSelector.withTypes<
+    TransactionsRootState & TokenDefinitionsRootState
+>();
 
-        const transactionTargets = selectTransactionTargets(state, txid, accountKey);
+const selectTransactionTargetAddresses = createMemoizedSelector(
+    [selectTransactionByAccountKeyAndTxid, selectTransactionTargets],
+    (transaction, transactionTargets) => {
         if (G.isNullable(transaction) || G.isNullable(transactionTargets)) return [];
 
         const isSentTransactionType = transaction.type === 'sent';
@@ -30,18 +51,16 @@ const selectTransactionTargetAddresses = memoizeWithArgs(
             isSentTransactionType,
         });
     },
-    { size: 50 },
 );
 
-export const selectTransactionAddresses = memoizeWithArgs(
-    (
-        state: TransactionsRootState,
-        txid: string,
-        accountKey: AccountKey,
-        addressesType: AddressesType,
-    ): VinVoutAddress[] => {
-        const transaction = selectTransactionByTxidAndAccountKey(state, txid, accountKey);
-
+export const selectTransactionAddresses = createMemoizedSelector(
+    [
+        selectTransactionByAccountKeyAndTxid,
+        selectTransactionTargetAddresses,
+        (_state, _accountKey: AccountKey, _txid: string, addressesType: AddressesType) =>
+            addressesType,
+    ],
+    (transaction, transactionTargetAddresses, addressesType): VinVoutAddress[] => {
         if (G.isNullable(transaction)) return [];
 
         const networkType = getNetworkType(transaction.symbol);
@@ -49,14 +68,21 @@ export const selectTransactionAddresses = memoizeWithArgs(
         if (networkType === 'ripple') {
             // For ripple, we don't have inputs (input is always the same address - account descriptor)
             if (addressesType === 'inputs') {
-                return [{ address: transaction.descriptor, isChangeAddress: false }];
+                return [
+                    {
+                        address: transaction.descriptor,
+                        isChangeAddress: false,
+                        outputIndex: 0,
+                        txTargetId: createSimpleTargetId({ n: 0 }),
+                    },
+                ];
             }
 
             // We have only one output so we don't need to sort it
-            return selectTransactionTargetAddresses(state, txid, accountKey);
+            return transactionTargetAddresses;
         }
 
-        const targetAddresses = selectTransactionTargetAddresses(state, txid, accountKey);
+        const targetAddresses = transactionTargetAddresses;
 
         const inputsOutputs =
             addressesType === 'inputs' ? transaction.details.vin : transaction.details.vout;
@@ -71,7 +97,6 @@ export const selectTransactionAddresses = memoizeWithArgs(
 
         return sortTargetAddressesToBeginning(addresses, targetAddresses);
     },
-    { size: 100 },
 );
 
 type TransactionTransferInputOutput = { address: string; amount?: string };
@@ -82,18 +107,16 @@ export type TransactionTranfer = {
     decimals?: number;
 };
 
-export const selectTransactionInputAndOutputTransfers = memoizeWithArgs(
+export const selectTransactionInputAndOutputTransfers = createMemoizedSelector(
+    [selectTransactionByAccountKeyAndTxid, selectTokenDefinitions],
     (
-        state: TransactionsRootState & FiatRatesRootState & SettingsSliceRootState,
-        txid: string,
-        accountKey: AccountKey,
+        transaction,
+        tokenDefinitions,
     ): {
         externalTransfers: TransactionTranfer[];
         internalTransfers: TransactionTranfer[];
         tokenTransfers: TransactionTranfer[];
     } | null => {
-        const transaction = selectTransactionByTxidAndAccountKey(state, txid, accountKey);
-
         if (G.isNullable(transaction)) return null;
 
         const networkType = getNetworkType(transaction.symbol);
@@ -102,7 +125,7 @@ export const selectTransactionInputAndOutputTransfers = memoizeWithArgs(
             const externalTransfers: TransactionTranfer[] = [
                 {
                     inputs: [{ address: transaction.descriptor }],
-                    outputs: [{ address: transaction.targets?.[0].addresses?.[0] ?? '' }],
+                    outputs: [{ address: transaction.targets?.[0]?.addresses?.[0] ?? '' }],
                     symbol: transaction.symbol,
                 },
             ];
@@ -134,14 +157,20 @@ export const selectTransactionInputAndOutputTransfers = memoizeWithArgs(
             }),
         );
 
+        const tokenDefinitionsForNetwork = getSimpleCoinDefinitionsByNetwork(
+            tokenDefinitions,
+            transaction.symbol,
+        );
+
         const tokenTransfers: TransactionTranfer[] = pipe(
             tokens,
-            A.filter(({ symbol, contract }) =>
-                selectEthereumTokenHasFiatRates(
-                    state,
-                    contract as TokenAddress,
-                    symbol as TokenSymbol,
-                ),
+            A.filter(
+                ({ contract }) =>
+                    !!isTokenDefinitionKnown(
+                        tokenDefinitionsForNetwork,
+                        transaction.symbol,
+                        contract,
+                    ),
             ),
             A.map(({ from, to, amount, symbol, decimals }) => ({
                 inputs: [{ address: from }],
@@ -153,5 +182,50 @@ export const selectTransactionInputAndOutputTransfers = memoizeWithArgs(
 
         return { externalTransfers, internalTransfers, tokenTransfers };
     },
-    { size: 100 },
 );
+
+// Preferred way to get this value is to use selectHasAccountTransactionHistory, because it is faster (no need to fetch transactions).
+// That selector unfortunately does not support Ripple, so for XRP accounts we need to use suboptimal selectHasAccountTransactionHistory.
+export const selectHasAccountAnyTransactions = createMemoizedSelector(
+    [selectAccountNetworkType, selectHasAccountTransactionHistory, selectAccountTransactions],
+    (networkType, hasAccountTransactionHistory, transactions): boolean => {
+        if (networkType !== 'ripple') {
+            return hasAccountTransactionHistory;
+        }
+
+        return transactions.length > 0;
+    },
+);
+
+// Unlike selectHasAccountAnyTransactions, the token branch can only inspect already fetched
+// transactions, so it returns false until the first transactions page is loaded.
+export const selectHasAccountAnyTransactionsForToken = (
+    state: AccountsRootState & TransactionsRootState,
+    accountKey: AccountKey,
+    tokenContract?: TokenAddress,
+): boolean => {
+    if (!tokenContract) {
+        return selectHasAccountAnyTransactions(state, accountKey);
+    }
+
+    const transactions = selectAccountTransactions(state, accountKey);
+
+    return transactions.some(transaction =>
+        transaction.tokens.some(token => token.contract === tokenContract),
+    );
+};
+
+export const selectTransactionFiatRate = (
+    state: WalletSettingsRootState & FiatRatesRootState,
+    transaction: WalletAccountTransaction,
+    tokenAddress?: TokenAddress,
+) => {
+    const localCurrency = selectBaseCurrency(state);
+    const fiatRateKey = getFiatRateKey(transaction.symbol, localCurrency, tokenAddress);
+
+    return selectHistoricFiatRatesByTimestamp(
+        state,
+        fiatRateKey,
+        transaction.blockTime as Timestamp,
+    );
+};

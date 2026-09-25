@@ -1,5 +1,6 @@
-import { SocketBase, SocketConfig } from './base';
 import type { SocksProxyAgent } from 'socks-proxy-agent';
+
+import { SocketBase, type SocketConfig } from './base';
 import type { SocketListener } from './interface';
 
 type TorSocketConfig = SocketConfig & {
@@ -17,7 +18,7 @@ export class TorSocket extends SocketBase {
     protected async openSocket(listener: SocketListener) {
         const { host, port } = this;
         const socket = await this.proxyAgent
-            .callback(null as any, { host, port, timeout: this.timeout, secureEndpoint: false })
+            .connect(null as any, { host, port, timeout: this.timeout, secureEndpoint: false })
             .catch(e => {
                 listener.onError(e);
                 throw e;

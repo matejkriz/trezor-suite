@@ -1,66 +1,43 @@
-import { Alert } from 'react-native';
+import { VStack } from '@suite-native/atoms';
+import { isDevelopOrDebugEnv } from '@suite-native/config';
+import { Translation } from '@suite-native/intl';
+import { DynamicScreenHeader, Screen } from '@suite-native/navigation';
 
-import * as Sentry from '@sentry/react-native';
+import { AnalyticsLogging } from '../components/AnalyticsLogging';
+import { ComponentDemoCard } from '../components/ComponentDemoCard';
+import { DangerZoneCard } from '../components/DangerZoneCard';
+import { DebuggingCard } from '../components/DebuggingCard';
+import { EarnCard } from '../components/EarnCard';
+import { FeatureFlagsCard } from '../components/FeatureFlagsCard';
+import { FirmwareSourceCard } from '../components/FirmwareSourceCard';
+import { InfoCard } from '../components/InfoCard';
+import { MessageSystemCard } from '../components/MessageSystemCard';
+import { SuiteSyncQuotaManager } from '../components/SuiteSyncQuotaManager';
+import { SuiteSyncRelaySettings } from '../components/SuiteSyncRelaySettings';
+import { TradingCard } from '../components/TradingCard';
 
-import { getEnv, isDebugEnv, isDevelopOrDebugEnv, isProduction } from '@suite-native/config';
-import { Button, Card, ListItem, VStack } from '@suite-native/atoms';
-import {
-    Screen,
-    StackProps,
-    DevUtilsStackParamList,
-    DevUtilsStackRoutes,
-    ScreenSubHeader,
-} from '@suite-native/navigation';
-import { clearStorage } from '@suite-native/storage';
-import { getCommitHash, getSuiteVersion } from '@trezor/env-utils';
-
-import { RenderingUtils } from '../components/RenderingUtils';
-import { FeatureFlags } from '../components/FeatureFlags';
-import { TestnetsToggle } from '../components/TestnetsToggle';
-import { DiscoveryCoinsFilter } from '../components/DiscoveryCoinsFilter';
-
-export const DevUtilsScreen = ({
-    navigation,
-}: StackProps<DevUtilsStackParamList, DevUtilsStackRoutes.DevUtils>) => (
-    <Screen screenHeader={<ScreenSubHeader content="DEV utils" />}>
-        <VStack>
-            <Card>
-                <VStack spacing="medium">
-                    {!isDebugEnv() && (
-                        <ListItem
-                            subtitle={`${getEnv()}-${getSuiteVersion()}, commit ${getCommitHash()}`}
-                            title="Build version"
-                        />
-                    )}
-                    {isDebugEnv() && (
-                        <Button onPress={() => navigation.navigate(DevUtilsStackRoutes.Demo)}>
-                            See Component Demo
-                        </Button>
-                    )}
-                    {!isProduction() && <RenderingUtils />}
-                    {isDevelopOrDebugEnv() && (
-                        <>
-                            <FeatureFlags />
-                            <DiscoveryCoinsFilter />
-                        </>
-                    )}
-                    <Button
-                        onPress={() => {
-                            const errorMessage = `Sentry test error - ${Date.now()}`;
-                            Sentry.captureException(new Error(errorMessage));
-                            Alert.alert('Sentry error thrown', errorMessage);
-                        }}
-                    >
-                        Throw Sentry error
-                    </Button>
-                    <Button colorScheme="dangerElevation0" onPress={clearStorage}>
-                        Wipe all data
-                    </Button>
-                </VStack>
-            </Card>
-            <Card>
-                <TestnetsToggle />
-            </Card>
+export const DevUtilsScreen = () => (
+    <Screen
+        header={
+            <DynamicScreenHeader
+                title={<Translation id="moduleSettings.items.features.devUtils.title" />}
+                subtitle={<Translation id="moduleSettings.items.features.devUtils.subtitle" />}
+            />
+        }
+    >
+        <VStack spacing="sp16">
+            <InfoCard />
+            {isDevelopOrDebugEnv() && <ComponentDemoCard />}
+            <FeatureFlagsCard />
+            <AnalyticsLogging />
+            <TradingCard />
+            <EarnCard />
+            <MessageSystemCard />
+            <FirmwareSourceCard />
+            <SuiteSyncRelaySettings />
+            <SuiteSyncQuotaManager />
+            <DebuggingCard />
+            <DangerZoneCard />
         </VStack>
     </Screen>
 );

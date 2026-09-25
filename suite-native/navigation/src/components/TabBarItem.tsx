@@ -1,14 +1,16 @@
-import { TouchableOpacity, View } from 'react-native';
+import { View } from 'react-native';
 
-import { Icon, IconName } from '@suite-common/icons';
-import { Text, TITLE_MAX_FONT_MULTIPLIER } from '@suite-native/atoms';
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
+import { PressableOpacity, TITLE_MAX_FONT_MULTIPLIER, Text } from '@suite-native/atoms';
+import { Icon, type IconName } from '@suite-native/icons';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
 
 type TabBarItemProps = {
     isFocused: boolean;
     onPress: () => void;
     iconName: IconName;
+    focusedIconName: IconName;
     title?: string;
+    testID: string;
 };
 
 const tabBarItemStyle = prepareNativeStyle(_ => ({
@@ -20,16 +22,21 @@ const tabBarItemStyle = prepareNativeStyle(_ => ({
 const tabBarItemContainerStyle = prepareNativeStyle(utils => ({
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: utils.spacings.small,
+    paddingTop: utils.spacings.sp8,
 }));
 
-const TAB_BAR_ITEM_HORIZONTAL_HIT_SLOP = 15;
-
-export const TabBarItem = ({ isFocused, onPress, iconName, title }: TabBarItemProps) => {
+export const TabBarItem = ({
+    isFocused,
+    onPress,
+    iconName,
+    focusedIconName,
+    title,
+    testID,
+}: TabBarItemProps) => {
     const { applyStyle } = useNativeStyles();
 
     return (
-        <TouchableOpacity
+        <PressableOpacity
             accessibilityRole="button"
             accessibilityState={isFocused ? { selected: true } : {}}
             onPress={() => {
@@ -39,29 +46,27 @@ export const TabBarItem = ({ isFocused, onPress, iconName, title }: TabBarItemPr
              */
                 onPress();
             }}
-            hitSlop={{
-                top: TAB_BAR_ITEM_HORIZONTAL_HIT_SLOP,
-                bottom: TAB_BAR_ITEM_HORIZONTAL_HIT_SLOP,
-            }}
             style={applyStyle(tabBarItemStyle)}
+            testID={`@tabBar/${testID}`}
         >
             <View style={applyStyle(tabBarItemContainerStyle)}>
                 <Icon
-                    name={iconName}
+                    name={isFocused ? focusedIconName : iconName}
                     size="large"
-                    color={isFocused ? 'iconPrimaryDefault' : 'iconDisabled'}
+                    color={isFocused ? 'contentBrand' : 'contentDisabled'}
                 />
                 {title && (
                     <Text
                         maxFontSizeMultiplier={TITLE_MAX_FONT_MULTIPLIER}
-                        variant="label"
+                        variant="body-xs"
                         textAlign="center"
-                        color={isFocused ? 'textPrimaryDefault' : 'textDisabled'}
+                        color={isFocused ? 'contentBrand' : 'contentDisabled'}
+                        testID={`@tabBar/${testID}/title`}
                     >
                         {title}
                     </Text>
                 )}
             </View>
-        </TouchableOpacity>
+        </PressableOpacity>
     );
 };

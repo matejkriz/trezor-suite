@@ -1,16 +1,26 @@
 {
     "extends": "../../tsconfig.lib.json",
+    "include": ["./src"],
     "compilerOptions": {
         "outDir": "./lib",
-        "esModuleInterop": false
+        "rootDir": "./src",
+        "types": ["node", "chrome", "jest"]
     },
-    "include": ["./src"],
     "references": [
+        { "path": "../crypto-utils" },
+        { "path": "../device-utils" },
+        { "path": "../protobuf" },
+        { "path": "../protocol" },
+        { "path": "../type-utils" },
+        { "path": "../utils" },
+        { "path": "../blockchain-link" },
+        { "path": "../blockchain-link-types" },
+        { "path": "../device-authenticity" },
+        { "path": "../eslint" },
         {
-            "path": "../env-utils"
+            "path": "../../networks/cardano/network-cardano"
         },
-        {
-            "path": "../utils"
-        }
+        { "path": "../transport-common" },
+        { "path": "../utxo-lib" }
     ]
 }

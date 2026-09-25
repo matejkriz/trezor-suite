@@ -4,20 +4,20 @@ import { CoinjoinBackendClient } from './CoinjoinBackendClient';
 import { CoinjoinFilterController } from './CoinjoinFilterController';
 import { CoinjoinMempoolController } from './CoinjoinMempoolController';
 import { DISCOVERY_LOOKOUT, DISCOVERY_LOOKOUT_EXTENDED } from '../constants';
-import { scanAccount } from './scanAccount';
-import { getAccountInfo } from './getAccountInfo';
-import { createPendingTransaction } from './createPendingTx';
 import { deriveAddresses, isTaprootAddress } from './backendUtils';
-import { getNetwork } from '../utils/settingsUtils';
-import type { CoinjoinBackendSettings, LogEvent, Logger, LogLevel } from '../types';
+import { createPendingTransaction } from './createPendingTx';
+import { getAccountInfo } from './getAccountInfo';
+import { scanAccount } from './scanAccount';
+import type { CoinjoinBackendSettings, LogEvent, LogLevel, Logger } from '../types';
 import type {
-    ScanAccountParams,
+    AccountCache,
     ScanAccountCheckpoint,
+    ScanAccountParams,
     ScanAccountProgress,
     ScanProgressInfo,
     Transaction,
-    AccountCache,
 } from '../types/backend';
+import { getCoinjoinNetwork } from '../utils/settingsUtils';
 
 interface Events {
     log: LogEvent;
@@ -37,14 +37,13 @@ export class CoinjoinBackend extends TypedEmitter<Events> {
     constructor(settings: CoinjoinBackendSettings) {
         super();
         this.settings = Object.freeze(settings);
-        this.network = getNetwork(settings.network);
+        this.network = getCoinjoinNetwork(settings.network);
         const logger = this.getLogger();
         this.client = new CoinjoinBackendClient({ ...settings, logger });
         this.mempool = new CoinjoinMempoolController({
             client: this.client,
             network: this.network,
             filter: address => isTaprootAddress(address, this.network),
-            logger,
         });
     }
 
@@ -118,7 +117,10 @@ export class CoinjoinBackend extends TypedEmitter<Events> {
     }
 
     async getAccountCheckpoint(xpub: string) {
-        const { address } = deriveAddresses([], xpub, 'receive', 0, 1, this.network)[0];
+        const derived = deriveAddresses([], xpub, 'receive', 0, 1, this.network);
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const firstDerived: (typeof derived)[number] = derived[0];
+        const { address } = firstDerived;
         const addressFirstPage = await this.client.fetchAddress(address);
 
         if (addressFirstPage.txs === 0) {
@@ -138,7 +140,9 @@ export class CoinjoinBackend extends TypedEmitter<Events> {
                 : addressFirstPage;
 
         const transactions = latestPage.transactions!;
-        const oldestTx = transactions[transactions.length - 1];
+        const lastIndex = transactions.length - 1;
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const oldestTx: (typeof transactions)[number] = transactions[lastIndex];
         const blockHeight = oldestTx.blockHeight - 1;
         const blockHash = await this.client.fetchBlockHash(blockHeight);
 

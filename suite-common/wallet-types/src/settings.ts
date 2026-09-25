@@ -1,13 +1,31 @@
-import { Network } from '@suite-common/wallet-config';
-import { FeeLevel, PROTO } from '@trezor/connect';
-import { FiatCurrencyCode } from '@suite-common/suite-config';
+import { type NetworkSymbol } from '@suite-common/wallet-config';
+import type { BaseCurrencyCode } from '@trezor/blockchain-link-types';
+import type { PROTO } from '@trezor/connect';
+
+export const AddressDisplayOptions = {
+    ORIGINAL: 'original',
+    CHUNKED: 'chunked',
+} as const;
+
+export type AddressDisplayOptions =
+    (typeof AddressDisplayOptions)[keyof typeof AddressDisplayOptions];
+
+export const WalletType = {
+    STANDARD: 'standard',
+    PASSPHRASE: 'passphrase',
+} as const;
+
+export type WalletType = (typeof WalletType)[keyof typeof WalletType];
+
+export type SuspiciousTransactionsFilter = 'showAll' | 'hideSuspicious' | 'showUnblurred';
 
 export interface WalletSettings {
-    localCurrency: FiatCurrencyCode;
-    discreetMode: boolean;
-    enabledNetworks: Network['symbol'][];
+    localCurrency: BaseCurrencyCode;
+    enabledNetworks: NetworkSymbol[];
+    suspiciousTransactionsFilter: Partial<Record<NetworkSymbol, SuspiciousTransactionsFilter>>;
     bitcoinAmountUnit: PROTO.AmountUnit;
-    lastUsedFeeLevel: {
-        [key: string]: Omit<FeeLevel, 'blocks'>; // Key: Network['symbol']
-    };
+    mevProtection: boolean;
+    networkReserve: boolean;
+    isAutoEjectEnabled: boolean;
+    addressDisplayType: AddressDisplayOptions;
 }

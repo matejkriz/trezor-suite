@@ -1,17 +1,21 @@
-import BigNumber from 'bignumber.js';
+import { type BaseCurrencyAmount, asBaseCurrencyAmount } from '@suite-common/wallet-types';
+import { BigNumber } from '@trezor/utils';
 
-import { FiatRatesLegacy } from '@trezor/connect';
-import { Rate } from '@suite-common/wallet-types';
+import { type AmountUnit, asAmountUnit } from './AmountTypes';
 
-export const toFiatCurrency = (
-    amount: string,
-    fiatCurrency: string,
-    fiatRate: FiatRatesLegacy | Rate | undefined,
-    decimals = 2,
-    legacy = true,
-) => {
-    // calculate amount in local currency
-    const rate = legacy ? (fiatRate as FiatRatesLegacy)?.[fiatCurrency] : fiatRate?.rate;
+type ToFiatCurrencyParams = {
+    // Todo: remove `string`, its used only for backwards compatibility
+    amount: string | AmountUnit;
+    rate: number | undefined;
+};
+
+/**
+ * This function does only numerical operations, formatting is to be handled in formatters.
+ */
+export const toFiatCurrency = ({
+    amount,
+    rate,
+}: ToFiatCurrencyParams): BaseCurrencyAmount | null => {
     if (!rate) {
         return null;
     }
@@ -26,28 +30,32 @@ export const toFiatCurrency = (
         return null;
     }
 
-    return decimals === -1 ? localAmount.toFixed() : localAmount.toFixed(decimals);
+    return asBaseCurrencyAmount(localAmount);
 };
 
-export const fromFiatCurrency = (
-    localAmount: string,
-    fiatCurrency: string,
-    fiatRate: FiatRatesLegacy | Rate | undefined,
-    decimals: number,
-    legacy = true,
-) => {
-    const rate = legacy ? (fiatRate as FiatRatesLegacy)?.[fiatCurrency] : fiatRate?.rate;
+type FromBaseCurrencyParams = {
+    // Todo: remove string
+    fiatAmount: string | BaseCurrencyAmount;
+    rate: number | undefined;
+};
+
+/**
+ * This function does only numerical operations, formatting is to be handled in formatters.
+ */
+export const fromBaseCurrencyToCryptoUnit = ({
+    fiatAmount,
+    rate,
+}: FromBaseCurrencyParams): AmountUnit | null => {
     if (!rate) {
         return null;
     }
 
-    let formattedLocalAmount = localAmount;
-    if (typeof localAmount === 'string') {
-        formattedLocalAmount = localAmount.replace(',', '.');
+    let formattedLocalAmount = fiatAmount;
+    if (typeof fiatAmount === 'string') {
+        formattedLocalAmount = fiatAmount.replace(',', '.');
     }
 
     const amount = new BigNumber(formattedLocalAmount).div(rate);
-    const amountStr = amount.isNaN() ? null : amount.toFixed(decimals);
 
-    return amountStr;
+    return amount.isNaN() ? null : asAmountUnit(amount);
 };

@@ -1,30 +1,45 @@
-import styled from 'styled-components';
-import { ReactNode, MutableRefObject } from 'react';
-import { transparentize } from 'polished';
-import { spacings, zIndices } from '@trezor/theme';
-import { TooltipContent, TooltipFloatingUi, TooltipTrigger } from './TooltipFloatingUi';
-import { Placement } from '@floating-ui/react';
-import { TooltipBox, TooltipBoxProps } from './TooltipBox';
+import { type MutableRefObject, type ReactNode } from 'react';
+
+import { type Placement, type ShiftOptions } from '@floating-ui/react';
+import styled, { useTheme } from 'styled-components';
+
+import { QuestionIcon } from '@trezor/icons';
+import { type ZIndexValues, zIndices } from '@trezor/theme';
+
 import { TooltipArrow } from './TooltipArrow';
-import { TOOLTIP_DELAY_SHORT, TooltipDelay } from './TooltipDelay';
-
-export type Cursor = 'inherit' | 'pointer' | 'help' | 'default' | 'not-allowed';
-
-const Wrapper = styled.div<{ $isFullWidth: boolean }>`
-    width: ${({ $isFullWidth }) => ($isFullWidth ? '100%' : 'auto')};
-`;
-
-const Content = styled.div<{ $dashed: boolean; $cursor: Cursor }>`
-    cursor: ${({ $cursor }) => $cursor};
-
-    > * {
-        border-bottom: ${({ $dashed, theme }) =>
-            $dashed && `1.5px dashed ${transparentize(0.66, theme.TYPE_LIGHT_GREY)}`};
-        cursor: ${({ $cursor }) => $cursor};
-    }
-`;
+import { TooltipBox, type TooltipBoxProps } from './TooltipBox';
+import { TOOLTIP_DELAY_SHORT, type TooltipDelay } from './TooltipDelay';
+import { TooltipContent, TooltipFloatingUi, TooltipTrigger } from './TooltipFloatingUi';
+import {
+    type FrameProps,
+    type FramePropsKeys,
+    pickAndPrepareFrameProps,
+    withFrameProps,
+} from '../../utils/frameProps';
+import { type TransientProps } from '../../utils/transientProps';
+import { Icon } from '../Icon/Icon';
 
 export type TooltipInteraction = 'none' | 'hover';
+
+export const allowedTooltipFrameProps = [
+    'cursor',
+    'display',
+    'margin',
+    'width',
+    'maxWidth',
+    'minWidth',
+    'flex',
+] as const satisfies FramePropsKeys[];
+export type AllowedFrameProps = Pick<FrameProps, (typeof allowedTooltipFrameProps)[number]>;
+
+const Content = styled.div<TransientProps<AllowedFrameProps>>`
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    text-decoration: inherit;
+
+    ${withFrameProps}
+`;
 
 type ManagedModeProps = {
     isOpen?: boolean;
@@ -41,43 +56,50 @@ type UnmanagedModeProps = {
 };
 
 type TooltipUiProps = {
+    isActive?: boolean;
     children: ReactNode;
-    className?: string;
-    disabled?: boolean;
-    dashed?: boolean;
     offset?: number;
-    cursor?: Cursor;
-    isFullWidth?: boolean;
+    shift?: ShiftOptions;
     placement?: Placement;
     hasArrow?: boolean;
+    hasIcon?: boolean;
     appendTo?: HTMLElement | null | MutableRefObject<HTMLElement | null>;
-};
+    zIndex?: ZIndexValues;
+    disableFlip?: boolean;
+    as?: 'div' | 'span';
+} & AllowedFrameProps;
 
-export type TooltipProps = (ManagedModeProps | UnmanagedModeProps) &
-    TooltipUiProps &
-    TooltipBoxProps;
+export type ManagedTooltipProps = ManagedModeProps & TooltipUiProps & TooltipBoxProps;
+export type UnmanagedTooltipProps = UnmanagedModeProps & TooltipUiProps & TooltipBoxProps;
+
+export type TooltipProps = ManagedTooltipProps | UnmanagedTooltipProps;
 
 export const Tooltip = ({
+    isActive = true,
     placement = 'top',
     children,
-    isLarge = false,
-    dashed = false,
     delayShow = TOOLTIP_DELAY_SHORT,
     delayHide = TOOLTIP_DELAY_SHORT,
-    maxWidth = 400,
-    offset = spacings.sm,
-    cursor = 'help',
+    tooltipMaxWidth = 400,
+    offset = 12,
     content,
     addon,
-    title,
-    headerIcon,
-    disabled,
-    className,
-    isFullWidth = false,
     isOpen,
-    hasArrow = false,
+    hasArrow = true,
+    hasIcon = false,
     appendTo,
+    shift,
+    zIndex = zIndices.tooltip,
+    disableFlip = false,
+    as = 'div',
+    ...rest
 }: TooltipProps) => {
+    const theme = useTheme();
+    const frameProps = pickAndPrepareFrameProps(
+        rest,
+        allowedTooltipFrameProps,
+    ) as TransientProps<AllowedFrameProps>;
+
     if (!content || !children) {
         return <>{children}</>;
     }
@@ -85,35 +107,40 @@ export const Tooltip = ({
     const delayConfiguration = { open: delayShow, close: delayHide };
 
     return (
-        <Wrapper $isFullWidth={isFullWidth} className={className}>
-            <TooltipFloatingUi
-                placement={placement}
-                isOpen={isOpen}
-                offset={offset}
-                delay={delayConfiguration}
-            >
-                <TooltipTrigger>
-                    <Content $dashed={dashed} $cursor={disabled ? 'default' : cursor}>
-                        {children}
-                    </Content>
-                </TooltipTrigger>
+        <TooltipFloatingUi
+            isActive={isActive}
+            placement={placement}
+            isOpen={isOpen}
+            offset={offset}
+            shift={shift}
+            delay={delayConfiguration}
+            disableFlip={disableFlip}
+        >
+            <TooltipTrigger>
+                <Content as={as} data-component="Tooltip" {...frameProps}>
+                    {children}
+                    {hasIcon && isActive && <Icon as={QuestionIcon} size={16} />}
+                </Content>
+            </TooltipTrigger>
 
-                <TooltipContent
-                    data-test="@tooltip"
-                    style={{ zIndex: zIndices.tooltip }}
-                    arrowRender={hasArrow ? TooltipArrow : undefined}
-                    appendTo={appendTo}
-                >
-                    <TooltipBox
-                        content={content}
-                        addon={addon}
-                        headerIcon={headerIcon}
-                        isLarge={isLarge}
-                        maxWidth={maxWidth}
-                        title={title}
-                    />
-                </TooltipContent>
-            </TooltipFloatingUi>
-        </Wrapper>
+            <TooltipContent
+                data-testid="@tooltip"
+                style={{ zIndex }}
+                arrowRender={
+                    hasArrow
+                        ? props => (
+                              <TooltipArrow
+                                  {...props}
+                                  fill={theme.surfaceFillModelessNeutralDark}
+                              />
+                          )
+                        : undefined
+                }
+                appendTo={appendTo}
+                onClick={e => e.stopPropagation()}
+            >
+                <TooltipBox content={content} addon={addon} tooltipMaxWidth={tooltipMaxWidth} />
+            </TooltipContent>
+        </TooltipFloatingUi>
     );
 };

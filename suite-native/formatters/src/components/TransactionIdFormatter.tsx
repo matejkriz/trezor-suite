@@ -1,12 +1,12 @@
-import { Text, TextProps } from '@suite-native/atoms';
-import { WalletAccountTransaction } from '@suite-common/wallet-types';
+import { type WalletAccountTransaction } from '@suite-common/wallet-types';
+import { Text, type TextProps } from '@suite-native/atoms';
 
-import { FormatterProps } from '../types';
+import { type FormatterProps } from '../types';
 
 type TransactionIdFormatterProps = FormatterProps<WalletAccountTransaction['txid']> & TextProps;
 
 export const TransactionIdFormatter = ({ value, ...rest }: TransactionIdFormatterProps) => (
-    <Text variant="hint" numberOfLines={1} ellipsizeMode="tail" {...rest}>
-        #{value}
+    <Text variant="body-sm" numberOfLines={1} ellipsizeMode="tail" {...rest}>
+        {value}
     </Text>
 );

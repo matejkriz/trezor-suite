@@ -1,0 +1,20 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": { "outDir": "libDev" },
+    "references": [
+        { "path": "../../suite-common/networks" },
+        {
+            "path": "../../suite-common/redux-utils"
+        },
+        {
+            "path": "../../suite-common/toast-notifications"
+        },
+        {
+            "path": "../../suite-common/transfer-uri"
+        },
+        { "path": "../analytics" },
+        {
+            "path": "../../networks/network-module/network-module-suite-common-types"
+        }
+    ]
+}

@@ -18,13 +18,12 @@ Browser (User Agent), System and HW specifications, Suite version, instance id s
 
 ### Extra data:
 
--   Enabled-coins e.g.: `[btc, ltc, eth, xrp, doge]`
--   Wallet discovery e.g.:
+- Enabled-coins e.g.: `[btc, ltc, eth, xrp, doge]`
+- Wallet discovery e.g.:
 
 ```
 [
   {
-    authConfirm:False,
     bundleSize: 0,
     deviceState: [redacted],
     failed: [],
@@ -38,11 +37,10 @@ Browser (User Agent), System and HW specifications, Suite version, instance id s
 ]
 ```
 
--   Device information (slightly redacted):
+- Device information (slightly redacted):
 
 ```
 {
-  authConfirm: False,
   available: False,
   buttonRequests: [],
   connected: False,
@@ -56,13 +54,10 @@ Browser (User Agent), System and HW specifications, Suite version, instance id s
         [
           Capability_Bitcoin,
           Capability_Bitcoin_like,
-          Capability_Binance,
           Capability_Cardano,
           Capability_Crypto,
-          Capability_EOS,
           Capability_Ethereum,
           Capability_Monero,
-          Capability_NEM,
           Capability_Ripple,
           Capability_Stellar,
           Capability_Tezos,
@@ -88,13 +83,13 @@ Browser (User Agent), System and HW specifications, Suite version, instance id s
       major_version: 2,
       minor_version: 4,
       model: T,
-      needs_backup: False,
+      backup_availability: 0,
       no_backup: False,
       passphrase_always_on_device: False,
       passphrase_protection: True,
       patch_version: 2,
       pin_protection: True,
-      recovery_mode: False,
+      recovery_status: 0,
       revision: 9276b1702361f70e094286e2f89e919d8a230d5c,
       safety_checks: Strict,
       sd_card_present: False,
@@ -106,7 +101,7 @@ Browser (User Agent), System and HW specifications, Suite version, instance id s
       wipe_code_protection: False,
     },
   firmware: valid,
-  firmwareRelease:
+  firmwareReleaseConfigInfo:
     {
       changelog: [],
       isNewer: False,
@@ -131,7 +126,7 @@ Browser (User Agent), System and HW specifications, Suite version, instance id s
 }
 ```
 
--   Action logs:
+- Action logs:
 
 ```
 [

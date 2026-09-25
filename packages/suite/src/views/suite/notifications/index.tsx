@@ -1,23 +1,123 @@
-import styled from 'styled-components';
-import { Card } from '@trezor/components';
+import { useState } from 'react';
 
-import { Notifications, Translation } from 'src/components/suite';
-import { DashboardSection } from 'src/components/dashboard';
-import { useLayout } from 'src/hooks/suite';
+import { DebugOnlyBadge, selectIsDebugModeActive } from '@suite/debug';
+import { Translation, type TranslationKey } from '@suite/intl';
+import {
+    type NotificationsState,
+    isTransactionNotification,
+} from '@suite-common/toast-notifications';
+import {
+    selectHasUnseenNonPhishingTransactionNotifications,
+    selectNonPhishingTransactionNotifications,
+} from '@suite-common/wallet-core';
+import { Card, CollapsibleBox, Column, Dot, Row } from '@trezor/components';
 
-const StyledSection = styled(DashboardSection)`
-    width: 100%;
-`;
+import {
+    type NavigationItem,
+    PageHeader,
+    SubpageNavigation,
+} from 'src/components/suite/layouts/SuiteLayout';
+import { NotificationGroup } from 'src/components/suite/notifications/Notifications/NotificationGroup/NotificationGroup';
+import { ReleaseNotes } from 'src/components/suite/notifications/ReleaseNotes/ReleaseNotes';
+import { TriggerActivityNotification } from 'src/components/suite/notifications/TriggerActivityNotification/TriggerActivityNotification';
+import { useLayout, useSelector } from 'src/hooks/suite';
+
+type ActivityTab = 'transactions' | 'release-notes' | 'all';
+
+type NotificationsViewState = {
+    notifications: NotificationsState<TranslationKey>;
+};
+
+const selectSuiteNotifications = (state: NotificationsViewState) => state.notifications;
 
 const NotificationsView = () => {
-    useLayout('Notifications');
+    const isDebugModeActive = useSelector(selectIsDebugModeActive);
+    const [selectedTab, setSelectedTab] = useState<ActivityTab>('transactions');
+
+    const notifications = useSelector(selectSuiteNotifications);
+    const hasUnseenNotifications = useSelector(selectHasUnseenNonPhishingTransactionNotifications);
+    const transactionNotifications = useSelector(selectNonPhishingTransactionNotifications);
+    const activityNotifications = notifications.filter(
+        notification => !isTransactionNotification(notification),
+    );
+
+    const activitySubpages: NavigationItem<ActivityTab>[] = [
+        {
+            id: 'transactions',
+            title: (
+                <Row gap={4} alignItems="center">
+                    <Translation id="NOTIFICATIONS_IMPORTANT_TITLE" />
+                    {hasUnseenNotifications && (
+                        <Dot
+                            isAnimated
+                            intent="critical"
+                            size={8}
+                            data-testid="@notifications/menu/unseen-dot"
+                        />
+                    )}
+                </Row>
+            ),
+            callback: () => setSelectedTab('transactions'),
+            'data-testid': '@notifications/menu/transactions',
+        },
+        {
+            id: 'all',
+            title: <Translation id="NOTIFICATIONS_SYSTEM_TITLE" />,
+            callback: () => setSelectedTab('all'),
+            'data-testid': '@notifications/menu/all',
+        },
+        {
+            id: 'release-notes',
+            title: <Translation id="TR_RELEASE_NOTES" />,
+            callback: () => setSelectedTab('release-notes'),
+            'data-testid': '@notifications/menu/release-notes',
+        },
+    ];
+
+    useLayout(
+        'Activity',
+        <>
+            <PageHeader />
+            <SubpageNavigation
+                data-testid="@notifications/menu"
+                items={activitySubpages}
+                activeItemId={selectedTab}
+            />
+        </>,
+    );
 
     return (
-        <StyledSection heading={<Translation id="NOTIFICATIONS_TITLE" />}>
-            <Card paddingType="none">
-                <Notifications />
-            </Card>
-        </StyledSection>
+        <Column gap={16} width="100%" maxWidth={600} margin={{ horizontal: 'auto' }}>
+            {selectedTab === 'transactions' && (
+                <Card>
+                    <NotificationGroup notifications={transactionNotifications} />
+                </Card>
+            )}
+            {selectedTab === 'all' && (
+                <Card>
+                    <NotificationGroup
+                        notifications={activityNotifications}
+                        emptyTitle="NOTIFICATIONS_EMPTY_ACTIVITY_TITLE"
+                        emptyDescription="NOTIFICATIONS_EMPTY_ACTIVITY_DESC"
+                    />
+                </Card>
+            )}
+            {selectedTab === 'release-notes' && <ReleaseNotes />}
+
+            {isDebugModeActive && (
+                <CollapsibleBox
+                    data-testid="@activity/debug/box"
+                    heading={
+                        <Row gap={8}>
+                            Debug activity
+                            <DebugOnlyBadge />
+                        </Row>
+                    }
+                >
+                    <TriggerActivityNotification />
+                </CollapsibleBox>
+            )}
+        </Column>
     );
 };
 

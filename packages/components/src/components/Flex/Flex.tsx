@@ -1,0 +1,220 @@
+import React, { type HTMLAttributes } from 'react';
+
+import styled, { type DefaultTheme, css } from 'styled-components';
+
+import { type Color, type SpacingValue } from '@trezor/theme';
+
+import {
+    type FlexAlignItems,
+    type FlexAlignSelf,
+    type FlexDirection,
+    type FlexJustifyContent,
+    type FlexType,
+    type FlexWrap,
+} from './FlexProp';
+import {
+    type FrameProps,
+    type FramePropsKeys,
+    pickAndPrepareFrameProps,
+    withFrameProps,
+} from '../../utils/frameProps';
+import { type TransientProps, makePropsTransient } from '../../utils/transientProps';
+
+export const allowedFlexFrameProps = [
+    'margin',
+    'padding',
+    'width',
+    'height',
+    'minHeight',
+    'maxHeight',
+    'minWidth',
+    'maxWidth',
+    'overflow',
+    'cursor',
+    'display',
+    'opacity',
+    'position',
+    'pointerEvents',
+    'zIndex',
+] as const satisfies FramePropsKeys[];
+type AllowedFrameProps = Pick<FrameProps, (typeof allowedFlexFrameProps)[number]>;
+
+export const withDivider = ({
+    theme,
+    $rowGap,
+    $columnGap,
+    $direction,
+    $dividerColor,
+}: {
+    theme: DefaultTheme;
+    $rowGap: SpacingValue;
+    $columnGap: SpacingValue;
+    $direction: FlexDirection;
+    $dividerColor?: Color;
+}) => css`
+    & > * {
+        position: relative;
+    }
+
+    & > *:not(:first-child)::before {
+        content: '';
+        display: block;
+        position: absolute;
+
+        ${
+            $direction === 'column' &&
+            `
+        top: -${$rowGap / 2}px;
+        height: 1px;
+        width: 100%;
+        left: 0;
+        border-top: 1px solid ${$dividerColor ? theme[$dividerColor] : theme.borderNeutral};`
+        }
+        ${
+            $direction === 'row' &&
+            `
+        top: 0;
+        height: 100%;
+        width: 1px;
+        left: -${$columnGap / 2}px;
+        border-left: 1px solid ${$dividerColor ? theme[$dividerColor] : theme.borderNeutral};`
+        }
+    }
+`;
+
+type ContainerProps = TransientProps<AllowedFrameProps> & {
+    $rowGap: SpacingValue;
+    $columnGap: SpacingValue;
+    $justifyContent: FlexJustifyContent;
+    $alignItems: FlexAlignItems;
+    $alignSelf: FlexAlignSelf;
+    $direction: FlexDirection;
+    $flex: FlexType;
+    $flexWrap: FlexWrap;
+    $order?: number;
+    $isReversed: boolean;
+    $hasDivider: boolean;
+    $dividerColor?: Color;
+};
+
+const Container = styled.div<ContainerProps>`
+    display: flex;
+
+    flex-flow: ${({ $direction, $isReversed, $flexWrap }) =>
+        `${$direction}${$isReversed ? '-reverse' : ''} ${$flexWrap}`};
+    flex: ${({ $flex }) => $flex};
+    gap: ${({ $rowGap, $columnGap }) => `${$rowGap}px ${$columnGap}px`};
+    justify-content: ${({ $justifyContent }) => $justifyContent};
+    align-items: ${({ $alignItems }) => $alignItems};
+    align-self: ${({ $alignSelf }) => $alignSelf};
+    ${({ $order }) => (typeof $order !== 'undefined' ? `order: ${$order};` : '')}
+
+    ${({ $hasDivider, ...props }) => $hasDivider && withDivider(props)}
+    ${withFrameProps}
+
+    &:empty {
+        display: none;
+    }
+`;
+
+export type FlexProps = AllowedFrameProps &
+    Pick<HTMLAttributes<HTMLElement>, 'onClick' | 'onMouseEnter' | 'onMouseLeave'> & {
+        gap?: SpacingValue;
+        rowGap?: SpacingValue;
+        columnGap?: SpacingValue;
+        /**
+         * Distributes space between and around content items along the **main** axis
+         */
+        justifyContent?: FlexJustifyContent;
+        /**
+         * Controls the alignment of items on the **cross** axis
+         */
+        alignItems?: FlexAlignItems;
+        alignSelf?: FlexAlignSelf;
+        children: React.ReactNode;
+        direction?: FlexDirection;
+        flex?: FlexType;
+        flexWrap?: FlexWrap;
+        order?: number;
+        isReversed?: boolean;
+        hasDivider?: boolean;
+        dividerColor?: Color;
+        'data-testid'?: string;
+        'data-component'?: string;
+        as?: string;
+        ref?: React.RefObject<HTMLElement | null>;
+    };
+
+export const Flex = ({
+    gap = 0,
+    rowGap = gap,
+    columnGap = gap,
+    justifyContent = 'flex-start',
+    alignItems = 'normal',
+    alignSelf = 'auto',
+    children,
+    direction = 'row',
+    flex = 'initial',
+    flexWrap = 'nowrap',
+    order,
+    isReversed = false,
+    'data-testid': dataTestId,
+    'data-component': dataComponent = 'Flex',
+    as = 'div',
+    hasDivider = false,
+    dividerColor,
+    onClick,
+    onMouseEnter,
+    onMouseLeave,
+    ref,
+    ...rest
+}: FlexProps) => {
+    const frameProps = pickAndPrepareFrameProps(rest, allowedFlexFrameProps);
+
+    return (
+        <Container
+            data-testid={dataTestId}
+            data-component={dataComponent}
+            {...makePropsTransient({
+                rowGap,
+                columnGap,
+                justifyContent,
+                alignItems,
+                alignSelf,
+                direction,
+                flex,
+                flexWrap,
+                order,
+                isReversed,
+                hasDivider,
+                dividerColor,
+            })}
+            onClick={onClick}
+            as={as}
+            onMouseEnter={onMouseEnter}
+            onMouseLeave={onMouseLeave}
+            ref={ref as React.Ref<HTMLDivElement>}
+            {...frameProps}
+        >
+            {children}
+        </Container>
+    );
+};
+
+export const Column = (props: FlexProps) => (
+    <Flex data-component="Column" {...props} direction="column" />
+);
+export const Row = (props: FlexProps) => (
+    <Flex data-component="Row" alignItems="center" {...props} direction="row" />
+);
+export const Center = (props: FlexProps) => (
+    <Flex
+        data-component="Center"
+        alignSelf="center"
+        alignItems="center"
+        justifyContent="center"
+        width="100%"
+        height="100%"
+        {...props}
+    />
+);

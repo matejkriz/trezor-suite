@@ -3,36 +3,73 @@
  * @docs docs/misc/analytics.md
  */
 
-import { allowSentryReport, setSentryUser } from 'src/utils/suite/sentry';
-import { getEnvironment, getCommitHash, isCodesignBuild } from '@trezor/env-utils';
-import type { Dispatch, GetState } from 'src/types/suite';
+import { type Dispatch, type UnknownAction } from '@reduxjs/toolkit';
+import { type ThunkDispatch } from 'redux-thunk';
 
+import { type DesktopAnalyticsDep, events } from '@suite/analytics';
 import {
+    type AnalyticsRootState,
     analyticsActions,
-    selectHasUserAllowedTracking,
     selectAnalyticsInstanceId,
-    selectIsAnalyticsEnabled,
+    selectCustomAnalyticsUrl,
+    selectHasUserAllowedTracking,
     selectIsAnalyticsConfirmed,
-} from '@suite-common/analytics';
-import { getTrackingRandomId } from '@trezor/analytics';
-import { analytics, EventType } from '@trezor/suite-analytics';
+    selectIsAnalyticsEnabled,
+    selectLoggerEnabled,
+} from '@suite-common/analytics-redux';
+import { type WithServices } from '@suite-common/redux-utils';
+import { type InitOptions, getTrackingRandomId } from '@trezor/analytics-uploader';
+import { getCommitHash, getEnvironment, isCodesignBuild } from '@trezor/env-utils';
 
-export const enableAnalyticsThunk = () => (dispatch: Dispatch) => {
-    analytics.report({ type: EventType.SettingsAnalytics, payload: { value: true } });
-    allowSentryReport(true);
+import { allowSentryReport, setSentryUser } from 'src/utils/suite/sentry';
 
-    dispatch(analyticsActions.enableAnalytics());
+type SendReportProps = {
+    sendReport: boolean;
 };
 
-export const disableAnalyticsThunk = () => (dispatch: Dispatch) => {
-    analytics.report(
-        { type: EventType.SettingsAnalytics, payload: { value: false } },
-        { force: true },
-    );
-    allowSentryReport(false);
+type EnableAnalyticsThunkDeps = WithServices<DesktopAnalyticsDep>;
 
-    dispatch(analyticsActions.disableAnalytics());
-};
+export const enableAnalyticsThunk =
+    ({ sendReport }: SendReportProps) =>
+    (
+        dispatch: Dispatch<UnknownAction>,
+        _getState: () => unknown,
+        extra: EnableAnalyticsThunkDeps,
+    ) => {
+        if (sendReport) {
+            extra.services.analytics.report({
+                type: events.settingsAnalyticsEvent.name,
+                payload: { value: true },
+            });
+        }
+        allowSentryReport(true);
+
+        dispatch(analyticsActions.enableAnalytics());
+    };
+
+type DisableAnalyticsThunkDeps = WithServices<DesktopAnalyticsDep>;
+
+export const disableAnalyticsThunk =
+    ({ sendReport }: SendReportProps) =>
+    (
+        dispatch: Dispatch<UnknownAction>,
+        _getState: () => unknown,
+        extra: DisableAnalyticsThunkDeps,
+    ) => {
+        if (sendReport) {
+            extra.services.analytics.report(
+                { type: events.settingsAnalyticsEvent.name, payload: { value: false } },
+                { force: true },
+            );
+        }
+        allowSentryReport(false);
+
+        dispatch(analyticsActions.disableAnalytics());
+    };
+
+type InitThunkState = AnalyticsRootState;
+
+type InitThunkDeps = WithServices<DesktopAnalyticsDep>;
 
 /**
  * Init analytics, should be always run on application start (see suiteMiddleware). It:
@@ -40,35 +77,48 @@ export const disableAnalyticsThunk = () => (dispatch: Dispatch) => {
  * - set sentry user id
  * @param state - tracking state loaded from storage
  */
-export const init = () => (dispatch: Dispatch, getState: GetState) => {
-    const sessionId = getTrackingRandomId();
-    // if instanceId does not exist yet (was not loaded from storage), create a new one
-    const instanceId = selectAnalyticsInstanceId(getState()) ?? getTrackingRandomId();
-    const userAllowedTracking = selectHasUserAllowedTracking(getState());
-    const isAnalyticsEnabled = selectIsAnalyticsEnabled(getState());
-    const isAnalyticsConfirmed = selectIsAnalyticsConfirmed(getState());
-
-    analytics.init(userAllowedTracking, {
-        instanceId,
-        sessionId,
-        environment: getEnvironment(),
-        commitId: getCommitHash(),
-        isDev: !isCodesignBuild(),
-        callbacks: {
-            onEnable: () => dispatch(enableAnalyticsThunk()),
-            onDisable: () => dispatch(disableAnalyticsThunk()),
-        },
-    });
-
-    allowSentryReport(!!userAllowedTracking);
-    setSentryUser(instanceId);
-
-    dispatch(
-        analyticsActions.initAnalytics({
+export const initThunk =
+    () =>
+    (
+        dispatch: ThunkDispatch<InitThunkState, InitThunkDeps, UnknownAction>,
+        getState: () => InitThunkState,
+        extra: InitThunkDeps,
+    ) => {
+        const sessionId = getTrackingRandomId();
+        // if instanceId does not exist yet (was not loaded from storage), create a new one
+        const instanceId = selectAnalyticsInstanceId(getState()) ?? getTrackingRandomId();
+        const hasUserAllowedTracking = selectHasUserAllowedTracking(getState());
+        const isAnalyticsEnabled = selectIsAnalyticsEnabled(getState());
+        const isAnalyticsConfirmed = selectIsAnalyticsConfirmed(getState());
+        const customAnalyticsUrl = selectCustomAnalyticsUrl(getState());
+        const loggerEnabled = selectLoggerEnabled(getState());
+        const getOptions: (props: SendReportProps) => InitOptions = ({
+            sendReport,
+        }: SendReportProps) => ({
             instanceId,
             sessionId,
-            enabled: isAnalyticsEnabled,
-            confirmed: isAnalyticsConfirmed,
-        }),
-    );
-};
+            environment: getEnvironment(),
+            url: customAnalyticsUrl,
+            loggerEnabled,
+            commitId: getCommitHash(),
+            isDev: !isCodesignBuild(),
+            callbacks: {
+                onEnable: () => dispatch(enableAnalyticsThunk({ sendReport })),
+                onDisable: () => dispatch(disableAnalyticsThunk({ sendReport })),
+            },
+        });
+
+        extra.services.analytics.init(hasUserAllowedTracking, getOptions({ sendReport: true }));
+
+        allowSentryReport(isAnalyticsEnabled);
+        setSentryUser(instanceId);
+
+        dispatch(
+            analyticsActions.initAnalytics({
+                instanceId,
+                sessionId,
+                enabled: isAnalyticsEnabled,
+                confirmed: isAnalyticsConfirmed,
+            }),
+        );
+    };

@@ -1,61 +1,35 @@
-import styled, { useTheme } from 'styled-components';
-import { useDispatch } from 'src/hooks/suite';
-import { Button, Icon, variables } from '@trezor/components';
-import { onCancel as closeModal } from 'src/actions/suite/modalActions';
-import { Modal, Translation } from 'src/components/suite';
-
-const StyledModal = styled(Modal)`
-    width: 435px;
-`;
-
-const StyledButton = styled(Button)`
-    flex: 1;
-`;
-
-const StyledIcon = styled(Icon)`
-    width: 84px;
-    height: 84px;
-    margin: 12px auto 32px;
-    border-radius: 50%;
-    background: ${({ theme }) => theme.BG_GREY};
-`;
-
-const Text = styled.p`
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-`;
-
-const Heading = styled.h3`
-    font-size: 32px;
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-    line-height: 32px;
-    margin: 10px 0 22px;
-`;
+import { Translation } from '@suite/intl';
+import { closeModal } from '@suite/modal';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { Column, H3, Modal, Paragraph } from '@trezor/components';
+import { ArrowsInIcon } from '@trezor/icons';
 
 export const MoreRoundsNeededModal = () => {
-    const theme = useTheme();
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
 
     const close = () => dispatch(closeModal());
 
     return (
-        <StyledModal
-            bottomBarComponents={
-                <StyledButton variant="secondary" onClick={close}>
-                    <Translation id="TR_OK" />
-                </StyledButton>
+        <Modal
+            onCancel={close}
+            bottomContent={
+                <Modal.Button intent="neutral" priority="secondary" onClick={close}>
+                    <Translation id="TR_CLOSE" />
+                </Modal.Button>
             }
+            width={600}
+            icon={ArrowsInIcon}
+            intent="info"
         >
-            <StyledIcon icon="CONFETTI_SUCCESS" size={32} color={theme.TYPE_DARK_GREY} />
-            <Text>
-                <Translation id="TR_COINJOIN_ENDED" />
-            </Text>
-            <Heading>
-                <Translation id="TR_MORE_ROUNDS_NEEDED" />
-            </Heading>
-            <Text>
-                <Translation id="TR_MORE_ROUNDS_NEEDED_DESCRIPTION" />
-            </Text>
-        </StyledModal>
+            <Column gap={8}>
+                <H3>
+                    <Translation id="TR_COINJOIN_ENDED" />
+                </H3>
+                <Paragraph intent="neutral" priority="secondary">
+                    <Translation id="TR_MORE_ROUNDS_NEEDED_DESCRIPTION" />
+                </Paragraph>
+            </Column>
+        </Modal>
     );
 };

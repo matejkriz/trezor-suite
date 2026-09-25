@@ -1,10 +1,9 @@
-import { ReactNode } from 'react';
-import { IntlProvider } from 'react-intl';
+import { type ReactNode } from 'react';
 
-// FIXME this is only temporary until Intl refactor will be finished
-import enMessages from '@trezor/suite-data/files/translations/en.json';
+import { ServicesProvider } from '@suite-common/dependency-injection';
+import { type NativeAnalyticsDep, analytics } from '@suite-native/analytics';
 import { useActiveColorScheme } from '@suite-native/theme';
-import { createRenderer, StylesProvider } from '@trezor/styles';
+import { StylesProvider, createRenderer } from '@trezor/styles-native';
 import { prepareNativeTheme } from '@trezor/theme';
 
 type ProviderProps = {
@@ -13,18 +12,41 @@ type ProviderProps = {
 
 const renderer = createRenderer();
 
-// Since react native skia `Canvas` is using its own renderer, the  React Native context
-// is not available directly. This component re-injects the needed context providers.
-// read more: https://shopify.github.io/react-native-skia/docs/canvas/contexts
-export const GraphContextProvider = ({ children }: ProviderProps) => {
+/**
+ * @deprecated This is a hack to go around the Skia `Canvas` limitation.
+ *             See: https://github.com/trezor/trezor-suite/pull/25076
+ *
+ * So far only analytics are needed in the graph context. Might be extended later.
+ */
+const services: NativeAnalyticsDep = {
+    analytics,
+};
+
+/**
+ * @deprecated This is a hack to go around the Skia `Canvas` limitation.
+ *             See: https://github.com/trezor/trezor-suite/pull/25076
+ */
+const GraphServicesProvider = ({ children }: ProviderProps) => (
+    <ServicesProvider services={services}>{children}</ServicesProvider>
+);
+
+const GraphStylesProvider = ({ children }: ProviderProps) => {
     const colorVariant = useActiveColorScheme();
     const theme = prepareNativeTheme({ colorVariant });
 
     return (
-        <IntlProvider locale="en" defaultLocale="en" messages={enMessages}>
-            <StylesProvider theme={theme} renderer={renderer}>
-                {children}
-            </StylesProvider>
-        </IntlProvider>
+        <StylesProvider theme={theme} renderer={renderer}>
+            {children}
+        </StylesProvider>
     );
 };
+
+// Since react native skia `Canvas` is using its own renderer, the  React Native context
+// is not available directly. This component re-injects the needed context providers.
+// read more: https://shopify.github.io/react-native-skia/docs/canvas/contexts
+export const GraphContextProvider = ({ children }: ProviderProps) => (
+    <GraphServicesProvider>
+        {/* StylesProvider needs access to the ServicesProvider */}
+        <GraphStylesProvider>{children}</GraphStylesProvider>
+    </GraphServicesProvider>
+);

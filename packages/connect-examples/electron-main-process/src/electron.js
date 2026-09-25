@@ -1,7 +1,12 @@
-const { app, ipcMain, BrowserWindow } = require('electron');
-const path = require('path');
-const url = require('url');
-const { initTrezorConnect, callTrezorConnect } = require('./trezor-connect-ipc');
+// We have restricted electron.ipcMain import to wrap it with security validation, but this is not a live app, only an example.
+// eslint-disable-next-line @typescript-eslint/no-restricted-imports
+import { BrowserWindow, app, ipcMain } from 'electron';
+import path from 'node:path';
+import url, { fileURLToPath } from 'node:url';
+
+import { callTrezorConnect, initTrezorConnect } from './trezor-connect-ipc.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let mainWindow;
 
@@ -11,7 +16,7 @@ const init = () => {
         width: 1024,
         height: 775,
         webPreferences: {
-            preload: path.join(__dirname, 'preload.js'),
+            preload: path.join(__dirname, 'preload.cjs'),
         },
     });
 
@@ -34,7 +39,7 @@ app.on('ready', init);
 
 // Quit when all windows are closed.
 app.on('window-all-closed', () => {
-    // On macOS it is common for applications and their menu bar
+    // On macOS, it is common for applications and their menu bar
     // to stay active until the user quits explicitly with Cmd + Q
     if (process.platform !== 'darwin') {
         app.quit();

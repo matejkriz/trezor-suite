@@ -1,31 +1,14 @@
 import { createAction } from '@reduxjs/toolkit';
 
-import { Account, WalletAccountTransaction } from '@suite-common/wallet-types';
-import { AccountTransaction } from '@trezor/connect';
+import {
+    type Account,
+    type AccountKey,
+    type WalletAccountTransaction,
+} from '@suite-common/wallet-types';
 import { enhanceTransaction } from '@suite-common/wallet-utils';
+import { type AccountTransaction } from '@trezor/connect';
 
 export const TRANSACTIONS_MODULE_PREFIX = '@common/wallet-core/transactions';
-
-const fetchError = createAction(
-    `${TRANSACTIONS_MODULE_PREFIX}/fetchError`,
-    (payload: { error: string | null }) => ({ payload }),
-);
-const fetchSuccess = createAction(`${TRANSACTIONS_MODULE_PREFIX}/fetchSuccess`);
-const fetchInit = createAction(`${TRANSACTIONS_MODULE_PREFIX}/fetchInit`);
-
-type UpdateTransactionFiatRatePayload = Array<{
-    txid: string;
-    account: Account;
-    updateObject: Partial<WalletAccountTransaction>;
-    ts: number;
-}>;
-
-const updateTransactionFiatRate = createAction(
-    `${TRANSACTIONS_MODULE_PREFIX}/updateTransactionFiatRate`,
-    (payload: UpdateTransactionFiatRatePayload) => ({
-        payload,
-    }),
-);
 
 const resetTransaction = createAction(
     `${TRANSACTIONS_MODULE_PREFIX}/resetTransaction`,
@@ -34,13 +17,34 @@ const resetTransaction = createAction(
 
 const replaceTransaction = createAction(
     `${TRANSACTIONS_MODULE_PREFIX}/replaceTransaction`,
-    (payload: { key: string; txid: string; tx: WalletAccountTransaction }) => ({ payload }),
+    (payload: { key: AccountKey; txid: string; tx: WalletAccountTransaction }) => ({ payload }),
 );
 
 const removeTransaction = createAction(
     `${TRANSACTIONS_MODULE_PREFIX}/removeTransaction`,
     (payload: { account: Account; txs: { txid: string }[] }) => ({ payload }),
 );
+
+const markTransactionAsNotScam = createAction(
+    `${TRANSACTIONS_MODULE_PREFIX}/markTransactionAsNotScam`,
+    (payload: { key: AccountKey; txid: string; isMarkedAsNotScam: boolean }) => ({ payload }),
+);
+
+type AddTransactionActionProps = {
+    transactions: (AccountTransaction & Partial<WalletAccountTransaction>)[];
+    account: Account;
+    page?: number;
+    perPage?: number;
+};
+
+type AddTransactionActionResult = {
+    payload: {
+        transactions: WalletAccountTransaction[];
+        account: Account;
+        page?: number;
+        perPage?: number;
+    };
+};
 
 const addTransaction = createAction(
     `${TRANSACTIONS_MODULE_PREFIX}/addTransaction`,
@@ -49,19 +53,7 @@ const addTransaction = createAction(
         account,
         page,
         perPage,
-    }: {
-        transactions: (AccountTransaction & Partial<WalletAccountTransaction>)[];
-        account: Account;
-        page?: number;
-        perPage?: number;
-    }): {
-        payload: {
-            transactions: WalletAccountTransaction[];
-            account: Account;
-            page?: number;
-            perPage?: number;
-        };
-    } => ({
+    }: AddTransactionActionProps): AddTransactionActionResult => ({
         payload: {
             transactions: transactions.map(t => enhanceTransaction(t, account)),
             account,
@@ -73,11 +65,8 @@ const addTransaction = createAction(
 
 export const transactionsActions = {
     addTransaction,
-    fetchError,
-    fetchInit,
-    fetchSuccess,
     replaceTransaction,
     removeTransaction,
     resetTransaction,
-    updateTransactionFiatRate,
+    markTransactionAsNotScam,
 } as const;

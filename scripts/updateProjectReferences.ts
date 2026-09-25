@@ -1,30 +1,29 @@
-import fs from 'fs';
-import path from 'path';
-import prettier from 'prettier';
+import chalk from 'chalk';
 import { minimatch } from 'minimatch';
+import fs from 'node:fs';
+import path from 'node:path';
+import prettier from 'prettier';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import chalk from 'chalk';
 
-import { getWorkspacesList } from './utils/getWorkspacesList';
 import { getPrettierConfig } from './utils/getPrettierConfig';
+import { getWorkspacesList } from './utils/getWorkspacesList';
 
-const rootTsConfigLocation = path.join(__dirname, '..', 'tsconfig.json');
-
+/**
+ * Example usage:
+ *      yarn update-project-references --read-only 1 2 3 --test true
+ *      yarn update-project-references --ignore *\/firmware
+ */
 (async () => {
     const { argv } = yargs(hideBin(process.argv))
         .array('read-only')
         .array('ignore')
-        .array('typings')
         .boolean('test') as any;
 
-    const readOnlyGlobs = argv.readOnly || [];
-    const ignoreGlobs = argv.ignore || [];
-    const typingPaths = argv.typings || [];
-    const isTesting = argv.test || false;
+    const readOnlyGlobs: string[] = argv.readOnly || [];
+    const ignoreGlobs: string[] = argv.ignore || [];
 
-    const rootConfig = JSON.parse(fs.readFileSync(rootTsConfigLocation).toString());
-    const nextRootReferences: { path: string }[] = [];
+    const isTesting = argv.test || false;
 
     const prettierConfig = await getPrettierConfig();
 
@@ -40,14 +39,26 @@ const rootTsConfigLocation = path.join(__dirname, '..', 'tsconfig.json');
         }
     };
 
+    const parseTSConfigFile = (configPath: string) => {
+        try {
+            return fs.existsSync(configPath)
+                ? JSON.parse(fs.readFileSync(configPath).toString())
+                : null;
+        } catch {
+            console.error(chalk.bold.red('Error while parsing file: '), configPath);
+            process.exit(1);
+        }
+    };
+
+    const isDiffInConfig = async (actualConfig: any[] = [], expectedConfig: any[] = []) =>
+        (await serializeConfig(actualConfig)) !== (await serializeConfig(expectedConfig));
+
     const workspaces = getWorkspacesList();
 
     // NOTE: Workspace keys must be sorted due to file systems being a part of the equation...
-    Object.keys(workspaces)
-        .sort()
-        .forEach(async workspaceName => {
-            const workspace = workspaces[workspaceName];
-
+    Object.entries(workspaces)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .forEach(async ([_workspaceName, workspace]) => {
             if (workspace.location === '.') {
                 // Skip root workspace
                 return;
@@ -57,12 +68,9 @@ const rootTsConfigLocation = path.join(__dirname, '..', 'tsconfig.json');
                 return;
             }
 
-            nextRootReferences.push({
-                path: workspace.location,
-            });
-
             const workspacePath = path.resolve(process.cwd(), workspace.location);
             const workspaceConfigPath = path.resolve(workspacePath, 'tsconfig.json');
+            const workspaceLibConfigPath = path.resolve(workspacePath, 'tsconfig.lib.json');
 
             const defaultWorkspaceConfig = {
                 extends: path.relative(workspacePath, path.resolve(process.cwd(), 'tsconfig.json')),
@@ -70,19 +78,15 @@ const rootTsConfigLocation = path.join(__dirname, '..', 'tsconfig.json');
                 include: ['.'],
             };
 
-            let workspaceConfig;
-            try {
-                workspaceConfig = fs.existsSync(workspaceConfigPath)
-                    ? JSON.parse(fs.readFileSync(workspaceConfigPath).toString())
-                    : defaultWorkspaceConfig;
-            } catch {
-                console.error(chalk.bold.red('Error while parsing file: '), workspaceConfigPath);
-                process.exit(1);
-            }
+            // parse tsconfig.json, which should exist, so if it doesn't, assign default config to have it created
+            const workspaceConfig =
+                parseTSConfigFile(workspaceConfigPath) ?? defaultWorkspaceConfig;
 
-            const nextWorkspaceReferences = typingPaths.map((typingPath: string) => ({
-                path: path.relative(workspacePath, path.resolve(process.cwd(), typingPath)),
-            }));
+            // parse tsconfig.lib.json, which may not exist, and shall not be created
+            const workspaceLibConfig = parseTSConfigFile(workspaceLibConfigPath);
+
+            // actual references of the workspace from parsed package.json (assigned later)
+            const nextWorkspaceReferences: Array<{ path: string }> = [];
 
             Object.values(workspace.workspaceDependencies).forEach(dependencyLocation => {
                 const dependencyPath = path.resolve(process.cwd(), dependencyLocation);
@@ -99,75 +103,44 @@ const rootTsConfigLocation = path.join(__dirname, '..', 'tsconfig.json');
                 }
             });
 
+            const expectedReferences = nextWorkspaceReferences;
+            const expectedLibReferences = nextWorkspaceReferences.filter(
+                // Don't include reference to schema-utils due to issues with the @sinclair/typebox library
+                // When using a reference it results in incorrect imports
+                ({ path }) => path !== '../schema-utils',
+            );
+
             if (isTesting) {
-                if (
-                    (await serializeConfig(workspaceConfig.references ?? [])) !==
-                    (await serializeConfig(nextWorkspaceReferences))
-                ) {
+                const isConfigDiff = await isDiffInConfig(
+                    workspaceConfig.references,
+                    expectedReferences,
+                );
+
+                const isConfigLibDiff =
+                    workspaceLibConfig !== null &&
+                    (await isDiffInConfig(workspaceLibConfig.references, expectedLibReferences));
+
+                if (isConfigDiff || isConfigLibDiff) {
                     console.error(
                         chalk.red(
                             `TypeScript project references in ${workspace.location} are inconsistent with package.json#dependencies.`,
                         ),
                         chalk.red.bold(`Run "yarn update-project-references" to fix them.`),
                     );
-
                     process.exit(1);
                 }
 
                 return;
             }
 
-            workspaceConfig.references = nextWorkspaceReferences;
+            if (readOnlyGlobs.some((path: string) => minimatch(workspace.location, path))) return;
 
-            if (!readOnlyGlobs.some((path: string) => minimatch(workspace.location, path))) {
-                fs.writeFileSync(workspaceConfigPath, await serializeConfig(workspaceConfig));
-            }
+            workspaceConfig.references = expectedReferences;
+            fs.writeFileSync(workspaceConfigPath, await serializeConfig(workspaceConfig));
 
-            // Copy references also to tsconfig.lib.json if exists
-            const workspaceLibConfigPath = path.resolve(workspacePath, 'tsconfig.lib.json');
-            if (fs.existsSync(workspaceLibConfigPath)) {
-                try {
-                    const workspaceLibConfig = JSON.parse(
-                        fs.readFileSync(workspaceLibConfigPath).toString(),
-                    );
-
-                    workspaceLibConfig.references = nextWorkspaceReferences;
-
-                    if (
-                        !readOnlyGlobs.some((path: string) => minimatch(workspace.location, path))
-                    ) {
-                        fs.writeFileSync(
-                            workspaceLibConfigPath,
-                            await serializeConfig(workspaceLibConfig, 2),
-                        );
-                    }
-                } catch {
-                    console.error(
-                        chalk.bold.red('Error while parsing file: '),
-                        workspaceLibConfigPath,
-                    );
-                    process.exit(1);
-                }
+            if (workspaceLibConfig !== null) {
+                workspaceLibConfig.references = expectedLibReferences;
+                fs.writeFileSync(workspaceLibConfigPath, await serializeConfig(workspaceLibConfig));
             }
         });
-
-    if (isTesting) {
-        if (
-            (await serializeConfig(rootConfig.references)) !==
-            (await serializeConfig(nextRootReferences))
-        ) {
-            console.error(
-                `TypeScript project references in root tsconfig.json are inconsistent.`,
-                `Run "yarn update-project-references" to fix them.`,
-            );
-
-            process.exit(1);
-        }
-
-        return;
-    }
-
-    rootConfig.references = nextRootReferences;
-
-    fs.writeFileSync(rootTsConfigLocation, await serializeConfig(rootConfig));
 })();

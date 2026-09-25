@@ -1,10 +1,10 @@
 /* eslint-disable no-console */
 
-// eslint-disable-next-line import/no-extraneous-dependencies
 import * as jws from 'jws';
 
-import { JWS_SIGN_ALGORITHM } from '../../src/constants';
-import { TokenStructure } from '../../src/types';
+import { TokenStructure } from '../../src/tokenDefinitionsTypes';
+
+const JWS_SIGN_ALGORITHM = 'ES256';
 
 // There must be no extra spaces at the beginning of the line.
 const devPrivateKey = `-----BEGIN EC PRIVATE KEY-----

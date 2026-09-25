@@ -1,0 +1,194 @@
+import { type Store } from '@reduxjs/toolkit';
+
+import { tradingExchangeActions } from '@suite-common/trading';
+import { type NativeAnalyticsDep, events } from '@suite-native/analytics';
+import { mockNativeAnalytics } from '@suite-native/analytics/mocks';
+import { type UseFormReturn } from '@suite-native/forms';
+import { renderHookWithStoreProvider } from '@suite-native/test-utils-store';
+import { btcAsset, ethAsset, getBtcAccount, usdcAsset } from '@suite-native/trading-fixtures';
+import { type TradingRootState, buyActions, exchangeActions } from '@suite-native/trading-state';
+
+import { useTradeableAssetChange } from './useTradeableAssetChange';
+import { createTradingTestStore } from '../../../test-utils/tradingTestUtils';
+
+type State = TradingRootState;
+
+const reportMock = jest.fn();
+const services: NativeAnalyticsDep = {
+    analytics: mockNativeAnalytics(reportMock),
+};
+
+const btcAccount = getBtcAccount();
+
+type MockForm = {
+    setValue: jest.Mock;
+    getValues: jest.Mock;
+};
+
+const createMockForm = (counterpartAsset?: unknown): MockForm => ({
+    setValue: jest.fn(),
+    getValues: jest.fn().mockReturnValue(counterpartAsset),
+});
+
+describe('useTradeableAssetChange', () => {
+    let store: Store<State>;
+    let setSelectedValue: jest.Mock;
+
+    beforeEach(() => {
+        reportMock.mockClear();
+        store = createTradingTestStore({ tradeType: 'exchange' });
+        setSelectedValue = jest.fn();
+    });
+
+    const renderChangeAsset = async (
+        config: Omit<Partial<Parameters<typeof useTradeableAssetChange>[0]>, 'form'> & {
+            form: MockForm;
+        },
+    ) => {
+        const { result } = await renderHookWithStoreProvider(
+            () =>
+                useTradeableAssetChange({
+                    tradingType: 'exchange',
+                    selectedValue: undefined,
+                    setSelectedValue,
+                    analyticsParameter: 'cryptoFrom',
+                    getAssetChangedAction: exchangeActions.sendAssetChanged,
+                    ...config,
+                    form: config.form as unknown as UseFormReturn<never>,
+                }),
+            { services: { ...services, store } },
+        );
+
+        return result.current;
+    };
+
+    it('should not apply any change effects when the selected asset is unchanged (dedup guard)', async () => {
+        const dispatchSpy = jest.spyOn(store, 'dispatch');
+        const changeAsset = await renderChangeAsset({
+            form: createMockForm(),
+            selectedValue: btcAsset,
+        });
+
+        changeAsset(btcAsset);
+
+        expect(setSelectedValue).not.toHaveBeenCalled();
+        expect(dispatchSpy).not.toHaveBeenCalled();
+        expect(reportMock).not.toHaveBeenCalled();
+    });
+
+    it('should still set the trading account key before the dedup guard returns', async () => {
+        const dispatchSpy = jest.spyOn(store, 'dispatch');
+        const changeAsset = await renderChangeAsset({
+            form: createMockForm(),
+            selectedValue: btcAsset,
+            getSetTradingAccountKeyAction: tradingExchangeActions.setTradingAccountKey,
+        });
+
+        changeAsset(btcAsset, btcAccount);
+
+        expect(dispatchSpy).toHaveBeenCalledWith(
+            tradingExchangeActions.setTradingAccountKey(btcAccount.key),
+        );
+        expect(setSelectedValue).not.toHaveBeenCalled();
+    });
+
+    it('should keep the amount and dispatch the base action on a cross-network change', async () => {
+        const dispatchSpy = jest.spyOn(store, 'dispatch');
+        const form = createMockForm();
+        const changeAsset = await renderChangeAsset({
+            form,
+            selectedValue: btcAsset,
+            getAssetChangedAction: exchangeActions.sendAssetChanged,
+            getAssetTokenChangedAction: exchangeActions.receiveTokenChanged,
+        });
+
+        changeAsset(usdcAsset);
+
+        expect(setSelectedValue).toHaveBeenCalledWith(usdcAsset);
+        expect(form.setValue).not.toHaveBeenCalled();
+        expect(dispatchSpy).toHaveBeenCalledWith(exchangeActions.sendAssetChanged());
+        expect(dispatchSpy).not.toHaveBeenCalledWith(exchangeActions.receiveTokenChanged());
+    });
+
+    it('should dispatch the token action when the network symbol is unchanged', async () => {
+        const dispatchSpy = jest.spyOn(store, 'dispatch');
+        const changeAsset = await renderChangeAsset({
+            form: createMockForm(),
+            tradingType: 'buy',
+            selectedValue: ethAsset,
+            getAssetChangedAction: buyActions.assetChanged,
+            getAssetTokenChangedAction: buyActions.assetTokenChanged,
+        });
+
+        // usdcAsset is an Ethereum token, so switching from native ETH is a same-network change.
+        changeAsset(usdcAsset);
+
+        expect(dispatchSpy).toHaveBeenCalledWith(buyActions.assetTokenChanged());
+        expect(dispatchSpy).not.toHaveBeenCalledWith(buyActions.assetChanged());
+    });
+
+    it('should not report analytics when shouldReportAnalytics is false', async () => {
+        const changeAsset = await renderChangeAsset({
+            form: createMockForm(),
+            selectedValue: btcAsset,
+        });
+
+        changeAsset(usdcAsset, undefined, { shouldReportAnalytics: false });
+
+        expect(setSelectedValue).toHaveBeenCalledWith(usdcAsset);
+        expect(reportMock).not.toHaveBeenCalled();
+    });
+
+    it('should clear the counterpart asset and dispatch its action on collision', async () => {
+        const dispatchSpy = jest.spyOn(store, 'dispatch');
+        const form = createMockForm(usdcAsset);
+        const changeAsset = await renderChangeAsset({
+            form,
+            selectedValue: btcAsset,
+            analyticsParameter: 'cryptoFrom',
+            getAssetChangedAction: exchangeActions.sendAssetChanged,
+            collision: {
+                counterpartAssetField: 'receiveAsset',
+                counterpartAnalyticsParameter: 'cryptoTo',
+                getCounterpartChangedAction: exchangeActions.receiveAssetChanged,
+            },
+        });
+
+        changeAsset(usdcAsset);
+
+        expect(form.setValue).toHaveBeenCalledWith('receiveAsset', undefined, undefined);
+        expect(dispatchSpy).toHaveBeenCalledWith(exchangeActions.receiveAssetChanged());
+        expect(reportMock).toHaveBeenCalledWith({
+            type: events.tradingParameterChangedEvent.name,
+            payload: { type: 'exchange', parameter: 'cryptoTo' },
+        });
+    });
+
+    it('should clear the counterpart amount without a counterpart action when omitted', async () => {
+        const dispatchSpy = jest.spyOn(store, 'dispatch');
+        const form = createMockForm(usdcAsset);
+        const changeAsset = await renderChangeAsset({
+            form,
+            selectedValue: btcAsset,
+            analyticsParameter: 'cryptoTo',
+            getAssetChangedAction: exchangeActions.receiveAssetChanged,
+            collision: {
+                counterpartAssetField: 'sendAsset',
+                counterpartAmountField: 'sendCryptoAmount',
+                counterpartAnalyticsParameter: 'cryptoFrom',
+            },
+        });
+
+        changeAsset(usdcAsset);
+
+        expect(form.setValue).toHaveBeenCalledWith('sendAsset', undefined, undefined);
+        expect(form.setValue).toHaveBeenCalledWith('sendCryptoAmount', undefined, {
+            shouldValidate: true,
+        });
+        expect(dispatchSpy).not.toHaveBeenCalledWith(exchangeActions.sendAssetChanged());
+        expect(reportMock).toHaveBeenCalledWith({
+            type: events.tradingParameterChangedEvent.name,
+            payload: { type: 'exchange', parameter: 'cryptoFrom' },
+        });
+    });
+});

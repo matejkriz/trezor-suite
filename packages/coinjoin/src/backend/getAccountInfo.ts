@@ -1,17 +1,18 @@
-import type { Network } from '@trezor/utxo-lib';
+import { sumAddressValues } from '@trezor/blockchain-link';
 import { sortTxsFromLatest } from '@trezor/blockchain-link-utils';
-import { sumAddressValues } from '@trezor/blockchain-link/src/workers/electrum/methods/getAccountInfo';
+import type { Network } from '@trezor/utxo-lib';
 
-import { isTxConfirmed, doesTxContainAddress } from './backendUtils';
-import type {
-    Transaction,
-    AccountInfo,
-    ScanAccountCheckpoint,
-    PrederivedAddress,
-    AccountCache,
-} from '../types/backend';
-import { getAccountUtxo } from './getAccountUtxo';
 import { CoinjoinAddressController } from './CoinjoinAddressController';
+import { doesTxContainAddress, isTxConfirmed } from './backendUtils';
+import { getAccountUtxo } from './getAccountUtxo';
+import type {
+    AccountCache,
+    AccountInfo,
+    Address,
+    PrederivedAddress,
+    ScanAccountCheckpoint,
+    Transaction,
+} from '../types/backend';
 
 const PAGE_SIZE_DEFAULT = 25;
 
@@ -39,7 +40,7 @@ const sumBalance = (current: number, tx: Transaction) => current + getDelta(tx);
 
 const enhanceAddress =
     (transactions: Transaction[]) =>
-    ({ address, path }: PrederivedAddress) => {
+    ({ address, path }: PrederivedAddress): Address => {
         const txs = transactions.filter(tx => doesTxContainAddress(address)(tx.details));
         const sent = sumAddressValues(txs, address, tx => tx.details.vin);
         const received = sumAddressValues(txs, address, tx => tx.details.vout);
@@ -48,9 +49,9 @@ const enhanceAddress =
             address,
             path,
             transfers: txs.length,
-            balance: txs.length ? (received - sent).toString() : undefined,
-            sent: txs.length ? sent.toString() : undefined,
-            received: txs.length ? received.toString() : undefined,
+            balance: txs.length ? (received - sent).toString() : '0',
+            sent: txs.length ? sent.toString() : '0',
+            received: txs.length ? received.toString() : '0',
         };
     };
 

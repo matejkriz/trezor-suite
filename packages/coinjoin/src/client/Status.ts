@@ -1,18 +1,14 @@
-import { TypedEmitter } from '@trezor/utils';
+import type { TimerId } from '@trezor/type-utils';
+import { TypedEmitter, getWeakRandomInt } from '@trezor/utils';
 
 import * as coordinator from './coordinator';
-import { transformStatus } from '../utils/roundUtils';
-import { patchResponse } from '../utils/http';
 import { coordinatorRequest } from './coordinatorRequest';
 import { STATUS_TIMEOUT } from '../constants';
 import { RoundPhase } from '../enums';
-import {
-    CoinjoinClientSettings,
-    CoinjoinStatusEvent,
-    LogEvent,
-    CoinjoinClientVersion,
-} from '../types';
-import { Round } from '../types/coordinator';
+import { type CoinjoinClientSettings, type CoinjoinStatusEvent, type LogEvent } from '../types';
+import { type Round } from '../types/coordinator';
+import { patchResponse } from '../utils/http';
+import { transformStatus } from '../utils/roundUtils';
 
 type StatusMode = keyof typeof STATUS_TIMEOUT;
 
@@ -38,9 +34,10 @@ export class Status extends TypedEmitter<StatusEvents> {
     mode: StatusMode = 'idle';
     private settings: CoinjoinClientSettings;
     private abortController: AbortController;
-    private statusTimeout?: ReturnType<typeof setTimeout>;
+    private statusTimeout?: TimerId;
     private identities: string[]; // registered identities
     private runningAffiliateServer = false;
+    private lastStatusRequestTimestamp?: number;
 
     constructor(settings: CoinjoinClientSettings) {
         super();
@@ -59,7 +56,11 @@ export class Status extends TypedEmitter<StatusEvents> {
                 const known = this.rounds.find(prevRound => prevRound.Id === nextRound.Id);
                 if (!known) return true; // new phase
                 if (nextRound.Phase === known.Phase + 1) return true; // expected update
-                if (nextRound.Phase === RoundPhase.TransactionSigning && !known.AffiliateRequest) {
+                if (
+                    nextRound.Phase === RoundPhase.TransactionSigning &&
+                    this.settings.affiliationId &&
+                    !known.AffiliateRequest
+                ) {
                     return true; // affiliateRequest is propagated asynchronously, might be added after phase change
                 }
 
@@ -92,7 +93,7 @@ export class Status extends TypedEmitter<StatusEvents> {
                     .filter(
                         prevRound =>
                             prevRound.Phase < RoundPhase.Ended &&
-                            !next.find(nextRound => prevRound.Id === nextRound.Id),
+                            !next.some(nextRound => prevRound.Id === nextRound.Id),
                     )
                     .map(r => ({ ...r, phase: RoundPhase.Ended })),
             );
@@ -170,25 +171,29 @@ export class Status extends TypedEmitter<StatusEvents> {
         }, timeout);
     }
 
-    private processStatus(status: coordinator.CoinjoinStatus) {
-        // add matching coinjoinRequest to rounds
-        status.RoundStates.forEach(round => {
-            const roundRequest = status.AffiliateInformation?.AffiliateData[round.Id];
-            round.AffiliateRequest = roundRequest?.trezor;
-        });
+    private processStatus(status: coordinator.CoinjoinStatus, prevStatusTimestamp?: number) {
+        const { affiliationId } = this.settings;
+        if (affiliationId) {
+            // add matching coinjoinRequest to rounds
+            status.RoundStates.forEach(round => {
+                const roundRequest = status.AffiliateInformation?.AffiliateData[round.Id];
+                round.AffiliateRequest = roundRequest?.[affiliationId];
+            });
 
-        // report affiliate server status
-        const runningAffiliateServer =
-            !!status.AffiliateInformation?.RunningAffiliateServers.includes('trezor');
-        if (this.runningAffiliateServer !== runningAffiliateServer) {
-            this.emit('affiliate-server', runningAffiliateServer);
+            // report affiliate server status
+            const runningAffiliateServer =
+                !!status.AffiliateInformation?.RunningAffiliateServers.includes(affiliationId);
+            if (this.runningAffiliateServer !== runningAffiliateServer) {
+                this.emit('affiliate-server', runningAffiliateServer);
+            }
+            this.runningAffiliateServer = runningAffiliateServer;
         }
-        this.runningAffiliateServer = runningAffiliateServer;
 
         const changed = this.compareStatus(status.RoundStates);
         if (changed.length > 0) {
             const statusEvent = {
                 changed,
+                prevStatusTimestamp,
                 ...transformStatus(status),
             };
 
@@ -206,7 +211,10 @@ export class Status extends TypedEmitter<StatusEvents> {
     async getStatus() {
         if (!this.enabled) return Promise.resolve();
 
-        const identity = this.identities[Math.floor(Math.random() * this.identities.length)];
+        const identity = this.identities[getWeakRandomInt(0, this.identities.length)];
+        // request-sent time, captured before the round-trip so response transit does not leak into
+        // the phase-start lower bound (see getSigningSendDeadline / processStatus)
+        const requestTimestamp = Date.now();
         const status = await coordinator.getStatus({
             baseUrl: this.settings.coordinatorUrl,
             signal: this.abortController.signal,
@@ -215,10 +223,18 @@ export class Status extends TypedEmitter<StatusEvents> {
 
         // for easier debugging explicitly catch and log processStatus errors
         try {
-            return this.processStatus(status);
+            // lower bound for the start of any phase first observed now: the request-sent time of the
+            // previous committed poll (see getSigningSendDeadline). Advanced below only after this poll
+            // commits.
+            const prevStatusTimestamp = this.lastStatusRequestTimestamp;
+            const processedStatus = this.processStatus(status, prevStatusTimestamp);
+            // advance the anchor only after the poll is fully committed (processStatus did not throw)
+            this.lastStatusRequestTimestamp = requestTimestamp;
+
+            return processedStatus;
         } catch (error) {
             this.log('error', `Status processing ${error.message}`);
-            throw new Error(`Status processing ${error.message}`);
+            throw new Error(`Status processing ${error.message}`, { cause: error });
         }
     }
 
@@ -233,15 +249,15 @@ export class Status extends TypedEmitter<StatusEvents> {
                 identity: this.identities[0],
                 attempts: 3, // schedule 3 attempts on start
             },
-        ).then(patchResponse);
+        )
+            .then(patchResponse)
+            .catch(() => undefined);
 
-        return version
-            ? ({
-                  majorVersion: version.BackenMajordVersion,
-                  commitHash: version.CommitHash,
-                  legalDocumentsVersion: version.Ww2LegalDocumentsVersion,
-              } as CoinjoinClientVersion)
-            : undefined;
+        return {
+            majorVersion: version?.BackenMajordVersion ?? '0',
+            commitHash: version?.CommitHash ?? 'deadbeef',
+            legalDocumentsVersion: version?.Ww2LegalDocumentsVersion ?? '1.0',
+        };
     }
 
     async start() {

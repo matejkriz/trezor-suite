@@ -1,0 +1,108 @@
+import { useCallback, useRef } from 'react';
+
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { type AccountKey, type FeeLevelLabel, type TokenAddress } from '@suite-common/wallet-types';
+import { events, injectNativeAnalytics } from '@suite-native/analytics';
+
+import { type UpdateSelectedFeeLevelThunkParams } from '../../types';
+
+type UseFeeSelectionParams = {
+    accountKey: AccountKey;
+    tokenContract?: TokenAddress;
+    updateThunk: (params: UpdateSelectedFeeLevelThunkParams) => any;
+    formDraftKey?: string;
+};
+
+export type CustomFeeParams = {
+    customFeePerUnit?: string;
+    customFeeLimit?: string;
+    customMaxFeePerGas?: string;
+    customMaxPriorityFeePerGas?: string;
+};
+
+export const useFeeSelection = ({
+    accountKey,
+    tokenContract,
+    updateThunk,
+    formDraftKey,
+}: UseFeeSelectionParams) => {
+    const { analytics, dispatch } = useServices(injectNativeAnalytics, injectDispatch);
+    const handleFeeLevelChange = useCallback(
+        async (
+            feeLevel: FeeLevelLabel,
+            {
+                customFeePerUnit,
+                customFeeLimit,
+                customMaxFeePerGas,
+                customMaxPriorityFeePerGas,
+            }: CustomFeeParams = {},
+        ) => {
+            analytics.report({
+                type: events.sendFeeLevelChangedEvent.name,
+                payload: { value: feeLevel },
+            });
+
+            let thunkParams: UpdateSelectedFeeLevelThunkParams;
+            if (feeLevel === 'custom') {
+                thunkParams = {
+                    accountKey,
+                    tokenContract,
+                    feeLevelLabel: 'custom',
+                    feePerUnit: customFeePerUnit!,
+                    feeLimit: customFeeLimit,
+                    maxFeePerGas: customMaxFeePerGas,
+                    maxPriorityFeePerGas: customMaxPriorityFeePerGas,
+                    formDraftKey,
+                };
+            } else {
+                thunkParams = {
+                    accountKey,
+                    tokenContract,
+                    feeLevelLabel: feeLevel,
+                    formDraftKey,
+                };
+            }
+
+            await dispatch(updateThunk(thunkParams));
+        },
+        [analytics, dispatch, updateThunk, accountKey, tokenContract, formDraftKey],
+    );
+
+    const handleCustomFeeSet = useCallback(
+        ({
+            customFeePerUnit,
+            customFeeLimit,
+            customMaxFeePerGas,
+            customMaxPriorityFeePerGas,
+        }: CustomFeeParams) =>
+            handleFeeLevelChange('custom', {
+                customFeePerUnit,
+                customFeeLimit,
+                customMaxFeePerGas,
+                customMaxPriorityFeePerGas,
+            }),
+        [handleFeeLevelChange],
+    );
+
+    const hasDispatchedDefaultFee = useRef(false);
+
+    // pre-select default 'normal' fee level without analytics if fee is not already set
+    const dispatchDefaultFee = useCallback(() => {
+        if (hasDispatchedDefaultFee.current) {
+            return;
+        }
+        hasDispatchedDefaultFee.current = true;
+
+        dispatch(
+            updateThunk({
+                accountKey,
+                tokenContract,
+                feeLevelLabel: 'normal',
+                formDraftKey,
+            }),
+        );
+    }, [dispatch, updateThunk, accountKey, tokenContract, formDraftKey]);
+
+    return { handleFeeLevelChange, handleCustomFeeSet, dispatchDefaultFee };
+};

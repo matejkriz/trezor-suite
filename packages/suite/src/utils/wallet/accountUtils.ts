@@ -1,8 +1,10 @@
-import { Account } from '@suite-common/wallet-types';
-import { WalletParams } from 'src/types/wallet';
+import { type Account } from '@suite-common/wallet-types';
+import { type StaticSessionId } from '@trezor/connect';
+
+import { type WalletParams } from 'src/types/wallet';
 
 export const getSelectedAccount = (
-    deviceState: string | typeof undefined,
+    deviceState: StaticSessionId | undefined,
     accounts: Account[],
     routerParams: WalletParams | undefined,
 ) => {

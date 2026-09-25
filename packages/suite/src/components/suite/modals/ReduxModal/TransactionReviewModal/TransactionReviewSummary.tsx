@@ -1,365 +1,180 @@
-import styled, { useTheme } from 'styled-components';
-import BigNumber from 'bignumber.js';
-import { getFeeUnits, formatNetworkAmount, formatAmount, getFee } from '@suite-common/wallet-utils';
-import { Icon, CoinLogo, variables } from '@trezor/components';
-import { formatDuration, isFeatureFlagEnabled } from '@suite-common/suite-utils';
-import { borders, spacingsPx, typography } from '@trezor/theme';
-import { TranslationKey } from '@suite-common/intl-types';
-import { Translation, FormattedCryptoAmount, AccountLabel } from 'src/components/suite';
-import { Account, Network } from 'src/types/wallet';
-import { PrecomposedTransactionFinal, TxFinalCardano } from 'src/types/wallet/sendForm';
-import { useSelector } from 'src/hooks/suite/useSelector';
-import { selectLabelingDataForSelectedAccount } from 'src/reducers/suite/metadataReducer';
+import { AccountLabel } from '@suite/account';
+import { DebugOnlyBadge, selectIsDebugModeActive } from '@suite/debug';
+import { Translation } from '@suite/intl';
+import { selectConnectPopupCall } from '@suite-common/connect-popup';
+import { formatDurationStrict } from '@suite-common/suite-utils';
+import { type NetworkType, getNetwork } from '@suite-common/wallet-config';
+import { selectRawNetworkFeeInfo } from '@suite-common/wallet-core';
+import {
+    type FeeInfo,
+    type GeneralPrecomposedTransactionFinal,
+    type SendFormDraftKey,
+    type StakeType,
+} from '@suite-common/wallet-types';
+import { asAmountUnit, getFee, unitsToSubunits } from '@suite-common/wallet-utils';
+import { Box, IconButton, Note, Row, Text } from '@trezor/components';
+import { BroadcastIcon, ClockIcon, ComputerTowerIcon, InfoIcon, ReceiptIcon } from '@trezor/icons';
+import { TokenIcon } from '@trezor/product-components';
+import { BigNumber } from '@trezor/utils';
 
-const Wrapper = styled.div`
-    padding: 20px 15px 12px;
-    display: flex;
-    flex-direction: column;
-    border-radius: ${borders.radii.xs};
-    background: ${({ theme }) => theme.backgroundSurfaceElevation0};
-    min-width: 190px;
-    width: 225px;
-    justify-content: flex-start;
-    align-items: center;
+import { ConnectCallSource } from 'src/components/suite/ConnectCallSource';
+import { FeeRate } from 'src/components/wallet/Fees/FeeRate';
+import { useLocales, useSelector } from 'src/hooks/suite';
+import { type AppState } from 'src/types/suite';
+import { type Account } from 'src/types/wallet';
 
-    @media (max-width: ${variables.SCREEN_SIZE.SM}) {
-        width: 100%;
-    }
-`;
+import { TransactionReviewEthereumNotes } from './TransactionReviewEthereumNotes';
+import { TransactionReviewTronFeeNotes } from './TransactionReviewTronFeeNotes';
 
-const SummaryHead = styled.div`
-    margin: 0 0 10px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-`;
+const getEstimatedTime = (
+    networkType: NetworkType,
+    feeInfo: FeeInfo | undefined,
+    tx: GeneralPrecomposedTransactionFinal,
+): number | undefined => {
+    if (!feeInfo) return;
 
-const IconWrapper = styled.div`
-    background-color: ${({ theme }) => theme.backgroundSurfaceElevation1};
-    padding: 4px;
-    border-radius: 100px;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    const matchedFeeLevel = feeInfo.levels.find(item => item.feePerUnit === tx.feePerByte);
 
-    & > svg {
-        margin: 0 auto;
-        display: block;
-    }
-`;
+    // TODO: estimated EVM time, blocks logic in connect
+    if (networkType !== 'bitcoin' || !matchedFeeLevel) return;
 
-const NestedIconWrapper = styled(IconWrapper)`
-    width: 16px;
-    height: 16px;
-    position: absolute;
-    top: 0;
-    right: 0;
-    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 20%);
-`;
+    return matchedFeeLevel.blocks * feeInfo.blockTime * 60;
+};
 
-const HeadlineAmount = styled.div`
-    display: block;
-`;
+const selectSendFormDrafts = (state: AppState) => state.wallet.send.drafts;
+const selectCurrentAccountKey = (state: AppState) => state.wallet.selectedAccount.account?.key;
 
-const Headline = styled.div`
-    font-size: 16px;
-    font-weight: 600;
-    margin-top: 20px;
-    word-break: break-all;
-`;
-
-const AccountWrapper = styled.div`
-    font-size: 12px;
-    color: ${({ theme }) => theme.textSubdued};
-    display: flex;
-    margin-top: 5px;
-    word-break: normal;
-    overflow-wrap: anywhere;
-    align-items: center;
-
-    & > div {
-        margin: 1px 5px 0 0;
-        display: block;
-    }
-`;
-
-const Separator = styled.div`
-    border-top: 1px solid ${({ theme }) => theme.borderElevation2};
-    margin: 10px 0 0;
-    padding: 0 0 10px;
-    width: 100%;
-`;
-
-const LeftDetails = styled.div`
-    width: 100%;
-    flex-direction: column;
-    margin-top: 6px;
-    flex: 1;
-    display: flex;
-    font-weight: 500;
-    text-align: start;
-`;
-
-const RateInfo = styled.div`
-    position: relative;
-    padding: 6px 12px;
-    text-align: start;
-    background: ${({ theme }) => theme.backgroundAlertBlueSubtleOnElevation1};
-    border-radius: 6px;
-    color: ${({ theme }) => theme.textAlertBlue};
-
-    &::before {
-        content: '';
-        position: absolute;
-        top: -6px;
-        left: 20px;
-        border-left: 8px solid transparent;
-        border-right: 8px solid transparent;
-        border-bottom: 6px solid ${({ theme }) => theme.textAlertBlue};
-    }
-`;
-
-const TxDetailsButton = styled.button<{ $detailsOpen: boolean }>`
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-radius: ${borders.radii.xs};
-    padding: ${spacingsPx.xxs} ${spacingsPx.xxs} ${spacingsPx.xxs} ${spacingsPx.xs};
-    margin: 0 -${spacingsPx.xxs};
-    width: calc(100% + ${spacingsPx.xs});
-    border: 0;
-    ${typography.label}
-    color: ${({ theme }) => theme.textSubdued};
-    transition:
-        background 0.15s,
-        opacity 0.15s;
-    background: ${({ theme, $detailsOpen }) => $detailsOpen && theme.backgroundSurfaceElevation3};
-    cursor: pointer;
-
-    &:hover {
-        opacity: 0.8;
-    }
-
-    & > * {
-        display: block;
-    }
-`;
-
-const LeftDetailsRow = styled.div`
-    display: flex;
-    font-size: 12px;
-
-    & + & {
-        margin-top: 10px;
-    }
-`;
-
-const LeftDetailsBottom = styled.div`
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    flex: 1;
-`;
-
-const ReviewRbfLeftDetailsLineLeft = styled.div`
-    display: flex;
-    align-items: center;
-    margin: 0 5% 0 0;
-    width: 50%;
-    color: ${({ theme }) => theme.textSubdued};
-
-    & > div:first-child {
-        margin: 1px 5px 0 0;
-        display: block;
-    }
-`;
-
-const ReviewRbfLeftDetailsLineRight = styled.div<{ $color: string; $uppercase?: boolean }>`
-    width: 45%;
-    text-align: left;
-    color: ${props => props.$color};
-    font-weight: 500;
-
-    ${({ $uppercase }) =>
-        $uppercase &&
-        `
-        text-transform: uppercase;
-  `};
-`;
-
-interface TransactionReviewSummaryProps {
-    estimateTime?: number;
-    tx: PrecomposedTransactionFinal | TxFinalCardano;
+type TransactionReviewSummaryProps = {
+    tx: GeneralPrecomposedTransactionFinal;
     account: Account;
-    network: Network;
     broadcast?: boolean;
-    detailsOpen: boolean;
     onDetailsClick: () => void;
-    actionText: TranslationKey;
-}
+    stakeType?: StakeType | null;
+    timer?: React.JSX.Element;
+};
 
 export const TransactionReviewSummary = ({
-    estimateTime,
     tx,
     account,
-    network,
     broadcast,
-    detailsOpen,
     onDetailsClick,
-    actionText,
+    stakeType,
+    timer,
 }: TransactionReviewSummaryProps) => {
-    const drafts = useSelector(state => state.wallet.send.drafts);
-    const { accountLabel } = useSelector(selectLabelingDataForSelectedAccount);
-    const currentAccountKey = useSelector(
-        state => state.wallet.selectedAccount.account?.key,
-    ) as string;
+    const drafts = useSelector(selectSendFormDrafts);
+    const currentAccountKey = useSelector(selectCurrentAccountKey) as string;
+    const rawFeeInfo = useSelector(state => selectRawNetworkFeeInfo(state, account.symbol));
+    const locale = useLocales();
+    const { symbol, networkType } = account;
+    const network = getNetwork(symbol);
+    const fee = getFee(account.networkType, tx);
+    const estimateTime = getEstimatedTime(networkType, rawFeeInfo, tx);
+    const connectPopupCall = useSelector(selectConnectPopupCall);
+    const isDebug = useSelector(selectIsDebugModeActive);
 
-    const theme = useTheme();
-
-    const { symbol, accountType, index } = account;
-    const fee = getFee(network.networkType, tx);
-
-    const spentWithoutFee = !tx.token ? new BigNumber(tx.totalSpent).minus(tx.fee).toString() : '';
-    const amount = !tx.token
-        ? formatNetworkAmount(spentWithoutFee, symbol)
-        : formatAmount(tx.totalSpent, tx.token.decimals);
-
-    const formFeeRate = drafts[currentAccountKey]?.feePerUnit;
-    const isFeeCustom = drafts[currentAccountKey]?.selectedFee === 'custom';
+    const formFeeRate = drafts[currentAccountKey as SendFormDraftKey]?.feePerUnit; // Todo: is this cast correct? https://github.com/trezor/trezor-suite/issues/24918
+    const isFeeCustom = drafts[currentAccountKey as SendFormDraftKey]?.selectedFee === 'custom'; // Todo: is this cast correct? https://github.com/trezor/trezor-suite/issues/24918
     const isComposedFeeRateDifferent = isFeeCustom && formFeeRate !== fee;
 
+    const isEthereumNetworkType = networkType === 'ethereum';
+
     return (
-        <Wrapper>
-            <SummaryHead>
-                <IconWrapper>
-                    <CoinLogo size={48} symbol={symbol} />
-                    <NestedIconWrapper>
-                        <Icon size={12} color={theme.iconSubdued} icon="SEND" />
-                    </NestedIconWrapper>
-                </IconWrapper>
-
-                <Headline>
-                    <Translation id={actionText} />
-                    <HeadlineAmount>
-                        <FormattedCryptoAmount
-                            disableHiddenPlaceholder
-                            value={amount}
-                            symbol={tx.token?.symbol ?? symbol}
+        <>
+            <Row justifyContent="space-between">
+                <Row columnGap={16} rowGap={4} flexWrap="wrap">
+                    <Row gap={4}>
+                        <TokenIcon size={16} symbol={symbol} />
+                        <AccountLabel
+                            account={account}
+                            showAccountTypeBadge
+                            accountTypeBadgeSize="small"
+                            data-testid="@modal/header/account-label"
                         />
-                    </HeadlineAmount>
-                </Headline>
+                    </Row>
 
-                <AccountWrapper>
-                    <Icon size={12} color={theme.iconSubdued} icon="WALLET" />
-                    <AccountLabel
-                        accountLabel={accountLabel}
-                        accountType={accountType}
-                        symbol={symbol}
-                        index={index}
-                    />
-                </AccountWrapper>
-            </SummaryHead>
+                    {estimateTime !== undefined && (
+                        <Note data-testid="@modal/header/estimated-time" icon={ClockIcon}>
+                            {'≈ '}
+                            <Text data-testid="@modal/header/estimated-time/value">
+                                {formatDurationStrict(estimateTime, locale)}
+                            </Text>
+                        </Note>
+                    )}
 
-            <Separator />
+                    {isEthereumNetworkType && (
+                        <TransactionReviewEthereumNotes account={account} tx={tx} />
+                    )}
 
-            <LeftDetails>
-                {estimateTime !== undefined && (
-                    <LeftDetailsRow>
-                        <ReviewRbfLeftDetailsLineLeft>
-                            <Icon size={12} color={theme.iconSubdued} icon="CALENDAR" />
-                            <Translation id="TR_DELIVERY" />
-                        </ReviewRbfLeftDetailsLineLeft>
+                    {!['ethereum', 'solana', 'tron'].includes(networkType) && (
+                        <Note data-testid="@modal/header/fee-rate" icon={ReceiptIcon}>
+                            <FeeRate feeRate={fee} networkType={network.networkType} />
+                        </Note>
+                    )}
 
-                        <ReviewRbfLeftDetailsLineRight $color={theme.textSubdued}>
-                            {formatDuration(estimateTime)}
-                        </ReviewRbfLeftDetailsLineRight>
-                    </LeftDetailsRow>
-                )}
-                {!!tx.feeLimit && network.networkType !== 'solana' && (
-                    <LeftDetailsRow>
-                        <ReviewRbfLeftDetailsLineLeft>
-                            <Icon size={12} color={theme.iconSubdued} icon="GAS" />
-                            <Translation id="TR_GAS_LIMIT" />
-                        </ReviewRbfLeftDetailsLineLeft>
+                    {networkType === 'tron' && (
+                        <TransactionReviewTronFeeNotes tx={tx} account={account} />
+                    )}
 
-                        <ReviewRbfLeftDetailsLineRight $color={theme.textSubdued}>
-                            {tx.feeLimit}
-                        </ReviewRbfLeftDetailsLineRight>
-                    </LeftDetailsRow>
-                )}
-                <LeftDetailsRow>
-                    <ReviewRbfLeftDetailsLineLeft>
-                        <Icon size={12} color={theme.iconSubdued} icon="GAS" />
-                        {network.networkType === 'bitcoin' && <Translation id="TR_FEE_RATE" />}
-                        {network.networkType === 'ethereum' && <Translation id="TR_GAS_PRICE" />}
-                        {network.networkType === 'ripple' && <Translation id="TR_TX_FEE" />}
-                        {network.networkType === 'solana' && <Translation id="TR_TX_FEE" />}
-                    </ReviewRbfLeftDetailsLineLeft>
-
-                    <ReviewRbfLeftDetailsLineRight $color={theme.textSubdued}>
-                        {fee} {getFeeUnits(network.networkType)}
-                    </ReviewRbfLeftDetailsLineRight>
-                </LeftDetailsRow>
-
-                {isComposedFeeRateDifferent && network.networkType === 'bitcoin' && (
-                    <LeftDetailsRow>
-                        <RateInfo>
+                    {isComposedFeeRateDifferent && network.networkType === 'bitcoin' && (
+                        <Text data-testid="@modal/header/fee-rate-changed">
                             <Translation id="TR_FEE_RATE_CHANGED" />
-                        </RateInfo>
-                    </LeftDetailsRow>
-                )}
+                        </Text>
+                    )}
 
-                <LeftDetailsRow>
-                    <ReviewRbfLeftDetailsLineLeft>
-                        <Icon size={12} color={theme.iconSubdued} icon="BROADCAST" />
-                        <Translation id="BROADCAST" />
-                    </ReviewRbfLeftDetailsLineLeft>
+                    {!stakeType && !broadcast && connectPopupCall?.state !== 'ongoing' && (
+                        <Note data-testid="@modal/header/broadcast" icon={BroadcastIcon}>
+                            <Translation id="BROADCAST" />
+                            {': '}
+                            <Text data-testid="@modal/header/broadcast/state" intent="critical">
+                                <Translation id="TR_OFF" />
+                            </Text>
+                        </Note>
+                    )}
 
-                    <ReviewRbfLeftDetailsLineRight
-                        $color={broadcast ? theme.textPrimaryDefault : theme.textAlertYellow}
-                        $uppercase
-                    >
-                        <Translation id={broadcast ? 'TR_ON' : 'TR_OFF'} />
-                    </ReviewRbfLeftDetailsLineRight>
-                </LeftDetailsRow>
-                {isFeatureFlagEnabled('RBF') && network.features?.includes('rbf') && (
-                    <LeftDetailsRow>
-                        <ReviewRbfLeftDetailsLineLeft>
-                            <Icon size={12} color={theme.textSubdued} icon="RBF" />
-                            <Translation id="RBF" />
-                        </ReviewRbfLeftDetailsLineLeft>
+                    {connectPopupCall?.state === 'ongoing' && (
+                        <ConnectCallSource data-testid="@modal/header/connect-source" />
+                    )}
 
-                        <ReviewRbfLeftDetailsLineRight
-                            $color={tx.rbf ? theme.textPrimaryDefault : theme.textAlertYellow}
-                            $uppercase
-                        >
-                            <Translation id={tx.rbf ? 'TR_ON' : 'TR_OFF'} />
-                        </ReviewRbfLeftDetailsLineRight>
-                    </LeftDetailsRow>
-                )}
-                {tx.inputs.length !== 0 && (
-                    <LeftDetailsBottom>
-                        <Separator />
-
-                        <LeftDetailsRow>
-                            <TxDetailsButton
-                                $detailsOpen={detailsOpen}
+                    {tx.inputs.length > 0 && (
+                        // TODO: IconButton doesn't take margin even though it should
+                        <Box margin={{ left: 'auto' }}>
+                            <IconButton
                                 onClick={() => onDetailsClick()}
-                            >
-                                <Translation id="TR_TRANSACTION_DETAILS" />
-                                <Icon
-                                    size={12}
-                                    color={theme.iconSubdued}
-                                    icon={detailsOpen ? 'CROSS' : 'ARROW_RIGHT'}
-                                />
-                            </TxDetailsButton>
-                        </LeftDetailsRow>
-                    </LeftDetailsBottom>
-                )}
-            </LeftDetails>
-        </Wrapper>
+                                data-testid="@modal/header/details-button"
+                                intent="neutral"
+                                priority="secondary"
+                                icon={InfoIcon}
+                                tooltip={{
+                                    content: <Translation id="TR_TRANSACTION_DETAILS" />,
+                                }}
+                            />
+                        </Box>
+                    )}
+                </Row>
+                {timer}
+            </Row>
+            {networkType === 'solana' && isDebug && (
+                <Row margin={{ top: 8 }} gap={8}>
+                    <DebugOnlyBadge />
+                    <Note data-testid="@modal/header/cu-limit" icon={ComputerTowerIcon}>
+                        CU Limit
+                        {': '}
+                        <Text data-testid="@modal/header/cu-limit/value">{tx.feeLimit}</Text> CU
+                    </Note>
+                    <Note data-testid="@modal/header/cu-price" icon={ComputerTowerIcon}>
+                        CU Price
+                        {': '}
+                        <FeeRate
+                            feeRate={unitsToSubunits({
+                                value: asAmountUnit(new BigNumber(tx.feePerByte)),
+                                decimals: -6,
+                            })}
+                            networkType={network.networkType}
+                        />
+                        /CU
+                    </Note>
+                </Row>
+            )}
+        </>
     );
 };

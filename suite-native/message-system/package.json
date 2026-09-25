@@ -6,28 +6,35 @@
     "sideEffects": false,
     "main": "src/index",
     "scripts": {
-        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "type-check": "yarn g:tsc --build"
+        "depcheck": "yarn g:depcheck",
+        "type-check": "yarn g:tsc --build",
+        "test:unit": "yarn g:jest:native",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'"
     },
     "dependencies": {
         "@mobily/ts-belt": "^3.13.1",
-        "@reduxjs/toolkit": "1.9.5",
-        "@suite-common/icons": "workspace:*",
+        "@reduxjs/toolkit": "2.12.0",
+        "@suite-common/dependency-injection": "workspace:*",
+        "@suite-common/device": "workspace:*",
+        "@suite-common/geolocation": "workspace:*",
         "@suite-common/message-system": "workspace:*",
         "@suite-common/redux-utils": "workspace:*",
         "@suite-common/suite-types": "workspace:*",
         "@suite-common/wallet-core": "workspace:*",
         "@suite-native/atoms": "workspace:*",
+        "@suite-native/discovery": "workspace:*",
+        "@suite-native/icons": "workspace:*",
         "@suite-native/intl": "workspace:*",
         "@suite-native/link": "workspace:*",
-        "@suite-native/navigation": "workspace:*",
-        "@trezor/styles": "workspace:*",
+        "@trezor/connect": "workspace:*",
+        "@trezor/styles-native": "workspace:*",
         "@trezor/theme": "workspace:*",
-        "proxy-memoize": "2.0.2",
-        "react": "18.2.0",
-        "react-native": "0.73.2",
-        "react-native-reanimated": "3.7.0-nightly-20240101-9d365ae7b",
-        "react-native-safe-area-context": "4.9.0",
-        "react-redux": "8.0.7"
+        "react": "19.2.3",
+        "react-native": "0.86.0",
+        "react-native-reanimated": "4.5.0",
+        "react-redux": "9.3.0"
+    },
+    "devDependencies": {
+        "@suite-native/test-utils-store": "workspace:*"
     }
 }

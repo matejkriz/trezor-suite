@@ -1,12 +1,15 @@
-/ci @vdovhanych @mroz22
-
 /.github/workflows @vdovhanych
 
 /docker @vdovhanych @mroz22
 
-/scripts @Nodonisko
-
-/packages/analytics @tomasklim
+/scripts @vdovhanych
+/scripts/list-outdated-dependencies/connect-dependencies.txt @martykan
+/scripts/list-outdated-dependencies/earn-dependencies.txt @tomasklim
+/scripts/list-outdated-dependencies/growth-dependencies.txt @jvaclavik @Lemonexe
+/scripts/list-outdated-dependencies/networks-dependencies.txt @OriginalEveres
+/scripts/list-outdated-dependencies/trade-dependencies.txt @vytick
+/scripts/list-outdated-dependencies/qa-dependencies.txt @Vere-Grey @STew790
+/scripts/list-outdated-dependencies/wallet-dependencies.txt @matusbalascak
 
 /packages/blockchain-link @mroz22 @marekrjpolak
 
@@ -16,74 +19,105 @@
 
 /packages/coinjoin @marekrjpolak @szymonlesisz
 
-/packages/components @jvaclavik @peter-sanderson
+/packages/components @trezor/suite-growth @seibei-iguchi @jvaclavik
 
-/packages/connect @mroz22 @szymonlesisz @martykan
+/packages/product-components @trezor/suite-growth @seibei-iguchi @jvaclavik
 
-/packages/connect-common @mroz22 @szymonlesisz @martykan
+/packages/connect @mroz22 @szymonlesisz @martykan @marekrjpolak
 
-/packages/connect-examples @mroz22 @szymonlesisz @martykan
+/packages/connect-common @mroz22 @martykan
 
-/packages/connect-explorer @mroz22 @szymonlesisz @martykan
+/packages/connect-examples @mroz22 @martykan
 
-/packages/connect-iframe @mroz22 @szymonlesisz @martykan
+/packages/connect-explorer @mroz22 @martykan
 
-/packages/connect-plugin-ethereum @mroz22 @szymonlesisz @martykan
+/packages/connect-plugin-ethereum @mroz22 @martykan
 
-/packages/connect-plugin-stellar @mroz22 @szymonlesisz @martykan
+/packages/connect-plugin-stellar @mroz22 @martykan
 
-/packages/connect-popup @mroz22 @szymonlesisz @martykan
+/packages/connect-web @mroz22 @martykan
 
-/packages/connect-web @mroz22 @szymonlesisz @martykan
+/packages/connect-webextension @mroz22 @martykan
 
-/packages/connect-webextension @mroz22 @karliatto @martykan
+/packages/connect-mobile @mroz22 @martykan
+
+/packages/crypto-utils @mroz22 @marekrjpolak
 
 /packages/icons @trezor/suite-mobile
 
-/suite-common/message-system @tomasklim @matejkriz
-
-/packages/suite @tomasklim @matejkriz
-
-/packages/suite-analytics @tomasklim
-
-/packages/suite-build @matejkriz @tomasklim
-
-/packages/suite-data @tomasklim @matejkriz
-
-/packages/suite-desktop @tomasklim @marekrjpolak
-
-/packages/suite-desktop-ui @tomasklim @matejkriz
-
-/packages/suite-desktop-api @szymonlesisz @marekrjpolak
-
-/suite-native @trezor/suite-mobile
+/suite/desktop-app-api @szymonlesisz @marekrjpolak
 
 /packages/suite-storage @matejkriz
 
-/packages/suite-web @marekrjpolak @tomasklim
+/packages/transport @mroz22 @szymonlesisz
 
-/packages/transport @mroz22
+/packages/transport-bluetooth @szymonlesisz
 
-/packages/transport-native @trezor/suite-mobile @Nodonisko
+/packages/transport-bridge @mroz22 @szymonlesisz
 
-/packages/theme @Nodonisko @jvaclavik @peter-sanderson
+/packages/transport-test @mroz22
 
-/packages/urls @marekrjpolak
+/packages/theme @trezor/suite-growth
 
-/packages/utils @karliatto
+/packages/urls @marekrjpolak @pavelmario
 
-/packages/node-utils @karliatto
+/packages/utils @marekrjpolak
+
+/packages/node-utils @marekrjpolak
 
 /packages/utxo-lib @szymonlesisz
 
-/packages/styles @Nodonisko @jvaclavik @peter-sanderson
+/packages/styles @trezor/suite-growth
 
-/translations @alex-jerechinsky
+/packages/dom-utils @trezor/suite-growth
 
-/packages/suite/src/support/messages.ts @alex-jerechinsky
-
-/suite-common/graph @trezor/suite-mobile @Nodonisko
-
-/packages/connect/src/data/deviceAuthenticityConfig.ts @tsusanka
+/packages/device-authenticity/src/config/deviceAuthenticityConfig.ts @tsusanka @MiroslavProchazka
+/packages/device-authenticity/src/config/deviceAuthenticityBlacklistConfig.ts @tsusanka @MiroslavProchazka
 
 /packages/schema-utils @martykan
+
+/packages/connect-explorer-theme @martykan
+
+/packages/websocket-client @mroz22 @marekrjpolak
+
+# Automation
+/.github/actions @Vere-Grey @vdovhanych
+/.github/workflows/build-llm-** @Vere-Grey @vdovhanych
+/.github/workflows/check-test-health-** @Vere-Grey @vdovhanych
+/.github/workflows/template-suite-** @Vere-Grey @vdovhanych
+/.github/workflows/test-suite-** @Vere-Grey @vdovhanych
+/docs/tests @Vere-Grey
+/packages/e2e-utils @Vere-Grey
+/packages/trezor-user-env-link @Vere-Grey
+/suite/e2e @Vere-Grey
+/suite-common/e2e-evolu-client @Vere-Grey
+/suite-native/app/e2e @Vere-Grey
+
+# Analytics
+/packages/analytics-docs @jvaclavik
+/packages/analytics-log-server @jvaclavik
+/packages/analytics-uploader @jvaclavik
+
+# Suite Desktop Packages
+/suite/analytics @jvaclavik
+/suite/analytics/src/events @jvaclavik @kolomaznikt
+/suite/analytics/src/constants.ts @jvaclavik @kolomaznikt
+/suite/src/messages.ts @pavelmario
+
+# Suite Mobile Packages
+/suite-native/analytics @jvaclavik
+/suite-native/analytics/src/events @jvaclavik @kolomaznikt
+/suite-native/analytics/src/constants.ts @jvaclavik @kolomaznikt
+/suite-native/analytics/src/types.ts @jvaclavik @kolomaznikt
+/suite-native/module-authorize-device @juriczech
+/suite-native/module-passphrase @juriczech
+/suite-native/passphrase @juriczech
+
+# Suite Common Packages
+/suite-common/analytics @jvaclavik
+/suite-common/analytics/src/events @jvaclavik @kolomaznikt
+/suite-common/analytics/src/constants.ts @jvaclavik @kolomaznikt
+/suite-common/analytics/src/types.ts @jvaclavik @kolomaznikt
+/suite-common/graph @trezor/suite-mobile
+/suite-common/message-system @tomasklim @matejkriz @MiroslavProchazka @pavelmario
+/suite-common/token-definitions @tomasklim

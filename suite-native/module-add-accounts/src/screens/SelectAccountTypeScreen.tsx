@@ -1,60 +1,60 @@
 import { useState } from 'react';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View } from 'react-native';
 
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { useNativeStyles, prepareNativeStyle } from '@trezor/styles';
-import { AccountType } from '@suite-common/wallet-config';
+import { type AccountType } from '@suite-common/wallet-config';
 import {
-    AddCoinAccountStackParamList,
-    AddCoinAccountStackRoutes,
-    Screen,
-    ScreenSubHeader,
-    StackProps,
-} from '@suite-native/navigation';
+    type AddCoinEnabledAccountType,
+    accountTypeTranslationKeys,
+    useAddCoinAccount,
+} from '@suite-native/add-coin-account';
 import {
-    Button,
-    VStack,
-    Text,
-    IconButton,
-    SelectableItem,
-    BulletListItem,
     Box,
+    BulletList,
+    BulletListItem,
+    Button,
+    SelectableItem,
+    Text,
+    VStack,
+    useBannerAwareSafeAreaInsets,
 } from '@suite-native/atoms';
-import { useTranslate, Translation, TxKeyPath } from '@suite-native/intl';
+import { Translation, type TxKeyPath, useTranslate } from '@suite-native/intl';
 import { useOpenLink } from '@suite-native/link';
-
-import { useAddCoinAccount, accountTypeTranslationKeys } from '../hooks/useAddCoinAccount';
+import {
+    type AddCoinAccountStackParamList,
+    type AddCoinAccountStackRoutes,
+    Screen,
+    ScreenHeader,
+    type StackProps,
+} from '@suite-native/navigation';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
+import { TREZOR_SUPPORT_MULTIPLE_ACCOUNTS } from '@trezor/urls';
 
 const GRADIENT_HEIGHT = 48;
 
 // for extra space on the bottom due to android showing odd SafeAreaInsets.bottom
 const EXTRA_BOTTOM_PADDING = 48;
 
-const ACCOUNT_TYPES_URL = 'https://trezor.io/learn/a/multiple-accounts-in-trezor-suite';
-
 const bulletsForKeyPath = (keyPath: TxKeyPath) => (
-    <Box paddingLeft="small">
+    <Box paddingLeft="sp8">
         <Translation
             id={keyPath}
             values={{
-                li: chunks =>
-                    chunks.map(
-                        row =>
-                            row && (
-                                <BulletListItem key={`${row}`} variant="hint" color="textSubdued">
-                                    {row}
-                                </BulletListItem>
-                            ),
-                    ),
+                li: chunks => (
+                    <BulletList textVariant="body-sm" textColor="contentSecondary">
+                        {chunks.map(row => (
+                            <BulletListItem key={`${row}`}>{row}</BulletListItem>
+                        ))}
+                    </BulletList>
+                ),
             }}
         />
     </Box>
 );
 
 const itemsStyle = prepareNativeStyle(utils => ({
-    paddingHorizontal: utils.spacings.extraSmall,
+    paddingHorizontal: utils.spacings.sp4,
 }));
 
 const bottomWrapperStyle = prepareNativeStyle((_, { bottomInset }: { bottomInset: number }) => ({
@@ -70,85 +70,90 @@ const gradientStyle = prepareNativeStyle(_ => ({
 }));
 
 const buttonWrapperStyle = prepareNativeStyle(utils => ({
-    paddingHorizontal: utils.spacings.medium,
-    backgroundColor: utils.colors.backgroundSurfaceElevation0,
+    paddingHorizontal: utils.spacings.sp16,
+    backgroundColor: utils.colors.surfaceFillPage,
 }));
 
 const aboutStyle = prepareNativeStyle((utils, { bottomInset }: { bottomInset: number }) => ({
-    paddingTop: utils.spacings.extraLarge,
+    paddingTop: utils.spacings.sp32,
     paddingBottom: EXTRA_BOTTOM_PADDING + GRADIENT_HEIGHT + bottomInset,
     width: '100%',
-    paddingHorizontal: utils.spacings.small,
-    gap: 12,
+    paddingHorizontal: utils.spacings.sp8,
+    gap: utils.spacings.sp12,
 }));
+
+const getAccountTypeTranslations = (type: AccountType) => {
+    if (!Object.keys(accountTypeTranslationKeys).includes(type)) {
+        return undefined;
+    }
+
+    return accountTypeTranslationKeys[type as AddCoinEnabledAccountType];
+};
 
 export const SelectAccountTypeScreen = ({
     route,
-    navigation,
 }: StackProps<AddCoinAccountStackParamList, AddCoinAccountStackRoutes.SelectAccountType>) => {
     const { accountType: defaultType, networkSymbol, flowType } = route.params;
     const { translate } = useTranslate();
     const openLink = useOpenLink();
-    const insets = useSafeAreaInsets();
+    const insets = useBannerAwareSafeAreaInsets();
     const { applyStyle, utils } = useNativeStyles();
 
     const { getAvailableAccountTypesForNetworkSymbol, addCoinAccount } = useAddCoinAccount();
 
     const [selectedAccountType, setSelectedAccountType] = useState<AccountType>(defaultType);
 
-    const types: AccountType[] = getAvailableAccountTypesForNetworkSymbol({ networkSymbol });
-    const { titleKey: accountTypeKey } = accountTypeTranslationKeys[selectedAccountType];
+    const types: AccountType[] = getAvailableAccountTypesForNetworkSymbol({
+        symbol: networkSymbol,
+    });
 
-    const handleClose = () => navigation.goBack();
+    const accountTypeKey = getAccountTypeTranslations(selectedAccountType)?.titleKey;
 
-    const handleMoreTap = () => openLink(ACCOUNT_TYPES_URL);
+    const handleMoreTap = () => openLink(TREZOR_SUPPORT_MULTIPLE_ACCOUNTS);
 
     const handleConfirmTap = () =>
-        addCoinAccount({ networkSymbol, accountType: selectedAccountType, flowType });
+        addCoinAccount({ symbol: networkSymbol, accountType: selectedAccountType, flowType });
 
     return (
         <>
             <Screen
-                screenHeader={
-                    <ScreenSubHeader
-                        content={translate('moduleAddAccounts.selectAccountTypeScreen.title', {
+                header={
+                    <ScreenHeader
+                        title={translate('moduleAddAccounts.selectAccountTypeScreen.title', {
                             symbol: _ => networkSymbol.toUpperCase(),
                         })}
-                        leftIcon={
-                            <IconButton
-                                iconName="close"
-                                onPress={handleClose}
-                                colorScheme="tertiaryElevation0"
-                                size="medium"
-                            />
-                        }
+                        closeActionType="close"
                     />
                 }
             >
-                <VStack spacing="large" style={applyStyle(itemsStyle)}>
+                <VStack spacing="sp24" style={applyStyle(itemsStyle)}>
                     {types.map(item => {
-                        const { titleKey, subtitleKey, descKey } = accountTypeTranslationKeys[item];
+                        const intlData = getAccountTypeTranslations(item);
+                        if (!intlData) {
+                            return null;
+                        }
+                        const { titleKey, subtitleKey, descKey } = intlData;
 
                         return (
                             <SelectableItem
                                 key={`select-type-${item}`}
-                                title={translate(titleKey)}
-                                subtitle={translate(subtitleKey)}
+                                title={<Translation id={titleKey} />}
+                                subtitle={<Translation id={subtitleKey} />}
                                 content={bulletsForKeyPath(descKey)}
                                 isSelected={selectedAccountType === item}
                                 isDefault={defaultType === item}
-                                data-testID={`@add-account/select-type/${item}`}
+                                testID={`@add-account/select-type/${item}`}
                                 onSelected={() => setSelectedAccountType(item)}
                             />
                         );
                     })}
                 </VStack>
                 <View style={applyStyle(aboutStyle, { bottomInset: insets.bottom })}>
-                    <Text variant="hint" color="textSubdued" textAlign="center">
+                    <Text variant="body-sm" color="contentSecondary" textAlign="center">
                         <Translation id="moduleAddAccounts.selectAccountTypeScreen.aboutTypesLabel" />
                     </Text>
-                    <Button size="medium" colorScheme="tertiaryElevation0" onPress={handleMoreTap}>
-                        {translate('moduleAddAccounts.selectAccountTypeScreen.buttons.more')}
+                    <Button intent="neutral" priority="secondary" onPress={handleMoreTap}>
+                        <Translation id="moduleAddAccounts.selectAccountTypeScreen.buttons.more" />
                     </Button>
                 </View>
             </Screen>
@@ -156,15 +161,18 @@ export const SelectAccountTypeScreen = ({
                 <LinearGradient
                     style={applyStyle(gradientStyle)}
                     colors={[
-                        utils.transparentize(1, utils.colors.backgroundSurfaceElevation0),
-                        utils.colors.backgroundSurfaceElevation0,
+                        utils.transparentize(1, utils.colors.surfaceFillPage),
+                        utils.colors.surfaceFillPage,
                     ]}
                 />
                 <View style={applyStyle(buttonWrapperStyle)}>
-                    <Button size="medium" onPress={handleConfirmTap}>
-                        {translate('moduleAddAccounts.selectAccountTypeScreen.buttons.confirm', {
-                            type: _ => translate(accountTypeKey),
-                        })}
+                    <Button onPress={handleConfirmTap}>
+                        <Translation
+                            id="moduleAddAccounts.selectAccountTypeScreen.buttons.confirm"
+                            values={{
+                                type: _ => (accountTypeKey ? translate(accountTypeKey) : undefined),
+                            }}
+                        />
                     </Button>
                 </View>
             </View>

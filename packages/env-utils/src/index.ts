@@ -1,6 +1,6 @@
 import { envUtils } from './envUtils';
 
-export type { Environment } from './types';
+export type { Environment, EnvUtils } from './types';
 
 export const {
     isWeb,
@@ -10,13 +10,8 @@ export const {
     getUserAgent,
     isAndroid,
     isChromeOs,
-    getBrowserVersion,
-    getBrowserName,
     getCommitHash,
-    getDeviceType,
-    getOsVersion,
     getSuiteVersion,
-    isFirefox,
     getPlatform,
     getPlatformLanguages,
     getScreenWidth,
@@ -32,7 +27,7 @@ export const {
     isLinux,
     isCodesignBuild,
     getOsName,
-    getOsNameWeb,
-    getOsFamily,
     getJWSPublicKey,
 } = envUtils;
+
+export { resolveStaticPath, resolveConnectPath } from './resolveStaticPath';

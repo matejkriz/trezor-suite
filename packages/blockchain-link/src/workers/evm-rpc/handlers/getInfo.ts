@@ -1,0 +1,31 @@
+import { RESPONSES } from '@trezor/blockchain-link-types';
+import type { MessageTypes, ResponseTypes as Responses } from '@trezor/blockchain-link-types';
+
+import type { Request } from '../types';
+import { getChainId } from '../utils/client';
+
+export const getInfo = async (
+    request: Request<MessageTypes.GetInfo>,
+): Promise<Responses.GetInfo> => {
+    const client = await request.connect();
+    const [blockNumber, chainId] = await Promise.all([client.getBlockNumber(), getChainId(client)]);
+
+    const block = await client.getBlock({ blockNumber, includeTransactions: false });
+
+    const { coinName } = request;
+
+    return {
+        type: RESPONSES.GET_INFO,
+        payload: {
+            url: request.state.url ?? '',
+            name: `EVM RPC (Chain ${chainId})`,
+            shortcut: coinName,
+            decimals: 18,
+            blockHeight: Number(blockNumber),
+            blockHash: block?.hash || '',
+            testnet: false,
+            version: '1.0.0',
+            network: coinName,
+        },
+    };
+};

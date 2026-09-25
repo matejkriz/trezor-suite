@@ -1,93 +1,221 @@
-import { A } from '@mobily/ts-belt';
+import { pipe } from '@mobily/ts-belt';
 
-import { networks, NetworkSymbol } from '@suite-common/wallet-config';
-import { amountToSatoshi, formatAmount } from '@suite-common/wallet-utils';
+import { redactNumericalSubstring } from '@suite-common/discreet-mode';
+import { LANGUAGES, type Locale } from '@suite-common/suite-types';
+import {
+    type NetworkSymbol,
+    getNetwork,
+    getNetworkOptional,
+    isNetworkSymbol,
+} from '@suite-common/wallet-config';
+import { type TokenSymbol } from '@suite-common/wallet-types';
+import {
+    convertAmountSubunitsToUnits,
+    convertAmountUnitsToSubunits,
+} from '@suite-common/wallet-utils';
 import { PROTO } from '@trezor/connect';
+import { exhaustive } from '@trezor/type-utils';
+import { BigNumber, localizeNumber } from '@trezor/utils';
 
 import { makeFormatter } from '../makeFormatter';
-import { FormatterConfig } from '../types';
-import { prepareNetworkSymbolFormatter } from './prepareNetworkSymbolFormatter';
+import { type FormatterConfig } from '../types';
+import { prepareDisplaySymbolFormatter } from './prepareDisplaySymbolFormatter';
+import { formatCompactCryptoAmount, isMoneyLikeToken } from '../utils/formatCompactCryptoAmount';
+import { truncateCryptoAmount } from '../utils/truncateCryptoAmount';
 
 export type CryptoAmountFormatterInputValue = string;
 
+export type CryptoAmountFormatterFormatStyle = 'exact' | 'compact-balance';
+
 export type CryptoAmountFormatterDataContext = {
-    symbol: NetworkSymbol;
+    symbol: NetworkSymbol | TokenSymbol;
     withSymbol?: boolean;
-    isBalance?: boolean;
+    isBalance?: boolean; // This enables the display in Sats if selected in settings // Todo: fix WTF naming
     maxDisplayedDecimals?: number;
     isEllipsisAppended?: boolean;
+    smallestUnitsOverride?: boolean;
+    formatStyle?: CryptoAmountFormatterFormatStyle;
+    tokenDecimals?: number;
 };
 
-const truncateDecimals = (value: string, maxDecimals: number, isEllipsisAppended: boolean) => {
-    const parts = value.split('.');
-    const [integerPart, fractionalPart] = parts;
+export const BASE_CRYPTO_MAX_DISPLAYED_DECIMALS = 8;
 
-    if (fractionalPart && fractionalPart.length > maxDecimals) {
-        return `${integerPart}.${fractionalPart.slice(0, maxDecimals)}${
-            isEllipsisAppended ? '…' : ''
-        }`;
+const DEFAULT_LOCALE: Locale = 'en-US';
+
+const isLocale = (value: string): value is Locale => Object.hasOwn(LANGUAGES, value);
+
+const getSafeLocale = (locale: string): Locale => (isLocale(locale) ? locale : DEFAULT_LOCALE);
+
+const appendEllipsis = ({
+    value,
+    wasResultRounded,
+    formatterContext,
+}: {
+    value: string;
+    wasResultRounded: boolean;
+    formatterContext: Partial<CryptoAmountFormatterDataContext>;
+}): string => {
+    const { isEllipsisAppended = true } = formatterContext;
+
+    if (wasResultRounded && isEllipsisAppended) {
+        return `${value}…`;
     }
 
     return value;
 };
 
-// We cannot use networks "A.includes(networks[symbol].features, 'amount-unit')" because this flag is on many coins like ETH.
-// These coins will looks very bad in app because for example ETH have 18 numbers... So we hardcode enabled coins here.
-const COINS_WITH_SATS = ['btc', 'test'] satisfies NetworkSymbol[];
+const formatExactCryptoAmount = ({
+    value,
+    locale,
+    formatterContext,
+}: {
+    value: string;
+    locale: Locale;
+    formatterContext: Partial<CryptoAmountFormatterDataContext>;
+}): string => {
+    const { maxDisplayedDecimals = BASE_CRYPTO_MAX_DISPLAYED_DECIMALS } = formatterContext;
+    const cryptoAmount = new BigNumber(value);
+    const truncatedCryptoAmount = cryptoAmount.isFinite()
+        ? truncateCryptoAmount(cryptoAmount, maxDisplayedDecimals)
+        : cryptoAmount;
+
+    const formattedValue = localizeNumber(truncatedCryptoAmount, locale, 0, maxDisplayedDecimals);
+
+    const wasResultRounded =
+        cryptoAmount.isFinite() && !cryptoAmount.isEqualTo(truncatedCryptoAmount);
+
+    return appendEllipsis({ value: formattedValue, wasResultRounded, formatterContext });
+};
+
+type NormalizedCryptoAmount = {
+    value: string;
+    areSubunitsDisplayed: boolean;
+};
+
+const normalizeCryptoAmountForDisplay = ({
+    value,
+    config,
+    formatterContext,
+}: {
+    value: string;
+    config: FormatterConfig;
+    formatterContext: Partial<CryptoAmountFormatterDataContext>;
+}): NormalizedCryptoAmount => {
+    const { symbol, isBalance = false, smallestUnitsOverride } = formatterContext;
+    const { bitcoinAmountUnit } = config;
+    const decimals = getNetworkOptional(symbol)?.decimals ?? 0;
+
+    const areAmountUnitsSupported =
+        symbol && isNetworkSymbol(symbol)
+            ? getNetwork(symbol)?.features.some(feature => feature === 'amount-unit') === true
+            : false;
+
+    if (smallestUnitsOverride === false) {
+        return { value, areSubunitsDisplayed: false };
+    }
+
+    if (
+        smallestUnitsOverride === true ||
+        (isBalance && areAmountUnitsSupported && bitcoinAmountUnit === PROTO.AmountUnit.SATOSHI)
+    ) {
+        return {
+            value: convertAmountUnitsToSubunits(value, decimals),
+            areSubunitsDisplayed: true,
+        };
+    }
+
+    // Non-balance values arrive in the smallest subunit, so convert them to main units
+    // unless subunit display (e.g. sats) is enabled.
+    if (
+        !isBalance &&
+        (bitcoinAmountUnit !== PROTO.AmountUnit.SATOSHI || !areAmountUnitsSupported)
+    ) {
+        return {
+            value: convertAmountSubunitsToUnits(value, decimals),
+            areSubunitsDisplayed: false,
+        };
+    }
+
+    // A balance reaching this point is already in main units; anything else was kept in sats by the
+    // branch above.
+    return { value, areSubunitsDisplayed: !isBalance };
+};
+
+const formatCryptoAmountForDisplay = ({
+    value,
+    config,
+    formatterContext,
+    areSubunitsDisplayed,
+}: {
+    value: string;
+    config: FormatterConfig;
+    formatterContext: Partial<CryptoAmountFormatterDataContext>;
+    areSubunitsDisplayed: boolean;
+}): string => {
+    const { formatStyle = 'exact', tokenDecimals } = formatterContext;
+    const locale = getSafeLocale(config.locale);
+
+    switch (formatStyle) {
+        case 'compact-balance':
+            return formatCompactCryptoAmount({
+                value,
+                locale,
+                isMoneyLike: isMoneyLikeToken(tokenDecimals),
+                areSubunitsDisplayed,
+            });
+        case 'exact':
+            return formatExactCryptoAmount({ value, locale, formatterContext });
+        default:
+            return exhaustive(formatStyle);
+    }
+};
+
+const appendSymbol = ({
+    value,
+    config,
+    formatterContext,
+}: {
+    value: string;
+    config: FormatterConfig;
+    formatterContext: Partial<CryptoAmountFormatterDataContext>;
+}) => {
+    const { symbol, smallestUnitsOverride, withSymbol = true } = formatterContext;
+
+    if (!withSymbol) {
+        return value;
+    }
+
+    const DisplaySymbolFormatter = prepareDisplaySymbolFormatter(config);
+    const formattedSymbol =
+        symbol && isNetworkSymbol(symbol)
+            ? DisplaySymbolFormatter.format(symbol, {
+                  areAmountUnitsEnabled: smallestUnitsOverride,
+              })
+            : symbol;
+
+    const symbolSuffix = formattedSymbol ? ` ${formattedSymbol}` : '';
+
+    return `${value}${symbolSuffix}`;
+};
 
 export const prepareCryptoAmountFormatter = (config: FormatterConfig) =>
     makeFormatter<CryptoAmountFormatterInputValue, string, CryptoAmountFormatterDataContext>(
-        (
-            value,
-            {
-                symbol,
-                isBalance = false,
-                withSymbol = true,
-                maxDisplayedDecimals = 8,
-                isEllipsisAppended = true,
-            },
-        ) => {
-            const { bitcoinAmountUnit } = config;
-
-            const decimals = networks[symbol!]?.decimals || 0;
-
-            // const areAmountUnitsSupported = A.includes(features, 'amount-unit');
-            const areAmountUnitsSupported = A.includes(COINS_WITH_SATS, symbol);
-
-            let formattedValue: string = value;
-
-            // balances are not in sats, but already formatted to BTC so we need to convert it back to sats if needed
-            if (
-                isBalance &&
-                areAmountUnitsSupported &&
-                bitcoinAmountUnit === PROTO.AmountUnit.SATOSHI
-            ) {
-                formattedValue = amountToSatoshi(value, decimals);
-            }
-
-            // if it's not balance and sats units are disabled, values other than balances are in sats so we need to convert it to BTC
-            if (
-                !isBalance &&
-                (bitcoinAmountUnit !== PROTO.AmountUnit.SATOSHI || !areAmountUnitsSupported)
-            ) {
-                formattedValue = formatAmount(value, decimals ?? 8);
-            }
-
-            if (maxDisplayedDecimals) {
-                formattedValue = truncateDecimals(
-                    formattedValue,
-                    maxDisplayedDecimals,
-                    isEllipsisAppended,
-                );
-            }
-
-            if (withSymbol) {
-                const NetworkSymbolFormatter = prepareNetworkSymbolFormatter(config);
-
-                return `${formattedValue} ${NetworkSymbolFormatter.format(symbol!)}`;
-            }
-
-            return formattedValue;
-        },
+        (value, formatterContext, shouldRedactNumbers) =>
+            pipe(
+                normalizeCryptoAmountForDisplay({ value, config, formatterContext }),
+                ({ value: normalizedAmount, areSubunitsDisplayed }) =>
+                    formatCryptoAmountForDisplay({
+                        value: normalizedAmount,
+                        config,
+                        formatterContext,
+                        areSubunitsDisplayed,
+                    }),
+                formattedAmount =>
+                    appendSymbol({ value: formattedAmount, config, formatterContext }),
+                valueWithSymbol =>
+                    shouldRedactNumbers
+                        ? redactNumericalSubstring(valueWithSymbol)
+                        : valueWithSymbol,
+            ),
         'CryptoAmountFormatter',
     );

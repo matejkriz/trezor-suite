@@ -5,10 +5,12 @@
     "license": "See LICENSE.md in repo root",
     "private": true,
     "sideEffects": false,
+    "type": "module",
     "scripts": {
-        "type-check": "yarn g:tsc --build",
+        "depcheck": "yarn g:depcheck",
         "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "test:unit": "jest -c ../../jest.config.base.js"
+        "type-check": "yarn g:tsc --build",
+        "test:unit": "yarn g:jest"
     },
     "dependencies": {}
 }

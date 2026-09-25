@@ -1,11 +1,42 @@
-# @trezor/connect-plugin-stellar
+# @trezor/connect-plugin-stellar (deprecated)
 
-[![Build Status](https://github.com/trezor/trezor-suite/actions/workflows/connect-test.yml/badge.svg)](https://github.com/trezor/trezor-suite/actions/workflows/connect-test.yml)
 [![NPM](https://img.shields.io/npm/v/@trezor/connect-plugin-stellar.svg)](https://www.npmjs.org/package/@trezor/connect-plugin-stellar)
-[![Known Vulnerabilities](https://snyk.io/test/github/trezor/connect-plugin-stellar/badge.svg?targetFile=package.json)](https://snyk.io/test/github/trezor/trezor-suite?targetFile=packages/connect-plugin-stellar/package.json)
 
-Serializer for data sent between StellarSdk and [@trezor/connect](../connect)
+> **Deprecated as of `@trezor/connect@10`.** Do not use in new code.
 
-## Publishing
+`TrezorConnect.stellarSignTransaction` method now supports XDR base64 format, so utility function
+`transformTransaction` is not needed anymore.
 
-[Follow instructions](../../docs/releases/npm-packages.md) how to publish @trezor package to npm registry.
+## Migration
+
+Before:
+
+```ts
+import { Networks, Transaction } from '@stellar/stellar-sdk';
+import { transformTransaction } from '@trezor/connect-plugin-stellar';
+
+const tx = new Transaction(..., Networks.TESTNET);
+const { path, transaction, networkPassphrase } = transformTransaction(path, tx);
+
+await TrezorConnect.stellarSignTransaction({
+    device,
+    path,
+    transaction,
+    networkPassphrase,
+});
+```
+
+After:
+
+```ts
+import { Transaction } from '@stellar/stellar-sdk';
+
+const tx = new Transaction(..., Networks.TESTNET);
+
+await TrezorConnect.stellarSignTransaction({
+    device,
+    path,
+    xdrBase64: tx.toXdr(),
+    testnet: true,
+});
+```

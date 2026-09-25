@@ -1,8 +1,11 @@
-import { Api, blockheaderToBlockhash } from '../utils';
-import type { GetBlockHash as Req } from '@trezor/blockchain-link-types/src/messages';
-import type { GetBlockHash as Res } from '@trezor/blockchain-link-types/src/responses';
+import type { MessageTypes, ResponseTypes } from '@trezor/blockchain-link-types';
 
-const getBlockHash: Api<Req, Res> = async (client, payload) => {
+import { type Api, blockheaderToBlockhash } from '../utils';
+
+type Req = MessageTypes.GetBlockHash;
+type Res = ResponseTypes.GetBlockHash;
+
+const getBlockHash: Api<Req, Res> = async ({ client }, payload) => {
     const blockheader = await client.request('blockchain.block.header', payload);
 
     return blockheaderToBlockhash(blockheader);

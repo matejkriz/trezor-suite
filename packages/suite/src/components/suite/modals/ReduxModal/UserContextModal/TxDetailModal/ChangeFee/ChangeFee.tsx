@@ -1,188 +1,120 @@
-import { ReactNode } from 'react';
-import styled from 'styled-components';
-import { Card, Icon, variables } from '@trezor/components';
-import { Translation, FiatValue, FormattedCryptoAmount } from 'src/components/suite';
-import { useSelector } from 'src/hooks/suite';
-import { useRbf, RbfContext, UseRbfProps } from 'src/hooks/wallet/useRbfForm';
-import { formatNetworkAmount, getFeeUnits } from '@suite-common/wallet-utils';
-import { WalletAccountTransaction } from '@suite-common/wallet-types';
+import { type ReactNode } from 'react';
+import { FormProvider } from 'react-hook-form';
+
+import { Translation } from '@suite/intl';
+import { type NetworkType, getNetwork } from '@suite-common/wallet-config';
+import { type WalletAccountTransaction } from '@suite-common/wallet-types';
+import { formatNetworkAmount, isEip1559 } from '@suite-common/wallet-utils';
+import { Card, Divider, InfoItem, Row, Text } from '@trezor/components';
+
+import { BaseCurrencyValue } from 'src/components/suite/BaseCurrencyValue';
+import { FormattedCryptoAmount } from 'src/components/suite/FormattedCryptoAmount';
+import { FeeRate } from 'src/components/wallet/Fees/FeeRate';
+import { useRbfContext } from 'src/hooks/wallet/useRbfForm';
+
 import { RbfFees } from './RbfFees';
-import { AffectedTransactions } from './AffectedTransactions';
-import { DecreasedOutputs } from './DecreasedOutputs';
-import { ReplaceTxButton } from './ReplaceTxButton';
-import { borders } from '@trezor/theme';
-
-const Wrapper = styled.div`
-    margin: 12px 0;
-`;
-
-const Box = styled.div`
-    display: flex;
-    flex-direction: column;
-    padding: 18px 26px;
-    border: 1px solid ${({ theme }) => theme.STROKE_GREY};
-    border-radius: ${borders.radii.xs};
-`;
-
-const Inner = styled.div`
-    display: flex;
-
-    & + & {
-        border-top: 1px solid ${({ theme }) => theme.STROKE_GREY};
-        margin-top: 28px;
-        padding-top: 22px;
-    }
-`;
-
-const Title = styled.div`
-    width: 100px;
-    padding-right: 20px;
-    text-align: left;
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-`;
-
-const Content = styled.div`
-    flex: 1;
-    text-align: left;
-`;
-
-const RateWrapper = styled.div`
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-`;
-
-const Rate = styled.div`
-    margin: 1px 20px 0 0;
-    font-size: ${variables.FONT_SIZE.SMALL};
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-`;
-
-const Amount = styled.div`
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    text-align: right;
-
-    & * + * {
-        margin-top: 6px;
-    }
-`;
-
-const StyledCryptoAmount = styled.div`
-    font-size: ${variables.FONT_SIZE.NORMAL};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-`;
-
-const StyledFiatValue = styled.div`
-    font-size: ${variables.FONT_SIZE.SMALL};
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-`;
-
-const FinalizeWarning = styled(Card)`
-    display: flex;
-    flex-direction: row;
-    width: 100%;
-    padding: 12px 0;
-    margin-top: 16px;
-    text-align: center;
-    align-items: center;
-    justify-content: center;
-    color: ${({ theme }) => theme.TYPE_DARK_GREY};
-    background: ${({ theme }) => theme.BG_GREY};
-    font-size: ${variables.FONT_SIZE.SMALL};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-`;
-
-const InfoIcon = styled(Icon)`
-    margin-right: 8px;
-`;
-
-const Red = styled.span`
-    margin-left: 2px;
-    color: ${({ theme }) => theme.TYPE_RED};
-    font-weight: ${variables.FONT_WEIGHT.BOLD};
-`;
+import { AffectedTransactions } from '../AffectedTransactions/AffectedTransactions';
+import { DecreasedOutputs } from '../AffectedTransactions/DecreasedOutputs';
 
 /* children are only for test purposes, this prop is not available in regular build */
-interface ChangeFeeProps extends UseRbfProps {
+interface ChangeFeeProps {
     tx: WalletAccountTransaction;
     children?: ReactNode;
     showChained: () => void;
 }
 
+const getFeeRate = (tx: WalletAccountTransaction, networkType: NetworkType) => {
+    const rbf = tx.rbfParams;
+
+    if (!rbf) return null;
+
+    if (rbf.type === 'bitcoin' && rbf.feeRate !== undefined) {
+        return <FeeRate feeRate={rbf.feeRate} networkType={networkType} />;
+    }
+
+    if (rbf.type === 'ethereum') {
+        const { gasPrice, maxFeePerGas } = rbf;
+
+        return isEip1559(rbf) ? (
+            <FeeRate feeRate={maxFeePerGas} networkType={networkType} />
+        ) : (
+            <FeeRate feeRate={gasPrice} networkType={networkType} />
+        );
+    }
+
+    return null;
+};
+
 const ChangeFeeLoaded = (props: ChangeFeeProps) => {
-    const contextValues = useRbf(props);
-    const { tx, showChained, finalize, children } = props;
-    const { networkType } = contextValues.account;
-    const feeRate =
-        networkType === 'bitcoin' ? `${tx.rbfParams?.feeRate} ${getFeeUnits(networkType)}` : null;
+    const { tx, showChained, children } = props;
+    const {
+        account: { networkType },
+        chainedTxs,
+        methods,
+    } = useRbfContext();
+
     const fee = formatNetworkAmount(tx.fee, tx.symbol);
 
     return (
-        <RbfContext.Provider value={contextValues}>
-            <Wrapper>
-                <Box>
-                    <Inner>
-                        <Title>
-                            <Translation id="TR_CURRENT_FEE" />
-                        </Title>
-                        <Content>
-                            <RateWrapper>
-                                <Rate>{feeRate}</Rate>
-                                <Amount>
-                                    <StyledCryptoAmount>
-                                        <FormattedCryptoAmount
-                                            disableHiddenPlaceholder
-                                            value={fee}
-                                            symbol={tx.symbol}
-                                        />
-                                    </StyledCryptoAmount>
-                                    <StyledFiatValue>
-                                        <FiatValue
-                                            disableHiddenPlaceholder
-                                            amount={fee}
-                                            symbol={tx.symbol}
-                                        />
-                                    </StyledFiatValue>
-                                </Amount>
-                            </RateWrapper>
-                        </Content>
-                    </Inner>
-                    <Inner>
-                        <RbfFees />
-                    </Inner>
-                    <DecreasedOutputs />
-                    <AffectedTransactions showChained={showChained} />
-                </Box>
-                {finalize && (
-                    <FinalizeWarning>
-                        <InfoIcon icon="INFO" size={16} />
-                        <Translation
-                            id="TR_FINALIZE_TS_RBF_OFF_WARN"
-                            values={{ strong: chunks => <Red>{chunks}</Red> }}
+        <FormProvider {...methods}>
+            <Card
+                type="contrast"
+                paddingType="small"
+                header={<Translation id="TR_BUMP_FEE_SUBTEXT" />}
+            >
+                <InfoItem
+                    direction="row"
+                    label={
+                        <>
+                            <Translation
+                                id={
+                                    getNetwork(tx.symbol).networkType === 'ethereum'
+                                        ? 'TR_CURRENT_MAXIMUM_FEE_SPEED_UP'
+                                        : 'TR_CURRENT_FEE_SPEED_UP'
+                                }
+                                values={{
+                                    feeRate: getFeeRate(tx, networkType),
+                                }}
+                            />
+                        </>
+                    }
+                    typographyStyle="body-md"
+                >
+                    <Row gap={16} alignItems="baseline">
+                        <FormattedCryptoAmount
+                            disableHiddenPlaceholder
+                            value={fee}
+                            symbol={tx.symbol}
                         />
-                    </FinalizeWarning>
-                )}
-                <ReplaceTxButton finalize={finalize} />
+                        <Text intent="neutral" priority="secondary" typographyStyle="body-xs">
+                            <BaseCurrencyValue
+                                disableHiddenPlaceholder
+                                amount={fee}
+                                symbol={tx.symbol}
+                                showApproximationIndicator
+                            />
+                        </Text>
+                    </Row>
+                </InfoItem>
+
+                <Divider />
+
+                <RbfFees />
 
                 {children}
-            </Wrapper>
-        </RbfContext.Provider>
+            </Card>
+
+            <DecreasedOutputs />
+
+            <AffectedTransactions chainedTxs={chainedTxs} showChained={showChained} />
+        </FormProvider>
     );
 };
 
-export const ChangeFee = (props: Omit<ChangeFeeProps, 'selectedAccount' | 'rbfParams'>) => {
-    const selectedAccount = useSelector(state => state.wallet.selectedAccount);
-    if (selectedAccount.status !== 'loaded' || !props.tx.rbfParams) {
+export const ChangeFee = (props: ChangeFeeProps) => {
+    if (!props.tx.rbfParams) {
         return null;
     }
 
-    return (
-        <ChangeFeeLoaded
-            selectedAccount={selectedAccount}
-            rbfParams={props.tx.rbfParams}
-            {...props}
-        />
-    );
+    return <ChangeFeeLoaded {...props} />;
 };

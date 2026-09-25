@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react';
-import styled from 'styled-components';
+
 import { AnimatePresence, motion } from 'framer-motion';
-import { motionEasing, variables } from '@trezor/components';
-import { Translation, TranslationKey } from 'src/components/suite/Translation';
+import styled from 'styled-components';
+
+import { Translation, type TranslationKey } from '@suite/intl';
+import { motionEasing } from '@trezor/components';
+import { typography } from '@trezor/theme';
 
 const Fact = styled(motion.p)`
     max-width: 460px;
     height: 42px;
     margin-top: 6px;
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    font-size: ${variables.FONT_SIZE.SMALL};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-    line-height: 1.5;
+    color: ${({ theme }) => theme.contentSecondary};
+    ${typography['body-sm']}
     text-align: center;
 `;
 
@@ -50,6 +51,8 @@ const factsCount = FACTS.length;
 const selectNextHint = (currentIndex: number) => (currentIndex + 1) % factsCount;
 
 export const RotatingFacts = () => {
+    // Intentionally impure, non-deterministic rendering
+    // eslint-disable-next-line react-hooks/purity
     const firstHintIndex = Math.floor(Math.random() * (factsCount - 1));
     const [factIndex, setFactIndex] = useState(firstHintIndex);
 
@@ -68,7 +71,7 @@ export const RotatingFacts = () => {
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.4, ease: motionEasing.transition }}
             >
-                <Translation id={FACTS[factIndex]} />
+                <Translation id={FACTS[factIndex] ?? 'TR_LOADING_FACT_0'} />
             </Fact>
         </AnimatePresence>
     );

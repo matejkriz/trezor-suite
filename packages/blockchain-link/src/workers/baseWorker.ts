@@ -5,13 +5,13 @@
 // and
 // new BlockchainLink({ worker: () => new BlockchainLinkModule() });
 
-import SocksProxyAgent from 'socks-proxy-agent';
-import { CustomError } from '@trezor/blockchain-link-types/src/constants/errors';
+import { SocksProxyAgent } from 'socks-proxy-agent';
+
+import { CustomError, MESSAGES, RESPONSES } from '@trezor/blockchain-link-types';
+import type { BlockchainSettings, Message, Response } from '@trezor/blockchain-link-types';
+
 import { WorkerState } from './state';
 import { prioritizeEndpoints } from './utils';
-import { MESSAGES, RESPONSES } from '@trezor/blockchain-link-types/src/constants';
-import type { Response, BlockchainSettings } from '@trezor/blockchain-link-types';
-import type { Message } from '@trezor/blockchain-link-types/src/messages';
 
 // self is not declared in TS Webworker lib typings
 declare const self: { postMessage: (...args: any[]) => any };
@@ -31,7 +31,7 @@ export type ContextType<API> = {
 
 export abstract class BaseWorker<API> {
     api: API | undefined;
-    proxyAgent: ReturnType<typeof SocksProxyAgent> | undefined;
+    proxyAgent: SocksProxyAgent | undefined;
     settings: Partial<BlockchainSettings> = {};
     state: WorkerState;
     post: (data: Response) => void;
@@ -94,13 +94,16 @@ export abstract class BaseWorker<API> {
             }
 
             const endpoints = prioritizeEndpoints(urls);
-            this.connectPromise = this.connectRecursive(endpoints).then(api => {
-                this.debug('Connected');
-                this.api = api;
-                this.connectPromise = undefined;
+            this.connectPromise = this.connectRecursive(endpoints)
+                .then(api => {
+                    this.debug('Connected');
+                    this.api = api;
 
-                return api;
-            });
+                    return api;
+                })
+                .finally(() => {
+                    this.connectPromise = undefined;
+                });
         }
 
         return this.connectPromise;
@@ -137,13 +140,16 @@ export abstract class BaseWorker<API> {
         const { data } = event;
         const { id } = data;
 
-        this.debug('onmessage', data);
+        this.debug('onmessage', data.type);
 
         if (data.type === MESSAGES.HANDSHAKE) {
             this.settings = data.settings;
-            this.proxyAgent = data.settings.proxy
-                ? SocksProxyAgent(data.settings.proxy)
-                : undefined;
+            const { proxy } = data.settings;
+            if (proxy) {
+                this.proxyAgent = new SocksProxyAgent(proxy.uri, proxy.opts);
+            } else {
+                this.proxyAgent = undefined;
+            }
 
             return true;
         }
@@ -154,7 +160,7 @@ export abstract class BaseWorker<API> {
             return true;
         }
         if (data.type === MESSAGES.DISCONNECT) {
-            this.disconnect();
+            await this.disconnect();
             this.post({ id, type: RESPONSES.DISCONNECTED, payload: true });
 
             return true;

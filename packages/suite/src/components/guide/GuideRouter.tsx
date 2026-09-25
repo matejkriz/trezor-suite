@@ -1,111 +1,152 @@
-import styled, { css, keyframes } from 'styled-components';
-import { AnimatePresence, motion } from 'framer-motion';
+import { useCallback, useState } from 'react';
 import { FreeFocusInside } from 'react-focus-lock';
 
-import { variables, Backdrop } from '@trezor/components';
+import { AnimatePresence, motion } from 'framer-motion';
+
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { type ActiveView } from '@suite-common/suite-types';
+import { Box, Modal, ResizableBox, variables } from '@trezor/components';
 import { useOnce } from '@trezor/react-utils';
-import { useSelector } from 'src/hooks/suite';
+import { zIndices } from '@trezor/theme';
+import { exhaustive } from '@trezor/type-utils';
+
+import { setWidth as setGuideWidth } from 'src/actions/suite/guideActions';
 import {
-    SupportFeedbackSelection,
+    Feedback,
     Guide,
     GuideArticle,
     GuideCategory,
-    Feedback,
+    GuideShortcuts,
+    SupportFeedbackSelection,
 } from 'src/components/guide';
-import { useGuide, GUIDE_ANIMATION_DURATION_MS } from 'src/hooks/guide';
-import { zIndices } from '@trezor/theme';
+import { MIN_CONTENT_WIDTH } from 'src/constants/suite/layout';
+import { GUIDE_ANIMATION_DURATION_MS, useGuide } from 'src/hooks/guide';
+import { useSelector } from 'src/hooks/suite';
+import { selectGuideView, selectGuideWidth } from 'src/selectors/suite/guideSelectors';
+import { useResponsiveContext } from 'src/support/suite/ResponsiveContext';
 
-const fullHeightStyle = css`
-    position: absolute;
-    top: 0;
-    right: 0;
-`;
-
-const smoothBlur = keyframes`
-    from {
-        backdrop-filter: blur(0px);
+const getGuideContent = (activeView: ActiveView) => {
+    switch (activeView) {
+        case 'GUIDE_ARTICLE':
+            return <GuideArticle />;
+        case 'GUIDE_CATEGORY':
+            return <GuideCategory />;
+        case 'SUPPORT_FEEDBACK_SELECTION':
+            return <SupportFeedbackSelection />;
+        case 'FEEDBACK_BUG':
+            return <Feedback type="BUG" />;
+        case 'FEEDBACK_SUGGESTION':
+            return <Feedback type="SUGGESTION" />;
+        case 'GUIDE_DEFAULT':
+            return <Guide />;
+        case 'KEYBOARD_SHORTCUTS':
+            return <GuideShortcuts />;
+        default:
+            exhaustive(activeView);
     }
-
-    to {
-        backdrop-filter: blur(3px);
-    }
-`;
-
-const StyledBackdrop = styled(Backdrop)`
-    animation: ${smoothBlur} 0.3s ease-in forwards;
-    z-index: ${zIndices.guide};
-    cursor: pointer;
-
-    ${variables.SCREEN_QUERY.ABOVE_LAPTOP} {
-        display: none;
-    }
-`;
-
-const GuideWrapper = styled.div`
-    max-width: 100vw;
-    height: 100%;
-    z-index: ${zIndices.guide};
-
-    ${variables.SCREEN_QUERY.BELOW_LAPTOP} {
-        ${fullHeightStyle}
-    }
-`;
-
-const MotionGuide = styled(motion.div)`
-    max-width: 100vw;
-    height: 100%;
-    border-left: 1px solid ${({ theme }) => theme.STROKE_GREY};
-    display: flex;
-    overflow-x: hidden;
-`;
+};
 
 export const GuideRouter = () => {
-    const activeView = useSelector(state => state.guide.view);
+    const activeView = useSelector(selectGuideView);
+    const storedWidth = useSelector(selectGuideWidth);
+    const { isGuideOpen, closeGuide, isGuideOnTop } = useGuide();
+    const { contentWidth } = useResponsiveContext();
+    const { dispatch } = useServices(injectDispatch);
 
-    const { isGuideOpen, closeGuide } = useGuide();
+    const [width, setWidth] = useState(storedWidth);
+    const [isResizing, setIsResizing] = useState(false);
+    const [maxResizableGuideWidth, setMaxResizableGuideWidth] = useState<number>(
+        variables.LAYOUT_SIZE.GUIDE_PANEL_MAX_WIDTH,
+    );
 
     // if guide is open, do not animate guide opening if transitioning between onboarding, welcome and suite layout
     const isFirstRender = useOnce(isGuideOpen, false);
 
-    return (
-        <FreeFocusInside>
-            {isGuideOpen && <StyledBackdrop onClick={closeGuide} />}
+    const handleResizeMove = useCallback((nextWidth: number) => {
+        setWidth(nextWidth);
+    }, []);
 
-            <GuideWrapper>
-                <AnimatePresence>
-                    {isGuideOpen && (
-                        <MotionGuide
-                            data-test="@guide/panel"
-                            initial={{
-                                width: isFirstRender ? variables.LAYOUT_SIZE.GUIDE_PANEL_WIDTH : 0,
-                            }}
-                            animate={{
-                                width: variables.LAYOUT_SIZE.GUIDE_PANEL_WIDTH,
-                                transition: {
-                                    duration: GUIDE_ANIMATION_DURATION_MS / 1000,
-                                    bounce: 0,
-                                },
-                            }}
-                            exit={{
-                                width: 0,
-                                transition: {
-                                    duration: GUIDE_ANIMATION_DURATION_MS / 1000,
-                                    bounce: 0,
-                                },
-                            }}
-                        >
-                            {activeView === 'GUIDE_DEFAULT' && <Guide />}
-                            {activeView === 'GUIDE_ARTICLE' && <GuideArticle />}
-                            {activeView === 'GUIDE_CATEGORY' && <GuideCategory />}
-                            {activeView === 'SUPPORT_FEEDBACK_SELECTION' && (
-                                <SupportFeedbackSelection />
-                            )}
-                            {activeView === 'FEEDBACK_BUG' && <Feedback type="BUG" />}
-                            {activeView === 'FEEDBACK_SUGGESTION' && <Feedback type="SUGGESTION" />}
-                        </MotionGuide>
-                    )}
-                </AnimatePresence>
-            </GuideWrapper>
-        </FreeFocusInside>
+    const handleResizeEnd = useCallback(
+        (nextWidth: number) => {
+            dispatch(setGuideWidth(nextWidth));
+        },
+        [dispatch],
+    );
+
+    const content = (
+        <motion.div
+            data-testid="@guide/panel"
+            style={{ overflow: 'hidden' }}
+            initial={{
+                width: isFirstRender ? width : 0,
+            }}
+            animate={{
+                width,
+                transition: {
+                    duration: isResizing ? 0 : GUIDE_ANIMATION_DURATION_MS / 1000,
+                    bounce: 0,
+                },
+            }}
+            exit={{
+                width: 0,
+                transition: {
+                    duration: GUIDE_ANIMATION_DURATION_MS / 1000,
+                    bounce: 0,
+                },
+            }}
+        >
+            <ResizableBox
+                directions={['left']}
+                width={width}
+                forcedWidth={width}
+                minWidth={variables.LAYOUT_SIZE.GUIDE_PANEL_MIN_WIDTH}
+                maxWidth={maxResizableGuideWidth}
+                onResizeStart={() => {
+                    setIsResizing(true);
+                    // Cap growth so contentWidth can't shrink below MIN_CONTENT_WIDTH.
+                    // Captured at gesture start to stay stable despite ResizeObserver debounce lag.
+                    const limit =
+                        contentWidth != null
+                            ? width + contentWidth - MIN_CONTENT_WIDTH
+                            : variables.LAYOUT_SIZE.GUIDE_PANEL_MAX_WIDTH;
+                    setMaxResizableGuideWidth(
+                        Math.min(
+                            variables.LAYOUT_SIZE.GUIDE_PANEL_MAX_WIDTH,
+                            Math.max(width, limit),
+                        ),
+                    );
+                }}
+                onResizeStop={() => {
+                    setIsResizing(false);
+                    setMaxResizableGuideWidth(variables.LAYOUT_SIZE.GUIDE_PANEL_MAX_WIDTH);
+                }}
+                onWidthResizeMove={handleResizeMove}
+                onWidthResizeEnd={handleResizeEnd}
+                zIndex={zIndices.guide}
+            >
+                <Box height="100dvh" maxWidth="100vw" overflow="hidden auto">
+                    {activeView && getGuideContent(activeView)}
+                </Box>
+            </ResizableBox>
+        </motion.div>
+    );
+
+    return (
+        <AnimatePresence>
+            {isGuideOpen &&
+                (isGuideOnTop ? (
+                    <Modal.Backdrop
+                        alignment={{ x: 'end', y: 'center' }}
+                        padding={0}
+                        onClick={closeGuide}
+                        zIndex={zIndices.guide}
+                    >
+                        {content}
+                    </Modal.Backdrop>
+                ) : (
+                    <FreeFocusInside>{content}</FreeFocusInside>
+                ))}
+        </AnimatePresence>
     );
 };

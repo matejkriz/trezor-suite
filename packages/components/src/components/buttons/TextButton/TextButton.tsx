@@ -1,89 +1,126 @@
 import React from 'react';
+
 import styled from 'styled-components';
-import { borders, spacingsPx, typography } from '@trezor/theme';
-import { ButtonProps } from '../Button/Button';
-import { ButtonSize, getIconSize, IconAlignment } from '../buttonStyleUtils';
-import { Icon } from '../../assets/Icon/Icon';
+
+import { ArrowLineUpRightIcon } from '@trezor/icons';
+
+import {
+    type FrameProps,
+    type FramePropsKeys,
+    pickAndPrepareFrameProps,
+    withFrameProps,
+} from '../../../utils/frameProps';
+import { type TransientProps } from '../../../utils/transientProps';
+import { Box } from '../../Box/Box';
+import { Row } from '../../Flex/Flex';
+import { Icon, type IconComponent } from '../../Icon/Icon';
 import { Spinner } from '../../loaders/Spinner/Spinner';
-import { focusStyleTransition, getFocusShadowStyle } from '../../../utils/utils';
+import { Text } from '../../typography/Text/Text';
+import { type ButtonIntent, type ButtonPriority, type CommonButtonProps } from '../types';
+import { type TextButtonSize } from './types';
+import { mapIntentToCSS, mapSizeToGap, mapSizeToIconSize, mapSizeToTypographyStyle } from './utils';
+import { pickButtonProps } from '../utils';
 
-const TextButtonContainer = styled.button<{
-    $size: ButtonSize;
-    $iconAlignment: IconAlignment;
-    $hasIcon: boolean;
-}>`
-    display: flex;
-    align-items: center;
-    flex-direction: ${({ $iconAlignment }) => $iconAlignment === 'right' && 'row-reverse'};
-    gap: ${({ $hasIcon }) => $hasIcon && spacingsPx.xs};
-    height: ${({ $size: size }) => (size === 'small' ? 22 : 26)}px;
-    padding: 4px;
-    border: 1px solid transparent;
-    border-radius: ${borders.radii.xxs};
+export const allowedTextButtonFrameProps = [
+    'margin',
+    'maxWidth',
+    'width',
+    'flex',
+] as const satisfies FramePropsKeys[];
+export type AllowedTextButtonFrameProps = Pick<
+    FrameProps,
+    (typeof allowedTextButtonFrameProps)[number]
+>;
+
+const TextButtonContainer = styled.button<
+    TransientProps<AllowedTextButtonFrameProps> & {
+        $intent: ButtonIntent;
+        $priority: ButtonPriority;
+        $isUnderlined: boolean;
+        $isInverse: boolean;
+        disabled: boolean;
+    }
+>`
+    display: inline-flex;
+    flex-shrink: 0;
+    width: fit-content;
+    border: 0;
     background: none;
-    color: ${({ theme }) => theme.textPrimaryDefault};
-    ${({ $size }) => ($size === 'small' ? typography.hint : typography.body)};
-    white-space: nowrap;
-    transition:
-        ${focusStyleTransition},
-        color 0.1s ease-out;
-    outline: none;
+    padding: 0;
+    outline: 0;
     cursor: pointer;
-
-    ${getFocusShadowStyle()}
-
-    path {
-        fill: ${({ theme }) => theme.iconPrimaryDefault};
-        transition: fill 0.1s ease-out;
-    }
-
-    &:hover {
-        color: ${({ theme }) => theme.textPrimaryPressed};
-
-        path {
-            fill: ${({ theme }) => theme.iconPrimaryPressed};
-        }
-    }
+    white-space: nowrap;
+    max-width: 100%;
+    -webkit-app-region: no-drag;
+    transition: 0.1s ease-in-out;
 
     &:disabled {
-        color: ${({ theme }) => theme.textDisabled};
-        cursor: default;
-
-        path {
-            fill: ${({ theme }) => theme.iconDisabled};
-        }
+        cursor: not-allowed;
     }
+
+    ${({ $isUnderlined }) => $isUnderlined && 'text-decoration: underline;'}
+    ${({ $intent, $priority, disabled, $isInverse, theme }) =>
+        mapIntentToCSS($intent, $priority, $isInverse, disabled, theme)}
+
+    ${withFrameProps}
 `;
 
-export interface TextButtonProps extends Omit<ButtonProps, 'isFullWidth' | 'iconSize' | 'variant'> {
-    children: React.ReactNode;
-}
+export type TextButtonProps = CommonButtonProps &
+    AllowedTextButtonFrameProps & {
+        iconLeft?: IconComponent;
+        iconRight?: IconComponent;
+        size?: TextButtonSize;
+        children?: React.ReactNode;
+        isUnderlined?: boolean;
+        'data-testid'?: string;
+    };
 
 export const TextButton = ({
-    icon,
-    iconAlignment = 'left',
+    iconLeft,
+    iconRight,
     size = 'large',
-    isDisabled = false,
-    isLoading = false,
+    isUnderlined = false,
     children,
-    ...rest
+    'data-testid': dataTestId,
+    ...props
 }: TextButtonProps) => {
-    const IconComponent = icon ? <Icon icon={icon} size={getIconSize(size)} /> : null;
-
-    const Loader = <Spinner size={getIconSize(size)} />;
+    const frameProps = pickAndPrepareFrameProps(props, allowedTextButtonFrameProps);
+    const { intent, priority, isInverse, ...buttonProps } = pickButtonProps(props);
+    const iconSize = mapSizeToIconSize(size);
 
     return (
         <TextButtonContainer
-            $hasIcon={!!icon}
-            $size={size}
-            $iconAlignment={iconAlignment}
-            disabled={isDisabled || isLoading}
-            {...rest}
+            $intent={intent}
+            $priority={priority}
+            $isInverse={isInverse}
+            $isUnderlined={isUnderlined}
+            data-component="TextButton"
+            data-testid={dataTestId}
+            {...buttonProps}
+            {...frameProps}
         >
-            {!isLoading && icon && IconComponent}
-            {isLoading && Loader}
-
-            {children}
+            <Row gap={mapSizeToGap(size)} justifyContent="center" overflow="hidden" width="100%">
+                {props.isLoading && (
+                    <Spinner
+                        isDisabled={true}
+                        size={iconSize}
+                        data-testid={`${dataTestId}/spinner`}
+                    />
+                )}
+                {iconLeft && !props.isLoading && <Icon as={iconLeft} size={iconSize} />}
+                <Box overflow="hidden">
+                    <Text
+                        as="div"
+                        typographyStyle={mapSizeToTypographyStyle(size)}
+                        ellipsisLineCount={1}
+                    >
+                        {children}
+                    </Text>
+                </Box>
+                {(iconRight || buttonProps.target === '_blank') && (
+                    <Icon as={iconRight ?? ArrowLineUpRightIcon} size={iconSize} />
+                )}
+            </Row>
         </TextButtonContainer>
     );
 };

@@ -1,0 +1,161 @@
+import React, { useRef } from 'react';
+
+import { Translation } from '@suite/intl';
+import { type SolanaRewardsHistory } from '@suite-common/earn-staking-api/src/staking';
+import { formatNetworkAmount, isTestnet } from '@suite-common/wallet-utils';
+import { Card, Column, Grid, IconCircle, Row, Text } from '@trezor/components';
+import { PiggyBankIcon } from '@trezor/icons';
+
+import { DashboardSection } from 'src/components/dashboard';
+import { BaseCurrencyValue, FormattedCryptoAmount, FormattedDate } from 'src/components/suite';
+import { Pagination } from 'src/components/wallet';
+import { TransactionTargetLayout } from 'src/components/wallet/TransactionItem/TransactionTargetLayout';
+import { type UsePagination } from 'src/hooks/general/usePagination';
+import { useLayoutSize } from 'src/hooks/suite/useLayoutSize';
+import { type Account } from 'src/types/wallet';
+import SkeletonTransactionItem from 'src/views/wallet/transactions/TransactionList/SkeletonTransactionItem';
+
+import { RewardsEmpty } from './RewardsEmpty';
+
+const TEST_ID = '@staking/rewards-item';
+
+interface RewardsListProps {
+    account: Account;
+    rewardsQueryResult: SolanaRewardsHistory;
+    pagination: UsePagination;
+}
+
+export const RewardsList = ({ account, rewardsQueryResult, pagination }: RewardsListProps) => {
+    const sectionRef = useRef<HTMLDivElement>(null);
+    const { isBelowTablet } = useLayoutSize();
+    const isSolanaMainnet = !isTestnet(account.symbol);
+
+    const onPageSelected = (page: number) => {
+        pagination.changePage(page);
+        if (sectionRef.current) {
+            sectionRef.current.scrollIntoView();
+        }
+    };
+
+    const noRewards =
+        !isSolanaMainnet ||
+        (rewardsQueryResult.data?.rewards?.length === 0 && rewardsQueryResult.isSuccess);
+
+    if (noRewards) {
+        return <RewardsEmpty />;
+    }
+
+    if (rewardsQueryResult.isError) {
+        // TODO: handle failed request
+    }
+
+    return (
+        <DashboardSection
+            ref={sectionRef}
+            heading={<Translation id="TR_REWARDS" />}
+            data-testid="@wallet/accounts/rewards-list"
+        >
+            <Column gap={32}>
+                {rewardsQueryResult.isLoading || rewardsQueryResult.data === undefined ? (
+                    <Column gap={16}>
+                        <SkeletonTransactionItem />
+                        <SkeletonTransactionItem />
+                        <SkeletonTransactionItem />
+                    </Column>
+                ) : (
+                    <Column gap={40}>
+                        {rewardsQueryResult.data.rewards.map(reward => (
+                            <Column gap={10} key={reward.epoch} data-testid={TEST_ID}>
+                                <Text
+                                    typographyStyle="body-sm-strong"
+                                    intent="neutral"
+                                    priority="secondary"
+                                    data-testid={`${TEST_ID}/date`}
+                                >
+                                    <FormattedDate
+                                        value={reward?.time}
+                                        day="numeric"
+                                        month="long"
+                                        year="numeric"
+                                    />
+                                </Text>
+
+                                <Card paddingType="none">
+                                    <Row gap={32} padding={{ vertical: 16, horizontal: 24 }}>
+                                        <IconCircle
+                                            icon={PiggyBankIcon}
+                                            intent="neutral"
+                                            size={40}
+                                        />
+                                        <Column flex="1" gap={4}>
+                                            <Text typographyStyle="body-md">
+                                                <Translation id="TR_REWARD" />
+                                            </Text>
+                                            <Grid
+                                                columns={
+                                                    isBelowTablet
+                                                        ? '1fr max-content'
+                                                        : '1fr max-content minmax(110px, max-content)'
+                                                }
+                                                rowGap={6}
+                                                columnGap={24}
+                                                flex="1"
+                                            >
+                                                <TransactionTargetLayout
+                                                    addressLabel={
+                                                        <span data-testid={`${TEST_ID}/epoch`}>
+                                                            <Translation
+                                                                id="TR_STAKE_REWARDS_BADGE"
+                                                                values={{ count: reward.epoch }}
+                                                            />
+                                                        </span>
+                                                    }
+                                                    amount={
+                                                        reward?.amount && (
+                                                            <FormattedCryptoAmount
+                                                                value={formatNetworkAmount(
+                                                                    reward?.amount,
+                                                                    account.symbol,
+                                                                )}
+                                                                symbol={account.symbol}
+                                                                data-testid={`${TEST_ID}/crypto-amount`}
+                                                            />
+                                                        )
+                                                    }
+                                                    fiatAmount={
+                                                        reward?.amount && (
+                                                            <BaseCurrencyValue
+                                                                amount={formatNetworkAmount(
+                                                                    reward?.amount,
+                                                                    account.symbol,
+                                                                )}
+                                                                symbol={account.symbol}
+                                                                data-testid={`${TEST_ID}/fiat-amount`}
+                                                            />
+                                                        )
+                                                    }
+                                                />
+                                            </Grid>
+                                        </Column>
+                                    </Row>
+                                </Card>
+                            </Column>
+                        ))}
+                    </Column>
+                )}
+
+                {pagination.showPagination && !rewardsQueryResult.isLoading && (
+                    <Pagination
+                        hasPages={true}
+                        currentPage={pagination.page}
+                        isLastPage={pagination.isLastPage}
+                        perPage={pagination.pageSize}
+                        totalItems={pagination.totalCount}
+                        onPageSelected={onPageSelected}
+                        explicitNavigation
+                    />
+                )}
+            </Column>
+        </DashboardSection>
+    );
+};

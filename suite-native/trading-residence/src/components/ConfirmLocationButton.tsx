@@ -1,0 +1,56 @@
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { isCountrySubdivisionRequired } from '@suite-common/trading';
+import { Button } from '@suite-native/atoms';
+import { useFormContext, useWatch } from '@suite-native/forms';
+import { Translation } from '@suite-native/intl';
+import { residenceActions } from '@suite-native/trading-state';
+
+import { useCountrySubdivisionPickerControls } from './CountrySheet/CountrySubdivisionPickerControlsContext';
+import { useCountrySelectionAnalyticsReport } from '../hooks/useCountrySelectionAnalyticsReport';
+import { useFormCountryCode } from '../hooks/useFormCountryCode';
+import { type TradingLocationFormValues } from '../types/tradingLocationForm';
+import { getPreferredCountryOption } from '../utils/getPreferredCountryOption';
+
+export type ConfirmLocationButtonProps = {
+    afterConfirm: () => void;
+    testId?: string;
+};
+
+export const ConfirmLocationButton = ({ afterConfirm, testId }: ConfirmLocationButtonProps) => {
+    const countryCode = useFormCountryCode();
+    const { control } = useFormContext<TradingLocationFormValues>();
+    const countrySubdivision = useWatch({ control, name: 'countrySubdivision' });
+    const { showSheet: showCountrySubdivisionPicker } = useCountrySubdivisionPickerControls();
+    const { dispatch } = useServices(injectDispatch);
+    const analyticsReport = useCountrySelectionAnalyticsReport();
+    const isSubdivisionMissing =
+        isCountrySubdivisionRequired(countryCode) && typeof countrySubdivision === 'undefined';
+
+    const confirmLocation = () => {
+        dispatch(
+            residenceActions.setResidenceCountry({
+                country: countryCode,
+                countrySubdivision: countrySubdivision?.value,
+            }),
+        );
+        analyticsReport(
+            getPreferredCountryOption().value === countryCode ? 'submitDefault' : 'submitCustom',
+        );
+        afterConfirm();
+    };
+
+    const handlePress = isSubdivisionMissing ? showCountrySubdivisionPicker : confirmLocation;
+
+    return (
+        <Button intent="brand" priority="primary" onPress={handlePress} testID={testId}>
+            <Translation
+                id={
+                    isSubdivisionMissing
+                        ? 'tradingResidence.locationSettings.selectCountrySubdivisionButton'
+                        : 'tradingResidence.locationSettings.confirmButton'
+                }
+            />
+        </Button>
+    );
+};

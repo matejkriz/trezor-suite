@@ -1,25 +1,23 @@
-import { TouchableOpacity } from 'react-native';
-
-import { Box, Text } from '@suite-native/atoms';
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-import { colorVariants, CSSColor } from '@trezor/theme';
-import { useSystemColorScheme, useUserColorScheme, AppColorScheme } from '@suite-native/theme';
+import { Box, PressableOpacity, Text } from '@suite-native/atoms';
+import { Translation, type TxKeyPath } from '@suite-native/intl';
+import { type AppColorScheme, useSystemColorScheme, useUserColorScheme } from '@suite-native/theme';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
+import { type CSSColor, colorVariants } from '@trezor/theme';
 
 type ColorSchemePickerItemProps = {
     colorScheme: AppColorScheme;
+    translationId: TxKeyPath;
 };
 
 const pickerItemWrapperStyle = prepareNativeStyle<{ isColorSchemeActive: boolean }>(
     (utils, { isColorSchemeActive }) => ({
-        backgroundColor: utils.colors.backgroundSurfaceElevationNegative,
-        borderRadius: utils.borders.radii.medium,
+        backgroundColor: utils.colors.surfaceFillSunken,
+        borderRadius: utils.borders.radii.r16,
         minHeight: 114,
         flex: 1,
         paddingTop: 33,
         borderWidth: utils.borders.widths.medium,
-        borderColor: isColorSchemeActive
-            ? utils.colors.borderSecondary
-            : utils.colors.borderElevation1,
+        borderColor: isColorSchemeActive ? utils.colors.borderBrand : utils.colors.borderNeutral,
     }),
 );
 
@@ -36,7 +34,7 @@ const pickerItemDotStyle = prepareNativeStyle<PickerItemDotStyleProps>(
         extend: {
             condition: !isFirstItem,
             style: {
-                marginLeft: utils.negative(utils.spacings.small),
+                marginLeft: utils.negative(utils.spacings.sp8),
             },
         },
     }),
@@ -46,12 +44,14 @@ const textStyle = prepareNativeStyle(utils => ({
     alignSelf: 'center',
     textAlign: 'center',
     paddingTop: 23,
-    paddingBottom: utils.spacings.small,
-    paddingHorizontal: utils.spacings.small,
-    textTransform: 'capitalize',
+    paddingBottom: utils.spacings.sp8,
+    paddingHorizontal: utils.spacings.sp8,
 }));
 
-export const ColorSchemePickerItem = ({ colorScheme }: ColorSchemePickerItemProps) => {
+export const ColorSchemePickerItem = ({
+    colorScheme,
+    translationId,
+}: ColorSchemePickerItemProps) => {
     const { applyStyle } = useNativeStyles();
 
     const { userColorScheme, setUserColorScheme } = useUserColorScheme();
@@ -65,36 +65,36 @@ export const ColorSchemePickerItem = ({ colorScheme }: ColorSchemePickerItemProp
     };
 
     return (
-        <TouchableOpacity
+        <PressableOpacity
             onPress={handleSchemePress}
             style={applyStyle(pickerItemWrapperStyle, { isColorSchemeActive })}
         >
             <Box flexDirection="row" justifyContent="center">
                 <Box
                     style={applyStyle(pickerItemDotStyle, {
-                        backgroundColor: colorVariants[colorVariant].backgroundSurfaceElevation0,
+                        backgroundColor: colorVariants[colorVariant].surfaceFillPage,
                         isFirstItem: true,
                     })}
                 />
                 <Box
                     style={applyStyle(pickerItemDotStyle, {
-                        backgroundColor: colorVariants[colorVariant].backgroundNeutralSubdued,
+                        backgroundColor: colorVariants[colorVariant].elementFillNeutralBold,
                         isFirstItem: false,
                     })}
                 />
                 <Box
                     style={applyStyle(pickerItemDotStyle, {
-                        backgroundColor: colorVariants[colorVariant].backgroundNeutralBold,
+                        backgroundColor: colorVariants[colorVariant].elementFillContrast,
                         isFirstItem: false,
                     })}
                 />
             </Box>
             <Text
                 style={applyStyle(textStyle)}
-                color={isColorSchemeActive ? 'textSecondaryHighlight' : 'textSubdued'}
+                color={isColorSchemeActive ? 'contentBrand' : 'contentSecondary'}
             >
-                {colorScheme}
+                <Translation id={translationId} />
             </Text>
-        </TouchableOpacity>
+        </PressableOpacity>
     );
 };

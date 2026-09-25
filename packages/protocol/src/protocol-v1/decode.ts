@@ -1,6 +1,11 @@
-import * as ERRORS from '../errors';
-import { HEADER_SIZE, MESSAGE_HEADER_BYTE, MESSAGE_MAGIC_HEADER_BYTE } from './constants';
-import { TransportProtocolDecode } from '../types';
+import { PROTOCOL_MALFORMED } from '../errors';
+import {
+    HEADER_SIZE,
+    MESSAGE_HEADER_BYTE,
+    MESSAGE_MAGIC_HEADER_BYTE,
+    MESSAGE_MAX_LENGTH,
+} from './constants';
+import { type TransportProtocolDecode } from '../types';
 
 /**
  * Reads meta information from chunked buffer
@@ -13,31 +18,41 @@ const readHeaderChunked = (buffer: Buffer) => {
     // 1 byte
     const sharp2 = buffer.readUInt8(2);
     // 2 bytes
-    const typeId = buffer.readUInt16BE(3);
+    const messageType = buffer.readUInt16BE(3);
     // 4 bytes
     const length = buffer.readUInt32BE(5);
 
-    return { magic, sharp1, sharp2, typeId, length };
+    return { magic, sharp1, sharp2, messageType, length };
 };
 
 // Parses first raw input that comes from Trezor and returns some information about the whole message.
-// [compatibility]: accept Buffer just like decode does. But this would require changes in lower levels
 export const decode: TransportProtocolDecode = bytes => {
-    const buffer = Buffer.from(bytes);
-    const { magic, sharp1, sharp2, typeId, length } = readHeaderChunked(buffer);
+    // note: the occasionally appearing error "Attempt to access memory outside buffer bounds" comes from here in certain cases
+    // when usb.transferIn (read) did not receive any data but resolved with success. bytes has byteLength 0 in this case.
+    if (bytes.byteLength === 0) {
+        console.error('protocol-v1: decode: received empty buffer');
+    }
+
+    if (bytes.byteLength < HEADER_SIZE) {
+        throw new Error(PROTOCOL_MALFORMED);
+    }
+
+    const { magic, sharp1, sharp2, messageType, length } = readHeaderChunked(bytes);
 
     if (
         magic !== MESSAGE_MAGIC_HEADER_BYTE ||
         sharp1 !== MESSAGE_HEADER_BYTE ||
-        sharp2 !== MESSAGE_HEADER_BYTE
+        sharp2 !== MESSAGE_HEADER_BYTE ||
+        length > MESSAGE_MAX_LENGTH
     ) {
         // read-write is out of sync
-        throw new Error(ERRORS.PROTOCOL_MALFORMED);
+        throw new Error(PROTOCOL_MALFORMED);
     }
 
     return {
+        header: bytes.subarray(0, 3),
         length,
-        typeId,
-        buffer: buffer.subarray(HEADER_SIZE + 1), // each chunk is prefixed by magic byte
+        messageType,
+        payload: bytes.subarray(HEADER_SIZE),
     };
 };

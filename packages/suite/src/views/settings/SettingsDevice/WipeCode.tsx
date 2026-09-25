@@ -1,82 +1,89 @@
-import { analytics, EventType } from '@trezor/suite-analytics';
-import { useSelector } from 'react-redux';
-
+import { events, injectDesktopAnalytics } from '@suite/analytics';
+import { LearnMoreButton } from '@suite/external-links';
+import { Translation } from '@suite/intl';
+import { Anchor, SettingsAnchor } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { selectIsDeviceProtectedByWipeCode } from '@suite-common/device';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { ActionButton, ActionColumn, SectionItem, TextColumn } from '@trezor/product-components';
 import { HELP_CENTER_WIPE_CODE_URL } from '@trezor/urls';
-import { changeWipeCode } from 'src/actions/settings/deviceSettingsActions';
-import {
-    ActionButton,
-    ActionColumn,
-    SectionItem,
-    TextColumn,
-    Translation,
-} from 'src/components/suite';
-import { SettingsAnchor } from 'src/constants/suite/anchors';
-import { useDispatch } from 'src/hooks/suite';
-import { useAnchor } from 'src/hooks/suite/useAnchor';
-import { selectIsDeviceProtectedByWipeCode } from '@suite-common/wallet-core';
+
+import { changeWipeCodeThunk } from 'src/actions/settings/deviceSettingsActions';
+import { useSelector } from 'src/hooks/suite';
 
 interface Props {
     isDeviceLocked: boolean;
 }
 
 export const WipeCode = ({ isDeviceLocked }: Props) => {
-    const dispatch = useDispatch();
-    const { anchorRef, shouldHighlight } = useAnchor(SettingsAnchor.WipeCode);
+    const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
     const isDeviceProtectedByWipeCode = useSelector(selectIsDeviceProtectedByWipeCode);
 
     const enableWipeCode = () => {
-        dispatch(changeWipeCode({ remove: false }));
+        dispatch(changeWipeCodeThunk({ remove: false }));
         analytics.report({
             type: isDeviceProtectedByWipeCode
-                ? EventType.SettingsDeviceChangeWipeCode
-                : EventType.SettingsDeviceSetupWipeCode,
+                ? events.settingsDeviceChangeWipeCodeEvent.name
+                : events.settingsDeviceSetupWipeCodeEvent.name,
         });
     };
 
     const disableWipeCode = () => {
-        dispatch(changeWipeCode({ remove: true }));
+        dispatch(changeWipeCodeThunk({ remove: true }));
         analytics.report({
-            type: EventType.SettingsDeviceDisableWipeCode,
+            type: events.settingsDeviceDisableWipeCodeEvent.name,
         });
     };
 
     return (
-        <SectionItem
-            data-test="@settings/device/change-wipe-code"
-            ref={anchorRef}
-            shouldHighlight={shouldHighlight}
-        >
-            <TextColumn
-                title={<Translation id="TR_DEVICE_SETTINGS_WIPE_CODE_TITLE" />}
-                description={<Translation id="TR_DEVICE_SETTINGS_WIPE_CODE_DESC" />}
-                buttonLink={HELP_CENTER_WIPE_CODE_URL}
-            />
-
-            <ActionColumn>
-                <ActionButton
-                    onClick={enableWipeCode}
-                    isDisabled={isDeviceLocked}
-                    variant="destructive"
+        <Anchor anchorId={SettingsAnchor.WipeCode}>
+            {({ anchorId, anchorRef, shouldHighlight }) => (
+                <SectionItem
+                    data-testid={anchorId}
+                    ref={anchorRef}
+                    shouldHighlight={shouldHighlight}
                 >
-                    <Translation
-                        id={
-                            isDeviceProtectedByWipeCode
-                                ? 'TR_CHANGE_WIPE_CODE'
-                                : 'TR_SETUP_WIPE_CODE'
-                        }
+                    <TextColumn
+                        title={<Translation id="TR_DEVICE_SETTINGS_WIPE_CODE_TITLE" />}
+                        description={<Translation id="TR_DEVICE_SETTINGS_WIPE_CODE_DESC" />}
+                        bottomContent={<LearnMoreButton url={HELP_CENTER_WIPE_CODE_URL} />}
                     />
-                </ActionButton>
 
-                {isDeviceProtectedByWipeCode && (
-                    <ActionButton
-                        onClick={disableWipeCode}
-                        isDisabled={isDeviceLocked}
-                        variant="destructive"
-                    >
-                        <Translation id="TR_REMOVE_WIPE_CODE" />
-                    </ActionButton>
-                )}
-            </ActionColumn>
-        </SectionItem>
+                    <ActionColumn>
+                        <ActionButton
+                            onClick={enableWipeCode}
+                            isDisabled={isDeviceLocked}
+                            intent="critical"
+                            isTooltipActive={isDeviceLocked}
+                            tooltipContent={
+                                <Translation id="TR_SETTINGS_DEVICE_BANNER_TITLE_REMEMBERED" />
+                            }
+                        >
+                            <Translation
+                                id={
+                                    isDeviceProtectedByWipeCode
+                                        ? 'TR_CHANGE_WIPE_CODE'
+                                        : 'TR_SETUP_WIPE_CODE'
+                                }
+                            />
+                        </ActionButton>
+
+                        {isDeviceProtectedByWipeCode && (
+                            <ActionButton
+                                onClick={disableWipeCode}
+                                isDisabled={isDeviceLocked}
+                                intent="critical"
+                                isTooltipActive={isDeviceLocked}
+                                tooltipContent={
+                                    <Translation id="TR_SETTINGS_DEVICE_BANNER_TITLE_REMEMBERED" />
+                                }
+                            >
+                                <Translation id="TR_REMOVE_WIPE_CODE" />
+                            </ActionButton>
+                        )}
+                    </ActionColumn>
+                </SectionItem>
+            )}
+        </Anchor>
     );
 };

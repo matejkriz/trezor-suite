@@ -1,13 +1,12 @@
-import util from 'util';
-import path from 'path';
 import fs from 'fs';
 import net, { Socket } from 'net';
+import path from 'path';
+import util from 'util';
 
+import { TorControlPort, createHmacSignature, getCookieString } from '../src/torControlPort';
 import type { TorConnectionOptions } from '../src/types';
-import { createHmacSignature, getCookieString, TorControlPort } from '../src/torControlPort';
 
 const writeFile = util.promisify(fs.writeFile);
-const existsDirectory = util.promisify(fs.exists);
 const mkdir = util.promisify(fs.mkdir);
 const unlinkFile = util.promisify(fs.unlink);
 
@@ -19,9 +18,11 @@ const host = 'localhost';
 const port = 9998;
 const controlPort = 9999;
 
-describe('TorControlPort', () => {
+const conditionalTest = process.env.SKIP_FLAKY_TESTS ? describe.skip : describe;
+
+conditionalTest('TorControlPort', () => {
     beforeAll(async () => {
-        if (!(await existsDirectory(torDataDir))) {
+        if (!fs.existsSync(torDataDir)) {
             // Make sure there is `torDataDir` directory.
             mkdir(torDataDir);
         }
@@ -77,12 +78,16 @@ describe('TorControlPort', () => {
                             isProperlyAuthenticated = providedAuthSignature === authSignature;
                             sock.write('250 OK');
                             break;
-                        case !!authchallengeRequest:
-                            clientNonce = authchallengeRequest ? authchallengeRequest[1] : '';
+                        case !!authchallengeRequest: {
+                            const nonce = authchallengeRequest
+                                ? (authchallengeRequest[1] ?? '')
+                                : '';
+                            clientNonce = nonce;
                             sock.write(
                                 `250 AUTHCHALLENGE SERVERHASH=${serverHash} SERVERNONCE=${serverNonce}`,
                             );
                             break;
+                        }
                         default:
                     }
                 });

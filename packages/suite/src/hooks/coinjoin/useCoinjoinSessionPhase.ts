@@ -1,9 +1,11 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+
+import { getFirstSessionPhaseFromRoundPhase, selectSessionByAccountKey } from '@suite/coinjoin';
+import { type SessionPhase } from '@suite/coinjoin';
+import { type AccountKey } from '@suite-common/wallet-types';
+
 import { SESSION_PHASE_TRANSITION_DELAY } from 'src/constants/suite/coinjoin';
-import { useSelector } from 'src/hooks/suite/useSelector';
-import { selectSessionByAccountKey } from 'src/reducers/wallet/coinjoinReducer';
-import { SessionPhase } from 'src/types/wallet/coinjoin';
-import { getFirstSessionPhaseFromRoundPhase } from 'src/utils/wallet/coinjoinUtils';
+import { useSelector } from 'src/hooks/suite';
 
 const checkExpiration = (lastChangeTimestamp: number) => {
     const currentTimestamp = Date.now();
@@ -16,7 +18,7 @@ const checkExpiration = (lastChangeTimestamp: number) => {
     };
 };
 
-export const useCoinjoinSessionPhase = (accountKey: string) => {
+export const useCoinjoinSessionPhase = (accountKey: AccountKey) => {
     const { sessionPhaseQueue, roundPhase, paused } =
         useSelector(state => selectSessionByAccountKey(state, accountKey)) || {};
     const [phaseIndex, setPhaseIndex] = useState(0);
@@ -42,8 +44,10 @@ export const useCoinjoinSessionPhase = (accountKey: string) => {
         const { isExpired, currentTimestamp } = checkExpiration(lastChangeTimestamp);
 
         if (isExpired && sessionPhaseQueue) {
+            // @ts-expect-error: indexing with noUncheckedIndexedAccess
+            const firstPhase: SessionPhase = sessionPhaseQueue[0];
             setPhaseIndex(0);
-            setSessionPhase(sessionPhaseQueue[0]);
+            setSessionPhase(firstPhase);
             setLastChangeTimestamp(currentTimestamp);
         } else {
             /**

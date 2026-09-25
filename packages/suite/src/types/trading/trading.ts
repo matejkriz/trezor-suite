@@ -1,0 +1,102 @@
+import {
+    type BuyTrade,
+    type CryptoId,
+    type ExchangeProviderInfo,
+    type SellFiatTrade,
+} from 'invity-api';
+
+import { type ExtendedMessageDescriptor } from '@suite/intl';
+import type {
+    TradingBuyInfoSelector,
+    TradingBuyType,
+    TradingExchangeInfoSelector,
+    TradingExchangeType,
+    TradingProviderInfo,
+    TradingSellInfoSelector,
+    TradingSellType,
+    TradingTransactionBuy,
+    TradingTransactionExchange,
+    TradingTransactionSell,
+    TradingType,
+} from '@suite-common/trading';
+import { type Account } from '@suite-common/wallet-types';
+import { type TokenIconProps } from '@trezor/product-components';
+
+export type TradingTradeBuySellType = Exclude<TradingType, TradingExchangeType>;
+export type TradingTradeSellExchangeType = Exclude<TradingType, TradingBuyType>;
+export type TradingTradeBuyExchangeType = Exclude<TradingType, TradingSellType>;
+
+export type TradingTradeMapProps = {
+    buy: TradingTransactionBuy;
+    sell: TradingTransactionSell;
+    exchange: TradingTransactionExchange;
+};
+
+export type TradingTradeDetailBuySellType = BuyTrade | SellFiatTrade;
+
+export type TradingTradeInfoMapProps = {
+    buy: TradingBuyInfoSelector;
+    sell: TradingSellInfoSelector;
+    exchange: TradingExchangeInfoSelector;
+};
+
+export interface TradingUseWatchTradeProps<T extends TradingType> {
+    account: Account | undefined;
+    trade: TradingTradeMapProps[T] | undefined;
+    refreshIntervalSeconds?: number;
+}
+
+export type TradingCoinLogoProps = {
+    cryptoId: CryptoId;
+    className?: string;
+    size?: TokenIconProps['size'];
+} & Pick<TokenIconProps, 'showNetworkIcon' | 'margin'>;
+
+export interface TradingGetAmountLabelsProps {
+    type: TradingType;
+    amountInCrypto: boolean;
+}
+
+export type TradingPayGetLabelType =
+    | Extract<ExtendedMessageDescriptor['id'], `TR_TRADING_YOU_${'PAY' | 'GET' | 'RECEIVE'}`>
+    | 'TR_TRADING_SWAP'
+    | 'TR_TRADING_SWAP_AMOUNT';
+
+export interface TradingGetAmountLabelsReturnProps {
+    inputLabel: TradingPayGetLabelType;
+    offerLabel: TradingPayGetLabelType;
+    labelComparatorOffer: Extract<
+        ExtendedMessageDescriptor['id'],
+        `TR_TRADING_YOU_WILL_${'PAY' | 'GET'}`
+    >;
+    sendLabel: TradingPayGetLabelType;
+    receiveLabel: TradingPayGetLabelType;
+}
+
+export type TradingGetProvidersInfoProps =
+    | {
+          [name: string]: TradingProviderInfo;
+      }
+    | undefined;
+
+export type TradingExchangeProvidersInfoProps = {
+    [key: string]: ExchangeProviderInfo;
+};
+
+export interface TradingGetCryptoQuoteAmountProps {
+    amountInCrypto?: boolean | undefined;
+    sendAmount: string;
+    sendCurrency: CryptoId | string | undefined;
+    receiveAmount: string;
+    receiveCurrency: CryptoId | undefined;
+    networkFee?: string | undefined;
+}
+
+export interface TradingCryptoAmountProps {
+    amountInCrypto?: boolean | undefined;
+    sendAmount: string | number | undefined;
+    sendCurrency: CryptoId | string | undefined;
+    receiveAmount: string | number | undefined;
+    receiveCurrency: CryptoId | undefined;
+    className?: string;
+}

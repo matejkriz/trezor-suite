@@ -1,0 +1,230 @@
+import React, { forwardRef, useEffect, useState } from 'react';
+
+import styled, { keyframes } from 'styled-components';
+
+import { typography, zIndices } from '@trezor/theme';
+
+import {
+    type FrameProps,
+    type FramePropsKeys,
+    pickAndPrepareFrameProps,
+    withFrameProps,
+} from '../../utils/frameProps';
+import { type TransientProps } from '../../utils/transientProps';
+import { Box } from '../Box/Box';
+import { Column, Row } from '../Flex/Flex';
+import { Icon, type IconComponent } from '../Icon/Icon';
+import { Text } from '../typography/Text/Text';
+
+export const DROPDOWN_MENU = keyframes`
+    0% {
+        opacity: 0;
+        transform: translateY(-12px);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+`;
+
+export const allowedMenuFrameProps = [
+    'width',
+    'minWidth',
+    'maxWidth',
+    'maxHeight',
+] as const satisfies FramePropsKeys[];
+type AllowedMenuFrameProps = Pick<FrameProps, (typeof allowedMenuFrameProps)[number]>;
+
+const Container = styled.div<TransientProps<AllowedMenuFrameProps>>`
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    min-width: 180px;
+    border-radius: 16px;
+    background: ${({ theme }) => theme.surfaceFillModeless};
+    box-shadow: ${({ theme }) => theme.surfaceShadowModeless};
+    outline: 1px solid ${({ theme }) => theme.surfaceBorderModeless};
+    z-index: ${zIndices.modal};
+    animation: ${DROPDOWN_MENU} 0.15s ease-in-out;
+    list-style-type: none;
+    overflow: ${({ $maxHeight }) => ($maxHeight === undefined ? 'hidden' : 'hidden auto')};
+
+    /* when theme changes from light to dark */
+    transition: background 0.3s;
+    ${typography['body-sm']}
+
+    ${withFrameProps}
+`;
+
+const MenuList = styled.ul`
+    list-style: none;
+    display: block;
+`;
+
+export type DropdownMenuItemProps = {
+    label: React.ReactNode;
+    onClick?: () => unknown | Promise<unknown>;
+    icon?: IconComponent;
+    iconRight?: IconComponent;
+    isDisabled?: boolean;
+    isHidden?: boolean;
+    closeOnClick?: boolean;
+    'data-testid'?: string;
+};
+
+type MenuItemComponentProps = DropdownMenuItemProps & {
+    isKeyboardSelected: boolean;
+    onMouseEnter: () => void;
+};
+
+const MenuItem = ({
+    icon,
+    iconRight,
+    label,
+    isDisabled,
+    onClick,
+    isKeyboardSelected,
+    onMouseEnter,
+    'data-testid': dataTest,
+}: MenuItemComponentProps) => (
+    <Box
+        cursor={isDisabled ? 'default' : 'pointer'}
+        backgroundColor={isKeyboardSelected ? 'elementFillGhostHovered' : undefined}
+        borderRadius={4}
+        data-testid={dataTest}
+        as="li"
+        onClick={isDisabled ? undefined : onClick}
+        onMouseEnter={onMouseEnter}
+    >
+        <Row gap={12} padding={{ vertical: 8, horizontal: 12 }}>
+            {icon && (
+                <Icon
+                    as={icon}
+                    size={16}
+                    {...(isDisabled ? { isDisabled: true } : { intent: 'neutral' })}
+                />
+            )}
+            <Text intent="neutral" isDisabled={isDisabled} textWrap="nowrap">
+                {label}
+            </Text>
+            {iconRight && (
+                <Icon
+                    margin={{ left: 'auto' }}
+                    as={iconRight}
+                    size={16}
+                    {...(isDisabled ? { isDisabled: true } : { intent: 'neutral' })}
+                />
+            )}
+        </Row>
+    </Box>
+);
+
+export type MenuProps = AllowedMenuFrameProps & {
+    items?: DropdownMenuItemProps[];
+    content?: React.ReactNode;
+    onClose?: () => void;
+};
+
+export const Menu = forwardRef<HTMLUListElement, MenuProps>(
+    ({ items, content, onClose, ...rest }, ref) => {
+        const frameProps = pickAndPrepareFrameProps(rest, allowedMenuFrameProps);
+        const visibleItems = items?.filter(item => !item.isHidden);
+        const [focusedItemIndex, setFocusedItemIndex] = useState(
+            visibleItems?.length ? visibleItems.findIndex(item => !item.isDisabled) : null,
+        );
+
+        // handle selecting an item
+        useEffect(() => {
+            const handleKeyDown = (e: KeyboardEvent) => {
+                if (!visibleItems?.length || focusedItemIndex === null) {
+                    return;
+                }
+
+                if (e.key === ' ' || e.key === 'Enter') {
+                    e.preventDefault();
+
+                    const focusedItem = visibleItems[focusedItemIndex];
+
+                    if (focusedItem?.closeOnClick !== false) onClose?.();
+                    focusedItem?.onClick?.();
+                }
+            };
+
+            if (focusedItemIndex !== null && visibleItems?.length) {
+                document.addEventListener('keydown', handleKeyDown);
+
+                return () => {
+                    document.removeEventListener('keydown', handleKeyDown);
+                };
+            }
+        }, [focusedItemIndex, visibleItems, onClose]);
+
+        // handle keyboard navigation
+        useEffect(() => {
+            const handleKeyDown = (e: KeyboardEvent) => {
+                if (
+                    (e.key === 'ArrowUp' || e.key === 'ArrowDown') &&
+                    visibleItems &&
+                    visibleItems.length > 0 &&
+                    focusedItemIndex !== null
+                ) {
+                    e.preventDefault();
+                    let indexCandidate = focusedItemIndex;
+                    const direction = e.key === 'ArrowUp' ? -1 : 1;
+                    const getNextIndex = (index: number, dir: number) =>
+                        (index + dir + visibleItems.length) % visibleItems.length;
+
+                    do {
+                        indexCandidate = getNextIndex(indexCandidate, direction);
+                    } while (
+                        visibleItems[indexCandidate]?.isDisabled &&
+                        indexCandidate !== focusedItemIndex
+                    );
+
+                    setFocusedItemIndex(indexCandidate);
+                }
+            };
+
+            if (focusedItemIndex !== null && visibleItems?.length) {
+                document.addEventListener('keydown', handleKeyDown);
+
+                return () => {
+                    document.removeEventListener('keydown', handleKeyDown);
+                };
+            }
+        }, [visibleItems, focusedItemIndex]);
+
+        return (
+            <Container
+                data-component="Menu"
+                tabIndex={content ? 0 : 1} // do not affect tab order when there is no content
+                onClick={e => e.stopPropagation()} // prevent closing the menu when clicking on the menu itself or within the menu
+                {...frameProps}
+            >
+                <Column gap={16}>
+                    {content}
+                    {!!visibleItems?.length && (
+                        <MenuList ref={ref}>
+                            {visibleItems?.map((item, index) => (
+                                <MenuItem
+                                    isKeyboardSelected={index === focusedItemIndex}
+                                    onMouseEnter={() =>
+                                        !item.isDisabled && setFocusedItemIndex(index)
+                                    }
+                                    data-testid={item['data-testid']}
+                                    {...item}
+                                    onClick={() => {
+                                        if (item.closeOnClick !== false) onClose?.();
+                                        item.onClick?.();
+                                    }}
+                                    key={index}
+                                />
+                            ))}
+                        </MenuList>
+                    )}
+                </Column>
+            </Container>
+        );
+    },
+);

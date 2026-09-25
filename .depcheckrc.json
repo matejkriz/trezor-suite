@@ -1,0 +1,22 @@
+{
+    "ignore-patterns": ["libDev", "lib", "build"],
+    "ignores": [
+        "babel*",
+        "@babel/*",
+        "@swc/jest",
+        "@playwright/*",
+        "webpack*",
+        "worker-loader",
+        "process",
+        "rimraf",
+        "rollup-plugin-dts",
+        "tslib",
+        "buffer",
+        "node-gyp",
+        "version-bump-prompt",
+        "uuid",
+        "uint8array-tools",
+        "bitcore-lib",
+        "@arethetypeswrong/cli"
+    ]
+}

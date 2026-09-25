@@ -1,31 +1,55 @@
-import { MouseEventHandler } from 'react';
-import { Button } from '@trezor/components';
+import { type MouseEventHandler } from 'react';
 
-import { Translation, TroubleshootingTips } from 'src/components/suite';
-import { useDispatch } from 'src/hooks/suite';
-import { goto } from 'src/actions/suite/routerActions';
+import { events, injectDesktopAnalytics } from '@suite/analytics';
+import { Translation } from '@suite/intl';
+import { gotoThunk } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { selectSelectedDevice } from '@suite-common/device';
+import { injectDispatch, injectGetState } from '@suite-common/redux-utils';
+import { Banner } from '@trezor/components';
+import { DeviceModelInternal } from '@trezor/device-utils';
+import { CpuIcon } from '@trezor/icons';
+
+import { TroubleshootingTips } from 'src/components/suite/troubleshooting/TroubleshootingTips';
 
 export const DeviceNoFirmware = () => {
-    const dispatch = useDispatch();
+    const { analytics, dispatch, getState } = useServices(
+        injectDesktopAnalytics,
+        injectDispatch,
+        injectGetState,
+    );
 
     const handleClick: MouseEventHandler = e => {
         e.stopPropagation();
-        dispatch(goto('onboarding-index'));
+        const device = selectSelectedDevice(getState());
+
+        analytics.report(
+            {
+                type: events.deviceSetupStartedEvent.name,
+                payload: {
+                    deviceModel: device?.features?.internal_model || DeviceModelInternal.UNKNOWN,
+                },
+            },
+            { force: true },
+        );
+        dispatch(gotoThunk({ routeName: 'onboarding-index' }));
     };
 
     return (
         <TroubleshootingTips
             label={<Translation id="TR_NO_FIRMWARE" />}
             cta={
-                <Button onClick={handleClick}>
+                <Banner.Button onClick={handleClick}>
                     <Translation id="TR_GO_TO_ONBOARDING" />
-                </Button>
+                </Banner.Button>
             }
+            intent="info"
             items={[
                 {
                     key: 'device-firmware-missing',
                     heading: <Translation id="TR_NO_FIRMWARE" />,
                     description: <Translation id="TR_NO_FIRMWARE_EXPLAINED" />,
+                    icon: CpuIcon,
                 },
             ]}
         />

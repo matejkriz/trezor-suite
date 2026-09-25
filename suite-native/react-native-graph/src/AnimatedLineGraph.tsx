@@ -1,53 +1,53 @@
-import { useCallback, useEffect, useMemo, useRef, useState, ReactElement } from 'react';
-import { View, StyleSheet, LayoutChangeEvent } from 'react-native';
+import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type LayoutChangeEvent, StyleSheet, View } from 'react-native';
+import { GestureDetector } from 'react-native-gesture-handler';
 import Reanimated, {
+    FadeInDown,
+    FadeInUp,
+    cancelAnimation,
     runOnJS,
     useAnimatedReaction,
-    useSharedValue,
     useDerivedValue,
-    cancelAnimation,
+    useSharedValue,
+    withDelay,
     withRepeat,
     withSequence,
-    withTiming,
-    withDelay,
     withSpring,
-    FadeInUp,
-    FadeInDown,
+    withTiming,
 } from 'react-native-reanimated';
-import { GestureDetector } from 'react-native-gesture-handler';
 
 import {
     Canvas,
-    SkPath,
+    Circle,
+    Group,
     LinearGradient,
     Path,
-    Skia,
-    vec,
-    Group,
-    PathCommand,
-    mix,
-    Circle,
+    type PathCommand,
     Shadow,
+    type SkPath,
+    Skia,
+    mix,
+    vec,
 } from '@shopify/react-native-skia';
 
-import type { AnimatedLineGraphProps, GraphEventWithCords } from './LineGraphProps';
-import { SelectionDot as DefaultSelectionDot } from './SelectionDot';
+import { clamp, hexToRgba } from '@trezor/utils';
+
+import { BlurOverlay } from './BlurOverlay';
 import {
     createGraphPath,
     createGraphPathWithGradient,
     getGraphPathRange,
-    GraphPathRange,
-    getXInRange,
     getPointsInRange,
+    getXInRange,
 } from './CreateGraphPath';
-import { getSixDigitHex } from './utils/getSixDigitHex';
-import { usePanGesture } from './hooks/usePanGesture';
-import { getYForX } from './GetYForX';
-import { hexToRgba } from './utils/hexToRgba';
 import { DefaultGraphEvent } from './DefaultGraphEvent';
-import { useEventTooltipProps } from './hooks/useEventTooltipProps';
+import { getYForX } from './GetYForX';
+import type { AnimatedLineGraphProps, GraphEventWithCords, GraphPathRange } from './LineGraphProps';
 import { LoadingLine } from './LoadingLine';
-import { BlurOverlay } from './BlurOverlay';
+import { SelectionDot as DefaultSelectionDot } from './SelectionDot';
+import { useEventTooltipProps } from './hooks/useEventTooltipProps';
+import { usePanGesture } from './hooks/usePanGesture';
+import { getSixDigitHex } from './utils/getSixDigitHex';
 
 const INDICATOR_RADIUS = 7;
 const INDICATOR_BORDER_MULTIPLIER = 1.3;
@@ -144,22 +144,22 @@ export function AnimatedLineGraph<TEventPayload extends object>({
     }, []);
 
     const straightLine = useMemo(() => {
-        const path = Skia.Path.Make();
-        path.moveTo(0, height / 2);
+        const pathBuilder = Skia.PathBuilder.Make();
+        pathBuilder.moveTo(0, height / 2);
         for (let i = 0; i < width - 1; i += 2) {
             const x = i;
             const y = height / 2;
-            path.cubicTo(x, y, x, y, x, y);
+            pathBuilder.cubicTo(x, y, x, y, x, y);
         }
 
-        return path;
+        return pathBuilder.build();
     }, [height, width]);
 
     const paths = useSharedValue<{ from?: SkPath; to?: SkPath }>({});
     const gradientPaths = useSharedValue<{ from?: SkPath; to?: SkPath }>({});
     const commands = useSharedValue<PathCommand[]>([]);
     const [commandsChanged, setCommandsChanged] = useState(0);
-    const pointSelectedIndex = useRef<number>();
+    const pointSelectedIndex = useRef<number | undefined>(undefined);
 
     const pathRange: GraphPathRange = useMemo(
         () => getGraphPathRange(allPoints, range),
@@ -232,7 +232,7 @@ export function AnimatedLineGraph<TEventPayload extends object>({
             path = createGraphPath(createGraphPathProps);
         }
 
-        commands.value = path.toCmds();
+        commands.set(path.toCmds());
 
         if (gradientPath != null) {
             const previous = gradientPaths.value;
@@ -241,15 +241,14 @@ export function AnimatedLineGraph<TEventPayload extends object>({
                 from = from.interpolate(previous.from, interpolateProgress.value) ?? from;
 
             if (gradientPath.isInterpolatable(from)) {
-                gradientPaths.value = {
+                gradientPaths.set({
                     from,
                     to: gradientPath,
-                };
+                });
             } else {
-                gradientPaths.value = {
-                    from: gradientPath,
+                gradientPaths.set({
                     to: gradientPath,
-                };
+                });
             }
         }
 
@@ -259,32 +258,33 @@ export function AnimatedLineGraph<TEventPayload extends object>({
             from = from.interpolate(previous.from, interpolateProgress.value) ?? from;
 
         if (path.isInterpolatable(from)) {
-            paths.value = {
+            paths.set({
                 from,
                 to: path,
-            };
+            });
         } else {
-            paths.value = {
-                from: path,
+            paths.set({
                 to: path,
-            };
+            });
         }
 
         setCommandsChanged(commandsChanged + 1);
         setEventsWithCords(null);
 
-        interpolateProgress.value = 0;
-        interpolateProgress.value = withSpring(
-            1,
-            {
-                mass: 1,
-                stiffness: 500,
-                damping: 400,
-                velocity: 0,
-            },
-            () => {
-                runOnJS(calculateEventsPoints)();
-            },
+        interpolateProgress.set(0);
+        interpolateProgress.set(
+            withSpring(
+                1,
+                {
+                    mass: 1,
+                    stiffness: 500,
+                    damping: 400,
+                    velocity: 0,
+                },
+                () => {
+                    runOnJS(calculateEventsPoints)();
+                },
+            ),
         );
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
@@ -317,37 +317,39 @@ export function AnimatedLineGraph<TEventPayload extends object>({
     }, [color, enableFadeInMask]);
 
     const path = useDerivedValue(() => {
-        const from = paths.value.from ?? straightLine;
-        const to = paths.value.to ?? straightLine;
+        const { from, to } = paths.value;
+        if (from == null || to == null) return to ?? straightLine;
 
-        return to.interpolate(from, interpolateProgress.value);
+        return to.interpolate(from, interpolateProgress.value) ?? to;
     }, [interpolateProgress, paths]);
 
     const gradientPath = useDerivedValue(() => {
-        const from = gradientPaths.value.from ?? straightLine;
-        const to = gradientPaths.value.to ?? straightLine;
+        const { from, to } = gradientPaths.value;
+        if (from == null || to == null) return to ?? straightLine;
 
-        return to.interpolate(from, interpolateProgress.value);
+        return to.interpolate(from, interpolateProgress.value) ?? to;
     });
 
     const stopPulsating = useCallback(() => {
         cancelAnimation(indicatorPulseAnimation);
-        indicatorPulseAnimation.value = 0;
+        indicatorPulseAnimation.set(0);
     }, [indicatorPulseAnimation]);
 
     const startPulsating = useCallback(() => {
-        indicatorPulseAnimation.value = withRepeat(
-            withDelay(
-                1000,
-                withSequence(
-                    withTiming(1, { duration: 1100 }),
-                    withTiming(0, { duration: 0 }), // revert to 0
-                    withTiming(0, { duration: 1200 }), // delay between pulses
-                    withTiming(1, { duration: 1100 }),
-                    withTiming(1, { duration: 2000 }), // delay after both pulses
+        indicatorPulseAnimation.set(
+            withRepeat(
+                withDelay(
+                    1000,
+                    withSequence(
+                        withTiming(1, { duration: 1100 }),
+                        withTiming(0, { duration: 0 }), // revert to 0
+                        withTiming(0, { duration: 1200 }), // delay between pulses
+                        withTiming(1, { duration: 1100 }),
+                        withTiming(1, { duration: 2000 }), // delay after both pulses
+                    ),
                 ),
+                -1,
             ),
-            -1,
         );
     }, [indicatorPulseAnimation]);
 
@@ -355,18 +357,15 @@ export function AnimatedLineGraph<TEventPayload extends object>({
         (fingerX: number) => {
             const fingerXInRange = Math.max(fingerX - horizontalPadding, 0);
 
-            const lastDate = pointsInRange[pointsInRange.length - 1].date;
+            const lastDate = pointsInRange[pointsInRange.length - 1]?.date;
 
-            // If there was graph error, points in range can be empty
-            if (!lastDate) {
-                return;
-            }
+            if (!lastDate) return;
 
             const index = Math.round(
                 (fingerXInRange / getXInRange(drawingWidth, lastDate, pathRange.x)) *
                     (pointsInRange.length - 1),
             );
-            const pointIndex = Math.min(Math.max(index, 0), pointsInRange.length - 1);
+            const pointIndex = clamp(index, 0, pointsInRange.length - 1);
 
             if (pointSelectedIndex.current !== pointIndex) {
                 const dataPoint = pointsInRange[pointIndex];
@@ -387,11 +386,11 @@ export function AnimatedLineGraph<TEventPayload extends object>({
             const y = getYForX(commands.value, fingerX);
 
             if (y != null) {
-                circleX.value = fingerX;
-                circleY.value = y;
+                circleX.set(fingerX);
+                circleY.set(y);
             }
 
-            if (isActive.value) pathEnd.value = fingerX / width;
+            if (isActive.value) pathEnd.set(fingerX / width);
         },
         // pathRange.x must be extra included in deps otherwise onPointSelected doesn't work, IDK why
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -400,12 +399,14 @@ export function AnimatedLineGraph<TEventPayload extends object>({
 
     const setIsActive = useCallback(
         (active: boolean) => {
-            indicatorRadius.value = withSpring(!active ? INDICATOR_RADIUS : 0, {
-                mass: 1,
-                stiffness: 1000,
-                damping: 50,
-                velocity: 0,
-            });
+            indicatorRadius.set(
+                withSpring(!active ? INDICATOR_RADIUS : 0, {
+                    mass: 1,
+                    stiffness: 1000,
+                    damping: 50,
+                    velocity: 0,
+                }),
+            );
 
             if (active) {
                 onGestureStart?.();
@@ -413,7 +414,7 @@ export function AnimatedLineGraph<TEventPayload extends object>({
             } else {
                 onGestureEnd?.();
                 pointSelectedIndex.current = undefined;
-                pathEnd.value = 1;
+                pathEnd.set(1);
                 startPulsating();
             }
         },
@@ -423,7 +424,7 @@ export function AnimatedLineGraph<TEventPayload extends object>({
     useAnimatedReaction(
         () => x.value,
         fingerX => {
-            if (!loading && (isActive.value || fingerX)) {
+            if (!loading && isActive.value && fingerX) {
                 setFingerX(fingerX);
                 runOnJS(setFingerPoint)(fingerX);
             }
@@ -440,7 +441,7 @@ export function AnimatedLineGraph<TEventPayload extends object>({
     );
 
     useEffect(() => {
-        if (pointsInRange.length !== 0 && commands.value.length !== 0) pathEnd.value = 1;
+        if (pointsInRange.length !== 0 && commands.value.length !== 0) pathEnd.set(1);
     }, [commands, pathEnd, pointsInRange.length]);
 
     useEffect(() => {
@@ -451,13 +452,10 @@ export function AnimatedLineGraph<TEventPayload extends object>({
     }, [indicatorPulsating]);
 
     const dashedLine = useDerivedValue(() => {
-        const line = Skia.Path.Make();
         const y = path.value?.getPoint(0).y ?? height / 2;
-        line.moveTo(0, y);
-        line.lineTo(width, y);
-        line.dash(2, 5, 0);
+        const line = Skia.Path.Line(Skia.Point(0, y), Skia.Point(width, y));
 
-        return line;
+        return Skia.Path.Dash(line, 2, 5, 0)!;
     });
 
     const axisLabelContainerStyle = {
@@ -502,7 +500,6 @@ export function AnimatedLineGraph<TEventPayload extends object>({
                                         />
                                         <Group>
                                             <Path
-                                                // @ts-expect-error
                                                 path={path}
                                                 strokeWidth={lineThickness}
                                                 style="stroke"
@@ -518,10 +515,7 @@ export function AnimatedLineGraph<TEventPayload extends object>({
                                             </Path>
 
                                             {shouldFillGradient && (
-                                                <Path
-                                                    // @ts-expect-error
-                                                    path={gradientPath}
-                                                >
+                                                <Path path={gradientPath}>
                                                     <LinearGradient
                                                         start={vec(0, 0)}
                                                         end={vec(0, height)}

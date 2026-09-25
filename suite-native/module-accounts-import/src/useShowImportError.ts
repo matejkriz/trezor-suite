@@ -1,49 +1,47 @@
 import { useCallback } from 'react';
 
-import { networks, NetworkSymbol } from '@suite-common/wallet-config';
+import { type NetworkSymbol, getNetworkType } from '@suite-common/wallet-config';
 import { useAlert } from '@suite-native/alerts';
+import { type IconName } from '@suite-native/icons';
 import {
-    AccountsImportStackParamList,
+    type AccountsImportStackParamList,
     AccountsImportStackRoutes,
-    RootStackParamList,
-    RootStackRoutes,
-    StackToStackCompositeNavigationProps,
+    type RootStackParamList,
+    type StackToStackCompositeNavigationProps,
 } from '@suite-native/navigation';
-import { IconName } from '@suite-common/icons';
-import { PictogramVariant } from '@suite-native/atoms';
 
 type AlertError = 'invalidXpub' | 'invalidReceiveAddress' | 'networkError' | 'unknownError';
 type AlertErrorOptions = {
     title: string;
     description: string;
-    icon: IconName;
+    icon?: IconName;
+    isRetryEnabled: boolean;
 };
 
 const alertErrorMap: Record<AlertError, AlertErrorOptions> = {
     invalidXpub: {
         title: 'Invalid Public address (XPUB)',
         description: 'Check and correct the public address (XPUB).',
-        icon: 'warningTriangleLight',
+        isRetryEnabled: false,
     },
     invalidReceiveAddress: {
         title: 'Receive address invalid',
         description: 'Check and correct the receive address.',
-        icon: 'warningTriangleLight',
+        isRetryEnabled: false,
     },
     networkError: {
         title: 'Network error',
-        icon: 'noConnection',
         description:
             'We were unable to retrieve the data from the blockchain due to a network error.',
+        icon: 'wifiX',
+        isRetryEnabled: true,
     },
     unknownError: {
         title: 'Something went wrong',
-        icon: 'warningTriangleLight',
         description: 'We are unable to gather the data right now. Please try again.',
+        isRetryEnabled: true,
     },
 };
-
-const pictogramVariant: PictogramVariant = 'red';
 
 type NavigationProp = StackToStackCompositeNavigationProps<
     AccountsImportStackParamList,
@@ -51,16 +49,16 @@ type NavigationProp = StackToStackCompositeNavigationProps<
     RootStackParamList
 >;
 
-export const useShowImportError = (networkSymbol: NetworkSymbol, navigation: NavigationProp) => {
+export const useShowImportError = (symbol: NetworkSymbol, navigation: NavigationProp) => {
     const { showAlert } = useAlert();
 
     const showImportError = useCallback(
-        (message?: string, onRetry?: () => Promise<void>) => {
+        (message?: string, onRetry?: () => void) => {
             let alertError: AlertError = 'unknownError';
 
             if (message) {
                 const lowerCasedMessage = message.toLowerCase();
-                const { networkType } = networks[networkSymbol];
+                const networkType = getNetworkType(symbol);
 
                 if (lowerCasedMessage.includes('invalid address')) {
                     if (networkType === 'bitcoin' || networkType === 'cardano') {
@@ -74,21 +72,18 @@ export const useShowImportError = (networkSymbol: NetworkSymbol, navigation: Nav
             }
 
             const handleGoBack = () =>
-                navigation.navigate(RootStackRoutes.AccountsImport, {
-                    screen: AccountsImportStackRoutes.XpubScan,
-                    params: {
-                        networkSymbol,
-                    },
+                navigation.popTo(AccountsImportStackRoutes.XpubScan, {
+                    networkSymbol: symbol,
                 });
 
-            const { title, description, icon } = alertErrorMap[alertError];
+            const { title, description, icon, isRetryEnabled } = alertErrorMap[alertError];
 
-            if (onRetry) {
+            if (onRetry && isRetryEnabled) {
                 showAlert({
                     title,
                     description,
                     icon,
-                    pictogramVariant,
+                    pictogramVariant: 'critical',
                     primaryButtonTitle: 'Try Again',
                     onPressPrimaryButton: onRetry,
                     secondaryButtonTitle: 'Go back',
@@ -99,13 +94,14 @@ export const useShowImportError = (networkSymbol: NetworkSymbol, navigation: Nav
                     title,
                     description,
                     icon,
-                    pictogramVariant,
+                    pictogramVariant: 'critical',
                     primaryButtonTitle: 'Go back',
                     onPressPrimaryButton: handleGoBack,
+                    testID: `@alert-sheet/error/${alertError}`,
                 });
             }
         },
-        [networkSymbol, showAlert, navigation],
+        [symbol, showAlert, navigation],
     );
 
     return showImportError;

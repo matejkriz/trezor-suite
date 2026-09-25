@@ -1,55 +1,134 @@
-import { selectDevice } from '@suite-common/wallet-core';
+import { getFirmwareVersion } from '@trezor/device-utils';
+import { versionUtils } from '@trezor/utils';
 
-import { AnyStepId, AnyPath, Step } from 'src/types/onboarding';
-import { GetState } from 'src/types/suite';
-import { ID_AUTHENTICATE_DEVICE_STEP } from 'src/constants/onboarding/steps';
+import { ID_AUTHENTICATE_DEVICE_STEP, ID_SET_PIN_STEP } from 'src/constants/onboarding/steps';
+import { type AnyPath, type AnyStepId, type Step, type StepCategory } from 'src/types/onboarding';
+import { type TrezorDevice } from 'src/types/suite';
 
-export const isStepUsed = (step: Step, getState: GetState) => {
-    const state = getState();
-    const device = selectDevice(state);
+import { stepCategories } from '../../config/onboarding/steps';
 
-    const { path } = state.onboarding;
+export const parseStepId = (stepId: AnyStepId) => {
+    const activeStepCategory =
+        stepCategories.find(({ steps }) => steps.map(({ id }) => id).includes(stepId)) ?? null;
+
+    const activeStep = activeStepCategory?.steps.find(({ id }) => id === stepId) ?? null;
+
+    return {
+        activeStep,
+        activeStepCategory,
+    };
+};
+
+export type IsStepUsedProps = {
+    device: TrezorDevice | undefined;
+    onboardingPath: AnyPath[];
+    isDeviceAuthenticityCheckEnabled: boolean;
+    isUnlockedBootloaderAllowed: boolean;
+};
+
+export const isStepUsed = (step: Step, props: IsStepUsedProps): boolean => {
+    const {
+        device,
+        onboardingPath,
+        isDeviceAuthenticityCheckEnabled,
+        isUnlockedBootloaderAllowed,
+    } = props;
     const deviceModelInternal = device?.features?.internal_model;
+    const firmwareVersion = getFirmwareVersion(device);
 
     // The order of IF conditions matters!
     if (
         deviceModelInternal &&
         Array.isArray(step.supportedModels) &&
-        !step.supportedModels.includes(deviceModelInternal)
+        !(
+            step.supportedModels.includes(deviceModelInternal) ||
+            step.supportedModels.some(
+                it =>
+                    typeof it === 'object' &&
+                    it.model === deviceModelInternal &&
+                    firmwareVersion !== '' &&
+                    versionUtils.isNewerOrEqual(firmwareVersion, it.minFwVersion),
+            )
+        )
     ) {
         return false;
     }
+
+    if (
+        device?.firmwareType &&
+        Array.isArray(step.supportedFirmwareTypes) &&
+        !step.supportedFirmwareTypes.includes(device.firmwareType)
+    ) {
+        return false;
+    }
+
     if (step.id === ID_AUTHENTICATE_DEVICE_STEP) {
-        const {
-            isDeviceAuthenticityCheckDisabled,
-            debug: { isUnlockedBootloaderAllowed },
-        } = state.suite.settings;
         const isBootloaderUnlocked = device?.features?.bootloader_locked === false;
 
         return (
-            !isDeviceAuthenticityCheckDisabled &&
+            isDeviceAuthenticityCheckEnabled &&
             (!isUnlockedBootloaderAllowed || !isBootloaderUnlocked)
         );
     }
+
     if (!step.path) {
         return true;
     }
-    if (path.length === 0) {
+
+    if (onboardingPath.length === 0) {
         return true;
     }
 
-    return path.every((pathMember: AnyPath) =>
-        step.path?.some((stepPathMember: AnyPath) => stepPathMember === pathMember),
-    );
+    return onboardingPath.every((pathMember: AnyPath) => step.path?.includes(pathMember));
 };
 
-export const findNextStep = (currentStepId: AnyStepId, steps: Step[]) => {
-    const currentIndex = steps.findIndex((step: Step) => step.id === currentStepId);
-    if (!steps[currentIndex + 1]) {
-        throw new Error('no next step exists');
+export const isStepCategoryUsed = (stepCategory: StepCategory, props: IsStepUsedProps): boolean =>
+    stepCategory.steps.some(step => isStepUsed(step, props));
+
+// Validates if Id of the next step is available, or returns the earliest next available step
+export const resolveNextAvailableStep = (
+    requestedStepId: AnyStepId | null,
+    steps: Step[],
+    device: TrezorDevice | null,
+): Step | null => {
+    const currentIndex = steps.findIndex((step: Step) => step.id === requestedStepId);
+
+    // NOTE: the next step may not be in available steps at all
+    // in that case, we would go to the first step which is incorrect, the onboarding is complete
+    if (currentIndex === -1) {
+        return null;
     }
 
-    return steps[currentIndex + 1];
+    const nextStep = steps[currentIndex] ?? null;
+    if (!nextStep) {
+        return null;
+    }
+
+    if (nextStep.id === ID_SET_PIN_STEP && device) {
+        // Skip PIN setup step only if device has PIN protection explicitly enabled
+        if (device?.features?.pin_protection === true) {
+            return resolveNextAvailableStep(steps[currentIndex + 1]?.id ?? null, steps, device);
+        }
+    }
+
+    return nextStep;
+};
+
+// Calculates the next step given the current step Id
+export const findNextStep = (
+    currentStepId: AnyStepId,
+    steps: Step[],
+    device: TrezorDevice | null,
+) => {
+    const currentIndex = steps.findIndex((step: Step) => step.id === currentStepId);
+
+    if (currentIndex === -1) {
+        return null;
+    }
+
+    const nextStepOfCurrentIndex = steps[currentIndex + 1]?.id ?? null;
+
+    return resolveNextAvailableStep(nextStepOfCurrentIndex, steps, device);
 };
 
 export const findPrevStep = (currentStepId: AnyStepId, steps: Step[]) => {

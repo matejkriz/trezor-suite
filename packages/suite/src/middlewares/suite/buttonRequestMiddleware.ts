@@ -1,112 +1,118 @@
-import { MiddlewareAPI } from 'redux';
+import { type Dispatch, type UnknownAction } from '@reduxjs/toolkit';
+import { type MiddlewareAPI } from 'redux';
 
-import { selectDevice, deviceActions } from '@suite-common/wallet-core';
-import TrezorConnect, { UI } from '@trezor/connect';
+import { PAYMENT_REQUEST_BUTTON_NAMES, selectAccountByKey } from '@suite-common/wallet-core';
+import { UI_EVENTS, isUiEventOfType } from '@trezor/connect';
 
-import { SUITE } from 'src/actions/suite/constants';
-import { AppState, Action, Dispatch } from 'src/types/suite';
-import { ONBOARDING } from 'src/actions/onboarding/constants';
-import { checkDeviceAuthenticityThunk } from '@suite-common/device-authenticity';
+import { type AppState } from 'src/types/suite';
+
+const SIGN_TX_NETWORK_TYPES = ['cardano', 'ethereum', 'stellar', 'tron'] as const;
+
+const SIGN_TX_ROUTES = [
+    'wallet-send',
+    'wallet-staking',
+    'wallet-index',
+    'wallet-trading-exchange-confirm',
+    'wallet-trading-sell-confirm',
+    'earn-yield-deposit',
+    'earn-yield-withdraw',
+    'earn-yield-claim',
+    // The clear-signed wrap/unwrap review needs these too: firmware announces its provider and
+    // intent screens with ButtonRequest_Other (confirm_action's default), which without remapping
+    // would replace the review with ConfirmActionModal midway and reset its step tracking.
+    'earn-yield-wrap',
+    'earn-yield-unwrap',
+    'earn-tron-stake',
+    'earn-tron-vote',
+    'earn-tron-unstake',
+    'earn-tron-withdraw',
+    'earn-tron-claim',
+] as const;
+
+const SIGN_TX_CONNECT_METHODS = [
+    'cardanoSignTransaction',
+    'ethereumSignTransaction',
+    'stellarSignTransaction',
+] as const;
+
+const getAccountForButtonRequest = (state: AppState) => {
+    const { account } = state.wallet.selectedAccount;
+    if (account) return account;
+
+    const yieldAccountKey = state.wallet.stablecoinYield.txReview.accountKey;
+    if (yieldAccountKey) return selectAccountByKey(state, yieldAccountKey);
+
+    const tronStakeAccountKey = state.wallet.tronStake.txReview.accountKey;
+    if (tronStakeAccountKey) return selectAccountByKey(state, tronStakeAccountKey);
+
+    const sendAccountKey = state.wallet.send.accountKey;
+    if (sendAccountKey) return selectAccountByKey(state, sendAccountKey);
+
+    return undefined;
+};
+
+const shouldRemapToSignTx = (
+    code: string | undefined,
+    name: string | undefined,
+    state: AppState,
+): boolean => {
+    if (
+        name === 'confirm_ethereum_approve' &&
+        (code === 'ButtonRequest_Other' || code === 'ButtonRequest_Warning')
+    ) {
+        return true;
+    }
+
+    if (code !== 'ButtonRequest_Other') return false;
+
+    // SLIP-24 payment request review screens. Without remapping they route to ConfirmActionModal
+    // instead of the transaction review modal. Detected by name so it works on bitcoin-like networks
+    // (absent from SIGN_TX_NETWORK_TYPES) without affecting regular sends.
+    if (name !== undefined && PAYMENT_REQUEST_BUTTON_NAMES.includes(name)) {
+        return true;
+    }
+
+    const account = getAccountForButtonRequest(state);
+    const { activeCall } = state.connectPopup;
+
+    const isInSuite =
+        SIGN_TX_NETWORK_TYPES.some(type => type === account?.networkType) &&
+        SIGN_TX_ROUTES.some(route => route === state.router.route?.name);
+
+    const isInConnectCall =
+        activeCall?.state === 'ongoing' &&
+        SIGN_TX_CONNECT_METHODS.some(method => method === activeCall.method);
+
+    return isInSuite || isInConnectCall;
+};
 
 const buttonRequest =
-    (api: MiddlewareAPI<Dispatch, AppState>) =>
-    (next: Dispatch) =>
-    (action: Action): Action => {
-        // not sure if it's belongs here or to suiteMiddleware. however,
-        // in case when "passphrase on device" was chosen in <PassphraseModal /> do not display this modal ever again.
-        // catch passphrase request and respond immediately with `passphraseOnDevice: true` without action propagation
-        if (action.type === UI.REQUEST_PASSPHRASE) {
-            const device = selectDevice(api.getState());
-            if (
-                device &&
-                device.features &&
-                device.passphraseOnDevice &&
-                device.features.capabilities?.includes('Capability_PassphraseEntry')
-            ) {
-                TrezorConnect.uiResponse({
-                    type: UI.RECEIVE_PASSPHRASE,
-                    payload: {
-                        value: '',
-                        save: true,
-                        passphraseOnDevice: true,
-                    },
+    (api: MiddlewareAPI<Dispatch<UnknownAction>, AppState>) =>
+    (next: Dispatch<UnknownAction>) =>
+    (action: UnknownAction): UnknownAction => {
+        // firmware bug https://github.com/trezor/trezor-firmware/issues/35
+        // ugly hack to make Cardano review modal work
+        // ugly hack to make Ethereum staking and bump fee review modal on specific devices work
+        // root cause of this bug is wrong button request ButtonRequest_Other from CardanoSignTx - should be ButtonRequest_SignTx
+        if (isUiEventOfType(action, UI_EVENTS.BUTTON_REQUEST)) {
+            if (shouldRemapToSignTx(action.payload.code, action.payload.name, api.getState())) {
+                api.dispatch({
+                    ...action,
+                    payload: { ...action.payload, code: 'ButtonRequest_SignTx' },
                 });
 
                 return action;
             }
-        }
 
-        // firmware bug https://github.com/trezor/trezor-firmware/issues/35
-        // ugly hack to make Cardano review modal work
-        // root cause of this bug is wrong button request ButtonRequest_Other from CardanoSignTx - should be ButtonRequest_SignTx
-        if (action.type === UI.REQUEST_BUTTON && action.payload.code === 'ButtonRequest_Other') {
-            const {
-                wallet: {
-                    selectedAccount: { account },
-                },
-                router: { route },
-            } = api.getState();
-            if (account?.networkType === 'cardano' || account?.networkType === 'ethereum') {
-                if (route?.name === 'wallet-send' || route?.name === 'wallet-staking') {
-                    api.dispatch({
-                        ...action,
-                        payload: { ...action.payload, code: 'ButtonRequest_SignTx' },
-                    });
-
+            if (action.payload.code === 'ButtonRequest_Address') {
+                const { activeCall } = api.getState().connectPopup;
+                // Skip if address confirmation modal open
+                if (activeCall?.state === 'address-confirmation') {
                     return action;
                 }
             }
         }
 
-        // pass action
-        next(action);
-
-        switch (action.type) {
-            // old device might not be sending (action.payload.type) matrix thingy. In that case, we use only 'ui-request_pin' I am not sure
-            // anyway, remove this entire roundtrip through buttonRequests and save pin related data directly in modalReducer
-            case UI.REQUEST_PIN:
-            case UI.INVALID_PIN:
-                api.dispatch(
-                    deviceActions.addButtonRequest({
-                        device: selectDevice(api.getState()),
-                        buttonRequest: {
-                            code: action.payload.type ? action.payload.type : action.type,
-                        },
-                    }),
-                );
-                break;
-            case UI.REQUEST_BUTTON: {
-                const { device: _, ...request } = action.payload;
-                api.dispatch(
-                    deviceActions.addButtonRequest({
-                        device: selectDevice(api.getState()),
-                        buttonRequest: request,
-                    }),
-                );
-                break;
-            }
-            case SUITE.LOCK_DEVICE:
-                if (!action.payload) {
-                    api.dispatch(
-                        deviceActions.removeButtonRequests({
-                            device: selectDevice(api.getState()),
-                        }),
-                    );
-                }
-                break;
-            case ONBOARDING.SET_STEP_ACTIVE:
-            case checkDeviceAuthenticityThunk.fulfilled.type:
-                // clear all device's button requests in each step of the onboarding and after device authenticity check
-                api.dispatch(
-                    deviceActions.removeButtonRequests({
-                        device: selectDevice(api.getState()),
-                    }),
-                );
-                break;
-            default:
-            // no default
-        }
-
-        return action;
+        return next(action);
     };
 export default buttonRequest;

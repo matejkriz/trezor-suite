@@ -1,106 +1,85 @@
-import { useMemo } from 'react';
-
-import styled from 'styled-components';
 import { motion } from 'framer-motion';
 
-import { getStatus, deviceNeedsAttention } from '@suite-common/suite-utils';
-import { motionEasing } from '@trezor/components';
-import { selectDevicesCount, selectDevice } from '@suite-common/wallet-core';
+import { Translation } from '@suite/intl';
+import { selectSelectedDevice } from '@suite-common/device';
+import {
+    deviceNeedsAttention,
+    getStatus,
+    shouldDisplayInitialWarningIcon,
+} from '@suite-common/suite-utils';
+import { Column, Illustration, Paragraph, Text, motionEasing } from '@trezor/components';
 
-import { ConnectDevicePrompt } from 'src/components/suite';
-import { isWebUsb } from 'src/utils/suite/transport';
+import { getMessageId } from 'src/components/suite/getMessageId';
 import { useSelector } from 'src/hooks/suite';
+import { selectPrerequisite } from 'src/selectors/suite/suiteSelectors';
 
-import { Transport } from './Transport';
-import { DeviceConnect } from './DeviceConnect';
-import { DeviceAcquire } from './DeviceAcquire';
-import { DeviceUnreadable } from './DeviceUnreadable';
-import { DeviceUnknown } from './DeviceUnknown';
-import { DeviceSeedless } from './DeviceSeedless';
-import { DeviceRecoveryMode } from './DeviceRecoveryMode';
-import { DeviceInitialize } from './DeviceInitialize';
-import { DeviceBootloader } from './DeviceBootloader';
-import { DeviceNoFirmware } from './DeviceNoFirmware';
-import { DeviceUpdateRequired } from './DeviceUpdateRequired';
-import { DeviceDisconnectRequired } from './DeviceDisconnectRequired';
-import { selectPrerequisite } from 'src/reducers/suite/suiteReducer';
+import { BannerAndTroubleshooting } from './BannerAndTroubleshooting';
 
-const Wrapper = styled.div`
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-`;
+type PrerequisitesGuideProps = {
+    showDeviceImage?: boolean;
+};
 
-const TipsContainer = styled(motion.div)`
-    display: flex;
-`;
+const TopAnimation = ({ children }: { children: React.ReactNode }) => (
+    <motion.div
+        initial={{ opacity: 0, y: -50 }}
+        animate={{ opacity: 1, y: -0 }}
+        transition={{ delay: 0.2, duration: 0.4, ease: motionEasing.enter }}
+        data-testid="@connect-device-prompt"
+    >
+        {children}
+    </motion.div>
+);
 
-interface PrerequisitesGuideProps {
-    allowSwitchDevice?: boolean;
-}
+const BottomAnimation = ({ children }: { children: React.ReactNode }) => (
+    <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.6, duration: 0.5, ease: motionEasing.enter }}
+    >
+        {children}
+    </motion.div>
+);
 
-export const PrerequisitesGuide = ({ allowSwitchDevice }: PrerequisitesGuideProps) => {
-    const device = useSelector(selectDevice);
-    const devices = useSelector(selectDevicesCount);
-    const transport = useSelector(state => state.suite.transport);
+export const PrerequisitesGuide = ({ showDeviceImage = true }: PrerequisitesGuideProps) => {
+    const device = useSelector(selectSelectedDevice);
+    const deviceStatus = device ? getStatus(device) : null;
     const prerequisite = useSelector(selectPrerequisite);
 
-    const isWebUsbTransport = isWebUsb(transport);
+    const showWarning =
+        !!(device && deviceStatus && deviceNeedsAttention(deviceStatus)) ||
+        prerequisite === 'no-transport';
+    const showWarningIcon = shouldDisplayInitialWarningIcon(deviceStatus);
 
-    const TipComponent = useMemo(
-        () => () => {
-            switch (prerequisite) {
-                case 'transport-bridge':
-                    return <Transport />;
-                case 'device-disconnect-required':
-                    return <DeviceDisconnectRequired />;
-                case 'device-disconnected':
-                    return <DeviceConnect isWebUsbTransport={isWebUsbTransport} />;
-                case 'device-unacquired':
-                    return <DeviceAcquire />;
-                case 'device-unreadable':
-                    return (
-                        <DeviceUnreadable device={device} isWebUsbTransport={isWebUsbTransport} />
-                    );
-                case 'device-unknown':
-                    return <DeviceUnknown />;
-                case 'device-seedless':
-                    return <DeviceSeedless />;
-                case 'device-recovery-mode':
-                    return <DeviceRecoveryMode />;
-                case 'device-initialize':
-                    return <DeviceInitialize />;
-                case 'device-bootloader':
-                    return <DeviceBootloader device={device} />;
-                case 'firmware-missing':
-                    return <DeviceNoFirmware />;
-                case 'firmware-required':
-                    return <DeviceUpdateRequired />;
-
-                default:
-                    return null;
-            }
-        },
-        [prerequisite, isWebUsbTransport, device],
-    );
+    const texts = getMessageId({
+        connected: !!device,
+        showWarning: showWarningIcon ?? showWarning,
+        deviceStatus,
+        prerequisite,
+    });
 
     return (
-        <Wrapper>
-            <ConnectDevicePrompt
-                connected={!!device}
-                showWarning={!!(device && deviceNeedsAttention(getStatus(device)))}
-                allowSwitchDevice={allowSwitchDevice && devices > 1}
-                prerequisite={prerequisite}
-            />
-
-            <TipsContainer
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.6, duration: 0.5, ease: motionEasing.enter }}
-            >
-                <TipComponent />
-            </TipsContainer>
-        </Wrapper>
+        <>
+            <TopAnimation>
+                <Column alignItems="center">
+                    {showDeviceImage && <Illustration name="connectTrezor" width={350} />}
+                    <Text typographyStyle="headline-md" textWrap="balance" align="center">
+                        <Translation id={texts.heading} />
+                    </Text>
+                    {texts.description && (
+                        <Paragraph
+                            intent="neutral"
+                            priority="secondary"
+                            align="center"
+                            margin={{ top: 12 }}
+                        >
+                            <Translation id={texts.description} />
+                        </Paragraph>
+                    )}
+                </Column>
+            </TopAnimation>
+            <BottomAnimation>
+                <BannerAndTroubleshooting prerequisite={prerequisite} />
+            </BottomAnimation>
+        </>
     );
 };

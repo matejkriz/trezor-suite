@@ -1,204 +1,155 @@
-import { useState, Ref, ReactNode, ReactElement, InputHTMLAttributes } from 'react';
-import styled, { useTheme } from 'styled-components';
-import { useMeasure } from 'react-use';
-import { spacingsPx, spacings, typography } from '@trezor/theme';
+import { type InputHTMLAttributes, type ReactElement, type Ref } from 'react';
 
-import { Icon } from '../../assets/Icon/Icon';
+import styled from 'styled-components';
+
+import { XIcon } from '@trezor/icons';
+
+import { type FrameProps } from '../../../utils/frameProps';
+import { Box } from '../../Box/Box';
+import { Row } from '../../Flex/Flex';
+import { Icon } from '../../Icon/Icon';
+import { FloatingLabel } from '../FloatingLabel';
 import {
-    baseInputStyle,
-    INPUT_HEIGHTS,
-    BaseInputProps,
-    Label,
-    LABEL_TRANSFORM,
-} from '../InputStyles';
-import { BOTTOM_TEXT_MIN_HEIGHT, BottomText } from '../BottomText';
-import { InputState, InputSize } from '../inputTypes';
-import { TopAddons } from '../TopAddons';
-import { useElevation } from '../../ElevationContext/ElevationContext';
-import { UIHorizontalAlignment } from '../../../config/types';
+    FormCell,
+    type FormCellProps,
+    allowedFormCellFrameProps,
+    pickFormCellProps,
+} from '../FormCell/FormCell';
+import { InputWrapper } from '../InputWrapper';
+import { type InputSize } from '../types';
+import { INPUT_PADDING, commonInputStyles, mapSizeToHeight, mapSizeToPaddingTop } from '../utils';
 
-const Wrapper = styled.div<{ $width?: number; $hasBottomPadding: boolean }>`
-    display: inline-flex;
-    flex-direction: column;
-    width: ${({ $width }) => ($width ? `${$width}px` : '100%')};
-    padding-bottom: ${({ $hasBottomPadding }) =>
-        $hasBottomPadding ? `${BOTTOM_TEXT_MIN_HEIGHT}px` : '0'};
-`;
+export const allowedInputFrameProps = allowedFormCellFrameProps;
+type AllowedFrameProps = Pick<FrameProps, (typeof allowedInputFrameProps)[number]>;
 
-interface StyledInputProps extends BaseInputProps {
+const StyledInput = styled.input<{
+    $hasLabel?: boolean;
+    $isMasked?: boolean;
+    $isClean?: boolean;
     $size: InputSize;
-    $leftAddonWidth?: number;
-    $rightAddonWidth?: number;
-}
+}>`
+    ${commonInputStyles}
 
-const getExtraAddonPadding = (size: InputSize) =>
-    (size === 'small' ? spacings.sm : spacings.md) + spacings.xs;
+    padding: 0 ${({ $isClean }) => ($isClean ? 0 : INPUT_PADDING)}px;
+    padding-top: ${({ $hasLabel, $size }) => ($hasLabel ? mapSizeToPaddingTop($size) : 0)}px;
 
-const StyledInput = styled.input<StyledInputProps & { $isWithLabel: boolean }>`
-    padding: 0 ${spacingsPx.md};
-    padding-left: ${({ $leftAddonWidth, $size }) =>
-        $leftAddonWidth ? `${$leftAddonWidth + getExtraAddonPadding($size)}px` : undefined};
-    padding-right: ${({ $rightAddonWidth, $size }) =>
-        $rightAddonWidth ? `${$rightAddonWidth + getExtraAddonPadding($size)}px` : undefined};
-    height: ${({ $size }) => `${INPUT_HEIGHTS[$size as InputSize]}px`};
-    ${baseInputStyle}
-    ${({ $size }) => $size === 'small' && typography.hint};
+    ${({ $isMasked }) => $isMasked && `-webkit-text-security: disc;`}
 `;
 
-const InputWrapper = styled.div`
-    display: flex;
-    position: relative;
-    width: 100%;
-`;
+type InputHTMLProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'size'>;
 
-const getInputAddonPadding = (size: InputSize) =>
-    size === 'small' ? spacingsPx.sm : spacingsPx.md;
+export type InputProps = InputHTMLProps &
+    AllowedFrameProps &
+    Omit<FormCellProps, 'children'> & {
+        value?: string;
+        innerRef?: Ref<HTMLInputElement>;
+        label?: ReactElement | string;
+        leftContent?: ReactElement;
+        rightContent?: ReactElement;
+        size?: InputSize;
+        'data-testid'?: string;
+        showClearButton?: boolean;
+        onClear?: () => void;
+        isMasked?: boolean;
+        isClean?: boolean;
+    };
 
-const InputAddon = styled.div<{ $align: innerAddonAlignment; $size: InputSize }>`
-    position: absolute;
-    inset: 0 ${({ $align, $size }) => ($align === 'right' ? getInputAddonPadding($size) : 'auto')} 0
-        ${({ $align, $size }) => ($align === 'left' ? getInputAddonPadding($size) : 'auto')};
-    display: flex;
-    align-items: center;
-`;
-
-const InputLabel = styled(Label)`
-    /* move up when input is focused OR has a placeholder OR has value  */
-    input:focus ~ &,
-    input:not(:placeholder-shown) ~ &,
-    input:not([value='']) ~ & {
-        transform: ${LABEL_TRANSFORM};
-    }
-`;
-
-type innerAddonAlignment = Extract<UIHorizontalAlignment, 'left' | 'right'>;
-
-export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
-    value?: string;
-    innerRef?: Ref<HTMLInputElement>;
-    label?: ReactElement | string;
-    labelHoverAddon?: ReactElement;
-    labelRight?: ReactElement;
-    innerAddon?: ReactElement;
-    /**
-     * @description pass `null` if bottom text can be `undefined`
-     */
-    bottomText?: ReactNode;
-    isDisabled?: boolean;
-    size?: InputSize;
-    className?: string;
-    dataTest?: string;
-    inputState?: InputState; // TODO: do we need this? we only have the error state right now
-    innerAddonAlign?: innerAddonAlignment;
-    hasBottomPadding?: boolean;
-    /**
-     * @description the clear button replaces the addon on the right side
-     */
-    showClearButton?: 'hover' | 'always';
-    onClear?: () => void;
-}
-
-const Input = ({
+export const Input = ({
     value,
     innerRef,
-    inputState,
     label,
-    labelHoverAddon,
-    labelRight,
-    innerAddon,
-    innerAddonAlign = 'right',
-    bottomText,
+    leftContent,
+    rightContent,
     size = 'large',
-    isDisabled,
-    dataTest,
+    'data-testid': dataTest,
     showClearButton,
     placeholder,
     onClear,
-    hasBottomPadding = true,
-    className,
+    isMasked,
+    isClean,
     ...rest
 }: InputProps) => {
-    const [isHovered, setIsHovered] = useState(false);
+    const formCellProps = pickFormCellProps(rest);
+    const { isDisabled, hasError } = formCellProps;
 
-    const theme = useTheme();
-    const { elevation } = useElevation();
+    const inputProps = Object.entries(rest).reduce((props, [propKey, propValue]) => {
+        if (!(propKey in formCellProps)) {
+            props[propKey as keyof InputHTMLProps] = propValue;
+        }
 
-    const hasShowClearButton =
-        (showClearButton === 'always' || (showClearButton === 'hover' && isHovered)) &&
-        value &&
-        value?.length > 0;
+        return props;
+    }, {} as InputHTMLProps);
 
-    const [measureLeftAddon, { width: leftAddonWidth }] = useMeasure<HTMLDivElement>();
-    const [measureRightAddon, { width: rightAddonWidth }] = useMeasure<HTMLDivElement>();
+    const hasShowClearButton = showClearButton && !!value && value.length > 0;
 
     return (
-        <Wrapper
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
-            $hasBottomPadding={hasBottomPadding === true && bottomText === null}
-            className={className}
-        >
-            <TopAddons isHovered={isHovered} hoverAddon={labelHoverAddon} addonRight={labelRight} />
+        <FormCell {...formCellProps} data-component="Input" data-testid={dataTest}>
+            <InputWrapper
+                hasError={hasError}
+                isDisabled={isDisabled ?? false}
+                size={size}
+                isClean={isClean}
+            >
+                <Row height={isClean ? undefined : mapSizeToHeight(size)}>
+                    {leftContent && (
+                        <Row
+                            flex="0 0 auto"
+                            padding={isClean ? undefined : { left: INPUT_PADDING }}
+                            data-testid={`${dataTest}/input-addon`}
+                        >
+                            {leftContent}
+                        </Row>
+                    )}
 
-            <InputWrapper>
-                {innerAddon && innerAddonAlign === 'left' && (
-                    <InputAddon $align="left" ref={measureLeftAddon} $size={size}>
-                        {innerAddon}
-                    </InputAddon>
-                )}
-
-                {((innerAddon && innerAddonAlign === 'right') || hasShowClearButton) && (
-                    <InputAddon $align="right" ref={measureRightAddon} $size={size}>
-                        {!hasShowClearButton && innerAddon}
-
-                        {hasShowClearButton && (
-                            <Icon
-                                icon="CANCEL"
-                                size={16}
-                                onClick={onClear}
-                                color={theme.TYPE_DARK_GREY}
-                                useCursorPointer
-                            />
+                    <Box flex="1" height="100%" position={{ type: 'relative' }}>
+                        <StyledInput
+                            value={value}
+                            autoComplete="off"
+                            autoCorrect="off"
+                            autoCapitalize="off"
+                            spellCheck={false}
+                            disabled={isDisabled ?? false}
+                            $hasLabel={!!label && !isClean}
+                            ref={innerRef}
+                            data-lpignore="true"
+                            $isMasked={isMasked}
+                            $isClean={isClean}
+                            $size={size}
+                            placeholder={label && !isClean ? placeholder || ' ' : placeholder}
+                            data-testid={dataTest}
+                            {...inputProps}
+                        />
+                        {label && !isClean && (
+                            <FloatingLabel
+                                $isDisabled={isDisabled}
+                                $isActive={!!value || !!placeholder}
+                            >
+                                {label}
+                            </FloatingLabel>
                         )}
-                    </InputAddon>
-                )}
+                    </Box>
 
-                <StyledInput
-                    $elevation={elevation}
-                    value={value}
-                    autoComplete="off"
-                    autoCorrect="off"
-                    autoCapitalize="off"
-                    spellCheck={false}
-                    $inputState={inputState}
-                    disabled={isDisabled}
-                    $size={size}
-                    ref={innerRef}
-                    data-lpignore="true"
-                    $leftAddonWidth={leftAddonWidth}
-                    $rightAddonWidth={rightAddonWidth}
-                    $isWithLabel={!!label}
-                    placeholder={placeholder || ''} // needed for uncontrolled inputs
-                    data-test={dataTest}
-                    {...rest}
-                />
-
-                {label && (
-                    <InputLabel $size={size} $isDisabled={isDisabled}>
-                        {label}
-                    </InputLabel>
-                )}
+                    {(rightContent || hasShowClearButton) && (
+                        <Row
+                            flex="0 0 auto"
+                            padding={isClean ? undefined : { right: INPUT_PADDING }}
+                            data-testid={`${dataTest}/input-addon`}
+                            gap={12}
+                        >
+                            {rightContent}
+                            {hasShowClearButton && (
+                                <Icon
+                                    as={XIcon}
+                                    size={16}
+                                    intent="neutral"
+                                    onClick={onClear}
+                                    cursor="pointer"
+                                />
+                            )}
+                        </Row>
+                    )}
+                </Row>
             </InputWrapper>
-
-            {bottomText && (
-                <BottomText inputState={inputState} isDisabled={isDisabled}>
-                    {bottomText}
-                </BottomText>
-            )}
-        </Wrapper>
+        </FormCell>
     );
 };
-
-Input.InputAddon = InputAddon;
-
-export { Input };

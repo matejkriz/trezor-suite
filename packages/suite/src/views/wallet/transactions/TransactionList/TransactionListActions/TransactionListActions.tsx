@@ -1,15 +1,30 @@
-import styled from 'styled-components';
+import { type Dispatch, type SetStateAction, useCallback, useEffect, useState } from 'react';
 
-import { SearchAction, SearchProps } from './SearchAction';
-import { ExportAction, ExportActionProps } from './ExportAction';
+import { useTranslation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { notificationsActions } from '@suite-common/toast-notifications';
+import { hasNetworkPotentialFraudTransactions } from '@suite-common/token-definitions';
+import { fetchAllTransactionsForAccountThunk } from '@suite-common/wallet-core';
+import { type Account } from '@suite-common/wallet-types';
+import { Icon, Input } from '@trezor/components';
+import { Row } from '@trezor/components/src/components/Flex/Flex';
+import { MagnifyingGlassIcon } from '@trezor/icons';
 
-const Wrapper = styled.div`
-    display: flex;
-    align-items: center;
-`;
+import { setTransactionHistoryPrefill } from 'src/actions/suite/suiteActions';
+import { useSelector } from 'src/hooks/suite';
+import { selectTransactionHistoryPrefill } from 'src/selectors/suite/suiteSelectors';
 
-interface TransactionListActionsProps extends SearchProps, ExportActionProps {
+import { ExportAction } from './ExportAction';
+import { FilterAction } from './FilterAction';
+
+interface TransactionListActionsProps {
+    account: Account;
+    searchQuery: string;
+    setSearch: Dispatch<SetStateAction<string>>;
+    setSelectedPage: Dispatch<SetStateAction<number>>;
     isExportable?: boolean;
+    isTxFilteringEnabled?: boolean;
 }
 
 export const TransactionListActions = ({
@@ -17,22 +32,79 @@ export const TransactionListActions = ({
     searchQuery,
     setSearch,
     setSelectedPage,
-    accountMetadata,
     isExportable = true,
-}: TransactionListActionsProps) => (
-    <Wrapper>
-        <SearchAction
-            account={account}
-            searchQuery={searchQuery}
-            setSearch={setSearch}
-            setSelectedPage={setSelectedPage}
-        />
-        {isExportable && (
-            <ExportAction
-                account={account}
-                searchQuery={searchQuery}
-                accountMetadata={accountMetadata}
+    isTxFilteringEnabled = true,
+}: TransactionListActionsProps) => {
+    const [hasFetchedAll, setHasFetchedAll] = useState(false);
+
+    const transactionHistoryPrefill = useSelector(selectTransactionHistoryPrefill);
+
+    const { dispatch } = useServices(injectDispatch);
+    const { translationString } = useTranslation();
+
+    const onSearch = useCallback(
+        async (query: string) => {
+            setSelectedPage(1);
+            setSearch(query);
+
+            if (!hasFetchedAll) {
+                setHasFetchedAll(true);
+
+                try {
+                    await dispatch(
+                        fetchAllTransactionsForAccountThunk({
+                            accountKey: account.key,
+                            noLoading: true,
+                        }),
+                    );
+                } catch {
+                    dispatch(
+                        notificationsActions.addToast({
+                            type: 'error',
+                            error: translationString('TR_SEARCH_FAIL'),
+                        }),
+                    );
+                }
+            }
+        },
+        [account, dispatch, hasFetchedAll, setSearch, setSelectedPage, translationString],
+    );
+
+    useEffect(() => {
+        setHasFetchedAll(false);
+        setSearch('');
+    }, [account.symbol, account.index, account.accountType, setSearch]);
+
+    useEffect(() => {
+        if (transactionHistoryPrefill) {
+            onSearch(transactionHistoryPrefill);
+            setSearch(transactionHistoryPrefill);
+            dispatch(setTransactionHistoryPrefill(''));
+        }
+    }, [transactionHistoryPrefill, setSearch, onSearch, account, dispatch]);
+
+    return (
+        <Row gap={12}>
+            <Input
+                data-testid="@wallet/accounts/search-icon"
+                placeholder={translationString('TR_SEARCH_TRANSACTIONS')}
+                value={searchQuery}
+                onChange={event => onSearch(event.target.value)}
+                onClear={() => setSearch('')}
+                size="small"
+                leftContent={
+                    <Icon
+                        as={MagnifyingGlassIcon}
+                        intent="neutral"
+                        priority="secondary"
+                        size={16}
+                    />
+                }
             />
-        )}
-    </Wrapper>
-);
+            {isTxFilteringEnabled && hasNetworkPotentialFraudTransactions(account.symbol) && (
+                <FilterAction symbol={account.symbol} />
+            )}
+            {isExportable && <ExportAction account={account} searchQuery={searchQuery} />}
+        </Row>
+    );
+};

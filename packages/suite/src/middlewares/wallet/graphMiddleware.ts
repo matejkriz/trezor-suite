@@ -1,20 +1,16 @@
-import { MiddlewareAPI } from 'redux';
+import { type UnknownAction } from '@reduxjs/toolkit';
+import { type MiddlewareAPI, type Dispatch as ReduxDispatch } from 'redux';
 
-import {
-    discoveryActions,
-    accountsActions,
-    transactionsActions,
-    selectDeviceDiscovery,
-} from '@suite-common/wallet-core';
-import { DiscoveryStatus } from '@suite-common/wallet-constants';
+import { type Dispatch } from '@suite-common/redux-utils';
+import { accountsActions, discoveryActions } from '@suite-common/wallet-core';
 
 import * as graphActions from 'src/actions/wallet/graphActions';
-import { AppState, Action, Dispatch } from 'src/types/suite';
+import { type AppState } from 'src/types/suite';
 
 const graphMiddleware =
     (api: MiddlewareAPI<Dispatch, AppState>) =>
-    (next: Dispatch) =>
-    (action: Action): Action => {
+    (next: ReduxDispatch<UnknownAction>) =>
+    (action: UnknownAction): UnknownAction => {
         next(action);
         const currentAccounts = api.getState().wallet.accounts;
 
@@ -22,39 +18,22 @@ const graphMiddleware =
             // fetch graph data for selected account and range if needed
             if (action.payload.account) {
                 api.dispatch(
-                    graphActions.updateGraphData([action.payload.account], {
-                        newAccountsOnly: true,
+                    graphActions.updateGraphDataThunk({
+                        accounts: [action.payload.account],
                     }),
                 );
             }
         }
 
-        // don't run while fetching txs pages in transactions tab
-        if (transactionsActions.addTransaction.match(action) && !action.payload.page) {
-            const { account, transactions } = action.payload;
-
-            // don't run during discovery and on unconfirmed txs
-            const discovery = selectDeviceDiscovery(api.getState());
-            if (
-                discovery?.status === DiscoveryStatus.COMPLETED &&
-                transactions.some(t => (t.blockHeight ?? 0) > 0)
-            ) {
-                api.dispatch(
-                    graphActions.updateGraphData([account], {
-                        newAccountsOnly: false,
-                    }),
-                );
-            }
-        }
-
-        switch (action.type) {
-            case discoveryActions.completeDiscovery.type:
-                api.dispatch(
-                    graphActions.updateGraphData(currentAccounts, { newAccountsOnly: true }),
-                );
-                break;
-            default:
-                break;
+        if (
+            discoveryActions.updateDiscovery.match(action) &&
+            action.payload.status.status === 'complete'
+        ) {
+            api.dispatch(
+                graphActions.updateGraphDataThunk({
+                    accounts: currentAccounts,
+                }),
+            );
         }
 
         return action;

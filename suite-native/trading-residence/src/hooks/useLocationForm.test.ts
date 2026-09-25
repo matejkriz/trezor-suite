@@ -1,0 +1,112 @@
+import { type Store, combineReducers } from '@reduxjs/toolkit';
+import Localization, { type Locale } from 'expo-localization';
+
+import { initialWalletSettingsState } from '@suite-common/wallet-core';
+import { localeReducer } from '@suite-native/intl';
+import {
+    act,
+    createLightStore,
+    createStaticReducer,
+    renderHookWithStoreProvider,
+} from '@suite-native/test-utils-store';
+import { residenceActions, residenceReducer } from '@suite-native/trading-state';
+import { type TradingResidenceRootState } from '@suite-native/trading-types';
+
+import { useLocationForm } from './useLocationForm';
+
+type State = TradingResidenceRootState;
+
+describe('useLocationForm', () => {
+    let store: Store<State>;
+
+    const renderUseLocationForm = async () =>
+        await renderHookWithStoreProvider(() => useLocationForm(), { services: { store } });
+
+    beforeEach(() => {
+        store = createLightStore({
+            reducer: {
+                locale: localeReducer,
+                wallet: combineReducers({
+                    settings: createStaticReducer(initialWalletSettingsState),
+                    trading: combineReducers({
+                        residence: residenceReducer,
+                    }),
+                }),
+            },
+        });
+    });
+
+    it('should use default subdivision value from redux state', async () => {
+        await act(() => {
+            store.dispatch(
+                residenceActions.setResidenceCountry({
+                    country: 'US',
+                    countrySubdivision: 'CA',
+                }),
+            );
+        });
+
+        const { result } = await renderUseLocationForm();
+
+        expect(result.current.getValues('country')).toEqual(
+            expect.objectContaining({
+                value: 'US',
+            }),
+        );
+        expect(result.current.getValues('countrySubdivision')).toEqual({
+            value: 'CA',
+            label: 'California',
+            name: 'California',
+        });
+    });
+
+    it('should ignore persisted subdivision when it does not belong to country', async () => {
+        await act(() => {
+            store.dispatch(
+                residenceActions.setResidenceCountry({
+                    country: 'CZ',
+                    countrySubdivision: 'CA',
+                }),
+            );
+        });
+
+        const { result } = await renderUseLocationForm();
+
+        expect(result.current.getValues('countrySubdivision')).toBeUndefined();
+    });
+
+    it('should use value from expo-localization when country is not set in store', async () => {
+        const { result } = await renderUseLocationForm();
+
+        expect(result.current.getValues('country')).toEqual(
+            expect.objectContaining({
+                value: 'PL',
+            }),
+        );
+    });
+
+    it('should fallback to worldwide when country is not set in store and expo-localization country is not supported', async () => {
+        jest.spyOn(Localization, 'getLocales').mockReturnValue([
+            {
+                languageTag: 'es-CU',
+                languageCode: 'es',
+                textDirection: 'ltr',
+                digitGroupingSeparator: ' ',
+                decimalSeparator: ',',
+                measurementSystem: 'metric',
+                currencyCode: 'CUP',
+                currencySymbol: '$',
+                regionCode: 'CU',
+                temperatureUnit: 'celsius',
+            } as unknown as Locale,
+        ]);
+
+        const { result } = await renderUseLocationForm();
+
+        expect(result.current.getValues('country')).toEqual(
+            expect.objectContaining({
+                value: 'unknown',
+            }),
+        );
+    });
+});

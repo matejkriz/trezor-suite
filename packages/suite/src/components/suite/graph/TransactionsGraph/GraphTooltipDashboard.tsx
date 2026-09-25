@@ -1,10 +1,11 @@
-import { TooltipProps } from 'recharts';
+import { type TooltipProps } from 'recharts';
 
 import { useFormatters } from '@suite-common/formatters';
+import { BASE_CURRENCY_ZERO } from '@suite-common/wallet-utils';
 
-import { CommonAggregatedHistory, GraphRange } from 'src/types/wallet/graph';
+import type { FiatGraphProps } from 'src/components/suite/graph/types';
+import { type CommonAggregatedHistory, type GraphRange } from 'src/types/wallet/graph';
 
-import type { FiatGraphProps } from './TransactionsGraph';
 import { GraphTooltipBase } from './GraphTooltipBase';
 
 interface GraphTooltipDashboardProps extends TooltipProps<number, any> {
@@ -12,7 +13,6 @@ interface GraphTooltipDashboardProps extends TooltipProps<number, any> {
     localCurrency: string;
     sentValueFn: FiatGraphProps['sentValueFn'];
     receivedValueFn: FiatGraphProps['receivedValueFn'];
-    balanceValueFn?: FiatGraphProps['balanceValueFn'];
     onShow?: (index: number) => void;
     extendedDataForInterval?: CommonAggregatedHistory[];
 }
@@ -25,22 +25,34 @@ export const GraphTooltipDashboard = ({
     sentValueFn,
     ...props
 }: GraphTooltipDashboardProps) => {
-    const { FiatAmountFormatter } = useFormatters();
+    const { BaseCurrencyAmountFormatter } = useFormatters();
 
     // Note: payload is [] when discovery is paused.
     if (!active || !payload?.length) {
         return null;
     }
 
-    const receivedAmountString = receivedValueFn(payload[0].payload);
-    const sentAmountString = sentValueFn(payload[0].payload);
+    const firstPayload = payload[0]?.payload;
+
+    if (!firstPayload) {
+        return null;
+    }
+
+    const receivedAmountString = receivedValueFn(firstPayload);
+    const sentAmountString = sentValueFn(firstPayload);
 
     const receivedAmount = (
-        <FiatAmountFormatter currency={localCurrency} value={receivedAmountString ?? '0'} />
+        <BaseCurrencyAmountFormatter
+            currency={localCurrency}
+            value={receivedAmountString ?? BASE_CURRENCY_ZERO}
+        />
     );
 
     const sentAmount = (
-        <FiatAmountFormatter currency={localCurrency} value={sentAmountString ?? '0'} />
+        <BaseCurrencyAmountFormatter
+            currency={localCurrency}
+            value={sentAmountString ?? BASE_CURRENCY_ZERO}
+        />
     );
 
     return (

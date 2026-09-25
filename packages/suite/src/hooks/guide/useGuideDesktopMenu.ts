@@ -1,0 +1,42 @@
+import { useEffect } from 'react';
+
+import { injectDesktopApi } from '@suite/desktop-app-api';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+
+import { open, setView } from 'src/actions/suite/guideActions';
+
+// Opens the in-app guide on the right view when triggered from the desktop application
+// menu (Help → Support & feedback / Keyboard shortcuts).
+export const useGuideDesktopMenu = () => {
+    const { desktopApi, dispatch } = useServices(injectDispatch, injectDesktopApi);
+
+    useEffect(() => {
+        if (!desktopApi.available) return;
+
+        const openGuide = () => {
+            dispatch(setView('GUIDE_DEFAULT'));
+            dispatch(open());
+        };
+
+        const openSupportFeedback = () => {
+            dispatch(setView('SUPPORT_FEEDBACK_SELECTION'));
+            dispatch(open());
+        };
+
+        const openShortcuts = () => {
+            dispatch(setView('KEYBOARD_SHORTCUTS'));
+            dispatch(open());
+        };
+
+        desktopApi.on('guide/open', openGuide);
+        desktopApi.on('guide/open-support-feedback', openSupportFeedback);
+        desktopApi.on('guide/open-shortcuts', openShortcuts);
+
+        return () => {
+            desktopApi.removeAllListeners('guide/open');
+            desktopApi.removeAllListeners('guide/open-support-feedback');
+            desktopApi.removeAllListeners('guide/open-shortcuts');
+        };
+    }, [desktopApi, dispatch]);
+};

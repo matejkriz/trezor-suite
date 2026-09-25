@@ -4,16 +4,16 @@ The desktop application includes a logging library to display various types of l
 
 Four (or five if we count 'mute') log levels are currently implemented:
 
--   error (1)
--   warn (2)
--   info (3)
--   debug (4)
+- error (1)
+- warn (2)
+- info (3)
+- debug (4)
 
 All messages with an inferior level to the selected one will be displayed. For example, if the selected log level is _info_, then it will also display _warn_ and _error_ messages.
 
 ## How to enable logging
 
-Logging can be enabled by running Suite with the command line flag `--log-level=LEVEL` (replace _LEVEL_ with _error_, _warn_, _info_ or _debug_ based on the logging you wish to display). Additional command line flags can be found on the [Suite-Desktop page](../packages/suite-desktop.md).
+Logging can be enabled by running Suite with the command line flag `--log-level=LEVEL` (replace _LEVEL_ with _error_, _warn_, _info_ or _debug_ based on the logging you wish to display). Additional command line flags can be found on the [Suite-Desktop page](../suite/desktop-app/index.md).
 
 If you activate Debug menu, logging to file is automatically started. When you deactivate Debug menu, logging stopped if the app is not running with the command line flag. If you run the app with `--log-write` flag and then activate the Debug menu, logging just continue with the same file.
 
@@ -25,11 +25,11 @@ If you activate Debug menu, logging to file is automatically started. When you d
 
 Any of the following values:
 
--   mute (0)
--   error (1)
--   warn (2)
--   info (3)
--   debug (4)
+- mute (0)
+- error (1)
+- warn (2)
+- info (3)
+- debug (4)
 
 #### Options (all optional)
 
@@ -66,8 +66,8 @@ The options `outputFile` and `logFormat` can be used with some expressions, pref
 
 The constructor has the following parameters:
 
--   level (LogLevel): Selected log level (see LogLevels in **Exported Types** above)
--   options (Options): Optional parameter containing settings for the logger (see Options in **Exported Types** above)
+- level (LogLevel): Selected log level (see LogLevels in **Exported Types** above)
+- options (Options): Optional parameter containing settings for the logger (see Options in **Exported Types** above)
 
 ### Log methods
 
@@ -75,15 +75,15 @@ All log methods have the same signature as they are just wrappers around a priva
 
 The following methods are available:
 
--   `error(topic: string, messages: string | string[]); // level: 1`
--   `warn(topic: string, messages: string | string[]); // level: 2`
--   `info(topic: string, messages: string | string[]); // level: 3`
--   `debug(topic: string, messages: string | string[]); // level: 4`
+- `error(topic: string, messages: string | string[]); // level: 1`
+- `warn(topic: string, messages: string | string[]); // level: 2`
+- `info(topic: string, messages: string | string[]); // level: 3`
+- `debug(topic: string, messages: string | string[]); // level: 4`
 
 Parameters:
 
--   **topic** (string): Message topic
--   **messages** (string | string[]): Single message or array of messages which will be displayed one by line.
+- **topic** (string): Message topic
+- **messages** (string | string[]): Single message or array of messages which will be displayed one by line.
 
 ### Exit method
 

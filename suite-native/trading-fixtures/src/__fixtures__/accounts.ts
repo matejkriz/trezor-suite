@@ -1,0 +1,155 @@
+import { asNetworkSymbol } from '@suite-common/wallet-config';
+import { type Account, asAccountDescriptor } from '@suite-common/wallet-types';
+import {
+    mockWalletAccount,
+    networkSpecificDefaultEthereum,
+} from '@suite-common/wallet-types/mocks';
+import { type StaticSessionId } from '@trezor/device-utils';
+
+export const MOCK_ACCOUNT_DEVICE_SESSION_ID: StaticSessionId = '1@2:3';
+
+export const btc1NormalAccount = mockWalletAccount({
+    symbol: asNetworkSymbol('btc'),
+    accountLabel: 'BTC Account #1',
+    deviceState: MOCK_ACCOUNT_DEVICE_SESSION_ID,
+    accountType: 'normal',
+    descriptor: asAccountDescriptor('btc1normal'),
+    balance: '1000000',
+    availableBalance: '1000000',
+    formattedBalance: '0.01',
+    addresses: {
+        used: [
+            {
+                address: 'USED1',
+                path: 'path_USED1',
+                balance: '10000000',
+                transfers: 0,
+                sent: '0',
+                received: '0',
+            },
+            {
+                address: 'USED2',
+                path: 'path_USED2',
+                balance: '20000000',
+                transfers: 0,
+                sent: '0',
+                received: '0',
+            },
+        ],
+        change: [
+            {
+                address: 'CHANGE1',
+                path: 'path_CHANGE1',
+                transfers: 0,
+                sent: '0',
+                received: '0',
+                balance: '0',
+            },
+        ],
+        unused: [
+            {
+                address: 'UNUSED1',
+                path: 'path_UNUSED1',
+                transfers: 0,
+                sent: '0',
+                received: '0',
+                balance: '0',
+            },
+            {
+                address: 'UNUSED2',
+                path: 'path_UNUSED2',
+                transfers: 0,
+                sent: '0',
+                received: '0',
+                balance: '0',
+            },
+        ],
+    },
+    visible: true,
+});
+
+export const btc2legacyAccount = mockWalletAccount({
+    symbol: asNetworkSymbol('btc'),
+    accountLabel: 'BTC Account #2',
+    deviceState: MOCK_ACCOUNT_DEVICE_SESSION_ID,
+
+    accountType: 'legacy',
+    descriptor: asAccountDescriptor('btc2legacy'),
+    addresses: {
+        used: [],
+        change: [],
+        unused: [],
+    },
+    visible: true,
+});
+
+export const eth1NormalAccount = mockWalletAccount({
+    symbol: asNetworkSymbol('eth'),
+    accountLabel: 'ETH Account #1',
+    deviceState: MOCK_ACCOUNT_DEVICE_SESSION_ID,
+
+    accountType: 'normal',
+    descriptor: asAccountDescriptor('eth1normal'),
+    tokens: [
+        {
+            standard: 'ERC20',
+            name: 'USDC',
+            contract: '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
+            symbol: 'usdc',
+            decimals: 6,
+            balance: '1',
+        },
+    ],
+    visible: true,
+});
+
+export const eth2legacyAccount = mockWalletAccount({
+    symbol: asNetworkSymbol('eth'),
+    accountLabel: 'ETH Account #2',
+    deviceState: MOCK_ACCOUNT_DEVICE_SESSION_ID,
+    accountType: 'legacy',
+    descriptor: asAccountDescriptor('eth2legacy'),
+    visible: true,
+});
+
+export const eth3legacyAccount = mockWalletAccount({
+    symbol: asNetworkSymbol('eth'),
+    accountLabel: 'ETH Account #3 HIDDEN',
+    deviceState: MOCK_ACCOUNT_DEVICE_SESSION_ID,
+    accountType: 'legacy',
+    descriptor: asAccountDescriptor('eth3legacy'),
+    visible: false,
+});
+
+export const base1NormalAccount = mockWalletAccount(
+    {
+        symbol: asNetworkSymbol('base'),
+        accountLabel: 'Base Account #1',
+        deviceState: MOCK_ACCOUNT_DEVICE_SESSION_ID,
+        accountType: 'normal',
+        descriptor: asAccountDescriptor('base1normal'),
+        balance: '1000000000000000000',
+        availableBalance: '1000000000000000000',
+        formattedBalance: '1',
+        visible: true,
+    },
+    networkSpecificDefaultEthereum,
+);
+
+export const sol1normalAccount = mockWalletAccount({
+    symbol: asNetworkSymbol('sol'),
+    accountLabel: 'SOL Account #1',
+    deviceState: MOCK_ACCOUNT_DEVICE_SESSION_ID,
+    accountType: 'normal',
+    descriptor: asAccountDescriptor('sol1normal'),
+    visible: true,
+});
+
+export const accounts: Account[] = [
+    btc1NormalAccount,
+    btc2legacyAccount,
+    eth1NormalAccount,
+    eth2legacyAccount,
+    eth3legacyAccount,
+    sol1normalAccount,
+];

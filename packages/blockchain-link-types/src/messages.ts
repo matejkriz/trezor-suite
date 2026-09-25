@@ -1,12 +1,14 @@
-import * as MESSAGES from './constants/messages';
-import type { SubscriptionAccountInfo, BlockchainSettings, ChannelMessage } from './common';
+import { type ContractInfoParams } from './blockbook';
+import type { BlockchainSettings, ChannelMessage, SubscriptionAccountInfo } from './common';
+import type * as MESSAGES from './constants/messages';
 import type {
     AccountBalanceHistoryParams,
+    AccountInfoParams,
+    EstimateFeeParams,
     GetCurrentFiatRatesParams,
     GetFiatRatesForTimestampsParams,
     GetFiatRatesTickersListParams,
-    EstimateFeeParams,
-    AccountInfoParams,
+    RpcCallParams,
 } from './params';
 
 // messages sent from blockchain.js to worker
@@ -44,7 +46,7 @@ export interface GetAccountUtxo {
 
 export interface GetTransaction {
     type: typeof MESSAGES.GET_TRANSACTION;
-    payload: string;
+    payload: { txid: string; descriptor?: string };
 }
 
 export interface GetTransactionHex {
@@ -75,6 +77,11 @@ export interface GetFiatRatesForTimestamps {
 export interface EstimateFee {
     type: typeof MESSAGES.ESTIMATE_FEE;
     payload: EstimateFeeParams;
+}
+
+export interface RpcCall {
+    type: typeof MESSAGES.RPC_CALL;
+    payload: RpcCallParams;
 }
 
 export interface Subscribe {
@@ -124,11 +131,26 @@ export interface Unsubscribe {
 
 export interface PushTransaction {
     type: typeof MESSAGES.PUSH_TRANSACTION;
-    payload: string;
+    payload: {
+        hex: string;
+        disableAlternativeRPC?: boolean;
+    };
+}
+
+export interface GetEvmChainId {
+    type: typeof MESSAGES.GET_EVM_CHAIN_ID;
+    payload: {
+        url: string;
+    };
+}
+
+export interface GetContractInfo {
+    type: typeof MESSAGES.GET_CONTRACT_INFO;
+    payload: ContractInfoParams;
 }
 
 export type Message =
-    | ChannelMessage<{ type: typeof MESSAGES.TERMINATE; payload?: typeof undefined }>
+    | ChannelMessage<{ type: typeof MESSAGES.TERMINATE; payload?: never }>
     | ChannelMessage<{ type: typeof MESSAGES.HANDSHAKE; settings: BlockchainSettings }>
     | ChannelMessage<Connect>
     | ChannelMessage<Disconnect>
@@ -144,6 +166,9 @@ export type Message =
     | ChannelMessage<GetAccountBalanceHistory>
     | ChannelMessage<GetFiatRatesTickersList>
     | ChannelMessage<EstimateFee>
+    | ChannelMessage<RpcCall>
     | ChannelMessage<Subscribe>
     | ChannelMessage<Unsubscribe>
-    | ChannelMessage<PushTransaction>;
+    | ChannelMessage<PushTransaction>
+    | ChannelMessage<GetEvmChainId>
+    | ChannelMessage<GetContractInfo>;

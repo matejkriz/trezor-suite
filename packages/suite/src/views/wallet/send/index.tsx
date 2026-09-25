@@ -1,35 +1,38 @@
-import { ReactNode } from 'react';
+import { type ReactNode } from 'react';
+import { FormProvider } from 'react-hook-form';
+
 import styled from 'styled-components';
-import { Warning } from '@trezor/components';
 
-import { useSelector } from 'src/hooks/suite';
-import { WalletLayout } from 'src/components/wallet';
-import { useSendForm, SendContext, UseSendFormProps } from 'src/hooks/wallet/useSendForm';
-import { Header } from './components/Header';
-import { Outputs } from './components/Outputs';
-import { Options } from './components/Options/Options';
-import { SendFees } from './components/SendFees';
-import { TotalSent } from './components/TotalSent';
-import { Raw } from './components/Raw';
+import { selectFullSelectedAccount } from '@suite/account';
 import {
-    selectTargetAnonymityByAccountKey,
     selectRegisteredUtxosByAccountKey,
-} from 'src/reducers/wallet/coinjoinReducer';
-import { Translation } from 'src/components/suite';
-import { spacingsPx } from '@trezor/theme';
-import { breakpointMediaQueries } from '@trezor/styles';
-import { ConfirmEvmExplanationModal } from 'src/components/suite/modals';
+    selectTargetAnonymityByAccountKey,
+} from '@suite/coinjoin';
+import { Translation } from '@suite/intl';
+import { selectIsMetadataProviderConnected } from '@suite/metadata';
+import { selectRouteName } from '@suite/router';
+import { selectIsSuiteSyncEnabled } from '@suite-common/suite-sync';
+import { selectBaseCurrency, selectFees, selectSendRaw } from '@suite-common/wallet-core';
+import { Banner, Column } from '@trezor/components';
+import { SCREEN_QUERY } from '@trezor/components/src/config/variables';
 
-const SendLayout = styled(WalletLayout)`
-    display: flex;
-    flex-direction: column;
-    gap: ${spacingsPx.md};
-`;
+import { ConfirmEvmExplanationModal } from 'src/components/suite/modals/ConfirmEvmExplanationModal';
+import { WalletLayout } from 'src/components/wallet';
+import { useSelector } from 'src/hooks/suite';
+import { SendContext, type UseSendFormProps, useSendForm } from 'src/hooks/wallet/useSendForm';
+import { selectIsSuiteOnline } from 'src/selectors/suite/suiteSelectors';
+
+import { Options } from './Options/Options';
+import { Outputs } from './Outputs/Outputs';
+import { SendFees } from './SendFees';
+import { SendHeader } from './SendHeader';
+import { SendRaw } from './SendRaw';
+import { TotalSent } from './TotalSent/TotalSent';
 
 const FormGrid = styled.div`
-    gap: ${spacingsPx.md};
+    gap: 16px;
 
-    ${breakpointMediaQueries.xl} {
+    ${SCREEN_QUERY.ABOVE_DESKTOP} {
         display: grid;
         grid-template-columns: minmax(500px, auto) minmax(340px, 420px);
 
@@ -43,14 +46,14 @@ const FormGrid = styled.div`
         }
     }
 
-    ${breakpointMediaQueries.below_xl} {
+    ${SCREEN_QUERY.BELOW_DESKTOP} {
         display: flex;
         flex-direction: column;
     }
 `;
 
 interface SendProps {
-    children: ReactNode;
+    children?: ReactNode;
 }
 
 interface SendLoadedProps extends SendProps {
@@ -61,59 +64,79 @@ interface SendLoadedProps extends SendProps {
 // separated to call `useSendForm` hook at top level
 // children are only for test purposes, this prop is not available in regular build
 const SendLoaded = ({ children, selectedAccount }: SendLoadedProps) => {
-    const props = useSelector(state => ({
-        localCurrency: state.wallet.settings.localCurrency,
-        fees: state.wallet.fees,
-        online: state.suite.online,
-        sendRaw: state.wallet.send.sendRaw,
-        metadataEnabled: state.metadata.enabled && !!state.metadata.providers[0],
-        targetAnonymity: selectTargetAnonymityByAccountKey(state, selectedAccount.account.key),
-        prison: selectRegisteredUtxosByAccountKey(state, selectedAccount.account.key),
-    }));
+    const isSuiteSyncEnabled = useSelector(selectIsSuiteSyncEnabled);
+    const accountKey = selectedAccount.account.key;
 
-    const sendContextValues = useSendForm({ ...props, selectedAccount });
+    const localCurrency = useSelector(selectBaseCurrency);
+    const fees = useSelector(selectFees);
+    const online = useSelector(selectIsSuiteOnline);
+    const sendRaw = useSelector(selectSendRaw);
+    const isMetadataProviderConnected = useSelector(selectIsMetadataProviderConnected);
+    const metadataEnabled = isMetadataProviderConnected || isSuiteSyncEnabled;
+    const targetAnonymity = useSelector(state =>
+        selectTargetAnonymityByAccountKey(state, accountKey),
+    );
+    const prison = useSelector(state => selectRegisteredUtxosByAccountKey(state, accountKey));
+
+    const sendContextValues = useSendForm({
+        selectedAccount,
+        localCurrency,
+        fees,
+        online,
+        metadataEnabled,
+        targetAnonymity,
+        prison,
+    });
 
     const { symbol } = selectedAccount.account;
-
-    if (props.sendRaw) {
+    if (sendRaw) {
         return (
             <WalletLayout title="TR_NAV_SEND" isSubpage account={selectedAccount}>
-                <Raw network={selectedAccount.network} />
+                <SendRaw account={selectedAccount.account} />
             </WalletLayout>
         );
     }
 
     return (
-        <SendLayout title="TR_NAV_SEND" isSubpage account={selectedAccount}>
+        <WalletLayout title="TR_NAV_SEND" isSubpage account={selectedAccount}>
             <SendContext.Provider value={sendContextValues}>
-                <Header />
+                <FormProvider {...sendContextValues.methods}>
+                    <Column gap={24}>
+                        <SendHeader />
 
-                <FormGrid data-test="@wallet/send/outputs-and-options">
-                    <Outputs disableAnim={!!children} />
-                    <Options />
-                    <SendFees />
+                        <FormGrid data-testid="@wallet/send/outputs-and-options">
+                            <Outputs disableAnim={!!children} />
+                            <Options />
+                            <SendFees />
 
-                    {symbol === 'dsol' && (
-                        <Warning withIcon>
-                            <Translation id="TR_SOLANA_DEVNET_SHORTCUT_WARNING" />
-                        </Warning>
-                    )}
+                            {symbol === 'dsol' && (
+                                <Banner
+                                    icon
+                                    description={
+                                        <Translation id="TR_SOLANA_DEVNET_SHORTCUT_WARNING" />
+                                    }
+                                />
+                            )}
 
-                    <TotalSent />
-                </FormGrid>
+                            <TotalSent />
+                        </FormGrid>
+                    </Column>
 
-                {children}
+                    {children}
+                </FormProvider>
             </SendContext.Provider>
 
             <ConfirmEvmExplanationModal account={selectedAccount.account} route="wallet-send" />
-        </SendLayout>
+        </WalletLayout>
     );
 };
 
 const Send = ({ children }: SendProps) => {
-    const selectedAccount = useSelector(state => state.wallet.selectedAccount);
+    const selectedAccount = useSelector(selectFullSelectedAccount);
+    const currentRoute = useSelector(selectRouteName);
 
-    if (selectedAccount.status !== 'loaded') {
+    // alone selectedAccount.status is not enough, currently there is a race-condition that needs to be fixed in send form
+    if (selectedAccount.status !== 'loaded' || currentRoute !== 'wallet-send') {
         return <WalletLayout title="TR_NAV_SEND" account={selectedAccount} />;
     }
 

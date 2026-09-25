@@ -1,44 +1,77 @@
-import styled from 'styled-components';
+import { ContextMessage } from '@suite/message-system';
+import { selectRouter } from '@suite/router';
+import { Context } from '@suite-common/message-system';
+import {
+    isSupportedAdaStakingNetworkSymbol,
+    isSupportedEthStakingNetworkSymbol,
+    isSupportedSolStakingNetworkSymbol,
+    isSupportedTronStakingNetworkSymbol,
+} from '@suite-common/wallet-core';
+import { Column } from '@trezor/components';
 
-import { Account } from 'src/types/wallet';
-import { AuthConfirmFailed } from './AuthConfirmFailed';
-import { BackendDisconnected } from './BackendDisconnected';
-import { DeviceUnavailable } from './DeviceUnavailable';
-import { XRPReserve } from './XRPReserve';
+import { useSelector } from 'src/hooks/suite';
+import { type Account } from 'src/types/wallet';
+
 import { AccountImported } from './AccountImported';
 import { AccountOutOfSync } from './AccountOutOfSync';
-import { TorDisconnected } from './TorDisconnected';
-import { CoinjoinContextMessage } from './CoinjoinContextMessage';
-import { StakeEthBanner } from './StakeEthBanner';
-import { spacingsPx } from '@trezor/theme';
+import { BackendDisconnected } from './BackendDisconnected';
+import { CardanoLegacyBanner } from './CardanoLegacyBanner';
+import { DeviceUnavailable } from './DeviceUnavailable';
 import { EvmExplanationBanner } from './EvmExplanationBanner';
+import { ReserveBanner } from './ReserveBanner';
+import { StakingBanner } from './StakingBanner';
+import { StellarLimitedHistoryBanner } from './StellarLimitedHistoryBanner';
 import { TaprootBanner } from './TaprootBanner';
-
-const BannersWrapper = styled.div`
-    display: flex;
-    flex-direction: column;
-
-    > div:last-child {
-        margin-bottom: ${spacingsPx.xl};
-    }
-`;
+import { TorDisconnected } from './TorDisconnected';
 
 type AccountBannersProps = {
     account?: Account;
 };
 
-export const AccountBanners = ({ account }: AccountBannersProps) => (
-    <BannersWrapper>
-        <CoinjoinContextMessage account={account} />
-        <AuthConfirmFailed />
-        <BackendDisconnected />
-        <DeviceUnavailable />
-        <TorDisconnected />
-        <XRPReserve account={account} />
-        <AccountImported account={account} />
-        <AccountOutOfSync account={account} />
-        <StakeEthBanner />
-        <EvmExplanationBanner account={account} />
-        <TaprootBanner account={account} />
-    </BannersWrapper>
-);
+export const AccountBanners = ({ account }: AccountBannersProps) => {
+    const { route } = useSelector(selectRouter);
+
+    return (
+        <Column gap={12}>
+            {account?.symbol &&
+                isSupportedEthStakingNetworkSymbol(account.symbol) &&
+                route?.name === 'wallet-staking' && (
+                    <ContextMessage context={Context.getStaking('eth')} />
+                )}
+            {account?.symbol &&
+                isSupportedSolStakingNetworkSymbol(account.symbol) &&
+                route?.name === 'wallet-staking' && (
+                    <ContextMessage context={Context.getStaking('sol')} />
+                )}
+            {account?.symbol &&
+                isSupportedTronStakingNetworkSymbol(account.symbol) &&
+                route?.name === 'wallet-staking' && (
+                    <ContextMessage context={Context.getStaking('trx')} />
+                )}
+            {account?.symbol &&
+                isSupportedAdaStakingNetworkSymbol(account.symbol) &&
+                route?.name === 'wallet-staking' && (
+                    <ContextMessage context={Context.getStaking('ada')} />
+                )}
+            <BackendDisconnected />
+            <DeviceUnavailable />
+            <TorDisconnected />
+            <ReserveBanner account={account} />
+            <AccountImported account={account} />
+            <AccountOutOfSync account={account} />
+            <EvmExplanationBanner account={account} />
+            <TaprootBanner account={account} />
+            <CardanoLegacyBanner account={account} />
+            {account?.networkType === 'stellar' && <StellarLimitedHistoryBanner />}
+            {account?.symbol && <StakingBanner account={account} />}
+            {account?.symbol && account?.accountType && (
+                <ContextMessage
+                    context={[
+                        Context.getAccount(account.symbol),
+                        Context.getAccount(account.symbol, account.accountType),
+                    ]}
+                />
+            )}
+        </Column>
+    );
+};

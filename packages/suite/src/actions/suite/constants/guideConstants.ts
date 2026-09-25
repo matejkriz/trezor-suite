@@ -1,7 +1,7 @@
-export const OPEN = '@guide/open';
-export const CLOSE = '@guide/close';
-export const SET_INDEX_NODE = '@guide/set-index-node';
-export const SET_VIEW = '@guide/set-view';
-export const UNSET_NODE = '@guide/unset-node';
-export const OPEN_NODE = '@guide/open-node';
-export const SUBMIT_FEEDBACK = '@guide/feedback-submit';
+export const OPEN = '@guide/open' as const;
+export const CLOSE = '@guide/close' as const;
+export const SET_INDEX_NODE = '@guide/set-index-node' as const;
+export const SET_VIEW = '@guide/set-view' as const;
+export const UNSET_NODE = '@guide/unset-node' as const;
+export const OPEN_NODE = '@guide/open-node' as const;
+export const SET_WIDTH = '@guide/set-width' as const;

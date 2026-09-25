@@ -1,0 +1,41 @@
+import { useRef } from 'react';
+import { useSelector } from 'react-redux';
+
+import { ServerOffline } from '@suite-native/trading-atoms';
+import { selectIsTradingBuyEnabled } from '@suite-native/trading-state';
+
+import { BuyForm } from './BuyForm';
+import { BuyFormContextProvider } from './BuyFormContextProvider';
+import { BuyFormSkeleton } from './BuyFormSkeleton';
+import { useBuyData } from '../../hooks/buy/useBuyData';
+import { TradingTypeDisabled } from '../general/Error/TradingTypeDisabled';
+
+const BuyTabEnabled = () => {
+    const { isLoading, lastLoadedTimestamp, isFullyLoaded, refetch } = useBuyData();
+    const isLoadingFinished = !isLoading && lastLoadedTimestamp > 0;
+    const wasSkeletonDisplayed = useRef(!isLoadingFinished);
+
+    if (isLoadingFinished && !isFullyLoaded) {
+        return <ServerOffline onRetryPress={refetch} />;
+    }
+
+    if (!isFullyLoaded) {
+        return <BuyFormSkeleton />;
+    }
+
+    return (
+        <BuyFormContextProvider>
+            <BuyForm shouldAnimateEntering={wasSkeletonDisplayed.current} />
+        </BuyFormContextProvider>
+    );
+};
+
+export const BuyTab = () => {
+    const isBuyEnabled = useSelector(selectIsTradingBuyEnabled);
+
+    if (!isBuyEnabled) {
+        return <TradingTypeDisabled tradingType="buy" />;
+    }
+
+    return <BuyTabEnabled />;
+};

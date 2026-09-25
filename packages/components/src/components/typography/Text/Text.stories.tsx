@@ -1,53 +1,38 @@
-import styled from 'styled-components';
-import { Meta, StoryObj } from '@storybook/react';
-import { Text as TextComponent } from './Text';
+import { type Meta, type StoryObj } from '@storybook/react';
 
-const Wrapper = styled.div`
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-`;
+import {
+    Text as TextComponent,
+    type TextProps,
+    allowedTextFrameProps,
+    allowedTextTextProps,
+} from './Text';
+import { getFramePropsStory } from '../../../utils/frameProps';
+import { getTextPropsStory } from '../utils';
 
-const Block = styled.div`
-    display: flex;
-    flex-direction: column;
-`;
-
-const meta: Meta = {
-    title: 'Typography/Text',
-} as Meta;
+const meta: Meta<typeof TextComponent> = {
+    title: '🅰️ Typography',
+    component: TextComponent,
+};
 export default meta;
 
-export const Text: StoryObj = {
-    render: () => (
-        <Wrapper>
-            <Block>
-                <TextComponent>This is just a plain text</TextComponent>
-            </Block>
-            <Block>
-                <TextComponent variant={'primary'}>
-                    This is <strong>primary</strong> text
-                </TextComponent>
-                <TextComponent variant={'info'}>
-                    This is <strong>info</strong> text
-                </TextComponent>
-                <TextComponent variant={'warning'}>
-                    This is <strong>warning</strong> text
-                </TextComponent>
-                <TextComponent variant={'destructive'}>
-                    This is <strong>destructive</strong> text
-                </TextComponent>
-            </Block>
-            <Block>
-                <TextComponent color={'#9be887'}>
-                    This is <strong>custom</strong> color text
-                </TextComponent>
-            </Block>
-            <Block>
-                <TextComponent variant={'info'} typographyStyle="titleMedium">
-                    This is just a plain Medium Title
-                </TextComponent>
-            </Block>
-        </Wrapper>
-    ),
+export const Text: StoryObj<TextProps> = {
+    args: {
+        children: 'Quos delectus veritatis est doloribus dolor.',
+        isHighlighted: false,
+        isMonospaced: false,
+        isDisabled: false,
+        isInverse: false,
+        isTabular: false,
+        ...getTextPropsStory(allowedTextTextProps).args,
+        ...getFramePropsStory(allowedTextFrameProps).args,
+    },
+    argTypes: {
+        isHighlighted: { control: 'boolean' },
+        isMonospaced: { control: 'boolean' },
+        isDisabled: { control: 'boolean' },
+        isInverse: { control: 'boolean' },
+        isTabular: { control: 'boolean' },
+        ...getTextPropsStory(allowedTextTextProps).argTypes,
+        ...getFramePropsStory(allowedTextFrameProps).argTypes,
+    },
 };

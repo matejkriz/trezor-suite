@@ -1,87 +1,15 @@
-import styled, { css } from 'styled-components';
+import { Translation, type TranslationKey } from '@suite/intl';
+import { closeModal } from '@suite/modal';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { getNetwork } from '@suite-common/wallet-config';
+import { type Account } from '@suite-common/wallet-types';
+import { Column, H2, Modal, Paragraph } from '@trezor/components';
+import { WarningIcon } from '@trezor/icons';
 
-import { Translation, Modal } from 'src/components/suite';
-import { useDispatch, useSelector } from 'src/hooks/suite';
-import { Button, CoinLogo, H3, Image, variables } from '@trezor/components';
-import { onCancel } from 'src/actions/suite/modalActions';
-import { Account } from '@suite-common/wallet-types';
-import { networks } from '@suite-common/wallet-config';
-import { TranslationKey } from 'src/components/suite/Translation';
-import { SUITE } from 'src/actions/suite/constants';
-import { spacingsPx } from '@trezor/theme';
-
-const StyledImage = styled(Image)`
-    width: 100%;
-    height: 100%;
-    align-self: center;
-`;
-
-const StyledModal = styled(Modal)`
-    width: 390px;
-`;
-
-const StyledButton = styled(Button)`
-    flex-grow: 1;
-    margin-top: ${spacingsPx.xxl};
-`;
-
-const Content = styled.div`
-    display: flex;
-    flex-direction: column;
-`;
-
-const Title = styled(H3)`
-    margin-bottom: ${spacingsPx.xs};
-    text-align: left;
-`;
-
-const Description = styled.span`
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    font-size: ${variables.FONT_SIZE.SMALL};
-    font-weight: 500;
-    line-height: 20px;
-    text-align: left;
-`;
-
-const ImageWrapper = styled.div`
-    position: relative;
-    margin-bottom: ${spacingsPx.xxl};
-`;
-
-const ImageCoinLogoCommon = styled(CoinLogo)`
-    position: absolute;
-    width: auto;
-
-    div {
-        width: 100%;
-        height: 100%;
-    }
-
-    svg {
-        width: 100%;
-        height: 100%;
-    }
-`;
-
-const ImageCoinLogoLeft = styled(ImageCoinLogoCommon)`
-    top: 17%;
-    left: 3.5%;
-    height: 52%;
-
-    ${({ symbol }) =>
-        symbol === 'eth' &&
-        css`
-            top: 15.6%;
-            left: 4.8%;
-            height: 51%;
-        `}
-`;
-
-const ImageCoinLogoRight = styled(ImageCoinLogoCommon)`
-    top: 31%;
-    right: 3.5%;
-    height: 52%;
-`;
+import { confirmEvmExplanationModal } from 'src/actions/suite/suiteActions';
+import { useSelector } from 'src/hooks/suite';
+import { selectConfirmExplanationModalClosed } from 'src/selectors/suite/suiteSelectors';
 
 export interface ConfirmNetworkExplanationModalProps {
     account: Account | undefined;
@@ -92,27 +20,21 @@ export const ConfirmEvmExplanationModal = ({
     account,
     route,
 }: ConfirmNetworkExplanationModalProps) => {
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
     const close = () => {
-        dispatch(onCancel());
+        dispatch(closeModal());
         if (!account?.symbol) {
             return;
         }
-        dispatch({
-            type: SUITE.EVM_CONFIRM_EXPLANATION_MODAL,
-            symbol: account?.symbol,
-            route,
-        });
+        dispatch(confirmEvmExplanationModal({ symbol: account.symbol, route }));
     };
-    const confirmExplanationModalClosed = useSelector(
-        state => state.suite.evmSettings.confirmExplanationModalClosed,
-    );
+    const confirmExplanationModalClosed = useSelector(selectConfirmExplanationModalClosed);
 
     if (!account) {
         return null;
     }
 
-    const network = networks[account.symbol];
+    const network = getNetwork(account.symbol);
     const isVisible =
         account.empty &&
         network.networkType === 'ethereum' &&
@@ -136,39 +58,34 @@ export const ConfirmEvmExplanationModal = ({
     };
 
     return (
-        <StyledModal headerComponent={null}>
-            <Content>
-                <ImageWrapper>
-                    <StyledImage
-                        image={
-                            account.symbol === 'eth'
-                                ? 'CONFIRM_EVM_EXPLANATION_ETH'
-                                : 'CONFIRM_EVM_EXPLANATION_OTHER'
-                        }
-                    />
-                    <ImageCoinLogoLeft symbol={account.symbol} />
-                    {account.symbol !== 'eth' && <ImageCoinLogoRight symbol="eth" />}
-                </ImageWrapper>
-                <Title>
+        <Modal
+            bottomContent={
+                <Modal.Button onClick={close}>
+                    <Translation id="TR_GOT_IT_BUTTON" />
+                </Modal.Button>
+            }
+            width={600}
+            icon={WarningIcon}
+            intent="warning"
+        >
+            <Column gap={8}>
+                <H2 typographyStyle="headline-sm">
                     <Translation
                         id={titleTranslationsIds[route]}
                         values={{
                             network: network.name,
                         }}
                     />
-                </Title>
-                <Description>
+                </H2>
+                <Paragraph intent="neutral" priority="secondary" typographyStyle="body-sm">
                     <Translation
                         id={descriptionTranslationsIds[route]}
                         values={{
                             network: network.name,
                         }}
                     />
-                </Description>
-                <StyledButton variant="primary" onClick={close}>
-                    <Translation id="TR_CONFIRM" />
-                </StyledButton>
-            </Content>
-        </StyledModal>
+                </Paragraph>
+            </Column>
+        </Modal>
     );
 };

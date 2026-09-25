@@ -1,44 +1,65 @@
-import { UI } from '@trezor/connect';
+import { useMemo } from 'react';
+
+import { type OnboardingAnalytics } from '@suite/analytics';
+import { selectModal } from '@suite/modal';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { type BackupType } from '@suite-common/suite-types';
+import { UI_REQUESTS } from '@trezor/connect';
+
 import * as onboardingActions from 'src/actions/onboarding/onboardingActions';
-import * as routerActions from 'src/actions/suite/routerActions';
-import * as recoveryActions from 'src/actions/recovery/recoveryActions';
-import * as suiteActions from 'src/actions/suite/suiteActions';
-import { useActions, useSelector, useDispatch } from 'src/hooks/suite';
+import { type GoToSuiteOptions } from 'src/actions/onboarding/onboardingActions';
+import { useSelector } from 'src/hooks/suite';
+import { selectOnboarding } from 'src/selectors/onboarding/onboardingSelectors';
+import { type AnyPath, type AnyStepId, type BackupMedium } from 'src/types/onboarding';
+
+import { parseStepId } from '../../utils/onboarding/steps';
 
 export const useOnboarding = () => {
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
 
-    const { onboarding, modal } = useSelector(state => state);
+    const onboarding = useSelector(selectOnboarding);
+    const modal = useSelector(selectModal);
 
     const showPinMatrix =
-        modal.context === '@modal/context-device' && modal.windowType === UI.REQUEST_PIN;
+        modal.context === '@modal/context-device' && modal.windowType === UI_REQUESTS.REQUEST_PIN;
 
-    const actions = useActions({
-        goToStep: onboardingActions.goToStep,
-        goToNextStep: onboardingActions.goToNextStep,
-        goToPreviousStep: onboardingActions.goToPreviousStep,
-        resetOnboarding: onboardingActions.resetOnboarding,
-        enableOnboardingReducer: onboardingActions.enableOnboardingReducer,
-        rerun: recoveryActions.rerun,
-        updateAnalytics: onboardingActions.updateAnalytics,
-        addPath: onboardingActions.addPath,
-    });
+    const actions = useMemo(
+        () => ({
+            goToStep: (stepId: AnyStepId) => dispatch(onboardingActions.goToStep(stepId)),
+            goToNextStep: (stepId?: AnyStepId) =>
+                dispatch(onboardingActions.goToNextStepThunk(stepId)),
+            goToPreviousStep: () => dispatch(onboardingActions.goToPreviousStepThunk()),
+            resetOnboarding: () => dispatch(onboardingActions.resetOnboarding()),
+            enableOnboardingReducer: (enabled: boolean) =>
+                dispatch(onboardingActions.enableOnboardingReducer(enabled)),
+            rerun: () => dispatch(onboardingActions.rerunRecoveryThunk()),
+            updateAnalytics: (payload: Partial<OnboardingAnalytics>) =>
+                dispatch(onboardingActions.updateAnalytics(payload)),
+            addPath: (payload: AnyPath) => dispatch(onboardingActions.addPath(payload)),
+            updateBackupType: (payload: BackupType) =>
+                dispatch(onboardingActions.updateBackupType(payload)),
+            updateBackupMedium: (payload: BackupMedium) =>
+                dispatch(onboardingActions.updateBackupMedium(payload)),
+            goToSuite: (options?: GoToSuiteOptions) =>
+                dispatch(onboardingActions.goToSuiteThunk(options)),
+            resolveNextAfterSkipped: (requestedStepId: AnyStepId) =>
+                dispatch(onboardingActions.resolveNextAfterSkippedThunk(requestedStepId)),
+        }),
+        [dispatch],
+    );
 
-    const goToSuite = (initialRedirection = false) => {
-        dispatch(suiteActions.initialRunCompleted());
-        dispatch(onboardingActions.resetOnboarding());
-        dispatch(routerActions.closeModalApp(true));
-
-        // fixes a bug that user ends up in settings after initialization of a new device because he navigated to settings before
-        if (initialRedirection) {
-            dispatch(routerActions.goto('suite-index'));
-        }
-    };
+    const { activeStepId } = onboarding;
+    const { activeStep, activeStepCategory } = useMemo(
+        () => parseStepId(activeStepId),
+        [activeStepId],
+    );
 
     return {
         ...onboarding,
         ...actions,
+        activeStep,
+        activeStepCategory,
         showPinMatrix,
-        goToSuite,
     };
 };

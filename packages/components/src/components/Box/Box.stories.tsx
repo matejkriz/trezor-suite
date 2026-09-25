@@ -1,44 +1,63 @@
-import styled from 'styled-components';
-import { Meta, StoryObj } from '@storybook/react';
-import { Box as BoxComponent } from './Box';
-import { FONT_WEIGHT } from '../../config/variables';
+import { type Meta, type StoryObj } from '@storybook/react';
 
-const Text = styled.div`
-    font-weight: ${FONT_WEIGHT.DEMI_BOLD};
-`;
+import { borderWidthValues, colorVariants } from '@trezor/theme';
 
-const Wrapper = styled.div`
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    gap: 20px;
-`;
+import { Box as BoxComponent, allowedBoxFrameProps } from './Box';
+import { getFramePropsStory } from '../../utils/frameProps';
 
-const meta: Meta = {
-    title: 'Misc/Box',
-} as Meta;
+const meta: Meta<typeof BoxComponent> = {
+    title: 'Box',
+    component: BoxComponent,
+};
 export default meta;
 
-export const Box: StoryObj = {
-    render: () => (
-        <>
-            <Wrapper>
-                <BoxComponent>
-                    <Text>No state</Text>
-                </BoxComponent>
-                <BoxComponent variant="primary">
-                    <Text>Success</Text>
-                </BoxComponent>
-                <BoxComponent variant="destructive">
-                    <Text>Error</Text>
-                </BoxComponent>
-                <BoxComponent variant="warning">
-                    <Text>Warning</Text>
-                </BoxComponent>
-                <BoxComponent variant="info">
-                    <Text>Info</Text>
-                </BoxComponent>
-            </Wrapper>
-        </>
+export const Box: StoryObj<typeof BoxComponent> = {
+    render: props => (
+        <BoxComponent {...props}>
+            <p>
+                Quos delectus veritatis est doloribus dolor. Odit fugit omnis magni ipsam quia rem
+                aut. Et alias sint non. Consequuntur dignissimos veritatis debitis corporis esse.
+                Quaerat voluptatem unde aut. Iusto laborum omnis quis amet atque. Sint culpa
+                delectus non soluta temporibus saepe. Sequi saepe corrupti aliquam ut sit assumenda
+                aspernatur consequuntur. Ut est ullam iusto facilis voluptatibus. Sit est cum quos.
+            </p>
+        </BoxComponent>
     ),
+    args: {
+        ...getFramePropsStory(allowedBoxFrameProps).args,
+        width: '300px',
+        height: '300px',
+        backgroundColor: undefined,
+        backgroundColorOnInteraction: undefined,
+        borderColor: undefined,
+        borderOffset: undefined,
+    },
+    argTypes: {
+        backgroundColor: {
+            control: {
+                type: 'select',
+            },
+            options: Object.keys(colorVariants.standard),
+        },
+        backgroundColorOnInteraction: {
+            control: {
+                type: 'select',
+            },
+            options: Object.keys(colorVariants.standard),
+        },
+        borderColor: {
+            control: {
+                type: 'select',
+            },
+            options: Object.keys(colorVariants.standard),
+        },
+        borderWidth: {
+            control: 'select',
+            options: ['undefined', ...borderWidthValues],
+        },
+        borderOffset: {
+            control: 'number',
+        },
+        ...getFramePropsStory(allowedBoxFrameProps).argTypes,
+    },
 };

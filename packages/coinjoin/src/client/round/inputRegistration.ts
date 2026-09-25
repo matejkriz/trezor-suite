@@ -1,12 +1,12 @@
-import { getRandomNumberInRange } from '@trezor/utils';
+import { getWeakRandomNumberInRange } from '@trezor/utils';
 
-import * as coordinator from '../coordinator';
 import * as middleware from '../middleware';
 import { confirmationInterval } from './connectionConfirmation';
 import { ROUND_SELECTION_REGISTRATION_OFFSET } from '../../constants';
-import type { Alice } from '../Alice';
-import type { CoinjoinRound, CoinjoinRoundOptions } from '../CoinjoinRound';
 import { SessionPhase, WabiSabiProtocolErrorCode } from '../../enums';
+import type { AliceShape } from '../../types/alice';
+import type { CoinjoinRoundOptions, CoinjoinRoundShape } from '../../types/round';
+import * as coordinator from '../coordinator';
 
 /**
  * RoundPhase: 0, InputRegistration
@@ -19,10 +19,10 @@ import { SessionPhase, WabiSabiProtocolErrorCode } from '../../enums';
  */
 
 const registerInput = async (
-    round: CoinjoinRound,
-    input: Alice,
+    round: CoinjoinRoundShape,
+    input: AliceShape,
     options: CoinjoinRoundOptions,
-): Promise<Alice> => {
+): Promise<AliceShape> => {
     const { logger } = options;
     if (input.error) {
         logger.warn(`Trying to register input with error ${input.error}`);
@@ -56,7 +56,7 @@ const registerInput = async (
     // setup random delay for registration request. we want each input to be registered in different time as different TOR identity
     // note that this may cause that the input will not be registered if phase change before expected deadline
     const deadline = round.phaseDeadline - Date.now() - ROUND_SELECTION_REGISTRATION_OFFSET;
-    const delay = deadline > 0 ? getRandomNumberInRange(0, deadline) : 0;
+    const delay = deadline > 0 ? getWeakRandomNumberInRange(0, deadline) : 0;
     logger.info(
         `Trying to register ~~${input.outpoint}~~ to ~~${round.id}~~ with delay ${delay}ms and deadline ${round.phaseDeadline}`,
     );
@@ -189,7 +189,10 @@ const registerInput = async (
     }
 };
 
-export const inputRegistration = async (round: CoinjoinRound, options: CoinjoinRoundOptions) => {
+export const inputRegistration = async (
+    round: CoinjoinRoundShape,
+    options: CoinjoinRoundOptions,
+) => {
     // try to register each input
     // failed inputs will be excluded from this round, successful will continue to phase: 1 (connectionConfirmation)
     options.logger.info(`inputRegistration: ~~${round.id}~~`);
@@ -199,8 +202,10 @@ export const inputRegistration = async (round: CoinjoinRound, options: CoinjoinR
     await Promise.allSettled(inputs.map(input => registerInput(round, input, options))).then(
         result =>
             result.forEach((r, i) => {
+                // @ts-expect-error: indexing with noUncheckedIndexedAccess
+                const input: (typeof inputs)[number] = inputs[i];
                 if (r.status !== 'fulfilled') {
-                    inputs[i].setError(r.reason);
+                    input.setError(r.reason);
                 }
             }),
     );

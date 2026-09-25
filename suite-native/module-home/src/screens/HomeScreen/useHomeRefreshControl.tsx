@@ -1,21 +1,22 @@
-import { useCallback, useMemo, useState } from 'react';
+import { type RefObject, useCallback, useMemo, useState } from 'react';
 import { RefreshControl } from 'react-native';
-import { useDispatch } from 'react-redux';
 
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
 import { syncAllAccountsWithBlockchainThunk } from '@suite-native/blockchain';
-import { useNativeStyles } from '@trezor/styles';
+import { useNativeStyles } from '@trezor/styles-native';
 
-import { PortfolioContentRef } from './components/PortfolioContent';
+import { type PortfolioGraphRef } from './components/PortfolioGraph';
 
 export const useHomeRefreshControl = ({
-    isPortfolioEmpty,
-    portfolioContentRef,
+    isDiscoveredDeviceAccountless,
+    portfolioGraphRef,
 }: {
-    isPortfolioEmpty: boolean;
-    portfolioContentRef: React.MutableRefObject<PortfolioContentRef | null>;
+    isDiscoveredDeviceAccountless: boolean;
+    portfolioGraphRef: RefObject<PortfolioGraphRef | null>;
 }) => {
     const [isRefreshing, setIsRefreshing] = useState(false);
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
     const {
         utils: { colors },
     } = useNativeStyles();
@@ -24,26 +25,26 @@ export const useHomeRefreshControl = ({
         setIsRefreshing(true);
         try {
             await Promise.all([
-                portfolioContentRef.current?.refetchGraph?.(),
+                portfolioGraphRef.current?.refetchGraph({ forceRefetch: true }),
                 dispatch(syncAllAccountsWithBlockchainThunk()),
             ]);
-        } catch (error) {
+        } catch {
             // Do nothing
         }
         setIsRefreshing(false);
-    }, [dispatch, portfolioContentRef]);
+    }, [dispatch, portfolioGraphRef]);
 
     const refreshControl = useMemo(() => {
-        if (isPortfolioEmpty) return undefined;
+        if (isDiscoveredDeviceAccountless) return undefined;
 
         return (
             <RefreshControl
                 refreshing={isRefreshing}
                 onRefresh={handleRefresh}
-                colors={[colors.backgroundPrimaryDefault]}
+                colors={[colors.elementFillBrandBold]}
             />
         );
-    }, [isPortfolioEmpty, handleRefresh, colors, isRefreshing]);
+    }, [isDiscoveredDeviceAccountless, handleRefresh, colors, isRefreshing]);
 
     return refreshControl;
 };

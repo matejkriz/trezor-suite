@@ -1,54 +1,113 @@
-import { PROTOCOL } from './constants';
-import { getProtocolInfo, isProtocolScheme } from 'src/utils/suite/protocol';
-import type { Dispatch } from 'src/types/suite';
-import type { PROTOCOL_SCHEME } from 'src/constants/suite/protocol';
-import type { SendFormState } from 'src/reducers/suite/protocolReducer';
+import { type UnknownAction, createAction } from '@reduxjs/toolkit';
+import { type ThunkDispatch } from 'redux-thunk';
+
+import type { DesktopAnalyticsDep } from '@suite/analytics';
+import {
+    type AnchorSettingSection,
+    type GotoThunkState,
+    SettingsAnchor,
+    type SuiteRouterHistoryDep,
+    gotoThunk,
+    mapAnchorToRoute,
+    onLocationChangeThunk,
+} from '@suite/router';
+import {
+    type HandleCoinProtocolUriThunkState,
+    handleCoinProtocolUriThunk,
+} from '@suite/transfer-uri';
+import { type WithServices } from '@suite-common/redux-utils';
 import { notificationsActions } from '@suite-common/toast-notifications';
+import {
+    type WalletConnectInitThunkDeps,
+    type WalletConnectInitThunkState,
+} from '@suite-common/walletconnect';
+import * as walletConnectActions from '@suite-common/walletconnect';
+import {
+    SUITE_ANCHOR_DEEPLINK_PREFIX,
+    SUITE_BRIDGE_DEEPLINK,
+    SUITE_TRADING_REDIRECT_DEEPLINKS,
+    SUITE_WALLETCONNECT_DEEPLINK,
+} from '@trezor/urls';
+import { isArrayMember, safeParseUrl } from '@trezor/utils';
 
-export type ProtocolAction =
-    | {
-          type: typeof PROTOCOL.FILL_SEND_FORM;
-          payload: boolean;
-      }
-    | {
-          type: typeof PROTOCOL.SAVE_COIN_PROTOCOL;
-          payload: SendFormState;
-      }
-    | { type: typeof PROTOCOL.RESET };
+import type { SendFormState } from 'src/reducers/suite/protocolReducer';
 
-export const fillSendForm = (shouldFill: boolean): ProtocolAction => ({
-    type: PROTOCOL.FILL_SEND_FORM,
-    payload: shouldFill,
-});
+import { PROTOCOL } from './constants';
 
-const saveCoinProtocol = (
-    scheme: PROTOCOL_SCHEME,
-    address: string,
-    amount?: number,
-): ProtocolAction => ({
-    type: PROTOCOL.SAVE_COIN_PROTOCOL,
-    payload: { scheme, address, amount },
-});
+export const saveCoinProtocol = createAction(
+    PROTOCOL.SAVE_COIN_PROTOCOL,
+    (payload: SendFormState) => ({ payload }),
+);
 
-export const handleProtocolRequest = (uri: string) => (dispatch: Dispatch) => {
-    const protocol = getProtocolInfo(uri);
+export const fillSendForm = createAction<boolean>(PROTOCOL.FILL_SEND_FORM);
 
-    if (protocol && isProtocolScheme(protocol.scheme)) {
-        const { scheme, amount, address } = protocol;
+export const resetProtocol = createAction(PROTOCOL.RESET);
 
-        dispatch(saveCoinProtocol(scheme, address, amount));
-        dispatch(
-            notificationsActions.addToast({
-                type: 'coin-scheme-protocol',
-                address,
-                scheme,
-                amount,
-                autoClose: false,
-            }),
-        );
-    }
-};
+export type HandleProtocolRequestThunkState = GotoThunkState &
+    WalletConnectInitThunkState &
+    HandleCoinProtocolUriThunkState;
 
-export const resetProtocol = (): ProtocolAction => ({
-    type: PROTOCOL.RESET,
-});
+export type HandleProtocolRequestThunkDeps = WithServices<
+    DesktopAnalyticsDep & SuiteRouterHistoryDep
+>;
+
+export type HandleProtocolRequestDispatchDeps = HandleProtocolRequestThunkDeps &
+    WalletConnectInitThunkDeps;
+
+export const handleProtocolRequestThunk =
+    (uri: string) =>
+    (
+        dispatch: ThunkDispatch<
+            HandleProtocolRequestThunkState,
+            HandleProtocolRequestDispatchDeps,
+            UnknownAction
+        >,
+        _getState: () => HandleProtocolRequestThunkState,
+        extra: HandleProtocolRequestThunkDeps,
+    ) => {
+        dispatch(handleCoinProtocolUriThunk(uri, saveCoinProtocol));
+
+        if (uri?.startsWith(SUITE_BRIDGE_DEEPLINK)) {
+            dispatch(
+                gotoThunk({ routeName: 'suite-bridge-requested', params: { cancelable: true } }),
+            );
+        } else if (uri?.startsWith(SUITE_WALLETCONNECT_DEEPLINK)) {
+            const parsedUri = safeParseUrl(uri);
+            const wcUri = parsedUri?.searchParams?.get('uri');
+            if (wcUri) {
+                dispatch(walletConnectActions.walletConnectPairThunk({ uri: wcUri }))
+                    .unwrap()
+                    .catch(error => {
+                        dispatch(
+                            notificationsActions.addToast({
+                                type: 'error',
+                                error: error.message,
+                            }),
+                        );
+                    });
+            }
+        } else if (uri?.startsWith(SUITE_ANCHOR_DEEPLINK_PREFIX)) {
+            const anchor = uri.replace(SUITE_ANCHOR_DEEPLINK_PREFIX, '');
+
+            if (isArrayMember(anchor, Object.values(SettingsAnchor))) {
+                const [domain] = anchor.split('/');
+
+                const targetRoute =
+                    mapAnchorToRoute[domain?.replace(/^@/, '') as AnchorSettingSection];
+                dispatch(gotoThunk({ routeName: targetRoute, anchor }));
+            }
+        } else if (SUITE_TRADING_REDIRECT_DEEPLINKS.some(deeplink => uri?.startsWith(deeplink))) {
+            const parsedUri = safeParseUrl(decodeURIComponent(uri));
+            const redirectPath = parsedUri?.searchParams?.get('p');
+
+            if (redirectPath) {
+                const decodedPath = decodeURIComponent(redirectPath);
+                const [, hash] = decodedPath.split('/coinmarket-redirect/');
+                if (hash) {
+                    const path = { pathname: '/coinmarket-redirect', hash: `#${hash}` } as const;
+                    extra.services.suiteRouterHistory.navigate(path);
+                    dispatch(onLocationChangeThunk(path));
+                }
+            }
+        }
+    };

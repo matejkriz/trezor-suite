@@ -1,17 +1,17 @@
-import { TouchableOpacity, TouchableOpacityProps, View } from 'react-native';
+import { type PressableProps, View } from 'react-native';
 
-import { NativeStyleObject, prepareNativeStyle, useNativeStyles } from '@trezor/styles';
+import { type NativeStyleObject, prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
 
+import { PressableOpacity } from './Pressable';
 import { ACCESSIBILITY_FONTSIZE_MULTIPLIER } from './Text';
 
-type RadioValue = string | number;
-export interface RadioProps extends Omit<TouchableOpacityProps, 'style' | 'onPress'> {
-    value: RadioValue;
+export type RadioProps<TValue> = Omit<PressableProps, 'style' | 'onPress'> & {
+    value: TValue;
     isChecked?: boolean;
     isDisabled?: boolean;
-    onPress: (value: RadioValue) => void;
+    onPress: (value: TValue) => void;
     style?: NativeStyleObject;
-}
+};
 
 type RadioStyleProps = {
     isChecked: boolean;
@@ -21,53 +21,66 @@ type RadioStyleProps = {
 const RADIO_SIZE = 24 * ACCESSIBILITY_FONTSIZE_MULTIPLIER;
 const RADIO_CHECK_SIZE = 14 * ACCESSIBILITY_FONTSIZE_MULTIPLIER;
 
-const radioStyle = prepareNativeStyle<RadioStyleProps>((utils, { isChecked, isDisabled }) => ({
-    height: RADIO_SIZE,
-    width: RADIO_SIZE,
-    backgroundColor: isDisabled
-        ? utils.colors.backgroundNeutralDisabled
-        : utils.colors.backgroundSurfaceElevation1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: utils.borders.radii.round,
-    borderWidth: isChecked ? utils.borders.widths.large : utils.borders.widths.medium,
-    borderColor: utils.colors.borderElevation2,
-    extend: {
-        condition: isChecked && !isDisabled,
-        style: { borderColor: utils.colors.borderSecondary },
-    },
-}));
+const radioStyle = prepareNativeStyle<RadioStyleProps>(
+    ({ colors, borders }, { isChecked, isDisabled }) => {
+        const borderColor = (() => {
+            if (isChecked && isDisabled) return colors.elementFillFieldSelectedDisabled;
+            if (isChecked) return colors.elementFillFieldSelected;
+            if (isDisabled) return colors.elementBorderFieldDisabled;
 
-const radioCheckStyle = prepareNativeStyle<Omit<RadioStyleProps, 'isChecked'>>(
+            return colors.elementBorderField;
+        })();
+
+        const backgroundColor = (() => {
+            if (isChecked) return 'transparent';
+            if (isDisabled) return colors.elementFillFieldDisabled;
+
+            return colors.elementFillField;
+        })();
+
+        return {
+            height: RADIO_SIZE,
+            width: RADIO_SIZE,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: borders.radii.round,
+            borderWidth: borders.widths.large,
+            backgroundColor,
+            borderColor,
+        };
+    },
+);
+
+const radioCheckStyle = prepareNativeStyle<Pick<RadioStyleProps, 'isDisabled'>>(
     (utils, { isDisabled }) => ({
         height: RADIO_CHECK_SIZE,
         width: RADIO_CHECK_SIZE,
         borderRadius: utils.borders.radii.round,
         backgroundColor: isDisabled
-            ? utils.colors.backgroundNeutralDisabled
-            : utils.colors.backgroundPrimaryDefault,
+            ? utils.colors.elementFillFieldSelectedDisabled
+            : utils.colors.elementFillFieldSelected,
     }),
 );
 
-export const Radio = ({
+export const Radio = <TValue extends string | number>({
     value,
-    isChecked = false,
     onPress,
-    isDisabled = false,
     style,
+    isChecked = false,
+    isDisabled = false,
     ...props
-}: RadioProps) => {
+}: RadioProps<TValue>) => {
     const { applyStyle } = useNativeStyles();
 
     return (
-        <TouchableOpacity
+        <PressableOpacity
             disabled={isDisabled}
             onPress={() => onPress(value)}
             style={[applyStyle(radioStyle, { isChecked, isDisabled }), style]}
             {...props}
         >
             {isChecked && <View style={applyStyle(radioCheckStyle, { isDisabled })} />}
-        </TouchableOpacity>
+        </PressableOpacity>
     );
 };

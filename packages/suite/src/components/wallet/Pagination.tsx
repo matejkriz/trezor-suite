@@ -1,48 +1,93 @@
-import { useMemo } from 'react';
-import { Translation } from 'src/components/suite';
-import styled, { css } from 'styled-components';
-import { borders, spacingsPx, typography } from '@trezor/theme';
+import { useForm, useWatch } from 'react-hook-form';
 
-const Wrapper = styled.div`
+import styled, { css } from 'styled-components';
+
+import { Translation } from '@suite/intl';
+import { selectLanguage } from '@suite/settings';
+import { Button, Row } from '@trezor/components';
+import { CaretLeftIcon, CaretRightIcon } from '@trezor/icons';
+import { NumberInput } from '@trezor/product-components';
+import { typography } from '@trezor/theme';
+
+import { useSelector } from 'src/hooks/suite';
+
+const Wrapper = styled.div<{ $hasPages?: boolean }>`
     display: flex;
+    align-items: center;
     justify-content: center;
     flex-wrap: wrap;
-    gap: ${spacingsPx.xxxs};
+    gap: ${$hasPages => ($hasPages ? '8px' : '2px')};
 `;
 
 const PageItem = styled.div<{ $isActive?: boolean }>`
     display: flex;
     align-items: center;
     justify-content: center;
-    width: ${spacingsPx.xxl};
-    height: ${spacingsPx.xxl};
-    padding: ${spacingsPx.xxs} ${spacingsPx.xs};
+    width: 32px;
+    height: 32px;
+    padding: 4px 8px;
     background: ${({ $isActive, theme }) =>
-        $isActive ? theme.backgroundSecondaryDefault : 'transparent'};
+        $isActive ? theme.elementFillBrandBold : 'transparent'};
     text-align: center;
-    color: ${({ $isActive, theme }) => $isActive && theme.textOnSecondary};
-    border-radius: ${borders.radii.md};
+    color: ${({ $isActive, theme }) => $isActive && theme.contentPrimaryInverse};
+    border-radius: 16px;
     transition:
         background 0.15s ease-out,
         color 0.15s ease-out;
-    ${typography.hint};
+    ${typography['body-sm']};
     cursor: pointer;
 
     ${({ $isActive, theme }) =>
         !$isActive &&
         css`
             &:hover {
-                background: ${theme.backgroundTertiaryDefaultOnElevation0};
-                color: ${theme.textOnTertiary};
+                background: ${theme.elementFillNeutralSofter};
+                color: ${theme.contentNeutral};
             }
         `};
+`;
+
+const Ellipsis = styled(PageItem)`
+    cursor: default;
+
+    &:hover {
+        background: transparent;
+        color: inherit;
+    }
 `;
 
 const Actions = styled.div<{ $isActive: boolean }>`
     display: flex;
     visibility: ${props => (props.$isActive ? 'auto' : 'hidden')};
-    ${typography.callout};
+    ${typography['body-sm-strong']};
 `;
+
+export interface GetPagesProps {
+    currentPage: number;
+    totalPages: number;
+}
+
+export type Page = number | '...';
+
+export const getPages = ({ currentPage: page, totalPages: total }: GetPagesProps): Page[] => {
+    if (total <= 0) {
+        return [];
+    }
+
+    if (total <= 7) {
+        return [...Array(total)].map((_, i) => i + 1);
+    }
+
+    if (page <= 4) {
+        return [1, 2, 3, 4, 5, '...', total];
+    }
+
+    if (page >= total - 3) {
+        return [1, '...', total - 4, total - 3, total - 2, total - 1, total];
+    }
+
+    return [1, '...', page - 1, page, page + 1, '...', total];
+};
 
 interface PaginationProps {
     currentPage: number;
@@ -50,6 +95,10 @@ interface PaginationProps {
     hasPages?: boolean;
     perPage: number;
     totalItems: number;
+    explicitNavigation?: boolean;
+    // `totalItems` is a lower-bound estimate rather than a true count (e.g. accounts that can
+    // always be derived further), so the page-input shouldn't reject pages beyond it.
+    noUpperBound?: boolean;
     onPageSelected: (page: number) => void;
 }
 
@@ -60,78 +109,118 @@ export const Pagination = ({
     isLastPage,
     perPage,
     totalItems,
+    explicitNavigation = false,
+    noUpperBound = false,
     ...rest
 }: PaginationProps) => {
+    const locale = useSelector(selectLanguage);
+
     const totalPages = Math.ceil(totalItems / perPage);
-    const showPrevious = currentPage > 1;
-    // array of int used for creating all page buttons
-    const calculatedPages = useMemo(
-        () => [...Array(totalPages)].map((_p, i) => i + 1),
-        [totalPages],
-    );
+    const showPrev = currentPage > 1;
+    const showNext = noUpperBound || currentPage < totalPages;
+
+    const { control } = useForm({
+        defaultValues: {
+            pageInput: currentPage.toString(),
+        },
+    });
+
+    const pageInput = useWatch({ control, name: 'pageInput' });
+
+    const isPageInputInvalid =
+        !Number.isInteger(Number(pageInput)) ||
+        Number(pageInput) < 1 ||
+        (!noUpperBound && Number(pageInput) > totalPages);
+
+    const pageNumbers = getPages({ currentPage, totalPages });
+
+    const goToPage = () => {
+        onPageSelected(Number(pageInput));
+    };
 
     if (!hasPages) {
         return (
-            <Wrapper {...rest}>
-                <Actions $isActive={showPrevious}>
-                    <PageItem onClick={() => onPageSelected(currentPage - 1)}>
-                        ‹ <Translation id="TR_PAGINATION_NEWER" />
-                    </PageItem>
+            <Wrapper $hasPages={hasPages} {...rest}>
+                <Actions $isActive={showPrev}>
+                    <Button
+                        onClick={() => onPageSelected(currentPage - 1)}
+                        iconLeft={CaretLeftIcon}
+                        intent="neutral"
+                        priority="secondary"
+                    >
+                        <Translation id="TR_PAGINATION_NEWER" />
+                    </Button>
                 </Actions>
                 <Actions $isActive={!isLastPage}>
-                    <PageItem onClick={() => onPageSelected(currentPage + 1)}>
-                        <Translation id="TR_PAGINATION_OLDER" /> ›
-                    </PageItem>
+                    <Button
+                        onClick={() => onPageSelected(currentPage + 1)}
+                        iconRight={CaretRightIcon}
+                        intent="neutral"
+                        priority="secondary"
+                    >
+                        <Translation id="TR_PAGINATION_OLDER" />
+                    </Button>
                 </Actions>
             </Wrapper>
         );
     }
 
     return (
-        <Wrapper {...rest}>
-            <Actions $isActive={showPrevious}>
-                {currentPage > 2 && <PageItem onClick={() => onPageSelected(1)}>«</PageItem>}
-                <PageItem onClick={() => onPageSelected(currentPage - 1)}>‹</PageItem>
+        <Wrapper $hasPages={hasPages} {...rest}>
+            <Actions $isActive={showPrev}>
+                <PageItem
+                    onClick={() => onPageSelected(currentPage - 1)}
+                    data-testid="@wallet/pagination/go-to-previous-page-button"
+                >
+                    ‹
+                </PageItem>
             </Actions>
 
-            {totalPages ? (
-                calculatedPages.map(i => (
+            {pageNumbers.map((page, index) =>
+                page === '...' ? (
+                    <Ellipsis key={`ellipsis-${index}`}>...</Ellipsis>
+                ) : (
                     <PageItem
-                        key={i}
-                        data-test={`@wallet/accounts/pagination/${i}`}
-                        data-test-activated={i === currentPage ?? 'true'}
-                        onClick={() => onPageSelected(i)}
-                        $isActive={i === currentPage}
+                        key={page}
+                        data-testid={`@wallet/accounts/pagination/${page}`}
+                        data-test-activated={page === currentPage}
+                        onClick={() => (page !== currentPage ? onPageSelected(page) : {})}
+                        $isActive={page === currentPage}
                     >
-                        {i}
+                        {page}
                     </PageItem>
-                ))
-            ) : (
-                <>
-                    {[...Array(currentPage - 1)].map((_p, i) => (
-                        // this is fine, read "exception from the rule"
-                        // the list is never reordered/filtered, items have no ids, list/items do not change
-                        // https://medium.com/@robinpokorny/index-as-a-key-is-an-anti-pattern-e0349aece318
-                        <PageItem
-                            key={i}
-                            data-test={`@wallet/accounts/pagination/${i + 1}`}
-                            onClick={() => onPageSelected(i + 1)}
-                        >
-                            {i + 1}
-                        </PageItem>
-                    ))}
-                    <PageItem onClick={() => onPageSelected(currentPage)} $isActive>
-                        {currentPage}
-                    </PageItem>
-                </>
+                ),
             )}
 
-            <Actions $isActive={currentPage < (totalPages || 1)}>
-                <PageItem onClick={() => onPageSelected(currentPage + 1)}>›</PageItem>
-                {totalPages && totalPages > 2 && (
-                    <PageItem onClick={() => onPageSelected(totalPages)}>»</PageItem>
-                )}
+            <Actions $isActive={showNext}>
+                <PageItem
+                    onClick={() => onPageSelected(currentPage + 1)}
+                    data-testid="@wallet/pagination/go-to-next-page-button"
+                >
+                    ›
+                </PageItem>
             </Actions>
+
+            {explicitNavigation && (
+                <Row alignItems="center" gap={12} maxWidth="140px">
+                    <NumberInput
+                        name="pageInput"
+                        control={control}
+                        locale={locale}
+                        size="small"
+                        data-testid="@wallet/pagination/go-to-page-input"
+                    />
+                    <Button
+                        intent="neutral"
+                        priority="secondary"
+                        onClick={goToPage}
+                        isDisabled={isPageInputInvalid}
+                        data-testid="@wallet/pagination/go-to-page-button"
+                    >
+                        <Translation id="TR_PAGINATION_GO" />
+                    </Button>
+                </Row>
+            )}
         </Wrapper>
     );
 };

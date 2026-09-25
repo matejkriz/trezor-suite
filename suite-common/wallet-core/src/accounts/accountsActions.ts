@@ -1,15 +1,24 @@
 import { createAction } from '@reduxjs/toolkit';
 
-import { AccountInfo } from '@trezor/connect';
-import { Account, SelectedAccountStatus, DiscoveryItem } from '@suite-common/wallet-types';
+import { type NetworkSymbol, getNetwork } from '@suite-common/wallet-config';
+import {
+    type Account,
+    type AccountBackendSpecific,
+    type AccountFailureSpecific,
+    type AccountKey,
+    type SelectedAccountStatus,
+    asAccountDescriptor,
+    createAccountKey,
+} from '@suite-common/wallet-types';
 import {
     enhanceAddresses,
     enhanceTokens,
     enhanceUtxo,
     formatNetworkAmount,
-    getAccountKey,
     getAccountSpecific,
 } from '@suite-common/wallet-utils';
+import { type AccountInfo, type StaticSessionId } from '@trezor/connect';
+import { isArrayMember } from '@trezor/utils';
 
 import { ACCOUNTS_MODULE_PREFIX } from './accountsConstants';
 
@@ -29,127 +38,139 @@ const removeAccount = createAction(
     }),
 );
 
-type CreateAccountActionProps = {
-    deviceState: string;
-    discoveryItem: DiscoveryItem;
+export type CreateAccountActionProps = Pick<
+    Account,
+    | 'path'
+    | 'unlockPath'
+    | 'symbol'
+    | 'index'
+    | 'accountType'
+    | 'deviceState'
+    | 'imported'
+    | 'accountLabel'
+    | 'visible'
+> & {
     accountInfo: AccountInfo;
-    imported?: boolean;
-    accountLabel?: string;
-};
+} & AccountBackendSpecific &
+    AccountFailureSpecific;
 
-type CreateIndexLabeledAccountActionProps = Omit<
-    CreateAccountActionProps,
-    'imported' | 'accountLabel'
->;
-
-const composeCreateAccountActionPayload = ({
-    deviceState,
-    discoveryItem,
-    accountInfo,
-    imported,
-    accountLabel,
-}: CreateAccountActionProps): Account => ({
-    deviceState,
-    accountLabel,
-    imported,
-    index: discoveryItem.index,
-    path: discoveryItem.path,
-    unlockPath: discoveryItem.unlockPath,
-    descriptor: accountInfo.descriptor,
-    descriptorChecksum: accountInfo.descriptorChecksum,
-    key: getAccountKey(accountInfo.descriptor, discoveryItem.coin, deviceState),
-    accountType: discoveryItem.accountType,
-    symbol: discoveryItem.coin,
-    empty: accountInfo.empty,
-    ...(discoveryItem.backendType === 'coinjoin'
-        ? {
-              backendType: 'coinjoin',
-              status: discoveryItem.status,
-          }
-        : {
-              backendType: discoveryItem.backendType,
-          }),
-    visible:
-        !accountInfo.empty ||
-        discoveryItem.accountType === 'coinjoin' ||
-        (discoveryItem.accountType === 'normal' && discoveryItem.index === 0),
-    balance: accountInfo.balance,
-    availableBalance: accountInfo.availableBalance,
-    formattedBalance: formatNetworkAmount(
-        // xrp `availableBalance` is reduced by reserve, use regular balance
-        discoveryItem.networkType === 'ripple' ? accountInfo.balance : accountInfo.availableBalance,
-        discoveryItem.coin,
-    ),
-    tokens: enhanceTokens(accountInfo.tokens),
-    addresses: enhanceAddresses(accountInfo, discoveryItem),
-    utxo: enhanceUtxo(accountInfo.utxo, discoveryItem.networkType, discoveryItem.index),
-    history: accountInfo.history,
-    metadata: {
-        key: accountInfo.legacyXpub || accountInfo.descriptor,
-    },
-    ...getAccountSpecific(accountInfo, discoveryItem.networkType),
-});
-
-const createIndexLabeledAccount = createAction(
-    `${ACCOUNTS_MODULE_PREFIX}/createIndexLabeledAccount`,
-    ({
-        deviceState,
-        discoveryItem,
-        accountInfo,
-    }: CreateIndexLabeledAccountActionProps): { payload: Account } => ({
-        payload: composeCreateAccountActionPayload({ deviceState, discoveryItem, accountInfo }),
-    }),
-);
+type CoinjoinAccount = Extract<Account, { backendType: 'coinjoin' }>;
+type CoinjoinAccountStatus = CoinjoinAccount['status'];
 
 const createAccount = createAction(
     `${ACCOUNTS_MODULE_PREFIX}/createAccount`,
-    ({
-        deviceState,
-        discoveryItem,
-        accountInfo,
-        imported,
-        accountLabel,
-    }: CreateAccountActionProps): { payload: Account } => ({
-        payload: composeCreateAccountActionPayload({
+    (
+        { accountInfo, ...account }: CreateAccountActionProps,
+        supportedNetworks: readonly NetworkSymbol[],
+    ): {
+        payload: { account: Account; supportedNetworks: readonly NetworkSymbol[] };
+    } => {
+        const { symbol, index, deviceState } = account;
+        const { descriptor, descriptorChecksum, legacyXpub } = accountInfo;
+        const { empty, balance, availableBalance, addresses, history, utxo, tokens } = accountInfo;
+
+        try {
+            const { chainId, networkType } = getNetwork(symbol);
+
+            const isNonEthEvm = networkType === 'ethereum' && symbol !== 'eth';
+            const metadataKey = isNonEthEvm ? `${descriptor}-${chainId}` : legacyXpub || descriptor;
+
+            const payload: Account = {
+                ...account,
+                descriptor: asAccountDescriptor(descriptor),
+                descriptorChecksum,
+                empty,
+                balance,
+                availableBalance,
+                history,
+                key: createAccountKey({
+                    accountDescriptor: asAccountDescriptor(descriptor),
+                    networkSymbol: symbol,
+                    deviceStaticSessionId: deviceState,
+                }),
+                formattedBalance: formatNetworkAmount(
+                    // Ripple and Stellar `availableBalance` is reduced by reserve, use regular balance
+                    isArrayMember(networkType, ['ripple', 'stellar']) ? balance : availableBalance,
+                    symbol,
+                ),
+                tokens: enhanceTokens(tokens),
+                addresses: enhanceAddresses(accountInfo, {
+                    networkType,
+                    index,
+                    addresses,
+                }),
+                utxo: enhanceUtxo(utxo, networkType, index),
+                metadata: { key: metadataKey },
+                ...getAccountSpecific(accountInfo, networkType),
+            };
+
+            return {
+                payload: { account: payload, supportedNetworks },
+            };
+        } catch (error) {
+            console.error('Error creating account payload:', error);
+            throw new Error('Failed to create account payload', { cause: error });
+        }
+    },
+);
+
+const createAccountFromAccountInfo = createAction(
+    `${ACCOUNTS_MODULE_PREFIX}/createAccountFromAccountInfo`,
+    (accountInfo: AccountInfo, deviceState: StaticSessionId): { payload: Account } => ({
+        // @ts-expect-error, bit43path type,marek
+        payload: {
+            ...accountInfo,
             deviceState,
-            discoveryItem,
-            accountInfo,
-            imported,
-            accountLabel,
-        }),
+            accountLabel: 'label',
+            imported: false,
+            index: 0,
+        },
     }),
 );
 
 const updateAccount = createAction(
     `${ACCOUNTS_MODULE_PREFIX}/updateAccount`,
-    (account: Account, accountInfo: AccountInfo | null = null): { payload: Account } => {
+    (
+        account: Account,
+        accountInfo: AccountInfo | null = null,
+    ): { payload: { account: Account } } => {
         if (accountInfo) {
             return {
                 payload: {
-                    ...account,
-                    ...accountInfo,
-                    path: account.path,
-                    empty: accountInfo.empty,
-                    visible: account.visible || !accountInfo.empty,
-                    formattedBalance: formatNetworkAmount(
-                        // xrp `availableBalance` is reduced by reserve, use regular balance
-                        account.networkType === 'ripple'
-                            ? accountInfo.balance
-                            : accountInfo.availableBalance,
-                        account.symbol,
-                    ),
-                    utxo: enhanceUtxo(accountInfo.utxo, account.networkType, account.index),
-                    addresses: enhanceAddresses(accountInfo, account),
-                    tokens: enhanceTokens(accountInfo.tokens),
-                    ...getAccountSpecific(accountInfo, account.networkType),
+                    account: {
+                        ...account,
+                        ...accountInfo,
+                        descriptor: asAccountDescriptor(accountInfo.descriptor),
+                        path: account.path,
+                        empty: accountInfo.empty,
+                        visible: account.visible || !accountInfo.empty,
+                        formattedBalance: formatNetworkAmount(
+                            // Ripple and Stellar `availableBalance` is reduced by reserve, use regular balance
+                            ['ripple', 'stellar'].includes(account.networkType)
+                                ? accountInfo.balance
+                                : accountInfo.availableBalance,
+                            account.symbol,
+                        ),
+                        utxo: enhanceUtxo(accountInfo.utxo, account.networkType, account.index),
+                        addresses: enhanceAddresses(accountInfo, account),
+                        tokens: enhanceTokens(accountInfo.tokens),
+                        ...getAccountSpecific(accountInfo, account.networkType),
+                    },
                 },
             };
         }
 
         return {
-            payload: account,
+            payload: { account },
         };
     },
+);
+
+const addAccountTokens = createAction(
+    `${ACCOUNTS_MODULE_PREFIX}/addAccountTokens`,
+    (accountKey: AccountKey, tokens: NonNullable<Account['tokens']>) => ({
+        payload: { accountKey, tokens },
+    }),
 );
 
 const renameAccount = createAction(
@@ -164,7 +185,7 @@ const renameAccount = createAction(
 
 const startCoinjoinAccountSync = createAction(
     `${ACCOUNTS_MODULE_PREFIX}/startCoinjoinAccountSync`,
-    (account: Extract<Account, { backendType: 'coinjoin' }>) => ({
+    (account: CoinjoinAccount) => ({
         payload: {
             accountKey: account.key,
         },
@@ -173,10 +194,7 @@ const startCoinjoinAccountSync = createAction(
 
 const endCoinjoinAccountSync = createAction(
     `${ACCOUNTS_MODULE_PREFIX}/endCoinjoinAccountSync`,
-    (
-        account: Extract<Account, { backendType: 'coinjoin' }>,
-        status: Extract<Account, { backendType: 'coinjoin' }>['status'],
-    ) => ({
+    (account: CoinjoinAccount, status: CoinjoinAccountStatus) => ({
         payload: {
             accountKey: account.key,
             status,
@@ -186,10 +204,12 @@ const endCoinjoinAccountSync = createAction(
 
 const changeAccountVisibility = createAction(
     `${ACCOUNTS_MODULE_PREFIX}/changeAccountVisibility`,
-    (account: Account, visible = true): { payload: Account } => ({
+    (account: Account, visible = true): { payload: { account: Account } } => ({
         payload: {
-            ...account,
-            visible,
+            account: {
+                ...account,
+                visible,
+            },
         },
     }),
 );
@@ -198,8 +218,9 @@ export const accountsActions = {
     disposeAccount,
     removeAccount,
     createAccount,
-    createIndexLabeledAccount,
+    createAccountFromAccountInfo,
     updateAccount,
+    addAccountTokens,
     renameAccount,
     updateSelectedAccount,
     changeAccountVisibility,

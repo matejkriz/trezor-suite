@@ -1,31 +1,32 @@
-import { GuideContent } from './GuideContent';
-import { GuideButton } from './GuideButton';
-import { GuideRouter } from './GuideRouter';
-import { GuideHeader } from './GuideHeader';
-import { HeaderBreadcrumb } from './HeaderBreadcrumb';
-import { GuideNode } from './GuideNode';
-import { GuideViewWrapper, ContentScrolledContext } from './GuideViewWrapper';
-import { GuideCategories } from './GuideCategories';
-import { GuideSearch } from './GuideSearch';
 import { Feedback } from './Feedback';
-import { SupportFeedbackSelection } from './SupportFeedbackSelection';
 import { Guide } from './Guide';
 import { GuideArticle } from './GuideArticle';
+import { GuideButton } from './GuideButton';
+import { GuideCategories } from './GuideCategories';
 import { GuideCategory } from './GuideCategory';
-import { OpenGuideFromTooltip } from './OpenGuideFromTooltip';
+import { GuideContent } from './GuideContent';
+import { GuideHeader } from './GuideHeader';
 import { GuideMarkdown } from './GuideMarkdown';
+import { GuideNode } from './GuideNode';
+import { GuideRouter } from './GuideRouter';
+import { GuideSearch } from './GuideSearch';
+import { GuideSectionHeadline } from './GuideSectionHeadline';
+import { GuideShortcuts } from './GuideShortcuts';
+import { GuideViewWrapper } from './GuideViewWrapper';
+import { OpenGuideFromTooltip } from './OpenGuideFromTooltip';
+import { SupportFeedbackSelection } from './SupportFeedbackSelection';
 
 export {
     GuideContent,
     GuideButton,
     GuideRouter,
+    GuideShortcuts,
     GuideHeader,
-    HeaderBreadcrumb,
     GuideNode,
     GuideViewWrapper,
     GuideCategories,
     GuideSearch,
-    ContentScrolledContext,
+    GuideSectionHeadline,
     Feedback,
     SupportFeedbackSelection,
     Guide,

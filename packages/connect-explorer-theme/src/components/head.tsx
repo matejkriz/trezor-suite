@@ -1,14 +1,14 @@
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 
+import NextHead from 'next/head';
 import type { NextSeoProps } from 'next-seo';
 import { NextSeo } from 'next-seo';
 import { useTheme } from 'next-themes';
-import NextHead from 'next/head';
 import { useMounted } from 'nextra/hooks';
 
-import { useConfig } from '../contexts';
+import { useConfig } from '../contexts/useConfig';
 
-export function Head(): ReactElement {
+export function Head({ title }: { title?: string } = {}): ReactElement {
     const config = useConfig();
     const { resolvedTheme } = useTheme();
     const mounted = useMounted();
@@ -26,7 +26,7 @@ export function Head(): ReactElement {
     return (
         <>
             <NextSeo
-                title={config.title}
+                title={title ?? config.title}
                 description={frontMatter.description}
                 canonical={frontMatter.canonical}
                 openGraph={frontMatter.openGraph}
@@ -63,8 +63,8 @@ export function Head(): ReactElement {
         :root {
           --nextra-primary-hue: ${lightHue}deg;
           --nextra-primary-saturation: ${lightSaturation}%;
-          --nextra-navbar-height: 128px;
-          --nextra-menu-height: 3.75rem;
+          --nextra-navbar-height: 96px;
+          --nextra-menu-height: 96px;
           --nextra-banner-height: 2.5rem;
         }
 
@@ -73,7 +73,7 @@ export function Head(): ReactElement {
           --nextra-primary-saturation: ${darkSaturation}%;
         }
       `}</style>
-                {head}
+                {head as ReactNode}
             </NextHead>
         </>
     );

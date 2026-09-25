@@ -1,23 +1,38 @@
-import { RefObject, useEffect } from 'react';
-import { useDispatch } from './useDispatch';
-import { useSelector } from './useSelector';
-import { onAnchorChange } from 'src/actions/suite/routerActions';
+import { type RefObject, useEffect } from 'react';
 
-export const useClearAnchorHighlightOnClick = (elementRef: RefObject<HTMLElement>) => {
-    const anchor = useSelector(state => state.router.anchor);
-    const dispatch = useDispatch();
+import { anchorChange, selectRouterAnchor } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+
+import { useSelector } from 'src/hooks/suite';
+
+export const useClearAnchorHighlightOnClick = (elementRef: RefObject<HTMLElement | null>) => {
+    const anchor = useSelector(selectRouterAnchor);
+    const { dispatch } = useServices(injectDispatch);
 
     // Remove anchor highlight on click.
     useEffect(() => {
         // to assure propagation of click, which removes anchor highlight, work reliably
         // click listener has to be added on react container
         const parent = elementRef.current?.parentElement;
-        const removeAnchor = () => anchor && dispatch(onAnchorChange());
+        const removeAnchor = () => anchor && dispatch(anchorChange());
 
         if (parent && anchor) {
-            parent.addEventListener('click', removeAnchor);
+            let frameId: number | null = null;
 
-            return () => parent.removeEventListener('click', removeAnchor);
+            frameId = requestAnimationFrame(() => {
+                frameId = null;
+                parent.addEventListener('click', removeAnchor);
+            });
+
+            return () => {
+                if (frameId) {
+                    cancelAnimationFrame(frameId);
+                    frameId = null;
+                }
+
+                parent.removeEventListener('click', removeAnchor);
+            };
         }
     }, [elementRef, anchor, dispatch]);
 };

@@ -1,14 +1,14 @@
 export * from './borders';
 export * from './boxShadows';
-export * from './coinsColors';
 export * from './colors';
-export * from './elevation';
 export * from './fontFamilies';
 export * from './fontWeights';
-export * from './palette';
+export { palette } from './palette';
 export * from './prepareTheme';
 export * from './sizes';
 export * from './spacings';
-export * from './types';
+export type * from './types';
 export * from './typography';
 export * from './zIndices';
+export * from './breakpoints';
+export { transitions } from './transitions';

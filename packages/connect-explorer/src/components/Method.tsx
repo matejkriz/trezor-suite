@@ -1,68 +1,138 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
-import styled from 'styled-components';
+import { useCallback, useEffect, useState } from 'react';
+import { Inspector } from 'react-inspector';
 
-import { Button } from '@trezor/components';
+import { CopyToClipboard } from 'nextra/components';
+import styled, { useTheme } from 'styled-components';
 
-import type { Field, FieldWithBundle } from '../types';
+import {
+    Button,
+    type ButtonProps,
+    Card,
+    IconButton,
+    Row,
+    Text,
+    variables,
+} from '@trezor/components';
+import { XIcon } from '@trezor/icons';
 
 import * as methodActions from '../actions/methodActions';
-import { useSelector, useActions } from '../hooks';
-
-import { Input, TextArea, Checkbox, CoinSelect, ArrayWrapper, BatchWrapper, File } from './fields';
-import { Row } from './fields/Row';
-import Response from './Response';
+import { useActions, useSelector } from '../hooks';
+import type { Field, FieldWithBundle, FieldWithUnion } from '../types';
+import { CodeEditor } from './CodeEditor';
+import {
+    ArrayWrapper,
+    BatchWrapper,
+    Checkbox,
+    CoinSelect,
+    File,
+    Input,
+    TextArea,
+    UnionWrapper,
+} from './fields';
+import { selectMethod } from '../reducers/methodReducer';
 
 interface Props {
-    actions: any; // todo
+    actions: {
+        onSubmit: typeof methodActions.onSubmitThunk;
+        onBatchAdd: typeof methodActions.onBatchAdd;
+        onBatchRemove: typeof methodActions.onBatchRemove;
+        onFieldChange: typeof methodActions.onFieldChange;
+        onSetUnion: typeof methodActions.onSetUnion;
+    };
 }
+
+export const getFields = (fields: Field<any>[], props: Props) => {
+    // Move all booleans to the end while not breaking the order of other fields
+    const bools = fields.filter(f => f.type === 'checkbox');
+    const nonBools = fields.filter(f => f.type !== 'checkbox');
+    const boolsChildren = bools.map((batchField: any) => getField(batchField, props));
+    const children = nonBools.map((batchField: any) => getField(batchField, props));
+
+    return (
+        <>
+            {children}
+            {boolsChildren.length > 0 && <Checkboxes>{boolsChildren}</Checkboxes>}
+        </>
+    );
+};
 
 const getArray = (field: FieldWithBundle<any>, props: Props) => (
     <ArrayWrapper
         key={field.name}
         field={field}
-        onAdd={() => props.actions.onBatchAdd(field, field.batch[0].fields)}
+        onAdd={() => {
+            const { batch } = field;
+            // @ts-expect-error: indexing with noUncheckedIndexedAccess
+            const firstBatch: (typeof batch)[number] = batch[0];
+            props.actions.onBatchAdd(field, firstBatch.fields);
+        }}
     >
         {field.items?.map((batch, index) => {
             const key = `${field.name}-${index}`;
-            const children = batch.map((batchField: any) => getField(batchField, props));
 
             return (
                 <BatchWrapper key={key} onRemove={() => props.actions.onBatchRemove(field, batch)}>
-                    {children}
+                    {getFields(batch, props)}
                 </BatchWrapper>
             );
         })}
     </ArrayWrapper>
 );
 
+const getUnion = (field: FieldWithUnion<any>, props: Props) => (
+    <UnionWrapper
+        field={field}
+        onChange={(option: number) => props.actions.onSetUnion(field, field.options[option])}
+    >
+        {getFields(field.current, props)}
+    </UnionWrapper>
+);
+
 export const getField = (field: Field<any> | FieldWithBundle<any>, props: Props) => {
     switch (field.type) {
         case 'array':
             return getArray(field, props);
+        case 'union':
+            return getUnion(field, props);
         case 'input':
         case 'input-long':
         case 'number':
             return (
                 <Input
-                    dataTest={`@input/${field.name}`}
+                    data-testid={`@input/${field.name}`}
                     key={field.name}
                     field={field}
                     onChange={props.actions.onFieldChange}
                 />
             );
-        case 'address':
-            return <Input key={field.name} field={field} onChange={props.actions.onFieldChange} />;
-
         case 'checkbox':
             return (
                 <Checkbox
-                    data-test={`@checkbox/${field.name}`}
+                    data-testid={`@checkbox/${field.name}`}
                     key={field.name}
                     field={field}
                     onChange={props.actions.onFieldChange}
                 />
             );
         case 'json':
+            return (
+                <Card
+                    key={field.name}
+                    paddingType="small"
+                    header={field.name}
+                    margin={{ bottom: 8 }}
+                >
+                    <CodeEditor
+                        code={
+                            typeof field.value === 'string'
+                                ? field.value
+                                : JSON.stringify(field.value, null, 2)
+                        }
+                        codeChange={code => props.actions.onFieldChange(field, code)}
+                    />
+                </Card>
+            );
         case 'textarea':
         case 'function':
             return (
@@ -79,67 +149,199 @@ export const getField = (field: Field<any> | FieldWithBundle<any>, props: Props)
     }
 };
 
-const MethodContent = styled.section`
-    flex: 1;
-    padding: 10px 20px;
-    display: flex;
-    flex-direction: column;
+export const MethodContent = styled.div<{ $manualMode?: boolean }>(
+    ({ $manualMode }) => `
+    display: grid;
+    grid-template-columns: ${$manualMode ? '3fr 2fr' : '2fr 3fr'};
+    gap: 20px;
+
+    @media screen and (max-width: ${variables.SCREEN_SIZE.MD}) {
+        grid-template-columns: 1fr;
+    }
+
+    & > div {
+        /* CSS grid obscurities */
+        min-width: 0;
+    }
+`,
+);
+
+const Container = styled.div`
+    position: relative;
+    background: ${({ theme }) => theme.elementFillField};
+    border-radius: 12px;
+    width: 100%;
+    overflow-x: auto;
+    padding: 12px 16px;
+    overflow-wrap: break-word;
+    word-break: break-all;
+    min-height: 150px;
+    margin-bottom: 10px;
+
+    ul,
+    ol {
+        list-style: none;
+    }
+
+    pre {
+        padding: 0;
+        width: 100%;
+        overflow-x: scroll;
+    }
 `;
 
-interface VerifyButtonProps {
-    onClick: (url: string) => void;
-    name: string;
-}
+const Checkboxes = styled.div`
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 10px;
+`;
 
-const VerifyButton = ({ name, onClick }: VerifyButtonProps) => {
-    const signMethods = ['signMessage', 'ethereumSignMessage'];
-    const verifyUrls = ['/method/verifyMessage', '/method/ethereumVerifyMessage'];
-    const index = signMethods.indexOf(name);
-    if (index < 0) return null;
+const CopyWrapper = styled.div`
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    opacity: 0;
+    transition: opacity 0.3s;
 
-    return <Button onClick={() => onClick(verifyUrls[index])}>Verify response</Button>;
+    div:hover > & {
+        opacity: 1;
+    }
+`;
+
+const Sticky = styled.div`
+    position: sticky;
+    top: 20px;
+    align-self: flex-start;
+    width: 100%;
+`;
+
+type SubmitButtonProps = {
+    onClick: ButtonProps['onClick'];
+    isLoading: boolean;
+    text?: string;
 };
 
-const Method = () => {
-    const { method, docs } = useSelector(state => ({
-        method: state.method,
-        docs: state.docs,
-    }));
+const SubmitButton = ({ onClick, text, isLoading }: SubmitButtonProps) => (
+    <Button onClick={onClick} data-testid="@submit-button" flex="1" isLoading={isLoading}>
+        {text || 'Submit'}
+    </Button>
+);
+
+export const Method = () => {
+    const theme = useTheme();
+    const method = useSelector(selectMethod);
     const actions = useActions({
-        onSubmit: methodActions.onSubmit,
-        onVerify: methodActions.onVerify,
+        onSubmit: methodActions.onSubmitThunk,
+        onCancelCall: methodActions.onCancelCall,
         onBatchAdd: methodActions.onBatchAdd,
         onBatchRemove: methodActions.onBatchRemove,
         onFieldChange: methodActions.onFieldChange,
-        onFieldDataChange: methodActions.onFieldDataChange,
+        onSetUnion: methodActions.onSetUnion,
+        onCodeChange: methodActions.onCodeChangeThunk,
     });
 
-    const { onSubmit, onVerify } = actions;
+    const { onSubmit } = actions;
 
-    const { name, submitButton, fields, tab, javascriptCode, response } = method;
+    const { name, submitButton, fields, javascriptCode, response, schema, manualMode, processing } =
+        method;
+
+    const [code, setCode] = useState('');
+
+    const codeChange = useCallback(
+        (val: string) => {
+            setCode(val);
+            actions.onCodeChange(val);
+        },
+        [actions],
+    );
+    useEffect(() => {
+        // Don't override code when in manual mode
+        if (!javascriptCode || manualMode) return;
+        // Strip the function name and the brackets
+        const start = javascriptCode.indexOf('(');
+        const end = javascriptCode.lastIndexOf(')');
+        const params = javascriptCode.slice(start + 1, end);
+        setCode(params);
+    }, [javascriptCode, manualMode]);
 
     if (!name) return null;
 
-    const documentation = docs?.find(d => d.name === name);
+    const json = response ? (
+        <Inspector
+            theme={theme.mode === 'light' ? 'chromeLight' : 'chromeDark'}
+            data={response}
+            expandLevel={10}
+            table={false}
+        />
+    ) : null;
+
+    const buttonProps: SubmitButtonProps = {
+        onClick: onSubmit,
+        text: submitButton,
+        isLoading: processing,
+    };
 
     return (
-        <MethodContent>
-            {fields.map(field => getField(field, { actions }))}
-            <Row>
-                <Button onClick={onSubmit} data-test="@submit-button">
-                    {submitButton}
-                </Button>
-                {response && response.success && <VerifyButton name={name} onClick={onVerify} />}
-            </Row>
-            <Response
-                response={response}
-                code={javascriptCode}
-                hasDocumentation={!!docs}
-                docs={documentation && documentation.html}
-                tab={tab}
-            />
+        <MethodContent $manualMode={manualMode}>
+            <div>
+                {manualMode ? (
+                    <Container>
+                        <Text typographyStyle="body-md-strong">Method with params</Text>
+                        <CodeEditor {...{ code, codeChange, schema }} />
+                        <CopyWrapper>
+                            <CopyToClipboard getValue={() => javascriptCode ?? ''} />
+                        </CopyWrapper>
+
+                        <Row gap={4} margin={{ top: 12 }}>
+                            <SubmitButton {...buttonProps} />
+                            {buttonProps.isLoading && (
+                                <IconButton
+                                    icon={XIcon}
+                                    intent="neutral"
+                                    priority="secondary"
+                                    onClick={() => actions.onCancelCall()}
+                                    tooltip={{ isActive: false }}
+                                />
+                            )}
+                        </Row>
+                    </Container>
+                ) : (
+                    getFields(fields, { actions })
+                )}
+            </div>
+            <div>
+                <Sticky>
+                    {!manualMode && (
+                        <Container data-testid="@code">
+                            <Text typographyStyle="body-md-strong">Method with params</Text>
+                            <CopyWrapper>
+                                <CopyToClipboard getValue={() => javascriptCode ?? ''} />
+                            </CopyWrapper>
+                            <pre>{javascriptCode}</pre>
+                            <Row gap={4} margin={{ top: 12 }}>
+                                <SubmitButton {...buttonProps} />
+                                {buttonProps.isLoading && (
+                                    <IconButton
+                                        icon={XIcon}
+                                        intent="neutral"
+                                        priority="secondary"
+                                        data-testid="@cancel-button"
+                                        onClick={() => actions.onCancelCall()}
+                                        tooltip={{ isActive: false }}
+                                    />
+                                )}
+                            </Row>
+                        </Container>
+                    )}
+                    <Container data-testid="@response">
+                        <Text typographyStyle="body-md-strong">Response</Text>
+                        <CopyWrapper>
+                            <CopyToClipboard getValue={() => JSON.stringify(response, null, 2)} />
+                        </CopyWrapper>
+                        {json}
+                    </Container>
+                </Sticky>
+            </div>
         </MethodContent>
     );
 };
-
-export default Method;

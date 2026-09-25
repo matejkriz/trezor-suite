@@ -1,30 +1,31 @@
-import styled from 'styled-components';
-import { ConfirmOnDevice } from '@trezor/components';
-import { Translation, Modal, ModalProps } from 'src/components/suite';
-import { TrezorDevice } from 'src/types/suite';
-import { Fingerprint } from 'src/components/firmware';
+import { Fingerprint } from '@suite/firmware-upgrade';
+import { Translation } from '@suite/intl';
+import { getDeviceInternalModel } from '@suite-common/suite-utils';
+import { Card, Modal } from '@trezor/components';
+import { getDeviceColorVariant } from '@trezor/device-utils';
+import { ConfirmOnDevicePill } from '@trezor/product-components';
 
-const StyledModal = styled(Modal)`
-    width: 360px;
-`;
+import { type TrezorDevice } from 'src/types/suite';
 
-interface ConfirmFingerprintProps extends ModalProps {
+type ConfirmFingerprintProps = {
     device: TrezorDevice;
-}
+};
 
-export const ConfirmFingerprintModal = ({ device, ...rest }: ConfirmFingerprintProps) => (
-    <StyledModal
-        modalPrompt={
-            <ConfirmOnDevice
-                title={<Translation id="TR_CONFIRM_ON_TREZOR" />}
-                deviceModelInternal={device.features?.internal_model}
-                deviceUnitColor={device?.features?.unit_color}
-            />
-        }
-        heading={<Translation id="TR_CHECK_FINGERPRINT" />}
-        data-test="@suite/modal/confirm-fingerprint-on-device"
-        {...rest}
-    >
-        <Fingerprint device={device} />
-    </StyledModal>
+export const ConfirmFingerprintModal = ({ device }: ConfirmFingerprintProps) => (
+    <Modal.Backdrop>
+        <ConfirmOnDevicePill
+            title={<Translation id="TR_CONFIRM_ON_TREZOR" />}
+            deviceModelInternal={getDeviceInternalModel(device)}
+            deviceUnitColor={getDeviceColorVariant(device)}
+        />
+        <Modal.ModalBase
+            heading={<Translation id="TR_CHECK_FINGERPRINT" />}
+            data-testid="@suite/modal/confirm-fingerprint-on-device"
+            width={400}
+        >
+            <Card>
+                <Fingerprint device={device} />
+            </Card>
+        </Modal.ModalBase>
+    </Modal.Backdrop>
 );

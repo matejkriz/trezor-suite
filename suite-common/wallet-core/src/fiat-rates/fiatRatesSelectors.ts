@@ -1,47 +1,59 @@
-// This file is almost a duplicate with suite-native fiatRatesSelectors
-// There are some small differences such as removed memoization
+import { A, F, pipe } from '@mobily/ts-belt';
 
-import { A, D, F, pipe } from '@mobily/ts-belt';
-
-import { FiatCurrencyCode } from '@suite-common/suite-config';
 import {
-    Account,
-    AccountKey,
-    WalletAccountTransaction,
-    FiatRateKey,
-    Rate,
-    RateType,
-    TickerId,
-    FiatRates,
+    type TokenDefinitionsRootState,
+    selectIsSpecificCoinDefinitionKnown,
+} from '@suite-common/token-definitions';
+import {
+    type CryptoBaseCurrencyPair,
+    type Rate,
+    type RateTypeWithoutHistoric,
+    type RatesByKey,
+    type RatesByTimestamps,
+    type TickerId,
+    type Timestamp,
+    type TokenAddress,
 } from '@suite-common/wallet-types';
-import { getFiatRateKey, getFiatRateKeyFromTicker } from '@suite-common/wallet-utils';
-
 import {
-    AccountsRootState,
-    selectAccountByKey,
-    selectDeviceAccounts,
-} from '../accounts/accountsReducer';
-import { TransactionsRootState, selectTransactions } from '../transactions/transactionsReducer';
+    getFiatRateKeyFromTicker,
+    roundTimestampToNearestPastHour,
+} from '@suite-common/wallet-utils';
+import type { BaseCurrencyCode } from '@trezor/blockchain-link-types';
+import { BigNumber } from '@trezor/utils';
+
 import { MAX_AGE } from './fiatRatesConstants';
-import { FiatRatesRootState } from './fiatRatesTypes';
+import { type FiatRatesRootState } from './fiatRatesTypes';
+import { type AccountsRootState } from '../accounts/accountsReducer';
+import { selectAccounts } from '../accounts/accountsSelectors';
 
-type UnixTimestamp = number;
+export const selectCurrentFiatRates = (state: FiatRatesRootState): RatesByKey | undefined =>
+    state.wallet.fiat?.['current'];
 
-export const selectFiatRates = (
-    state: FiatRatesRootState,
-    rateType: RateType = 'current',
-): FiatRates | undefined => state.wallet.fiat?.[rateType];
+export const selectHistoricFiatRates = (state: FiatRatesRootState): RatesByTimestamps =>
+    state.wallet.fiat.historic;
 
 export const selectFiatRatesByFiatRateKey = (
     state: FiatRatesRootState,
-    fiatRateKey: FiatRateKey,
-    rateType: RateType = 'current',
+    fiatRateKey: CryptoBaseCurrencyPair,
+    rateType: RateTypeWithoutHistoric = 'current',
 ): Rate | undefined => state.wallet.fiat?.[rateType]?.[fiatRateKey];
+
+export const selectHistoricFiatRatesByTimestamp = (
+    state: FiatRatesRootState,
+    fiatRateKey: CryptoBaseCurrencyPair,
+    timestamp: Timestamp | undefined,
+): number | undefined => {
+    if (timestamp === undefined) return undefined;
+
+    const roundedTimestamp = roundTimestampToNearestPastHour(timestamp);
+
+    return state.wallet.fiat?.['historic']?.[fiatRateKey]?.[roundedTimestamp];
+};
 
 export const selectIsFiatRateLoading = (
     state: FiatRatesRootState,
-    fiatRateKey: FiatRateKey,
-    rateType: RateType = 'current',
+    fiatRateKey: CryptoBaseCurrencyPair,
+    rateType: RateTypeWithoutHistoric = 'current',
 ) => {
     const currentRate = selectFiatRatesByFiatRateKey(state, fiatRateKey, rateType);
 
@@ -51,8 +63,8 @@ export const selectIsFiatRateLoading = (
 export const selectIsTickerLoading = (
     state: FiatRatesRootState,
     ticker: TickerId,
-    fiatCurrency: FiatCurrencyCode,
-    rateType: RateType = 'current',
+    fiatCurrency: BaseCurrencyCode,
+    rateType: RateTypeWithoutHistoric = 'current',
 ) => {
     const fiatRateKey = getFiatRateKeyFromTicker(ticker, fiatCurrency);
 
@@ -61,9 +73,9 @@ export const selectIsTickerLoading = (
 
 export const selectShouldUpdateFiatRate = (
     state: FiatRatesRootState,
-    currentTimestamp: UnixTimestamp,
-    fiatRateKey: FiatRateKey,
-    rateType: RateType = 'current',
+    currentTimestamp: Timestamp,
+    fiatRateKey: CryptoBaseCurrencyPair,
+    rateType: RateTypeWithoutHistoric = 'current',
 ) => {
     const currentRate = selectFiatRatesByFiatRateKey(state, fiatRateKey, rateType);
 
@@ -76,33 +88,50 @@ export const selectShouldUpdateFiatRate = (
     return currentTimestamp - lastSuccessfulFetchTimestamp > MAX_AGE[rateType];
 };
 
-export const selectTickerFromAccounts = (state: FiatRatesRootState): TickerId[] => {
-    const accounts = selectDeviceAccounts(state as any);
+export const selectTickerFromAccounts = (
+    state: FiatRatesRootState & TokenDefinitionsRootState & AccountsRootState,
+): TickerId[] => {
+    // Use accounts of all remembered devices/wallets, not just the selected one, so that
+    // token fiat rates are fetched for every wallet. Otherwise tokens that exist only on a
+    // non-selected wallet (e.g. a passphrase wallet) never get a rate fetched on launch.
+    const accounts = selectAccounts(state);
 
     return pipe(
         accounts,
-        A.map(account => [
+        A.map((account): TickerId[] => [
             {
                 symbol: account.symbol,
-            } as TickerId,
-            ...(account.tokens || []).map(
-                token =>
-                    ({
-                        symbol: account.symbol,
-                        tokenAddress: token.contract,
-                    }) as TickerId,
-            ),
+            },
+            ...(account.tokens || [])
+                .filter(token => new BigNumber(token.balance ?? '0').gt(0))
+                .map(
+                    token =>
+                        ({
+                            symbol: account.symbol,
+                            tokenAddress: token.contract as TokenAddress,
+                            protocols: token.protocols,
+                        }) satisfies TickerId,
+                ),
         ]),
         A.flat,
+        A.filter(
+            ticker =>
+                !ticker.tokenAddress ||
+                selectIsSpecificCoinDefinitionKnown(state, ticker.symbol, ticker.tokenAddress),
+        ),
+        A.uniqBy(ticker =>
+            ticker.tokenAddress ? `${ticker.symbol}-${ticker.tokenAddress}` : ticker.symbol,
+        ),
+        A.sortBy(ticker => (ticker.tokenAddress ? 1 : 0)),
         F.toMutable,
     );
 };
 
 export const selectTickersToBeUpdated = (
-    state: FiatRatesRootState,
-    currentTimestamp: UnixTimestamp,
-    fiatCurrency: FiatCurrencyCode,
-    rateType: RateType,
+    state: FiatRatesRootState & TokenDefinitionsRootState & AccountsRootState,
+    currentTimestamp: Timestamp,
+    fiatCurrency: BaseCurrencyCode,
+    rateType: RateTypeWithoutHistoric,
 ): TickerId[] => {
     const tickers = selectTickerFromAccounts(state);
 
@@ -114,42 +143,4 @@ export const selectTickersToBeUpdated = (
             !selectIsTickerLoading(state, ticker, fiatCurrency, rateType)
         );
     });
-};
-
-export const selectTransactionsWithMissingRates = (
-    state: FiatRatesRootState & TransactionsRootState & AccountsRootState,
-    localCurrency: FiatCurrencyCode,
-) => {
-    const accountTransactions = selectTransactions(state);
-
-    return pipe(
-        accountTransactions,
-        D.mapWithKey((accountKey, txs) => ({
-            account: selectAccountByKey(state, accountKey as AccountKey),
-            txs: txs.filter(tx => !tx.rates?.[localCurrency]),
-        })),
-        D.filter(({ account, txs }) => !!account && !!txs.length),
-        D.values,
-        A.filter(value => !!value),
-    ) as {
-        account: Account;
-        txs: WalletAccountTransaction[];
-    }[];
-};
-
-export const selectIsAccountWithRatesByKey = (
-    state: AccountsRootState & FiatRatesRootState,
-    accountKey: string,
-    fiatCurrency: FiatCurrencyCode,
-) => {
-    const account = selectAccountByKey(state, accountKey);
-
-    if (!account) {
-        return false;
-    }
-
-    const fiatRateKey = getFiatRateKey(account.symbol, fiatCurrency);
-    const rates = selectFiatRatesByFiatRateKey(state, fiatRateKey);
-
-    return !!rates;
 };

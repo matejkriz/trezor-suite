@@ -1,17 +1,18 @@
 import { Select } from '@trezor/components';
 
-import type { Field } from '../../types';
-import { onFieldChange } from '../../actions/methodActions';
 import { Row } from './Row';
+import { type onFieldChange } from '../../actions/methodActions';
+import type { FieldBasic } from '../../types';
 
 interface CoinSelectProps {
-    field: Field<any>;
+    field: FieldBasic<any>;
     onChange: typeof onFieldChange;
 }
 
 const CoinSelect = ({ field, onChange }: CoinSelectProps) => (
     <Row>
         <Select
+            data-testid={`@select/${field.name}`}
             label={field.name}
             value={field.data!.find(d => d.value === field.value)}
             onChange={({ value }) => {
@@ -23,6 +24,7 @@ const CoinSelect = ({ field, onChange }: CoinSelectProps) => (
                 return onChange(field, value);
             }}
             options={field.data}
+            isSearchable
         />
     </Row>
 );

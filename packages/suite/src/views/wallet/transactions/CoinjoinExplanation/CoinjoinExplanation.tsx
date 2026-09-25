@@ -1,108 +1,64 @@
 import styled from 'styled-components';
-import { darken } from 'polished';
 
+import { Translation } from '@suite/intl';
 import { Card, Icon, variables } from '@trezor/components';
-import { HELP_CENTER_COINJOIN_URL } from '@trezor/urls';
-import { mediaQueries } from '@trezor/styles';
+import { ArrowsInIcon, CoinsIcon, QuestionIcon, TrezorBackupIcon } from '@trezor/icons';
+import { typography } from '@trezor/theme';
 
-import { Translation } from 'src/components/suite';
-import { CoinjoinProcessStep, CoinjoinProcessStepProps } from './CoinjoinProcessStep';
-import { spacingsPx, typography } from '@trezor/theme';
-import { LearnMoreButton } from 'src/components/suite/LearnMoreButton';
-
-const Container = styled(Card)`
-    background: ${({ theme }) => theme.backgroundTertiaryDefaultOnElevation0};
-`;
+import { CoinjoinProcessStep, type CoinjoinProcessStepProps } from './CoinjoinProcessStep';
 
 const Heading = styled.div`
     display: flex;
     align-items: center;
-    margin-bottom: ${spacingsPx.md};
-    color: ${({ theme }) => theme.textSubdued};
-    ${typography.hint};
+    margin-bottom: 16px;
+    color: ${({ theme }) => theme.contentSecondary};
+    ${typography['body-sm']};
 `;
 
-const QuestionIcon = styled(Icon)`
-    margin-right: 4px;
-`;
-
-const Steps = styled(Card)`
+const Steps = styled.div`
     box-shadow: none;
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
     justify-content: space-between;
-    margin-bottom: ${spacingsPx.xl};
-
-    ${mediaQueries.dark_theme} {
-        background: ${({ theme }) => theme.backgroundSurfaceElevation3};
-    }
+    margin-bottom: 24px;
 
     ${variables.SCREEN_QUERY.BELOW_LAPTOP} {
         display: block;
     }
 `;
 
-const StyledLearnMoreButton = styled(LearnMoreButton)`
-    margin: 0 auto;
-    color: ${({ theme }) => theme.textSubdued};
-
-    button {
-        background: #d9d9d9;
-    }
-
-    path {
-        fill: ${({ theme }) => theme.iconSubdued};
-    }
-
-    button:hover,
-    button:focus {
-        background: ${({ theme }) => darken(theme.HOVER_DARKEN_FILTER, '#d9d9d9')};
-    }
-
-    ${mediaQueries.dark_theme} {
-        button {
-            background: ${({ theme }) => theme.backgroundSurfaceElevation0};
-        }
-
-        button:hover,
-        button:focus {
-            background: ${({ theme }) =>
-                darken(theme.HOVER_DARKEN_FILTER, theme.backgroundSurfaceElevation0)};
-        }
-    }
-`;
-
-const STEPS: Array<Omit<CoinjoinProcessStepProps, 'number'>> = [
+const STEPS: Array<Omit<CoinjoinProcessStepProps, 'number'> & { id: string }> = [
     {
-        image: 'COINS',
+        id: 'coins',
+        iconName: CoinsIcon,
         title: <Translation id="TR_COINJOIN_STEP_1_TITLE" />,
         description: <Translation id="TR_COINJOIN_STEP_1_DESCRIPTION" />,
     },
     {
-        image: 'BACKUP',
+        id: 'backup',
+        iconName: TrezorBackupIcon,
         title: <Translation id="TR_START_COINJOIN" />,
         description: <Translation id="TR_COINJOIN_STEP_2_DESCRIPTION" />,
     },
     {
-        image: 'CLOUDY',
+        id: 'arrows',
+        iconName: ArrowsInIcon,
         title: <Translation id="TR_COINJOIN_STEP_3_TITLE" />,
         description: <Translation id="TR_COINJOIN_STEP_3_DESCRIPTION" />,
     },
 ];
 
 export const CoinjoinExplanation = () => (
-    <Container>
+    <Card>
         <Heading>
-            <QuestionIcon icon="QUESTION" size={15} />
+            <Icon as={QuestionIcon} margin={{ right: 4 }} size={15} />
             <Translation id="TR_COINJOIN_EXPLANATION_TITLE" />
         </Heading>
 
         <Steps>
-            {STEPS.map((step, index) => (
-                <CoinjoinProcessStep number={index + 1} key={step.image} {...step} />
+            {STEPS.map(({ id, ...step }, index) => (
+                <CoinjoinProcessStep number={index + 1} key={id} {...step} />
             ))}
         </Steps>
-
-        <StyledLearnMoreButton url={HELP_CENTER_COINJOIN_URL} />
-    </Container>
+    </Card>
 );

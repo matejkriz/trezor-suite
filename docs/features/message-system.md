@@ -6,18 +6,28 @@ Message system was implemented to allow sending emergency messages to Trezor Sui
 
 [Issue on Github](https://github.com/trezor/trezor-suite/issues/2752)
 
-## Types of in-app messages
+[Notion for production deployment](https://www.notion.so/satoshilabs/Message-system-production-release-c0ac4275461f4755bc9050ff2de57425)
+
+## Features of message system
+
+### Messages
 
 There are multiple ways of displaying message to a user:
 
--   banner
-    -   looks like a cookie bar above the page
--   modal
-    -   _TODO: missing implementation_
--   context
-    -   messages on specific places in app (e.g. settings page, banner in account page)
--   feature
-    -   disabling some feature with an explanation message
+- banner
+    - looks like a cookie bar above the page
+- modal
+    - _TODO: missing implementation_
+- context
+    - messages on specific places in app (e.g. settings page, banner in account page)
+
+### Feature
+
+Disabling some feature with an explanation message.
+
+### A/B testing
+
+The ability to create A/B testing.
 
 ## Implementation
 
@@ -31,21 +41,30 @@ The config is fetched at launch of the application and then every minute. It rem
 
 If fetching of a new config fails, the fetching process is repeated every 30 seconds.
 
+#### Data source (Remote vs Local)
+
+You can choose where Suite loads the message-system config from:
+
+- **Remote server (default)** – config is fetched on startup and then polled at a fixed interval (desktop/web vs. mobile may differ).
+- **Local file** – config is loaded from the repository bundle; no network (useful for development).
+
+This setting is available in **Settings → Debug → Message System info**.
+
 ### Schema
 
 The configuration structure is specified in JSON file using JSON schema. The file can be found in `suite-common/message-system/schema` folder. Its name is `config.schema.vX.json`.
 
 We use JSON schema for 2 reasons:
 
--   generating TypeScript types
--   validating configuration file
+- generating TypeScript types
+- validating configuration file
 
 ### Types
 
 Types are generated from JSON-schema during the `build:libs` process or can be generated manually by `yarn workspace @suite-common/message-system msg-system-types`. A `messageSystem.ts` file is created in `suite-common/suite-types/src` folder.
 
--   This file should never be changed manually.
--   This file is committed into the repository.
+- This file should never be changed manually.
+- This file is committed into the repository.
 
 ### Signing
 
@@ -55,20 +74,20 @@ To ensure the authenticity of a configuration file, JSON Web Signatures are used
 
 #### Validation
 
--   Validation of configuration file is performed in CI job in `validation` phase. It is used to detect possible structure and semantic errors.
--   It can be run locally by `yarn workspace @suite-common/message-system validate-config` script.
+- Validation of configuration file is performed in CI job in `validation` phase. It is used to detect possible structure and semantic errors.
+- It can be run locally by `yarn workspace @suite-common/message-system validate-config` script.
 
 #### Signing
 
--   Signing of the configuration file is performed:
-    -   in CI job in `prebuild` phase for distribution and
-    -   manually by `yarn message-system-sign-config` (or `yarn build:libs`) script for local development.
--   The results are saved into `suite-common/message-system/files` as two files:
-    -   `config.v1.jws` to be uploaded to `https://data.trezor.io/config/$environment/config.vX.jws`
-    -   `config.v1.ts` to be bundled with application
--   Development private key is baked into project structure together with public keys for both development and production.
--   Production private key is available only on `codesign` branch in CI (both Gitlab and Github).
--   Development private key can be found in `suite-common/message-system/scripts/sign-config.ts` file, the public keys can be found in `packages/suite-build/utils/jws.ts` file.
+- Signing of the configuration file is performed:
+    - in CI job in `prebuild` phase for distribution and
+    - manually by `yarn message-system-sign-config` (or `yarn build:libs`) script for local development.
+- The results are saved into `suite-common/message-system/files` as two files:
+    - `config.v1.jws` to be uploaded to `https://data.trezor.io/config/$environment/config.vX.jws`
+    - `config.v1.ts` to be bundled with application
+- Development private key is baked into project structure together with public keys for both development and production.
+- Production private key is available only on `codesign` branch in Github CI.
+- Development private key can be found in `suite-common/message-system/scripts/sign-config.ts` file, the public keys can be found in `packages/env-utils/src/jws.ts` file.
 
 ### Versioning of implementation
 
@@ -78,7 +97,7 @@ If changes made to the message system are incompatible with the previous version
 
 Structure of config, types and optionality of specific keys can be found in the schema or in generated types. Example config is commented below.
 
-```javascript
+```json
 {
     // Version of message system implementation. Bump if new version is not backward compatible.
     "version": 1,
@@ -116,11 +135,7 @@ Structure of config, types and optionality of specific keys can be found in the 
                     - Options: gte, lt, ranges, tildes, carets,... are supported, see semver lib for more info.
                     */
                     "os": {
-                        "macos": [
-                            "10.14",
-                            "10.18",
-                            "11"
-                        ],
+                        "macos": ["10.14", "10.18", "11"],
                         "linux": "*",
                         "windows": "!",
                         "android": "*",
@@ -135,18 +150,12 @@ Structure of config, types and optionality of specific keys can be found in the 
                         "revision": "7281ac61483e38d974625c2505bfe5efd519aacb"
                     },
                     "browser": {
-                        "firefox": [
-                            "82",
-                            "83"
-                        ],
+                        "firefox": ["82", "83"],
                         "chrome": "*",
                         "chromium": "!"
                     },
                     "transport": {
-                        "bridge": [
-                            "2.0.30",
-                            "2.0.27"
-                        ],
+                        "bridge": ["2.0.30", "2.0.27"],
                         "webusbplugin": "*"
                     },
                     /*
@@ -167,7 +176,7 @@ Structure of config, types and optionality of specific keys can be found in the 
                     // Empty device array is targeting users without a connected device.
                     "devices": [
                         {
-                            // Possible values: "1" +  "T1B1", "T" + "T2T1", "T2B1"
+                            // Possible values: "1" +  "T1B1", "T" + "T2T1", "T2B1", "T3B1", "T3T1"
                             // in case of targeting "T1B1" or "T2T1", for backwards compatibility use old (1, T) and new naming (T1B1, T2T1 together in a new object
                             // in case of targeting "T2B1" in Suites before device release, please use all three "T2B1", "Safe 3" and empty string ""
                             "model": "T1B1",
@@ -207,17 +216,14 @@ Structure of config, types and optionality of specific keys can be found in the 
                 "category": "banner",
                 /*
                 - Message in language of Suite app is shown to a user.
-                - Currently 'en', 'es', 'cs', 'ru', 'ja' are supported.
-                - 'en-GB' is used for backward compatibility and should match value of 'en'.
+                - Only official languages are required, community are optional
                 */
                 "content": {
-                    "en-GB": "New Trezor firmware is available!",
                     "en": "New Trezor firmware is available!",
                     "de": "Neue Trezor Firmware ist verfügbar!"
                 },
                 // optional headline following the language structure of content
                 "headline": {
-                    "en-GB": "Update your Trezor",
                     "en": "Update your Trezor",
                     "de": "Neue"
                 },
@@ -237,7 +243,6 @@ Structure of config, types and optionality of specific keys can be found in the 
                     - Label of call to action button shown to a user.
                     */
                     "label": {
-                        "en-GB": "Update now",
                         "en": "Update now",
                         "de": "Jetzt aktualisieren"
                     }
@@ -245,7 +250,6 @@ Structure of config, types and optionality of specific keys can be found in the 
                 // Used only for modals. (To be implemented)
                 "modal": {
                     "title": {
-                        "en-GB": "Update now",
                         "en": "Update now",
                         "de": "Jetzt aktualisieren"
                     },
@@ -253,18 +257,57 @@ Structure of config, types and optionality of specific keys can be found in the 
                 },
                 // Used only for context.
                 "context": {
-                    "domain": [
-                        "coins.receive",
-                        "coins.btc"
-                  ]
-                }
-                 // Used only for feature
+                    "domain": ["coins.receive", "coins.btc"]
+                },
+                // Used only for feature
                 "feature": [
                     {
-                        "domain": [
-                          "coinjoin"
-                        ],
+                        "domain": "coinjoin",
                         "flag": false
+                    }
+                ]
+            }
+        }
+    ],
+    // Used for AB testing
+    "experiments": [
+        {
+            // Same as for actions, check conditions above
+            "conditions": [
+                {
+                    "environment": {
+                        "desktop": ">=24.5.1",
+                        "mobile": "!",
+                        "web": ">=24.5.1"
+                    },
+                    // It's very useful to define a duration for each experiment that starts the next day at the earliest,
+                    // to minimize changing the application under the hands of those who have it open at the moment.
+                    "duration": {
+                        "from": "2021-03-01T12:10:00.000Z",
+                        "to": "2022-01-31T12:10:00.000Z"
+                    },
+                    // Country-based targeting is now evaluated only after the user visits the staking or trading section.
+                    // This behavior is currently implemented only for the desktop/web version.
+                    "countryCodes": ["CZ", "US"]
+                }
+            ],
+            // Detail of an experiment
+            "experiment": {
+                // Used as a selector for the test
+                // For `id` use UUID and then use mapping in `suite-common/message-system/src/experiment/experiments.ts`
+                "id": "e2e8d05f-1469-4e47-9ab0-53544e5cad07",
+                // Array of testing groups - minimum length of items is two
+                // The sum of group percentages must equal 100 in total
+                "groups": [
+                    {
+                        // Name of variant - any string
+                        "variant": "A",
+                        // The percentage range a user can be assigned to (0-100)
+                        "percentage": 30
+                    },
+                    {
+                        "variant": "B",
+                        "percentage": 70
                     }
                 ]
             }
@@ -288,11 +331,45 @@ Current priorities of existing banners can be found [here](https://github.com/tr
 
 Unfortunately, it is not possible to target specific distributions and versions of Linux. It is possible to only target all Linux users using `*` or exclude all Linux users using `!`.
 
+#### Experiment implementation
+
+The experiment is based on the `instanceId` used by analytics. It will remain active regardless of user consent. However, no data will be sent to analytics without user consent.
+
+##### Component experiment
+
+To create an experiment for components, use ExperimentWrapper.tsx. It requires the `id` of the test and the `components` to be tested as properties. Check the implementation details for more information [here](https://github.com/trezor/trezor-suite/blob/feat/ab-testing-on-message-system/packages/suite/src/components/suite/Experiment/ExperimentWrapper.tsx).
+
 ### Application steps
 
 1. Config is fetched on load of application and is stored in Redux state. To be persisted between sessions, is is mirrored into IndexDB.
 1. Conditions of config are evaluated on specific Redux actions. See `messageSystemMiddleware.ts` [file](https://github.com/trezor/trezor-suite/blob/145a43d21ee94461d3f013c1dc23241dd27b0224/packages/suite/src/middlewares/suite/messageSystemMiddleware.ts).
 1. If conditions of a message satisfy the user's stack, the message is accordingly propagated. If it is dismissible, its ID is saved to Redux state (IndexDB) on close, to avoid displaying it next time.
+
+### Message Manager (UI)
+
+Built-in UI to inspect and test messages:
+
+- Visual list of messages (banner/context/etc.) with details (translations, conditions, devices, CTA).
+
+- Filtering by category and active only.
+
+#### Development workflow (recommended)
+
+1. Go to **Settings → Debug → Message System info**
+
+1. Switch the **Config source** to **Local**
+
+1. Open **Message Manager** and click **Add new message**, fill the JSON (validated by the same schema).
+
+1. The message is added **only to app state** (not to the config file).
+
+1. Verify behavior in the UI.
+
+1. Use **Copy to clipboard** and paste the JSON into the config file to make it permanent.
+
+1. Run validation/signing (_yarn messages_).
+
+1. Test that everything works from a local file
 
 ### Followup
 

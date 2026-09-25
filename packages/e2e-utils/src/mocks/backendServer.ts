@@ -1,5 +1,6 @@
-import WebSocket from 'ws';
-import * as net from 'net';
+import WebSocket, { WebSocketServer } from 'ws';
+
+import { getFreePort } from '@trezor/node-utils';
 
 import { blockbook } from '../fixtures/blockbook';
 import { blockfrost } from '../fixtures/blockfrost';
@@ -22,23 +23,11 @@ export interface Fixture {
 
 export interface PushNotification {
     delay?: number;
+    id?: string;
+    data?: unknown;
 }
 
-// enables parallelization using a free port
-const getFreePort = () =>
-    new Promise<number>((resolve, reject) => {
-        const server = net.createServer();
-        server.unref();
-        server.on('error', reject);
-        server.listen(0, () => {
-            const { port } = server.address() as net.AddressInfo;
-            server.close(() => {
-                resolve(port);
-            });
-        });
-    });
-
-export class BackendWebsocketServerMock extends WebSocket.Server {
+export class BackendWebsocketServerMock extends WebSocketServer {
     backendType: BackendType;
     defaultResponses: Record<string, any> = {};
     fixtures?: Fixture[];
@@ -57,7 +46,7 @@ export class BackendWebsocketServerMock extends WebSocket.Server {
     }
 
     static async create(backendType: BackendType) {
-        const port = await getFreePort();
+        const [port] = await getFreePort();
 
         return new Promise<BackendWebsocketServerMock>((resolve, reject) => {
             const server = new BackendWebsocketServerMock({ backendType, port });
@@ -71,6 +60,10 @@ export class BackendWebsocketServerMock extends WebSocket.Server {
     }
 
     getFixtures() {
+        if (!this.fixtures) {
+            throw new Error('No fixtures set in BackendWebsocketServerMock');
+        }
+
         return this.fixtures;
     }
 
@@ -148,9 +141,10 @@ export class BackendWebsocketServerMock extends WebSocket.Server {
 
         if (Array.isArray(fixtures)) {
             // find nearest fixture with requested method
-            const fixtureIndex = fixtures.findIndex(f => f && f.method === method);
+            const fixtureIndex = fixtures.findIndex(f => f?.method === method);
             if (fixtureIndex >= 0) {
-                const fixture = fixtures[fixtureIndex];
+                // @ts-expect-error: indexing with noUncheckedIndexedAccess
+                const fixture: Fixture = fixtures[fixtureIndex];
                 if (typeof fixture.response === 'function') {
                     data = await fixture.response(request);
                 } else {

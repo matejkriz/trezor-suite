@@ -1,33 +1,28 @@
-import { useContext } from 'react';
+import { type JSX } from 'react';
+
 import styled, { css } from 'styled-components';
-import { transparentize } from 'polished';
-import { analytics, EventType } from '@trezor/suite-analytics';
+
+import { events, injectDesktopAnalytics } from '@suite/analytics';
+import { Translation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { H3, IconButton, Paragraph } from '@trezor/components';
+import { ArrowLeftIcon, XIcon } from '@trezor/icons';
+import { zIndices } from '@trezor/theme';
 
 import { close } from 'src/actions/suite/guideActions';
-import { useDispatch } from 'src/hooks/suite';
-import { IconButton, variables } from '@trezor/components';
-import { HeaderBreadcrumb, ContentScrolledContext } from 'src/components/guide';
-import { typography, zIndices } from '@trezor/theme';
 
-const HeaderWrapper = styled.div<{ $noLabel?: boolean; $isScrolled: boolean }>`
+const HeaderWrapper = styled.div<{
+    $noLabel?: boolean;
+}>`
     display: flex;
     align-items: center;
-    padding: 12px 21px;
+    padding: 12px 16px;
     position: sticky;
     top: 0;
     background-color: inherit;
-    box-shadow: none;
-    border-bottom: 1px solid transparent;
-    transition: all 0.5s ease;
     white-space: nowrap;
     z-index: ${zIndices.base}; /* Prevents search bar from overlapping when scrolling */
-
-    ${({ $isScrolled }) =>
-        $isScrolled &&
-        css`
-            box-shadow: 0 9px 27px 0 ${({ theme }) => transparentize(0.5, theme.STROKE_GREY)};
-            border-bottom: 1px solid ${({ theme }) => theme.STROKE_GREY};
-        `}
 
     ${({ $noLabel }) =>
         $noLabel &&
@@ -36,34 +31,18 @@ const HeaderWrapper = styled.div<{ $noLabel?: boolean; $isScrolled: boolean }>`
         `}
 `;
 
-const MainLabel = styled.div`
-    ${typography.titleSmall};
-    flex: 1;
-`;
-
-const Label = styled.div`
-    font-size: ${variables.FONT_SIZE.SMALL};
-    font-weight: ${variables.FONT_WEIGHT.DEMI_BOLD};
-    text-align: center;
-    color: ${({ theme }) => theme.TYPE_DARK_GREY};
-    padding: 0 15px;
-    width: 100%;
-`;
-
 interface GuideHeaderProps {
     back?: () => void;
     label?: string | JSX.Element;
-    useBreadcrumb?: boolean;
 }
 
-export const GuideHeader = ({ back, label, useBreadcrumb }: GuideHeaderProps) => {
-    const dispatch = useDispatch();
-    const isScrolled = useContext(ContentScrolledContext);
+export const GuideHeader = ({ back, label }: GuideHeaderProps) => {
+    const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
 
     const goBack = () => {
         back?.();
         analytics.report({
-            type: EventType.GuideHeaderNavigation,
+            type: events.guideHeaderNavigationEvent.name,
             payload: {
                 type: 'back',
             },
@@ -72,7 +51,7 @@ export const GuideHeader = ({ back, label, useBreadcrumb }: GuideHeaderProps) =>
     const handleClose = () => {
         dispatch(close());
         analytics.report({
-            type: EventType.GuideHeaderNavigation,
+            type: events.guideHeaderNavigationEvent.name,
             payload: {
                 type: 'close',
             },
@@ -80,30 +59,45 @@ export const GuideHeader = ({ back, label, useBreadcrumb }: GuideHeaderProps) =>
     };
 
     return (
-        <HeaderWrapper $noLabel={!label} $isScrolled={isScrolled}>
-            {!useBreadcrumb && back && (
+        <HeaderWrapper $noLabel={!label}>
+            {back && (
                 <>
                     <IconButton
-                        size="medium"
-                        icon="ARROW_LEFT_LONG"
+                        icon={ArrowLeftIcon}
                         onClick={goBack}
-                        variant="tertiary"
-                        data-test="@guide/button-back"
+                        intent="neutral"
+                        priority="secondary"
+                        data-testid="@guide/button-back"
+                        tooltip={{ content: <Translation id="TR_BACK" /> }}
                     />
 
-                    {label && <Label data-test="@guide/label">{label}</Label>}
+                    {label && (
+                        <Paragraph
+                            typographyStyle="body-sm"
+                            align="center"
+                            ellipsisLineCount={2}
+                            margin={{ horizontal: 8 }}
+                            data-testid="@guide/label"
+                            width="100%"
+                        >
+                            {label}
+                        </Paragraph>
+                    )}
                 </>
             )}
-            {!useBreadcrumb && !back && label && <MainLabel>{label}</MainLabel>}
-
-            {useBreadcrumb && <HeaderBreadcrumb />}
+            {!back && label && (
+                <H3 flex="1" ellipsisLineCount={1} margin={{ right: 8 }}>
+                    {label}
+                </H3>
+            )}
 
             <IconButton
-                icon="ARROW_RIGHT_LINE"
-                variant="tertiary"
+                icon={XIcon}
+                intent="neutral"
+                priority="secondary"
                 onClick={handleClose}
-                data-test="@guide/button-close"
-                size="medium"
+                data-testid="@guide/button-close"
+                tooltip={{ content: <Translation id="TR_CLOSE" /> }}
             />
         </HeaderWrapper>
     );

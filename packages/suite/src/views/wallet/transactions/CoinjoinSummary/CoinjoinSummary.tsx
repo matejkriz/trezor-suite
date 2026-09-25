@@ -1,6 +1,8 @@
 import styled from 'styled-components';
+
+import { Translation } from '@suite/intl';
+import { type AccountKey } from '@suite-common/wallet-types';
 import { H3 } from '@trezor/components';
-import { Translation } from 'src/components/suite/Translation';
 
 import { CoinjoinBalanceSection } from './CoinjoinBalanceSection';
 
@@ -9,19 +11,15 @@ const Container = styled.div`
     margin-bottom: 32px;
 `;
 
-const Heading = styled(H3)`
-    margin-bottom: 28px;
-`;
-
 interface CoinjoinSummaryProps {
-    accountKey: string;
+    accountKey: AccountKey;
 }
 
 export const CoinjoinSummary = ({ accountKey }: CoinjoinSummaryProps) => (
     <Container>
-        <Heading>
+        <H3 margin={{ bottom: 24 }}>
             <Translation id="TR_MY_COINS" />
-        </Heading>
+        </H3>
 
         <CoinjoinBalanceSection accountKey={accountKey} />
     </Container>

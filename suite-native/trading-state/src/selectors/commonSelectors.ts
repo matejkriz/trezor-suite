@@ -1,0 +1,484 @@
+import type { CryptoId } from 'invity-api';
+
+import { type DeviceRootState } from '@suite-common/device';
+import {
+    Feature,
+    type MessageSystemRootState,
+    selectIsFeatureEnabled,
+} from '@suite-common/message-system';
+import { type NetworksRootState, selectSupportedNetworkSymbols } from '@suite-common/networks';
+import { createWeakMapSelector, returnStableArrayIfEmpty } from '@suite-common/redux-utils';
+import {
+    type TokenDefinitionsRootState,
+    filterKnownTokens,
+    getSimpleCoinDefinitionsByNetwork,
+    selectTokenDefinitions,
+} from '@suite-common/token-definitions';
+import {
+    type TradingRootStateWithDeviceAndAccounts,
+    type TradingTransaction,
+    type TradingType,
+    type TradingTypeWithConcierge,
+    cryptoIdToNetworkSymbol,
+    isFinalStatus,
+    selectDeviceTradingTrades,
+    selectTradingIsSlip24Allowed,
+    selectTradingSupportedSymbols,
+    selectTradingTradeByOrderId,
+    toTokenCryptoId,
+} from '@suite-common/trading';
+import {
+    getNetwork,
+    getNetworkDisplaySymbolName,
+    getNetworkType,
+} from '@suite-common/wallet-config';
+import {
+    type AccountsRootState,
+    type FiatRatesRootState,
+    type WalletSettingsRootState,
+    selectBaseCurrency,
+    selectCurrentFiatRates,
+    selectVisibleDeviceAccounts,
+    selectVisibleDeviceAccountsByNetworkSymbol,
+    selectVisibleDeviceAccountsMap,
+} from '@suite-common/wallet-core';
+import {
+    type Account,
+    type AccountKey,
+    type TokenAddress,
+    type TokenSymbol,
+} from '@suite-common/wallet-types';
+import {
+    getAccountFiatBalance,
+    getFiatRateKey,
+    parseAccountKey,
+    toFiatCurrency,
+} from '@suite-common/wallet-utils';
+import { selectAccountLabel, sortAccountsByNetworksAndAccountTypes } from '@suite-native/accounts';
+import {
+    FeatureFlag,
+    type FeatureFlagsRootState,
+    selectIsFeatureFlagEnabled,
+} from '@suite-native/feature-flags';
+import { type CombinedLabelingState } from '@suite-native/labeling';
+import {
+    type SettingsSliceRootState,
+    selectIsExperimentalFeatureEnabled,
+} from '@suite-native/settings';
+import { type TokensRootState } from '@suite-native/tokens';
+import {
+    type SectionListData,
+    getSymbolFromTradeableAsset,
+    toCaseAwareCryptoId,
+} from '@suite-native/trading-atoms';
+import { type MyAsset, type TradeableAsset } from '@suite-native/trading-types';
+
+import { selectIsTradingEnabledForCountry } from './residenceSelectors';
+import { type TradingRootState } from '../reducers';
+
+export type CombinedSelectorsRootState = TradingRootStateWithDeviceAndAccounts &
+    TokenDefinitionsRootState &
+    FiatRatesRootState &
+    WalletSettingsRootState &
+    TokensRootState &
+    FeatureFlagsRootState &
+    NetworksRootState;
+
+const createTradingWithDeviceAndAccountsMemoizedSelector =
+    createWeakMapSelector.withTypes<TradingRootStateWithDeviceAndAccounts>();
+
+const createCombinedMemoizedSelector =
+    createWeakMapSelector.withTypes<CombinedSelectorsRootState>();
+
+const createFeatureFlagsMemoizedSelector = createWeakMapSelector.withTypes<
+    MessageSystemRootState & FeatureFlagsRootState
+>();
+
+const createFiatRatesMemoizedSelector = createWeakMapSelector.withTypes<
+    FiatRatesRootState & WalletSettingsRootState & TradingRootState
+>();
+
+export const selectTradingEnvironment = (state: TradingRootState) =>
+    state.wallet.trading.tradingEnvironment;
+
+const createTradingMemoizedSelector = createWeakMapSelector.withTypes<TradingRootState>();
+
+export const selectTradedAccountKeys = createTradingMemoizedSelector(
+    [state => state.wallet.trading.trades],
+    trades =>
+        returnStableArrayIfEmpty<AccountKey>(
+            trades.length
+                ? Array.from(
+                      new Set(
+                          trades.flatMap(trade =>
+                              [
+                                  'selectedAccountKey' in trade
+                                      ? trade.selectedAccountKey
+                                      : undefined,
+                                  'receiveAccountKey' in trade
+                                      ? trade.receiveAccountKey
+                                      : undefined,
+                                  'sendAccountKey' in trade ? trade.sendAccountKey : undefined,
+                              ].filter((key): key is AccountKey => !!key),
+                          ),
+                      ),
+                  )
+                : undefined,
+        ),
+);
+
+export const selectIsTradingBuyEnabled = (state: MessageSystemRootState & FeatureFlagsRootState) =>
+    selectIsFeatureEnabled(state, Feature.trading.buy, true);
+export const selectIsTradingExchangeEnabled = (
+    state: MessageSystemRootState & FeatureFlagsRootState,
+) => selectIsFeatureEnabled(state, Feature.trading.exchange, true);
+
+export const selectIsTradingSellEnabled = (state: MessageSystemRootState & FeatureFlagsRootState) =>
+    selectIsFeatureEnabled(state, Feature.trading.sell, true);
+
+export const selectIsTradingConciergeEnabled = (
+    state: MessageSystemRootState & FeatureFlagsRootState,
+) => selectIsFeatureEnabled(state, Feature.trading.concierge, true);
+
+export const selectIsTradingTxSimulationEnabled = (state: MessageSystemRootState) =>
+    selectIsFeatureEnabled(state, Feature.trading.txSimulation, true);
+
+export const selectIsTradingSlip24Enabled = (
+    state: MessageSystemRootState & SettingsSliceRootState & TradingRootStateWithDeviceAndAccounts,
+    account: Account | undefined | null,
+) =>
+    selectTradingIsSlip24Allowed(
+        state,
+        account,
+        selectIsFeatureEnabled(state, Feature.trading.slip24, true) &&
+            selectIsExperimentalFeatureEnabled(state, 'slip24'),
+    );
+
+export const selectIsTradingEnabled = (
+    state: MessageSystemRootState & FeatureFlagsRootState & TradingRootState,
+) => {
+    if (!selectIsTradingEnabledForCountry(state)) {
+        return false;
+    }
+
+    return (
+        selectIsTradingBuyEnabled(state) ||
+        selectIsTradingExchangeEnabled(state) ||
+        selectIsTradingSellEnabled(state) ||
+        selectIsTradingConciergeEnabled(state)
+    );
+};
+
+export const selectEnabledTradingTypes = createFeatureFlagsMemoizedSelector(
+    [
+        selectIsTradingBuyEnabled,
+        selectIsTradingExchangeEnabled,
+        selectIsTradingSellEnabled,
+        selectIsTradingConciergeEnabled,
+    ],
+    (
+        isTradingBuyEnabled,
+        isTradingExchangeEnabled,
+        isTradingSellEnabled,
+        isTradingConciergeEnabled,
+    ) => {
+        const enabledTypes: TradingTypeWithConcierge[] = [];
+
+        if (isTradingExchangeEnabled) {
+            enabledTypes.push('exchange');
+        }
+        if (isTradingBuyEnabled) {
+            enabledTypes.push('buy');
+        }
+        if (isTradingSellEnabled) {
+            enabledTypes.push('sell');
+        }
+        if (isTradingConciergeEnabled) {
+            enabledTypes.push('concierge');
+        }
+
+        return enabledTypes;
+    },
+);
+
+export const selectIsTradingBlacklisted = (state: MessageSystemRootState) =>
+    selectIsFeatureEnabled(state, Feature.trading.restrictions.blacklist, false);
+
+// trade for opening in detail
+export const selectTradeToBeOpened = (state: TradingRootState) => {
+    const orderId = state.wallet.trading.tradeOrderIdToBeOpened;
+    if (!orderId) return undefined;
+
+    return state.wallet.trading.trades.find(trade => trade.data.orderId === orderId);
+};
+
+export const selectIsAmountInputActive = (state: TradingRootState) =>
+    state.wallet.trading.isAmountInputActive;
+
+export const selectActiveTradingType = (state: TradingRootState) =>
+    state.wallet.trading.activeTradingType;
+
+export const selectHasActiveTradingType = (state: TradingRootState) =>
+    state.wallet.trading.activeTradingType !== null;
+
+export const selectAmountInBaseFiatCurrency = createFiatRatesMemoizedSelector(
+    [
+        selectCurrentFiatRates,
+        selectBaseCurrency,
+        (_state, asset: TradeableAsset) => asset,
+        (_state, _symbol, amount: string) => amount,
+    ],
+    (fiatRates, localCurrency, asset, amount) => {
+        const symbol = getSymbolFromTradeableAsset(asset);
+
+        if (!symbol || !fiatRates) {
+            return undefined;
+        }
+
+        const fiatRateKey = getFiatRateKey(symbol, localCurrency, asset.contractAddress);
+        const rate = fiatRates[fiatRateKey]?.rate;
+
+        if (!rate) {
+            return undefined;
+        }
+
+        return toFiatCurrency({ amount, rate }) || undefined;
+    },
+);
+
+export const selectAccountsWithTokensToSellSectionListByTradingType =
+    createCombinedMemoizedSelector(
+        [
+            selectVisibleDeviceAccounts,
+            selectTokenDefinitions,
+            selectCurrentFiatRates,
+            selectBaseCurrency,
+            selectTradingSupportedSymbols,
+            (state: CombinedSelectorsRootState) =>
+                selectIsFeatureFlagEnabled(state, FeatureFlag.IsCardanoSendEnabled),
+            (_state, tradingType: TradingType) => tradingType,
+            selectSupportedNetworkSymbols,
+        ],
+        (
+            accounts,
+            tokenDefinitions,
+            fiatRates,
+            localCurrency,
+            sellCryptoIds,
+            isCardanoSendEnabled,
+            tradingType,
+            supportedNetworks,
+        ) => {
+            if (tradingType === 'buy') {
+                return returnStableArrayIfEmpty([]);
+            }
+            const sellCryptoIdsSet = new Set(sellCryptoIds);
+
+            // TODO: Remove this filter when Cardano send is implemented (#15068)
+            // Currently filtering out Cardano accounts and tokens from trading until Cardano send is supported
+            const filteredAccounts = accounts.filter(account => {
+                if (!getNetwork(account.symbol).tradeCryptoId) {
+                    return false;
+                }
+                const networkType = getNetworkType(account.symbol);
+
+                return networkType !== 'cardano' || isCardanoSendEnabled;
+            });
+
+            const sortedAccounts = sortAccountsByNetworksAndAccountTypes(
+                filteredAccounts,
+                supportedNetworks,
+            );
+
+            return sortedAccounts
+                .map<SectionListData<MyAsset, Account>[number]>((account: Account) => {
+                    const networkTokenDefinitions = getSimpleCoinDefinitionsByNetwork(
+                        tokenDefinitions,
+                        account.symbol,
+                    );
+
+                    const knownTokens = filterKnownTokens(
+                        networkTokenDefinitions,
+                        account.symbol,
+                        account.tokens ?? [],
+                    );
+
+                    const tokensWithBalance = knownTokens.filter(
+                        token => parseFloat(token?.balance ?? '0') > 0,
+                    );
+
+                    const tokens: MyAsset[] = tokensWithBalance
+                        .map(token => {
+                            const fiatRateKey = getFiatRateKey(
+                                account.symbol,
+                                localCurrency,
+                                token.contract as TokenAddress,
+                            );
+                            const rate = fiatRates?.[fiatRateKey]?.rate;
+                            const fiatBalance =
+                                rate && token.balance
+                                    ? toFiatCurrency({ amount: token.balance, rate })
+                                    : null;
+
+                            const tokenSymbol =
+                                (token.symbol?.toUpperCase() as TokenSymbol) ?? null;
+                            const cryptoId = toCaseAwareCryptoId(
+                                toTokenCryptoId(account.symbol, token.contract),
+                            );
+
+                            return {
+                                symbol: account.symbol,
+                                name: token.name ?? tokenSymbol ?? '',
+                                balance: token.balance ?? '0',
+                                fiatBalance,
+                                tokenSymbol,
+                                contract: token.contract as TokenAddress,
+                                decimals: token.decimals,
+                                cryptoId,
+                                isEnabled: sellCryptoIdsSet.has(cryptoId),
+                                fiatRateKey,
+                                rate,
+                            };
+                        })
+                        .sort((a, b) => {
+                            // sellable (isEnabled) assets first
+                            if (a.isEnabled !== b.isEnabled) {
+                                return a.isEnabled ? -1 : 1;
+                            }
+
+                            // bigger fiatBalance first
+                            const aFiatBalance = a.fiatBalance ? Number(a.fiatBalance) : 0;
+                            const bFiatBalance = b.fiatBalance ? Number(b.fiatBalance) : 0;
+
+                            return bFiatBalance - aFiatBalance;
+                        });
+
+                    const cryptoId = toCaseAwareCryptoId(
+                        getNetwork(account.symbol).tradeCryptoId as CryptoId,
+                    );
+
+                    const accountAsset = {
+                        symbol: account.symbol,
+                        name: getNetworkDisplaySymbolName(account.symbol),
+                        balance: account.formattedBalance,
+                        fiatBalance: getAccountFiatBalance({
+                            account,
+                            baseCurrencyCode: localCurrency,
+                            rates: fiatRates,
+                            shouldIncludeStaking: false,
+                            shouldIncludeTokens: false,
+                        }),
+                        cryptoId,
+                        isEnabled: sellCryptoIdsSet.has(cryptoId),
+                    };
+
+                    const assets: MyAsset[] = [
+                        ...(parseFloat(account.balance) > 0 ? [accountAsset] : []),
+                        ...tokens,
+                    ];
+
+                    return {
+                        key: `section_${account.key}`,
+                        // Todo: this is wrong, correct label is determined by `selectAccountLabel` selector
+                        label: account.accountLabel ?? '',
+                        sectionData: account,
+                        data: assets,
+                    };
+                })
+                .filter(section => section.data.length > 0);
+        },
+    );
+
+export const selectTradesToWatchByAccount = createTradingWithDeviceAndAccountsMemoizedSelector(
+    [selectDeviceTradingTrades, selectVisibleDeviceAccountsMap],
+    (deviceTrades, visibleDeviceAccountsMap) => {
+        const tradesToWatch = deviceTrades.filter(
+            ({ tradeType, data }: TradingTransaction) =>
+                data.status && !isFinalStatus(tradeType, data.status),
+        );
+
+        const tradesMap = tradesToWatch.reduce((grouped, trade) => {
+            const tradeKey =
+                'selectedAccountKey' in trade ? trade.selectedAccountKey : trade.sendAccountKey;
+
+            const account = tradeKey ? visibleDeviceAccountsMap.get(tradeKey) : undefined;
+
+            if (account) {
+                const existingGroup = grouped.get(account.key);
+                if (existingGroup) {
+                    existingGroup.trades.push(trade);
+                } else {
+                    grouped.set(account.key, { account, trades: [trade] });
+                }
+            }
+
+            return grouped;
+        }, new Map<string, { account: Account; trades: TradingTransaction[] }>());
+
+        return {
+            tradesByAccount: returnStableArrayIfEmpty(Array.from(tradesMap.values())),
+            tradesToWatch: returnStableArrayIfEmpty(tradesToWatch),
+        };
+    },
+);
+
+export const selectTradingAccountKeyByOrderId = (
+    state: TradingRootState,
+    orderId: string | undefined,
+) => {
+    const trade = selectTradingTradeByOrderId(state, orderId);
+
+    if (!trade) {
+        return undefined;
+    }
+
+    return trade.tradeType === 'buy' ? trade.selectedAccountKey : trade.sendAccountKey;
+};
+
+export const selectVisibleDeviceAccountsByNetworkSymbolSorted = createWeakMapSelector.withTypes<
+    AccountsRootState & DeviceRootState & NetworksRootState
+>()(
+    [selectVisibleDeviceAccountsByNetworkSymbol, selectSupportedNetworkSymbols],
+    (accounts, supportedNetworks) => {
+        const sortedAccounts = sortAccountsByNetworksAndAccountTypes(accounts, supportedNetworks);
+
+        return returnStableArrayIfEmpty(sortedAccounts);
+    },
+);
+
+export const selectAccountLabelWithNetworkFallback = (
+    state: AccountsRootState & CombinedLabelingState,
+    accountKey?: AccountKey,
+    cryptoId?: CryptoId,
+) => {
+    if (accountKey) {
+        const {
+            accountDescriptor,
+            networkSymbol: accountNetworkSymbol,
+            deviceStaticSessionId,
+        } = parseAccountKey(accountKey);
+
+        const accountLabel = selectAccountLabel(
+            state,
+            deviceStaticSessionId,
+            accountDescriptor,
+            accountNetworkSymbol,
+        );
+
+        if (accountLabel) {
+            return accountLabel;
+        }
+    }
+
+    if (cryptoId) {
+        const networkSymbol = cryptoIdToNetworkSymbol(cryptoId);
+        if (networkSymbol) {
+            return getNetwork(networkSymbol).name;
+        }
+    }
+
+    return undefined;
+};
+
+export const selectTradingProviderConfirmationStatus = (state: TradingRootState) =>
+    state.wallet.trading.providerConfirmationStatus;

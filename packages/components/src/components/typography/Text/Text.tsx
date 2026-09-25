@@ -1,67 +1,203 @@
-import styled from 'styled-components';
-import { UIVariant } from '../../../config/types';
-import { CSSColor, Color, Colors, TypographyStyle, typography } from '@trezor/theme';
-import { ReactNode } from 'react';
-import { TransientProps } from '../../../utils/transientProps';
+import { type HTMLProps, type ReactNode } from 'react';
 
-export type TextVariant = Extract<
-    UIVariant,
-    'primary' | 'tertiary' | 'info' | 'warning' | 'destructive'
->;
+import styled, { type DefaultTheme, type RuleSet, css } from 'styled-components';
 
-type ExclusiveColorOrVariant =
-    | { variant?: TextVariant; color?: undefined }
+import { type Color } from '@trezor/theme';
+
+import { type TextIntent, type TextPriority, textIntents, textPriorities } from './types';
+import { mapIntentToCSS } from './utils';
+import {
+    type FrameProps,
+    type FramePropsKeys,
+    pickAndPrepareFrameProps,
+    withFrameProps,
+} from '../../../utils/frameProps';
+import { type TransientProps } from '../../../utils/transientProps';
+import {
+    type TextProps as TextPropsCommon,
+    type TextPropsKeys,
+    pickAndPrepareTextProps,
+    withTextProps,
+} from '../utils';
+
+export { textIntents, textPriorities };
+export type { TextIntent, TextPriority };
+
+export const allowedTextTextProps = [
+    'typographyStyle',
+    'textWrap',
+    'align',
+    'ellipsisLineCount',
+    'case',
+    'wordBreak',
+    'overflowWrap',
+] as const satisfies TextPropsKeys[];
+type AllowedTextTextProps = Pick<TextPropsCommon, (typeof allowedTextTextProps)[number]>;
+
+export const allowedTextFrameProps = [
+    'margin',
+    'padding',
+    'maxWidth',
+    'minWidth',
+    'width',
+    'flex',
+    'position',
+    'zIndex',
+    'cursor',
+    'opacity',
+    'pointerEvents',
+    'overflow',
+] as const satisfies FramePropsKeys[];
+type AllowedFrameProps = Pick<FrameProps, (typeof allowedTextFrameProps)[number]>;
+
+type ExclusiveColorOrIntent =
     | {
-          variant?: undefined;
-          /** @deprecated Use only is case of absolute desperation. Prefer using `variant`. */
-          color?: string;
+          intent?: TextIntent;
+          priority?: TextPriority;
+          isDisabled?: boolean;
+          color?: undefined;
+      }
+    | {
+          intent?: undefined;
+          priority?: undefined;
+          isDisabled?: undefined;
+          color?: Color;
       };
 
-const variantColorMap: Record<TextVariant, Color> = {
-    primary: 'textPrimaryDefault',
-    tertiary: 'textSubdued',
-    info: 'textAlertBlue',
-    warning: 'textAlertYellow',
-    destructive: 'textAlertRed',
+type ColorProps = {
+    theme: DefaultTheme;
+} & {
+    $intent?: TextIntent;
+    $priority?: TextPriority;
+    $isInverse?: boolean;
+    $isDisabled?: boolean;
+    $color?: Color;
 };
 
-type ColorProps = {
-    theme: Colors;
-} & TransientProps<ExclusiveColorOrVariant>;
-
-const getColorForTextVariant = ({
-    $variant,
+const getColorForText = ({
+    $intent,
+    $priority = 'primary',
+    $isInverse,
+    $isDisabled,
     theme,
     $color,
-}: ColorProps): CSSColor | 'inherit' | string => {
+}: ColorProps): RuleSet<object> => {
     if ($color !== undefined) {
-        return $color;
+        return css`
+            color: ${theme[$color]};
+        `;
     }
 
-    return $variant === undefined ? 'inherit' : theme[variantColorMap[$variant]];
+    if ($isDisabled) {
+        return css`
+            color: ${theme.contentDisabled};
+        `;
+    }
+
+    if ($intent === undefined) {
+        return css`
+            color: inherit;
+        `;
+    }
+
+    return css`
+        color: ${mapIntentToCSS($intent, $priority, $isInverse ?? false, theme)};
+    `;
 };
 
 type StyledTextProps = {
-    $typographyStyle?: TypographyStyle;
-} & ExclusiveColorOrVariant;
+    $intent?: TextIntent;
+    $priority?: TextPriority;
+    $isInverse?: boolean;
+    $isDisabled?: boolean;
+    $color?: Color;
+    $isMonospaced?: boolean;
+    $isHighlighted?: boolean;
+    $isTabular?: boolean;
+} & TransientProps<AllowedFrameProps & AllowedTextTextProps>;
 
 const StyledText = styled.span<StyledTextProps>`
-    color: ${getColorForTextVariant};
-    ${({ $typographyStyle }) => ($typographyStyle ? typography[$typographyStyle] : '')}
+    ${getColorForText};
+
+    ${({ $isMonospaced }) =>
+        $isMonospaced &&
+        css`
+            font-family: monospace;
+        `}
+    ${({ $isTabular }) =>
+        $isTabular &&
+        css`
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0 !important;
+        `}
+        ${({ $isHighlighted }) =>
+            $isHighlighted &&
+            css`
+                display: inline;
+                padding: 0 4px;
+                border-radius: 4px;
+                background-color: ${({ theme }) => theme.elementFillNeutralSoft};
+                box-decoration-break: clone;
+            `}
+    
+    ${withTextProps};
+    ${withFrameProps};
 `;
 
-type TextProps = {
+export type TextProps = Pick<HTMLProps<HTMLElement>, 'onCopy' | 'onClick'> & {
     children: ReactNode;
-    className?: string;
-    typographyStyle?: TypographyStyle;
-} & ExclusiveColorOrVariant;
+    isInverse?: boolean;
+    isMonospaced?: boolean;
+    isHighlighted?: boolean;
+    isTabular?: boolean;
+    as?: string;
+    'data-testid'?: string;
+    'data-component'?: string;
+    role?: string;
+} & ExclusiveColorOrIntent &
+    AllowedFrameProps &
+    AllowedTextTextProps;
 
-export const Text = ({ variant, color, children, className, typographyStyle }: TextProps) => {
+export const Text = ({
+    intent,
+    priority = 'primary',
+    isInverse = false,
+    isDisabled = false,
+    color,
+    children,
+    as = 'span',
+    'data-testid': dataTest,
+    'data-component': dataComponent = 'Text',
+    onClick,
+    onCopy,
+    isMonospaced,
+    isHighlighted,
+    role,
+    isTabular,
+    typographyStyle,
+    ...rest
+}: TextProps) => {
+    const frameProps = pickAndPrepareFrameProps(rest, allowedTextFrameProps);
+    const textProps = pickAndPrepareTextProps({ ...rest, typographyStyle }, allowedTextTextProps);
+
     return (
         <StyledText
-            {...(variant !== undefined ? { $variant: variant } : { $color: color })}
-            className={className}
-            $typographyStyle={typographyStyle}
+            $intent={intent}
+            $priority={priority}
+            $isInverse={isInverse}
+            $isDisabled={isDisabled}
+            $color={color}
+            as={as}
+            onClick={onClick}
+            onCopy={onCopy}
+            data-testid={dataTest}
+            data-component={dataComponent}
+            data-typography-style={typographyStyle}
+            $isMonospaced={isMonospaced}
+            $isHighlighted={isHighlighted}
+            $isTabular={isTabular}
+            {...textProps}
+            {...frameProps}
         >
             {children}
         </StyledText>

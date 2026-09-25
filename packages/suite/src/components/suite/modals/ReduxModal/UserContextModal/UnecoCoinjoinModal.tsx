@@ -1,57 +1,21 @@
-import styled from 'styled-components';
-import { transparentize } from 'polished';
+import { selectSelectedAccount } from '@suite/account';
+import { UNECONOMICAL_COINJOIN_THRESHOLD } from '@suite/coinjoin';
+import { Translation } from '@suite/intl';
+import { closeModal } from '@suite/modal';
+import { gotoThunk } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { convertAmountSubunitsToUnits, getAccountDecimals } from '@suite-common/wallet-utils';
+import { Column, H3, Modal, Paragraph } from '@trezor/components';
+import { ArrowsInIcon } from '@trezor/icons';
 
-import { selectIsAccountWithRatesByKey } from '@suite-common/wallet-core';
-import { Button, variables } from '@trezor/components';
-import { FiatValue, FormattedCryptoAmount, Modal, Translation } from 'src/components/suite';
-import { useDispatch } from 'src/hooks/suite/useDispatch';
-import { onCancel } from 'src/actions/suite/modalActions';
-import { goto } from 'src/actions/suite/routerActions';
-import { formatAmount, getAccountDecimals } from '@suite-common/wallet-utils';
-import { UNECONOMICAL_COINJOIN_THRESHOLD } from 'src/services/coinjoin';
-import { selectSelectedAccount } from 'src/reducers/wallet/selectedAccountReducer';
-import { useSelector } from 'src/hooks/suite/useSelector';
-import { selectLocalCurrency } from 'src/reducers/wallet/settingsReducer';
-
-const StyledModal = styled(Modal)`
-    width: 500px;
-
-    ${Modal.BottomBar} {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-    }
-`;
-
-const Text = styled.div`
-    text-align: start;
-`;
-
-const Message = styled.p`
-    margin-bottom: 12px;
-    font-weight: ${variables.FONT_WEIGHT.DEMI_BOLD};
-`;
-
-const Explanation = styled.i`
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    font-size: ${variables.FONT_SIZE.SMALL};
-`;
-
-const AgreeButton = styled(Button)`
-    background: ${({ theme }) => theme.TYPE_DARK_ORANGE};
-
-    &:hover {
-        background: ${({ theme }) => transparentize(0.2, theme.TYPE_DARK_ORANGE)};
-    }
-`;
+import { FormattedCryptoAmount } from 'src/components/suite/FormattedCryptoAmount';
+import { useSelector } from 'src/hooks/suite';
 
 export const UnecoCoinjoinModal = () => {
     const account = useSelector(selectSelectedAccount);
-    const localCurrency = useSelector(selectLocalCurrency);
-    const isAccountWithRate = useSelector(state =>
-        selectIsAccountWithRatesByKey(state, account?.key || '', localCurrency),
-    );
+    const { dispatch } = useServices(injectDispatch);
 
-    const dispatch = useDispatch();
     if (!account) {
         return null;
     }
@@ -60,64 +24,55 @@ export const UnecoCoinjoinModal = () => {
     const decimals = getAccountDecimals(symbol) || 8;
 
     const handleContinue = () => {
-        dispatch(onCancel());
-        dispatch(goto('wallet-anonymize', { preserveParams: true }));
+        dispatch(closeModal());
+        dispatch(gotoThunk({ routeName: 'wallet-anonymize', preserveParams: true }));
+    };
+
+    const handleCancel = () => {
+        dispatch(closeModal());
     };
 
     return (
-        <StyledModal
-            isCancelable
-            onCancel={() => dispatch(onCancel())}
-            heading={<Translation id="TR_UNECO_COINJOIN_TITLE" />}
-            bottomBarComponents={
+        <Modal
+            onCancel={handleCancel}
+            bottomContent={
                 <>
-                    <Button variant="secondary" onClick={() => dispatch(onCancel())}>
-                        <Translation id="TR_CANCEL" />
-                    </Button>
-
-                    <AgreeButton onClick={handleContinue}>
+                    <Modal.Button onClick={handleContinue}>
                         <Translation id="TR_UNECO_COINJOIN_AGREE" />
-                    </AgreeButton>
+                    </Modal.Button>
+                    <Modal.Button intent="neutral" priority="secondary" onClick={handleCancel}>
+                        <Translation id="TR_CANCEL" />
+                    </Modal.Button>
                 </>
             }
+            width={600}
+            intent="warning"
+            icon={ArrowsInIcon}
         >
-            <Text>
-                <Message>
-                    <Translation
-                        id="TR_UNECO_COINJOIN_WARNING"
-                        values={{
-                            crypto: (
-                                <FormattedCryptoAmount
-                                    value={formatAmount(UNECONOMICAL_COINJOIN_THRESHOLD, decimals)}
-                                    symbol={symbol}
-                                />
-                            ),
-                            fiat: (
-                                <FiatValue
-                                    amount={formatAmount(UNECONOMICAL_COINJOIN_THRESHOLD, decimals)}
-                                    symbol={symbol}
-                                />
-                            ),
-                            isAccountWithRate,
-                        }}
-                    />
-                </Message>
-
-                <Explanation>
+            <Column gap={8}>
+                <H3>
+                    <Translation id="TR_UNECO_COINJOIN_TITLE" />
+                </H3>
+                <Paragraph intent="neutral" priority="secondary">
                     <Translation
                         id="TR_UNECO_COINJOIN_EXPLANATION"
                         values={{
                             crypto: (
                                 <FormattedCryptoAmount
-                                    value={formatAmount(UNECONOMICAL_COINJOIN_THRESHOLD, decimals)}
+                                    value={convertAmountSubunitsToUnits(
+                                        UNECONOMICAL_COINJOIN_THRESHOLD,
+                                        decimals,
+                                    )}
                                     symbol={symbol}
+                                    isRawString
+                                    disableHiddenPlaceholder
                                 />
                             ),
-                            b: chunk => <b>{chunk}</b>,
+                            b: chunk => <strong>{chunk}</strong>,
                         }}
                     />
-                </Explanation>
-            </Text>
-        </StyledModal>
+                </Paragraph>
+            </Column>
+        </Modal>
     );
 };

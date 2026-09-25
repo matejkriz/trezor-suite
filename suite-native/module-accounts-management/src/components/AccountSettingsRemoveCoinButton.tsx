@@ -1,18 +1,17 @@
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 
-import { useNavigation } from '@react-navigation/native';
-
-import { Button, TrezorSuiteLiteHeader } from '@suite-native/atoms';
-import { accountsActions, AccountsRootState, selectAccountByKey } from '@suite-common/wallet-core';
-import { AccountKey } from '@suite-common/wallet-types';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
 import {
-    AppTabsRoutes,
-    HomeStackRoutes,
-    RootStackParamList,
-    RootStackRoutes,
-    StackNavigationProps,
-} from '@suite-native/navigation';
+    type AccountsRootState,
+    accountsActions,
+    selectAccountByKey,
+} from '@suite-common/wallet-core';
+import { type AccountKey } from '@suite-common/wallet-types';
 import { useAlert } from '@suite-native/alerts';
+import { Button, TrezorSuiteHeader } from '@suite-native/atoms';
+import { Translation } from '@suite-native/intl';
+import { useNavigateToInitialScreen } from '@suite-native/navigation';
 
 type AccountSettingsRemoveCoinButtonProps = {
     accountKey: AccountKey;
@@ -21,50 +20,52 @@ type AccountSettingsRemoveCoinButtonProps = {
 export const AccountSettingsRemoveCoinButton = ({
     accountKey,
 }: AccountSettingsRemoveCoinButtonProps) => {
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
+    const navigateToInitialScreen = useNavigateToInitialScreen();
     const { showAlert, hideAlert } = useAlert();
+
     const account = useSelector((state: AccountsRootState) =>
         selectAccountByKey(state, accountKey),
     );
-
-    const navigation =
-        useNavigation<StackNavigationProps<RootStackParamList, RootStackRoutes.AccountSettings>>();
 
     if (!account) return null;
 
     const handleRemoveAccount = () => {
         dispatch(accountsActions.removeAccount([account]));
-
-        navigation.navigate(RootStackRoutes.AppTabs, {
-            screen: AppTabsRoutes.HomeStack,
-            params: {
-                screen: HomeStackRoutes.Home,
-            },
-        });
+        navigateToInitialScreen();
     };
 
     const handleShowAlert = () => {
         showAlert({
-            icon: 'shieldWarning',
-            pictogramVariant: 'red',
+            pictogramVariant: 'critical',
             title: (
-                <>
-                    Do you really want to remove this coin from <TrezorSuiteLiteHeader />?
-                </>
+                <Translation
+                    id="moduleAccountManagement.accountSettingsScreen.removeAccountAlert.title"
+                    values={{ trezorSuiteHeader: <TrezorSuiteHeader /> }}
+                />
             ),
-            description:
-                'Your coins remain intact and safe. Import this coin again using your public key (XPUB) or receive address at any time.',
-            primaryButtonTitle: 'Remove coin',
-            primaryButtonVariant: 'dangerElevation0',
+            description: (
+                <Translation id="moduleAccountManagement.accountSettingsScreen.removeAccountAlert.description" />
+            ),
+            primaryButtonTitle: (
+                <Translation id="moduleAccountManagement.accountSettingsScreen.removeAccountAlert.primaryButton" />
+            ),
+            primaryButtonColorProps: { intent: 'critical', priority: 'primary' },
             onPressPrimaryButton: handleRemoveAccount,
-            secondaryButtonTitle: 'Cancel',
-            onPressSecondaryButton: () => hideAlert(),
+            secondaryButtonTitle: <Translation id="generic.buttons.cancel" />,
+            secondaryButtonColorProps: { intent: 'critical', priority: 'secondary' },
+            onPressSecondaryButton: hideAlert,
         });
     };
 
     return (
-        <Button size="large" onPress={handleShowAlert} colorScheme="dangerElevation0">
-            Remove coin
+        <Button
+            onPress={handleShowAlert}
+            intent="critical"
+            priority="secondary"
+            testID="@account-detail/settings/remove-coin-button"
+        >
+            <Translation id="moduleAccountManagement.accountSettingsScreen.removeAccountAlert.primaryButton" />
         </Button>
     );
 };

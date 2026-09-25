@@ -1,48 +1,30 @@
-import { MouseEvent } from 'react';
-import styled, { useTheme } from 'styled-components';
-import { transparentize } from 'polished';
+import { type MouseEvent } from 'react';
 
-import { Icon } from '@trezor/components';
-import { borders, spacingsPx, typography } from '@trezor/theme';
-import { Translation } from 'src/components/suite';
+import { Translation } from '@suite/intl';
+import { TextButton } from '@trezor/components';
+import { LightbulbIcon } from '@trezor/icons';
+
 import { useGuideOpenNode } from 'src/hooks/guide';
-
-const OpenGuideLink = styled.span`
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: ${spacingsPx.xxs};
-    padding: ${spacingsPx.xxxs} ${spacingsPx.xs};
-    border-radius: ${borders.radii.sm};
-    color: ${({ theme }) => theme.iconAlertYellow};
-    ${typography.hint};
-    overflow: visible;
-    cursor: pointer;
-
-    &:hover {
-        background: ${({ theme }) => transparentize(0.9, theme.backgroundAlertYellowBold)};
-    }
-`;
 
 type OpenGuideFromTooltipProps = {
     id: string;
-    dataTest?: string;
 };
 
-export const OpenGuideFromTooltip = ({ id, dataTest }: OpenGuideFromTooltipProps) => {
+export const OpenGuideFromTooltip = ({ id }: OpenGuideFromTooltipProps) => {
     const { openNodeById } = useGuideOpenNode();
-    const theme = useTheme();
 
     return (
-        <OpenGuideLink
-            data-test={dataTest}
+        <TextButton
+            intent="neutral"
+            priority="secondary"
             onClick={(e: MouseEvent<any>) => {
                 e.stopPropagation();
                 openNodeById(id);
             }}
+            size="small"
+            iconLeft={LightbulbIcon}
         >
-            <Icon size={12} color={theme.iconAlertYellow} icon="LIGHTBULB" />
             <Translation id="TR_LEARN" />
-        </OpenGuideLink>
+        </TextButton>
     );
 };

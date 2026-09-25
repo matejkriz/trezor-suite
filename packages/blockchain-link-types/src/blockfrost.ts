@@ -1,5 +1,5 @@
-import type { AccountInfoParams, EstimateFeeParams, AccountBalanceHistoryParams } from './params';
 import type { AccountBalanceHistory } from './common';
+import type { AccountBalanceHistoryParams, AccountInfoParams, EstimateFeeParams } from './params';
 
 type TxContentUtxo = {
     /** Transaction hash */
@@ -133,9 +133,9 @@ export interface Address {
     address: string;
     path: string;
     transfers: number;
-    balance?: string;
-    sent?: string;
-    received?: string;
+    balance: string;
+    sent: string;
+    received: string;
 }
 
 export interface AccountAddresses {
@@ -169,6 +169,22 @@ export interface BlockfrostAccountInfo {
         total: number;
         index: number;
     };
+    misc: {
+        staking: {
+            address: string;
+            isActive: boolean;
+            rewards: string;
+            poolId: string | null;
+            drep: {
+                drep_id: string;
+                hex: string;
+                amount: string;
+                active: boolean;
+                active_epoch: number | null;
+                has_script: boolean;
+            } | null;
+        };
+    };
 }
 
 export interface ParseAssetResult {
@@ -178,7 +194,7 @@ export interface ParseAssetResult {
 
 export interface AddressNotification {
     address: string;
-    tx: any;
+    tx: BlockfrostTransaction;
 }
 
 export interface ServerInfo {
@@ -207,17 +223,18 @@ export type AccountUtxo = {
 export interface UtxosData extends AddressUtxoContent {
     blockInformation: BlockContent;
 }
+
 export interface AssetBalance {
-    /** The unit of the value */
-    unit: string;
-    /** The quantity of the unit */
+    unit: string; // policy id + encoded name
     quantity: string;
     decimals: number;
+    ticker: string | null; // symbol
+    name: string | null;
     fingerprint?: string; // defined for all assets except lovelace
 }
 
 export type BlockfrostToken = {
-    type: 'BLOCKFROST';
+    standard: 'BLOCKFROST';
     name: string; // from unit or fingerprint
     contract: string; // unit
     symbol: string; // from unit or fingerprint
@@ -253,6 +270,7 @@ export interface BlockfrostUtxos {
     blockInfo: BlockContent;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 declare function FSend(method: 'GET_SERVER_INFO'): Promise<ServerInfo>;
 declare function FSend(
     method: 'GET_BLOCK',
@@ -280,4 +298,5 @@ declare function FSend(
     params: AccountBalanceHistoryParams,
 ): Promise<AccountBalanceHistory[]>;
 declare function FSend(method: 'ESTIMATE_FEE', params: EstimateFeeParams): Promise<Fee>;
+
 export type Send = typeof FSend;

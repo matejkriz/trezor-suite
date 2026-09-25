@@ -1,0 +1,17 @@
+{
+    "name": "@suite-common/delegated-identity-key-types",
+    "version": "1.0.0",
+    "private": true,
+    "license": "See LICENSE.md in repo root",
+    "sideEffects": false,
+    "main": "src/index",
+    "scripts": {
+        "depcheck": "yarn g:depcheck",
+        "type-check": "yarn g:tsc --build",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'"
+    },
+    "dependencies": {
+        "@suite-common/suite-types": "workspace:*",
+        "@trezor/type-utils": "workspace:*"
+    }
+}

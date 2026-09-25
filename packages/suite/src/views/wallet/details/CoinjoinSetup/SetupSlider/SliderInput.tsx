@@ -1,56 +1,73 @@
 import {
+    type ChangeEvent,
+    type KeyboardEvent,
     forwardRef,
     useEffect,
     useImperativeHandle,
     useRef,
     useState,
-    KeyboardEvent,
-    ChangeEvent,
 } from 'react';
+
 import styled from 'styled-components';
-import { Input, InputProps, variables } from '@trezor/components';
+
+import { typography } from '@trezor/theme';
 
 const LevelContainer = styled.div`
     width: 64px;
 `;
 
-const Level = styled(Input)`
-    input {
-        background: none;
-        height: 42px;
-        padding: ${({ innerAddon }) => !innerAddon && '1px 12px 0 12px'};
-        border: 1.5px solid ${({ theme }) => theme.STROKE_GREY};
-        color: ${({ theme }) => theme.TYPE_GREEN};
-        font-size: ${variables.FONT_SIZE.H3};
-        text-align: center;
+const InputWrapper = styled.div<{ $isDisabled?: boolean }>`
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 42px;
+    padding: 0 12px;
+    border: 2px solid ${({ theme }) => theme.elementBorderField};
+    border-radius: 4px;
+    background: none;
+    cursor: ${({ $isDisabled }) => ($isDisabled ? 'not-allowed' : 'text')};
+`;
 
-        &:disabled {
-            color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-        }
+const StyledInput = styled.input<{ $isDisabled?: boolean }>`
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    padding: 2px 0 0;
+    background: none;
+    border: none;
+    outline: none;
+    color: ${({ theme, $isDisabled }) =>
+        $isDisabled ? theme.contentSecondary : theme.contentBrand};
+    ${typography['headline-sm']}
+    text-align: center;
+
+    &::placeholder {
+        color: ${({ theme }) => theme.contentSecondary};
     }
 `;
 
 const InnerAddon = styled.div`
-    font-size: ${variables.FONT_SIZE.SMALL};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
+    ${typography['body-sm']}
+    color: ${({ theme }) => theme.contentSecondary};
+    margin-left: 4px;
 `;
 
 const MAX_ALLOWED_INTEGER = 1000000;
 
-export interface SliderInputProps extends Pick<InputProps, 'isDisabled' | 'innerAddonAlign'> {
+export interface SliderInputProps {
     value: number | '';
     onChange: (number: number) => void;
     min: number;
     max: number;
     unit?: string;
+    isDisabled?: boolean;
     className?: string;
 }
 
 export const SliderInput = forwardRef<
     { setPreviousValue: (number: number) => void },
     SliderInputProps
->(({ value, onChange, min, max, unit, className, ...props }, ref) => {
+>(({ value, onChange, min, max, unit, isDisabled, className }, ref) => {
     const [inputValue, setInputValue] = useState<number | ''>(value);
 
     const inputRef = useRef<HTMLInputElement>(null);
@@ -121,16 +138,19 @@ export const SliderInput = forwardRef<
 
     return (
         <LevelContainer className={className}>
-            <Level
-                value={String(inputValue)}
-                onChange={handleChange}
-                onFocus={handleFocus}
-                onBlur={handleBlur}
-                onKeyDown={handleKeyDown}
-                innerAddon={<InnerAddon onClick={focusInput}>{unit}</InnerAddon>}
-                innerRef={inputRef}
-                {...props}
-            />
+            <InputWrapper $isDisabled={isDisabled} onClick={focusInput}>
+                <StyledInput
+                    ref={inputRef}
+                    value={String(inputValue)}
+                    onChange={handleChange}
+                    onFocus={handleFocus}
+                    onBlur={handleBlur}
+                    onKeyDown={handleKeyDown}
+                    disabled={isDisabled}
+                    $isDisabled={isDisabled}
+                />
+                {unit && <InnerAddon>{unit}</InnerAddon>}
+            </InputWrapper>
         </LevelContainer>
     );
 });

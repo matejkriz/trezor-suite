@@ -1,0 +1,52 @@
+import { useEffect } from 'react';
+
+import { TRADE_API_RELOAD_QUOTES_AFTER_SECONDS } from '@suite-common/trading';
+import { useTimer } from '@trezor/react-utils';
+
+type UseReloadTimerProps = {
+    isEnabled?: boolean;
+    refreshLimitSeconds?: number;
+};
+
+export const MAX_RESET_COUNT = 40;
+
+export const useReloadTimer = ({
+    isEnabled = true,
+    refreshLimitSeconds = TRADE_API_RELOAD_QUOTES_AFTER_SECONDS,
+}: UseReloadTimerProps) => {
+    const timer = useTimer(refreshLimitSeconds);
+    const {
+        timeSpent: { seconds },
+        resetCount,
+        isStopped,
+        isLoading,
+        stop,
+        reset,
+    } = timer;
+
+    useEffect(() => {
+        if (isEnabled && isStopped && !isLoading && resetCount < MAX_RESET_COUNT) {
+            reset();
+        }
+
+        if ((!isEnabled && !isStopped) || resetCount >= MAX_RESET_COUNT) {
+            stop();
+        }
+    }, [isEnabled, isStopped, isLoading, resetCount, reset, stop]);
+
+    if (isStopped || isLoading || !isEnabled) {
+        return {
+            timer,
+            shouldReload: false,
+            resetCount,
+        };
+    }
+
+    const shouldReload = seconds >= refreshLimitSeconds;
+
+    return {
+        timer,
+        shouldReload,
+        resetCount,
+    };
+};

@@ -1,286 +1,249 @@
 import { useEffect, useRef } from 'react';
+
 import styled from 'styled-components';
 
-import { analytics, EventType } from '@trezor/suite-analytics';
-import { Button, variables, Warning } from '@trezor/components';
-import { Translation } from 'src/components/suite';
-import { notificationsActions } from '@suite-common/toast-notifications';
-import { TranslationKey } from '@suite-common/intl-types';
-import { copyToClipboard, download } from '@trezor/dom-utils';
-import { useDispatch } from 'src/hooks/suite';
-import { TransactionReviewDetails } from './TransactionReviewDetails';
-import { TransactionReviewOutput } from './TransactionReviewOutput';
-import type { Account } from 'src/types/wallet';
+import { Translation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import type { DeviceRootState } from '@suite-common/device';
+import { injectGetNamedAddressSupport } from '@suite-common/networks';
+import { selectAccounts, selectSendFormReviewLastButtonCode } from '@suite-common/wallet-core';
 import type {
     FormState,
-    PrecomposedTransactionFinal,
-    TxFinalCardano,
-} from 'src/types/wallet/sendForm';
-import { getOutputState } from 'src/utils/wallet/reviewTransactionUtils';
+    GeneralPrecomposedTransactionFinal,
+    ReviewOutput,
+    StakeFormState,
+    StakeType,
+} from '@suite-common/wallet-types';
+import {
+    findAccountsByAddress,
+    getEvmTransactionPurpose,
+    isEvmApprovalTx,
+    isEvmYieldTxByTextSignature,
+} from '@suite-common/wallet-utils';
+import { Column, H4 } from '@trezor/components';
+
+import { useSelector } from 'src/hooks/suite';
+import type { Account } from 'src/types/wallet';
+
+import { TransactionReviewOutput } from './TransactionReviewOutput';
 import { TransactionReviewTotalOutput } from './TransactionReviewTotalOutput';
-import { ReviewOutput } from 'src/types/wallet/transaction';
-import { spacingsPx } from '@trezor/theme';
-import { StakeFormState, StakeType } from '@suite-common/wallet-types';
+import { TransactionReviewVerifyAddress } from './TransactionReviewVerifyAddress';
+import { getTransactionReviewState } from './getTransactionReviewState';
 
-const Content = styled.div`
-    display: flex;
-    padding: 0;
-    flex: 1;
-`;
-const Flex = styled.div`
-    display: flex;
-    gap: ${spacingsPx.xxs};
-`;
-
-const Right = styled.div`
-    flex: 1;
-    margin: 20px 10px 10px 25px;
-    max-width: 460px;
-    position: relative;
-
-    @media (max-width: ${variables.SCREEN_SIZE.SM}) {
-        margin: 20px 10px 10px;
-    }
-`;
-
-const RightTop = styled.div`
-    flex: 1;
-    height: 320px;
-    overflow-y: auto;
-`;
-
-const RightTopInner = styled.div`
-    padding: 10px 0 20px;
-`;
-
-const RightBottom = styled.div`
-    margin-left: 30px;
-    padding: 20px 0 0;
-    border-top: 1px solid ${({ theme }) => theme.STROKE_GREY};
-    display: flex;
-    flex-direction: column;
-
-    ${variables.SCREEN_QUERY.MOBILE} {
-        display: block;
-        margin-left: 0;
-    }
-`;
-
-const StyledButton = styled(Button)`
-    display: flex;
-    flex: 1;
-
-    ${variables.SCREEN_QUERY.MOBILE} {
-        width: 100%;
-
-        & + & {
-            margin: 10px 0 0;
-        }
-    }
-`;
-
-const TxReviewFootnote = styled.div`
-    margin-top: ${spacingsPx.md};
-`;
-
-const Nowrap = styled.span`
-    white-space: nowrap;
-`;
-
-export interface TransactionReviewOutputListProps {
+export type TransactionReviewOutputListProps = {
     account: Account;
+    precomposedTx: GeneralPrecomposedTransactionFinal;
     precomposedForm: FormState | StakeFormState;
-    precomposedTx: PrecomposedTransactionFinal | TxFinalCardano;
-    signedTx?: { tx: string }; // send reducer
-    decision?: { resolve: (success: boolean) => void }; // dfd
-    detailsOpen: boolean;
+    signedTx?: { tx: string };
     outputs: ReviewOutput[];
     buttonRequestsCount: number;
     isRbfAction: boolean;
-    actionText: TranslationKey;
+    reviewStep: number;
+    onTryAgain: (close: boolean) => void;
     isSending?: boolean;
-    setIsSending?: () => void;
-    ethereumStakeType?: StakeType;
-}
+    stakeType?: StakeType;
+    deadline?: number;
+};
+
+const Wrapper = styled.div`
+    scroll-margin-top: 48px;
+`;
+
+const SectionHeading = ({ output, index }: { output: ReviewOutput; index: number }) => (
+    <H4 margin={{ top: index === 0 ? 0 : 8 }}>
+        {output.type === 'address' ? (
+            <Translation
+                id="TR_SEND_RECIPIENT_ADDRESS"
+                values={{
+                    index: index + 1,
+                }}
+            />
+        ) : (
+            <Translation id="TR_SUMMARY" />
+        )}
+    </H4>
+);
 
 export const TransactionReviewOutputList = ({
     account,
-    precomposedForm,
     precomposedTx,
+    precomposedForm,
     signedTx,
-    decision,
-    detailsOpen,
     outputs,
     buttonRequestsCount,
     isRbfAction,
-    actionText,
+    stakeType,
+    deadline,
+    reviewStep,
+    onTryAgain,
     isSending,
-    setIsSending,
-    ethereumStakeType,
 }: TransactionReviewOutputListProps) => {
-    const dispatch = useDispatch();
-    const { networkType } = account;
-
-    const { symbol } = account;
-    const { options, selectedFee } = precomposedForm;
-    let isCoinControlEnabled = false;
-    let hasCoinControlBeenOpened = false;
-    if ('isCoinControlEnabled' in precomposedForm) {
-        ({ isCoinControlEnabled } = precomposedForm);
-    }
-    if ('hasCoinControlBeenOpened' in precomposedForm) {
-        ({ hasCoinControlBeenOpened } = precomposedForm);
-    }
-    const broadcastEnabled = options.includes('broadcast');
-
-    const reportTransactionCreatedEvent = (action: 'sent' | 'copied' | 'downloaded' | 'replaced') =>
-        analytics.report({
-            type: EventType.TransactionCreated,
-            payload: {
-                action,
-                symbol,
-                tokens: outputs
-                    .filter(output => output.token?.symbol)
-                    .map(output => output.token?.symbol)
-                    .join(','),
-                outputsCount: precomposedForm.outputs.length,
-                broadcast: broadcastEnabled,
-                bitcoinRbf: !!options.includes('bitcoinRBF'),
-                bitcoinLockTime: !!options.includes('bitcoinLockTime'),
-                ethereumData: !!options.includes('ethereumData'),
-                rippleDestinationTag: !!options.includes('rippleDestinationTag'),
-                ethereumNonce: !!options.includes('ethereumNonce'),
-                selectedFee: selectedFee || 'normal',
-                isCoinControlEnabled,
-                hasCoinControlBeenOpened,
-            },
-        });
-    const handleSend = () => {
-        if (networkType === 'solana') {
-            setIsSending?.();
-        }
-        if (decision) {
-            decision.resolve(true);
-
-            reportTransactionCreatedEvent(isRbfAction ? 'replaced' : 'sent');
-        }
-    };
-    const handleCopy = () => {
-        const result = copyToClipboard(signedTx!.tx);
-        if (typeof result !== 'string') {
-            dispatch(
-                notificationsActions.addToast({
-                    type: 'copy-to-clipboard',
-                }),
-            );
-        }
-
-        reportTransactionCreatedEvent('copied');
-    };
-    const handleDownload = () => {
-        download(signedTx!.tx, 'signed-transaction.txt');
-
-        reportTransactionCreatedEvent('downloaded');
-    };
-
     const outputRefs = useRef<(HTMLDivElement | null)[]>([]);
+    const totalOutputRef = useRef<HTMLDivElement | null>(null);
+    const accounts = useSelector(selectAccounts);
+    const { getNamedAddressSupport } = useServices(injectGetNamedAddressSupport);
+    const { networkType, symbol } = account;
+    const namedAddress = getNamedAddressSupport(symbol);
+    const isMultirecipient =
+        outputs.filter(({ type }) => ['address', 'opreturn'].includes(type)).length > 1;
+    const isFirstOutputAddress = outputs[0]?.type === 'address';
 
-    const totalRef = useRef<HTMLDivElement>(null);
+    const lastButtonRequestCode = useSelector((state: DeviceRootState) =>
+        selectSendFormReviewLastButtonCode(state, symbol),
+    );
+
+    const reviewState = getTransactionReviewState({
+        index: outputs.length,
+        currentStep: reviewStep,
+        hasSignedTx: !!signedTx,
+        lastButtonRequestCode,
+    });
+
+    const { trading: isTrading } = precomposedForm;
+
+    const isFirstStep = buttonRequestsCount <= 1;
+
+    const isStaking = stakeType;
+
+    const isApprovalTx = isEvmApprovalTx(precomposedForm.transactionData);
+
+    // Resolved from the full context, not the calldata alone, so a WETH deposit()/withdraw() is
+    // classified as wrap/unwrap — the review rows for those mirror the device's clear-signing
+    // screens and need to know which of the two it is.
+    const evmTxType = getEvmTransactionPurpose({
+        networkSymbol: symbol,
+        to: precomposedTx.outputs.find(o => 'address' in o && typeof o.address === 'string')
+            ?.address,
+        data: precomposedForm.transactionData,
+    });
+
+    const isYieldOperation = isEvmYieldTxByTextSignature(evmTxType) || evmTxType === 'claim';
+
+    const isInternalTransfer =
+        isFirstOutputAddress &&
+        typeof outputs[0]?.value === 'string' &&
+        findAccountsByAddress(symbol, outputs[0]?.value, accounts).length > 0;
+
+    const summaryIndex = outputs.findIndex(
+        ({ type }) => !['address', 'amount', 'opreturn'].includes(type),
+    );
+
+    const isTronStakeFreeze =
+        networkType === 'tron' &&
+        (precomposedForm.tronStaking?.kind === 'freeze' ||
+            precomposedForm.tronStaking?.kind === 'unstake');
+
+    const nativeToken =
+        account.accountType === 'placeholder' && 'nativeToken' in precomposedTx
+            ? precomposedTx.nativeToken
+            : undefined;
 
     useEffect(() => {
-        const isLastStep = getOutputState(outputs.length, buttonRequestsCount) === 'active';
-
-        if (isLastStep) {
-            totalRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        } else {
-            const activeIndex = outputs.findIndex(
-                (_, index) => getOutputState(index, buttonRequestsCount) === 'active',
-            );
-
-            outputRefs.current[activeIndex]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (reviewStep === outputs.length || signedTx) {
+            // When the tx is signed, the outputs are updated, so we use instant scroll to prevent jumping
+            totalOutputRef.current?.scrollIntoView({ behavior: signedTx ? 'instant' : 'smooth' });
+        } else if (reviewStep !== 0) {
+            outputRefs.current[reviewStep]?.scrollIntoView({ behavior: 'smooth' });
         }
-    }, [buttonRequestsCount, outputs]);
+    }, [reviewStep, outputs.length, signedTx]);
+
+    if (
+        isFirstOutputAddress &&
+        isFirstStep &&
+        !isStaking &&
+        !isApprovalTx &&
+        !isTrading &&
+        !isInternalTransfer &&
+        !isYieldOperation &&
+        !signedTx
+    ) {
+        // If the user typed an ENS name, the form keeps the original input on `address`
+        // and the resolved hex on `resolvedAddress`. Surface both so the user can cross-
+        // check what they entered against what the device shows.
+        const firstFormOutput =
+            'outputs' in precomposedForm ? precomposedForm.outputs?.[0] : undefined;
+        const isEnsResolved =
+            !!firstFormOutput &&
+            !!firstFormOutput.address &&
+            !!firstFormOutput.resolvedAddress &&
+            firstFormOutput.address !== firstFormOutput.resolvedAddress &&
+            namedAddress.isNameLike(firstFormOutput.address);
+        const ensName = isEnsResolved ? firstFormOutput.address : undefined;
+        const ensResolvedAddress = isEnsResolved ? firstFormOutput.resolvedAddress : undefined;
+
+        return (
+            <TransactionReviewVerifyAddress
+                networkType={networkType}
+                deadline={deadline}
+                onTryAgain={onTryAgain}
+                isSending={isSending}
+                ensName={ensName}
+                resolvedAddress={ensResolvedAddress}
+            />
+        );
+    }
 
     return (
-        <Content>
-            <Right>
-                {detailsOpen && (
-                    <TransactionReviewDetails tx={precomposedTx} txHash={signedTx?.tx} />
-                )}
-                <RightTop>
-                    <RightTopInner>
-                        {outputs.map((output, index) => {
-                            const state = signedTx
-                                ? 'success'
-                                : getOutputState(index, buttonRequestsCount);
+        <Column gap={16}>
+            {outputs.map((output, index) => {
+                const isHeadingShown =
+                    isMultirecipient && (output.type === 'address' || index === summaryIndex);
+                const recipientIndex = outputs
+                    .filter(({ type }) => ['address', 'opreturn'].includes(type))
+                    .indexOf(output);
 
-                            return (
-                                <TransactionReviewOutput
-                                    // it's safe to use array index since outputs do not change
+                return (
+                    <Wrapper
+                        key={index}
+                        ref={(ref: HTMLDivElement | null) => {
+                            outputRefs.current[index] = ref;
+                        }}
+                    >
+                        <Column gap={12}>
+                            {isHeadingShown && (
+                                <SectionHeading output={output} index={recipientIndex} />
+                            )}
 
-                                    key={index}
-                                    ref={el => (outputRefs.current[index] = el)}
-                                    {...output}
-                                    state={state}
-                                    symbol={symbol}
-                                    account={account}
-                                    isRbf={isRbfAction}
-                                    ethereumStakeType={ethereumStakeType}
-                                />
-                            );
-                        })}
-                        {!(isRbfAction && networkType === 'bitcoin') && (
-                            <TransactionReviewTotalOutput
-                                ref={totalRef}
+                            <TransactionReviewOutput
+                                {...output}
+                                state={getTransactionReviewState({
+                                    index,
+                                    currentStep: reviewStep,
+                                    hasSignedTx: !!signedTx,
+                                })}
                                 account={account}
-                                signedTx={signedTx}
-                                outputs={outputs}
-                                buttonRequestsCount={buttonRequestsCount}
-                                precomposedTx={precomposedTx}
+                                isRbf={isRbfAction}
+                                isTrading={!!isTrading}
+                                stakeType={stakeType}
+                                evmTxType={evmTxType}
+                                nativeToken={nativeToken}
+                                isTronStakeFreeze={isTronStakeFreeze}
                             />
-                        )}
-                    </RightTopInner>
-                </RightTop>
-                <RightBottom>
-                    {broadcastEnabled ? (
-                        <StyledButton
-                            data-test="@modal/send"
-                            isDisabled={!signedTx}
-                            isLoading={isSending}
-                            onClick={handleSend}
-                        >
-                            <Translation id={actionText} />
-                        </StyledButton>
-                    ) : (
-                        <Flex>
-                            <StyledButton
-                                isDisabled={!signedTx}
-                                onClick={handleCopy}
-                                data-test="@send/copy-raw-transaction"
-                            >
-                                <Translation id="COPY_TRANSACTION_TO_CLIPBOARD" />
-                            </StyledButton>
-                            <StyledButton
-                                variant="tertiary"
-                                isDisabled={!signedTx}
-                                onClick={handleDownload}
-                            >
-                                <Translation id="DOWNLOAD_TRANSACTION" />
-                            </StyledButton>
-                        </Flex>
-                    )}
-                    {isSending && networkType === 'solana' ? (
-                        <TxReviewFootnote>
-                            <Warning variant="tertiary" icon="INFO" withIcon>
-                                <Translation
-                                    id="TR_SOLANA_TX_CONFIRMATION_MAY_TAKE_UP_TO_1_MIN"
-                                    values={{ nowrap: chunks => <Nowrap>{chunks}</Nowrap> }}
-                                />
-                            </Warning>
-                        </TxReviewFootnote>
-                    ) : null}
-                </RightBottom>
-            </Right>
-        </Content>
+                        </Column>
+                    </Wrapper>
+                );
+            })}
+
+            {!(isRbfAction && networkType === 'bitcoin') &&
+                (networkType !== 'tron' || isTronStakeFreeze) && (
+                    <Wrapper ref={totalOutputRef}>
+                        <Column gap={12}>
+                            {isMultirecipient && summaryIndex === -1 && (
+                                <H4 margin={{ top: 8 }}>
+                                    <Translation id="TR_SUMMARY" />
+                                </H4>
+                            )}
+                            <TransactionReviewTotalOutput
+                                account={account}
+                                state={reviewState}
+                                precomposedTx={precomposedTx}
+                                precomposedForm={precomposedForm}
+                                stakeType={stakeType}
+                                isRbf={isRbfAction}
+                            />
+                        </Column>
+                    </Wrapper>
+                )}
+        </Column>
     );
 };

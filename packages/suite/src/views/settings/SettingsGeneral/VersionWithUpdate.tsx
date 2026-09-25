@@ -1,22 +1,23 @@
-import { isDevEnv } from '@suite-common/suite-utils';
-import { desktopApi } from '@trezor/suite-desktop-api';
-
-import { installUpdate, setUpdateWindow } from 'src/actions/suite/desktopUpdateActions';
+import { injectDesktopApi } from '@suite/desktop-app-api';
 import {
-    ActionButton,
-    ActionColumn,
-    SectionItem,
-    TextColumn,
-    Translation,
-    TrezorLink,
-} from 'src/components/suite';
-import { useDispatch, useSelector } from 'src/hooks/suite';
-import { UpdateState } from 'src/reducers/suite/desktopUpdateReducer';
-import { useAnchor } from 'src/hooks/suite/useAnchor';
-import { SettingsAnchor } from 'src/constants/suite/anchors';
+    type DesktopUpdateState,
+    UpdateState,
+    desktopUpdateActions,
+    installUpdateThunk,
+    selectDesktopUpdate,
+} from '@suite/desktop-update';
+import { useExternalLink } from '@suite/external-links';
+import { getReleaseUrl } from '@suite/github';
+import { Translation } from '@suite/intl';
+import { Anchor, SettingsAnchor } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { isDevEnv } from '@suite-common/suite-utils';
+import { Button, type ButtonProps } from '@trezor/components';
+import { isDesktop } from '@trezor/env-utils';
+import { ActionButton, ActionColumn, SectionItem, TextColumn } from '@trezor/product-components';
 
-import { Button } from '@trezor/components';
-import { getReleaseUrl } from 'src/services/github';
+import { useSelector } from 'src/hooks/suite';
 
 const getUpdateStateMessage = (state: UpdateState) => {
     switch (state) {
@@ -30,111 +31,124 @@ const getUpdateStateMessage = (state: UpdateState) => {
     }
 };
 
-export const VersionWithUpdate = () => {
-    const desktopUpdate = useSelector(state => state.desktopUpdate);
-    const dispatch = useDispatch();
-    const { anchorRef, shouldHighlight } = useAnchor(SettingsAnchor.VersionWithUpdate);
-
-    const checkForUpdates = () => desktopApi.checkForUpdates(true);
-    const maximizeUpdater = () => dispatch(setUpdateWindow('maximized'));
-    const install = () => dispatch(installUpdate());
-
+const Description = ({ desktopUpdateState }: { desktopUpdateState: DesktopUpdateState }) => {
     const appVersion = process.env.VERSION || '';
+    const { dispatch } = useServices(injectDispatch);
+    const openChangelog = () => dispatch(desktopUpdateActions.setIsVersionInfoModalVisible(true));
+    const url = useExternalLink(getReleaseUrl(appVersion));
+    const commonButtonProps: Partial<ButtonProps> = {
+        'data-testid': '@settings/suite-version',
+        intent: 'neutral',
+        priority: 'secondary',
+        size: 'small',
+    } as const;
+    const buttonLabel = (
+        <>
+            {appVersion}
+            {isDevEnv && '-dev'}
+        </>
+    );
 
     return (
-        <SectionItem
-            data-test="@settings/version"
-            ref={anchorRef}
-            shouldHighlight={shouldHighlight}
-        >
-            <TextColumn
-                title={<Translation id="TR_SUITE_VERSION" />}
-                description={
-                    <div>
+        <div>
+            <Translation
+                id="TR_YOUR_CURRENT_VERSION"
+                values={{
+                    version: isDesktop() ? (
+                        <Button
+                            onClick={() => {
+                                openChangelog();
+                            }}
+                            margin={{ left: 4 }}
+                            {...commonButtonProps}
+                        >
+                            {buttonLabel}
+                        </Button>
+                    ) : (
+                        <Button href={url} margin={{ left: 4 }} {...commonButtonProps}>
+                            {buttonLabel}
+                        </Button>
+                    ),
+                }}
+            />
+            {[UpdateState.Available, UpdateState.Downloading, UpdateState.Ready].includes(
+                desktopUpdateState.state,
+            ) &&
+                desktopUpdateState.latest && (
+                    <>
+                        &nbsp;
                         <Translation
-                            id="TR_YOUR_CURRENT_VERSION"
+                            id={getUpdateStateMessage(desktopUpdateState.state)}
                             values={{
                                 version: (
-                                    <TrezorLink href={getReleaseUrl(appVersion)} variant="nostyle">
-                                        <Button
-                                            variant="tertiary"
-                                            size="tiny"
-                                            icon="EXTERNAL_LINK"
-                                            iconAlignment="right"
-                                        >
-                                            {appVersion}
-                                            {isDevEnv && '-dev'}
-                                        </Button>
-                                    </TrezorLink>
+                                    <Button
+                                        intent="critical"
+                                        size="small"
+                                        href={getReleaseUrl(desktopUpdateState.latest.version)}
+                                    >
+                                        {desktopUpdateState.latest.version}
+                                    </Button>
                                 ),
                             }}
                         />
-                        {[
-                            UpdateState.Available,
-                            UpdateState.Downloading,
-                            UpdateState.Ready,
-                        ].includes(desktopUpdate.state) &&
-                            desktopUpdate.latest && (
-                                <>
-                                    &nbsp;
-                                    <Translation
-                                        id={getUpdateStateMessage(desktopUpdate.state)}
-                                        values={{
-                                            version: (
-                                                <TrezorLink
-                                                    href={getReleaseUrl(appVersion)}
-                                                    variant="nostyle"
-                                                >
-                                                    <Button
-                                                        variant="destructive"
-                                                        size="tiny"
-                                                        icon="EXTERNAL_LINK"
-                                                        iconAlignment="right"
-                                                    >
-                                                        {desktopUpdate.latest.version}
-                                                    </Button>
-                                                </TrezorLink>
-                                            ),
-                                        }}
-                                    />
-                                </>
+                    </>
+                )}
+        </div>
+    );
+};
+
+export const VersionWithUpdate = () => {
+    const desktopUpdateState = useSelector(selectDesktopUpdate);
+    const { desktopApi, dispatch } = useServices(injectDispatch, injectDesktopApi);
+
+    const checkForUpdates = () => desktopApi.checkForUpdates({ isManual: true });
+    const maximizeUpdateModal = () => dispatch(desktopUpdateActions.setIsUpdateModalVisible(true));
+    const installAndRestart = () => dispatch(installUpdateThunk({ installNow: true }));
+
+    return (
+        <Anchor anchorId={SettingsAnchor.VersionWithUpdate}>
+            {({ anchorId, anchorRef, shouldHighlight }) => (
+                <SectionItem
+                    data-testid={anchorId}
+                    ref={anchorRef}
+                    shouldHighlight={shouldHighlight}
+                >
+                    <TextColumn
+                        title={<Translation id="TR_SUITE_VERSION" />}
+                        description={<Description desktopUpdateState={desktopUpdateState} />}
+                    />
+                    {desktopUpdateState.enabled && (
+                        <ActionColumn>
+                            {desktopUpdateState.state === UpdateState.Checking && (
+                                <ActionButton isDisabled intent="brand">
+                                    <Translation id="SETTINGS_UPDATE_CHECKING" />
+                                </ActionButton>
                             )}
-                    </div>
-                }
-            />
-            {desktopUpdate.enabled && (
-                <ActionColumn>
-                    {desktopUpdate.state === UpdateState.Checking && (
-                        <ActionButton isDisabled variant="secondary">
-                            <Translation id="SETTINGS_UPDATE_CHECKING" />
-                        </ActionButton>
+                            {(desktopUpdateState.state === UpdateState.NotAvailable ||
+                                desktopUpdateState.state === UpdateState.EarlyAccessDisable) && (
+                                <ActionButton onClick={checkForUpdates} intent="brand">
+                                    <Translation id="SETTINGS_UPDATE_CHECK" />
+                                </ActionButton>
+                            )}
+                            {desktopUpdateState.state === UpdateState.Available && (
+                                <ActionButton onClick={maximizeUpdateModal} intent="brand">
+                                    <Translation id="SETTINGS_UPDATE_AVAILABLE" />
+                                </ActionButton>
+                            )}
+                            {desktopUpdateState.state === UpdateState.Downloading && (
+                                <ActionButton onClick={maximizeUpdateModal} intent="brand">
+                                    <Translation id="SETTINGS_UPDATE_DOWNLOADING" />
+                                </ActionButton>
+                            )}
+                            {desktopUpdateState.state === UpdateState.Ready && (
+                                <ActionButton onClick={installAndRestart} intent="brand">
+                                    <Translation id="SETTINGS_UPDATE_READY" />
+                                </ActionButton>
+                            )}
+                        </ActionColumn>
                     )}
-                    {[
-                        UpdateState.NotAvailable,
-                        UpdateState.EarlyAccessDisable,
-                        UpdateState.EarlyAccessEnable,
-                    ].includes(desktopUpdate.state) && (
-                        <ActionButton onClick={checkForUpdates} variant="secondary">
-                            <Translation id="SETTINGS_UPDATE_CHECK" />
-                        </ActionButton>
-                    )}
-                    {desktopUpdate.state === UpdateState.Available && (
-                        <ActionButton onClick={maximizeUpdater} variant="secondary">
-                            <Translation id="SETTINGS_UPDATE_AVAILABLE" />
-                        </ActionButton>
-                    )}
-                    {desktopUpdate.state === UpdateState.Downloading && (
-                        <ActionButton onClick={maximizeUpdater} variant="secondary">
-                            <Translation id="SETTINGS_UPDATE_DOWNLOADING" />
-                        </ActionButton>
-                    )}
-                    {desktopUpdate.state === UpdateState.Ready && (
-                        <ActionButton onClick={install} variant="secondary">
-                            <Translation id="SETTINGS_UPDATE_READY" />
-                        </ActionButton>
-                    )}
-                </ActionColumn>
+                </SectionItem>
             )}
-        </SectionItem>
+        </Anchor>
     );
 };

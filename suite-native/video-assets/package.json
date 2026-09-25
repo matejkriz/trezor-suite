@@ -7,16 +7,18 @@
     "type": "module",
     "main": "src/index",
     "scripts": {
-        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
+        "depcheck": "yarn g:depcheck",
         "type-check": "yarn g:tsc --build",
-        "generate-videos": "yarn g:tsx ./scripts/generateVideos.ts"
+        "generate-videos": "yarn g:tsx ./scripts/generateVideos.ts",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'"
     },
     "dependencies": {
-        "@suite-native/atoms": "workspace:*",
-        "@trezor/styles": "workspace:*",
-        "expo-av": "13.10.5",
-        "prettier": "3.2.5",
-        "react": "18.2.0",
-        "react-native": "0.73.2"
+        "@trezor/styles-native": "workspace:*",
+        "expo": "~57.0.8",
+        "expo-video": "~57.0.1",
+        "prettier": "^3.9.6",
+        "react": "19.2.3",
+        "react-native": "0.86.0",
+        "react-native-reanimated": "4.5.0"
     }
 }

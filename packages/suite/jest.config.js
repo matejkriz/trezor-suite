@@ -1,20 +1,34 @@
+const version = require('./package.json').suiteVersion;
+const baseConfig = require('../../jest.config.base.swc');
+
 // all tests have same UTC timezone
 process.env.TZ = 'UTC';
 process.env.LANG = 'en-US';
+process.env.VERSION = version;
 
-const babelConfig = {
-    presets: [
-        ['@babel/preset-env', { targets: { node: 'current' }, modules: 'commonjs' }],
-        '@babel/preset-typescript',
-        [
-            '@babel/preset-react',
-            {
+const swcConfig = {
+    jsc: {
+        parser: {
+            syntax: 'typescript',
+            tsx: true,
+            decorators: true,
+        },
+        transform: {
+            react: {
                 runtime: 'automatic',
             },
-        ],
-    ],
+            decoratorVersion: '2022-03',
+        },
+        target: 'esnext',
+    },
+    module: {
+        type: 'commonjs',
+    },
 };
 
+/**
+ * @type {import('jest').Config}
+ */
 module.exports = {
     roots: [
         '<rootDir>/src',
@@ -27,13 +41,11 @@ module.exports = {
     setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
     moduleNameMapper: {
         '^@suite-common/(.+)': '<rootDir>/../../suite-common/$1',
-        '^@trezor/(.+)': '<rootDir>/../$1',
+        '^@trezor/(?!network-)(.+)': '<rootDir>/../$1',
         '^src/(.+)': '<rootDir>/src/$1',
         '\\.(mp4)$': '<rootDir>/__mocks__/import-mp4.js',
-        '\\.(svg)$': '<rootDir>/__mocks__/import-svg.js',
-        uuid: require.resolve('uuid'), // https://stackoverflow.com/questions/73203367/jest-syntaxerror-unexpected-token-export-with-uuid-library
-        // Enforce usage of JS version of bcrypto in tests because on CI we don't build native modules because it's slowing yarn install
-        '^bcrypto/lib/(.*)$': 'bcrypto/lib/$1-browser',
+        '\\.(svg|webp)$': '<rootDir>/__mocks__/import-svg.js',
+        ...baseConfig.moduleNameMapper,
     },
     moduleFileExtensions: ['js', 'ts', 'tsx'],
     coverageDirectory: './coverage',
@@ -48,16 +60,8 @@ module.exports = {
         '!**/constants/**',
         '!**/__tests__/**',
         '!**/__fixtures__/**',
-        '!<rootDir>/src/hooks/**/useCoinmarket*',
+        '!<rootDir>/src/hooks/**/useTrading*',
     ],
-    coverageThreshold: {
-        global: {
-            statements: 49,
-            branches: 38.7,
-            lines: 50,
-            functions: 47,
-        },
-    },
     modulePathIgnorePatterns: ['node_modules'],
     watchPathIgnorePatterns: ['<rootDir>/libDev'],
     testPathIgnorePatterns: [
@@ -71,11 +75,12 @@ module.exports = {
         '/public/',
     ],
 
-    transformIgnorePatterns: ['/node_modules/(?!d3-(.*)|internmap)/'],
+    transformIgnorePatterns: [
+        '/node_modules/(?!d3-(.*)|internmap|@walletconnect|uint8arrays|@noble)/',
+    ],
     testMatch: ['**/*.test.(ts|tsx|js)'],
     transform: {
-        '(d3-|internmap).*\\.js$': ['babel-jest', babelConfig],
-        '\\.(ts|tsx)$': ['babel-jest', babelConfig],
+        '\\.(js|jsx|ts|tsx)$': ['@swc/jest', swcConfig],
     },
     verbose: false,
     watchPlugins: ['jest-watch-typeahead/filename', 'jest-watch-typeahead/testname'],

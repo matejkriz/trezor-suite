@@ -1,0 +1,79 @@
+import { type NetworkSymbol, getNetwork } from '@suite-common/wallet-config';
+import { BannerInline, Card, HStack, Text } from '@suite-native/atoms';
+import { NetworkIcon } from '@suite-native/icons';
+import { Translation } from '@suite-native/intl';
+import { Link } from '@suite-native/link';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
+import { HOW_TO_CHOOSE_RIGHT_NETWORK_URL } from '@trezor/urls';
+
+const cardStyle = prepareNativeStyle(utils => ({
+    backgroundColor: utils.colors.surfaceFillSunken,
+    borderColor: utils.colors.borderNeutral,
+    borderWidth: utils.borders.widths.small,
+    paddingVertical: utils.spacings.sp12,
+
+    ...utils.boxShadows.none,
+}));
+
+type CorrectNetworkMessageCardProps = {
+    symbol: NetworkSymbol;
+    qrNetworkSymbol?: NetworkSymbol | null;
+};
+
+export const CorrectNetworkMessageCard = ({
+    symbol,
+    qrNetworkSymbol,
+}: CorrectNetworkMessageCardProps) => {
+    const { applyStyle } = useNativeStyles();
+
+    const network = getNetwork(symbol);
+
+    if (qrNetworkSymbol) {
+        return (
+            <BannerInline
+                intent="warning"
+                title={
+                    <Translation
+                        id="moduleSend.outputs.recipients.qrNetworkMismatch"
+                        values={{
+                            qrNetwork: getNetwork(qrNetworkSymbol).name,
+                            accountNetwork: network.name,
+                        }}
+                    />
+                }
+            />
+        );
+    }
+
+    if (network.networkType !== 'ethereum') return null;
+
+    return (
+        <Card style={applyStyle(cardStyle)}>
+            <HStack spacing="sp12" alignItems="center">
+                <NetworkIcon symbol={symbol} size="extraLarge" />
+                <Text variant="body-sm">
+                    <Translation
+                        id="moduleSend.outputs.correctNetworkMessage"
+                        values={{
+                            networkName: network.name,
+                            link: linkChunk => {
+                                const label = (linkChunk[0] as string) ?? '';
+
+                                return (
+                                    <Link
+                                        key={label}
+                                        href={HOW_TO_CHOOSE_RIGHT_NETWORK_URL}
+                                        label={label}
+                                        isUnderlined
+                                        textVariant="body-sm"
+                                        textColor="contentPrimary"
+                                    />
+                                );
+                            },
+                        }}
+                    />
+                </Text>
+            </HStack>
+        </Card>
+    );
+};

@@ -1,25 +1,16 @@
-import { ReactNode } from 'react';
-import styled from 'styled-components';
+import { type ReactNode } from 'react';
 
-import { variables } from '@trezor/components';
-import type { ExtendedMessageDescriptor } from 'src/types/suite';
+import { type ExtendedMessageDescriptor } from '@suite/intl';
+import { Paragraph } from '@trezor/components';
+
 import type { NotificationRendererProps } from 'src/components/suite';
 
-const Header = styled.div`
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    margin-top: 1px;
-`;
-
-const Body = styled.div`
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-    margin-top: 1px;
-`;
+import { type NotificationAction } from '../Notifications/NotificationGroup/NotificationList/NotificationView';
 
 type ConditionalActionRendererProps = NotificationRendererProps & {
     header: ReactNode;
     body: ReactNode;
-    icon?: JSX.Element;
+    icon?: ReactNode;
     actionLabel: ExtendedMessageDescriptor['id'];
     actionAllowed: boolean;
     onAction: () => void;
@@ -36,14 +27,10 @@ export const ConditionalActionRenderer = ({
     render: View,
     ...rest
 }: ConditionalActionRendererProps) => {
-    const action = actionAllowed
-        ? ({
-              onClick: onAction,
-              label: actionLabel,
-              position: 'bottom',
-              variant: 'primary',
-          } as const)
-        : undefined;
+    const actions: NotificationAction[] = [
+        { onClick: onAction, label: actionLabel, position: 'bottom', intent: 'brand' },
+        { onClick: onCancel, label: 'TR_CANCEL', position: 'bottom', priority: 'secondary' },
+    ];
 
     return (
         <View
@@ -51,10 +38,18 @@ export const ConditionalActionRenderer = ({
             variant="transparent"
             message="TOAST_COIN_SCHEME_PROTOCOL"
             messageValues={{
-                header: <Header>{header}</Header>,
-                body: <Body>{body}</Body>,
+                header: (
+                    <Paragraph typographyStyle="body-md-strong" margin={{ top: 2 }}>
+                        {header}
+                    </Paragraph>
+                ),
+                body: (
+                    <Paragraph typographyStyle="body-md" margin={{ top: 2 }}>
+                        {body}
+                    </Paragraph>
+                ),
             }}
-            action={action}
+            action={actions}
             onCancel={onCancel}
         />
     );

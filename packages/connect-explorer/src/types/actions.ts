@@ -1,0 +1,53 @@
+import type { TSchema } from '@sinclair/typebox';
+
+import type {
+    ConnectDynamicSettings,
+    ConnectMobileSettings,
+    PermissionRequest,
+} from '@trezor/connect-common';
+import type { TrezorConnectPublicAPI } from '@trezor/connect-web';
+
+import type { Field } from './common';
+
+// Method action constants
+export const SET_METHOD = 'method_set';
+export const SET_SCHEMA = 'schema_set';
+export const FIELD_CHANGE = 'method_field_change';
+export const ADD_BATCH = 'method_add_batch';
+export const REMOVE_BATCH = 'method_remove_batch';
+export const SET_UNION = 'method_set_union';
+export const RESPONSE = 'method_response';
+export const SET_MANUAL_MODE = 'method_set_manual_mode';
+export const SET_METHOD_PROCESSING = 'method_set_processing';
+
+// TrezorConnect action constants
+export const ON_CHANGE_CONNECT_OPTIONS = 'action__on_change_connect_options';
+export const ON_INIT_START = 'action__on_init_start';
+export const ON_INIT_ERROR = 'action__on_init_error';
+
+// Method action types
+export type MethodAction =
+    | { type: typeof SET_METHOD; methodConfig: any }
+    | { type: typeof SET_SCHEMA; method: keyof TrezorConnectPublicAPI<any>; schema: TSchema }
+    | { type: typeof FIELD_CHANGE; field: Field<any>; value: any }
+    | { type: typeof ADD_BATCH; field: Field<any>; item: any }
+    | { type: typeof REMOVE_BATCH; field: Field<any>; batch: any[] }
+    | { type: typeof SET_UNION; field: Field<any>; current: any }
+    | { type: typeof RESPONSE; response: any }
+    | { type: typeof SET_MANUAL_MODE; manualMode: boolean }
+    | { type: typeof SET_METHOD_PROCESSING; payload: boolean };
+
+// TrezorConnect action types
+// `requestedPermissions` is spelled out here as well: `Partial<A | B>` only exposes the keys
+// A and B share (`manifest`, `coreMode`), while `requestedPermissions` lives solely on the
+// `ConnectDynamicSettings` branch — the intersection makes it readable/writable on both.
+export type ConnectOptions = Partial<
+    (ConnectMobileSettings & { coreMode: 'deeplink' }) | ConnectDynamicSettings
+> & {
+    requestedPermissions?: PermissionRequest[];
+};
+
+export type TrezorConnectAction =
+    | { type: typeof ON_CHANGE_CONNECT_OPTIONS; payload: ConnectOptions }
+    | { type: typeof ON_INIT_START }
+    | { type: typeof ON_INIT_ERROR; payload: string };

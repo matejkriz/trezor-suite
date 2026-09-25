@@ -1,37 +1,50 @@
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { selectBaseCurrency, setBaseCurrency } from '@suite-common/wallet-core';
+import { events, injectNativeAnalytics } from '@suite-native/analytics';
 import { Select } from '@suite-native/atoms';
-import { FiatCurrency, fiatCurrencies, FiatCurrencyCode } from '@suite-common/suite-config';
-import { analytics, EventType } from '@suite-native/analytics';
+import { Translation } from '@suite-native/intl';
+import {
+    type BaseCurrency,
+    type BaseCurrencyCode,
+    baseCurrencies,
+} from '@trezor/blockchain-link-types';
+import { typedObjectValues } from '@trezor/utils';
 
-import { selectFiatCurrency, setFiatCurrency } from '../slice';
+import { PreferencesSettingsCard } from './PreferencesSettingsCard';
 
-export const transformFiatCurrencyToSelectItem = (fiatCurrency: FiatCurrency) => ({
-    label: fiatCurrency.value,
-    value: fiatCurrency.label,
+export const transformFiatCurrencyToSelectItem = ({ code, label }: BaseCurrency) => ({
+    value: code,
+    label: `${code.toUpperCase()} · ${label}`,
 });
 
-const fiatCurrencyItems = Object.values(fiatCurrencies).map(transformFiatCurrencyToSelectItem);
+const fiatCurrencyItems = typedObjectValues(baseCurrencies).map(transformFiatCurrencyToSelectItem);
 
 export const CurrencySelector = () => {
-    const selectedFiatCurrency = useSelector(selectFiatCurrency);
-    const dispatch = useDispatch();
-
-    const handleSelectCurrency = (localCurrency: FiatCurrencyCode) => {
-        dispatch(setFiatCurrency({ localCurrency }));
+    const selectedFiatCurrencyCode = useSelector(selectBaseCurrency);
+    const { analytics, dispatch } = useServices(injectNativeAnalytics, injectDispatch);
+    const handleSelectCurrency = (baseCurrencyCode: BaseCurrencyCode) => {
+        dispatch(setBaseCurrency(baseCurrencyCode));
         analytics.report({
-            type: EventType.SettingsChangeCurrency,
-            payload: { localCurrency },
+            type: events.settingsChangeCurrencyEvent.name,
+            payload: { localCurrency: baseCurrencyCode },
         });
     };
 
     return (
-        <Select<FiatCurrencyCode>
-            items={fiatCurrencyItems}
-            selectLabel="Currency"
-            selectValue={selectedFiatCurrency.label}
-            valueLabel={selectedFiatCurrency.label.toUpperCase()}
-            onSelectItem={handleSelectCurrency}
-        />
+        <PreferencesSettingsCard
+            iconName="coins"
+            title={<Translation id="moduleSettings.preferences.fiatCurrencyLabel" />}
+        >
+            <Select<BaseCurrencyCode>
+                items={fiatCurrencyItems}
+                value={selectedFiatCurrencyCode}
+                onSelectItem={handleSelectCurrency}
+                title={<Translation id="moduleSettings.preferences.fiatCurrencyLabel" />}
+                testID="@settings/localization/currency-selector"
+            />
+        </PreferencesSettingsCard>
     );
 };

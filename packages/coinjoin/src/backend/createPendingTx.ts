@@ -1,7 +1,7 @@
-import { transformTransaction } from '@trezor/blockchain-link-utils/src/blockbook';
+import { blockbookUtils } from '@trezor/blockchain-link-utils';
 
 import type { BroadcastedTransactionDetails } from '../types';
-import type { Transaction, AccountAddresses } from '../types/backend';
+import type { AccountAddresses, Transaction } from '../types/backend';
 
 // create pending transaction, the result of successfully broadcasted CoinjoinRound
 export const createPendingTransaction = (
@@ -38,5 +38,5 @@ export const createPendingTransaction = (
         })),
     };
 
-    return transformTransaction(blockbookTx, addresses ?? descriptor);
+    return blockbookUtils.transformTransaction(blockbookTx, addresses ?? descriptor);
 };

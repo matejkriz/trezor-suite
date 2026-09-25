@@ -1,0 +1,121 @@
+import { type ArgTypes, type Meta, type StoryObj } from '@storybook/react';
+import styled from 'styled-components';
+
+import { spacingValues } from '@trezor/theme';
+
+import {
+    Column as ColumnComponent,
+    type FlexProps,
+    Row as RowComponent,
+    allowedFlexFrameProps,
+} from './Flex';
+import { flexAlignItems, flexJustifyContent, flexWrap } from './FlexProp';
+import { getFramePropsStory } from '../../utils/frameProps';
+
+const Container = styled.div`
+    width: 100%;
+`;
+
+const Box = styled.div<{ $color: string }>`
+    background: ${({ $color }) => $color};
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 20px;
+    font-weight: 900;
+`;
+
+const args: Partial<FlexProps> = {
+    children: [
+        <Box key="box-a" $color="salmon">
+            A
+        </Box>,
+        <Box key="box-b" $color="green">
+            B
+        </Box>,
+        <Box key="box-c" $color="royalblue">
+            C
+        </Box>,
+    ],
+    gap: 8,
+    flexWrap: 'wrap',
+    isReversed: false,
+    hasDivider: false,
+    dividerColor: undefined,
+    ...getFramePropsStory(allowedFlexFrameProps).args,
+};
+const argTypes: Partial<ArgTypes<FlexProps>> = {
+    justifyContent: {
+        options: flexJustifyContent,
+        control: {
+            type: 'select',
+        },
+    },
+    alignItems: {
+        options: flexAlignItems,
+        control: {
+            type: 'select',
+        },
+    },
+    gap: {
+        options: spacingValues,
+        control: {
+            type: 'select',
+        },
+    },
+    rowGap: {
+        options: spacingValues,
+        control: {
+            type: 'select',
+        },
+    },
+    columnGap: {
+        options: spacingValues,
+        control: {
+            type: 'select',
+        },
+    },
+    flex: {
+        type: 'string',
+    },
+    isReversed: {
+        type: 'boolean',
+    },
+    hasDivider: {
+        type: 'boolean',
+    },
+    dividerColor: {
+        type: 'string',
+    },
+    flexWrap: {
+        options: Object.values(flexWrap),
+        control: {
+            type: 'select',
+        },
+    },
+    ...getFramePropsStory(allowedFlexFrameProps).argTypes,
+};
+
+const meta: Meta = {
+    title: 'Layout',
+};
+export default meta;
+
+export const Row: StoryObj<FlexProps> = {
+    render: rowArgs => (
+        <Container>
+            <RowComponent {...rowArgs} />
+        </Container>
+    ),
+    args,
+    argTypes,
+};
+
+export const Column: StoryObj<FlexProps> = {
+    render: columnArgs => (
+        <Container>
+            <ColumnComponent {...columnArgs} />
+        </Container>
+    ),
+    args,
+    argTypes,
+};

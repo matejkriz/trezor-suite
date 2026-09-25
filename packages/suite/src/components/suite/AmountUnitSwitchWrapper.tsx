@@ -1,24 +1,27 @@
-import { MouseEvent, ReactNode } from 'react';
+import { type MouseEvent, type ReactNode } from 'react';
+
 import styled from 'styled-components';
+
+import { Translation } from '@suite/intl';
+import { type NetworkSymbol } from '@suite-common/wallet-config';
 import { TOOLTIP_DELAY_NONE, TOOLTIP_DELAY_NORMAL, Tooltip } from '@trezor/components';
-import { useBitcoinAmountUnit } from 'src/hooks/wallet/useBitcoinAmountUnit';
-import { NetworkSymbol } from 'src/types/wallet';
-import { Translation } from './Translation';
 import { mediaQueries } from '@trezor/styles';
+
+import { useBitcoinAmountUnit } from 'src/hooks/wallet/useBitcoinAmountUnit';
 
 const Container = styled.div`
     position: relative;
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    margin: -2px -12px;
-    padding: 2px 12px;
+    margin: -2px -6px;
+    padding: 2px 6px;
     border-radius: 6px;
     transition: background 0.1s ease-in;
     cursor: pointer;
     ${mediaQueries.hover} {
         &:hover {
-            background: ${({ theme }) => theme.BG_GREY};
+            background: ${({ theme }) => theme.surfaceFillRaised};
         }
     }
 `;
@@ -57,7 +60,7 @@ export const AmountUnitSwitchWrapper = ({ symbol, children }: AmountUnitSwitchWr
         >
             <Container
                 onClick={handleToggleBitcoinAmountUnits}
-                data-test={`amount-unit-switch/${symbol}`}
+                data-testid={`amount-unit-switch/${symbol}`}
             >
                 {children}
             </Container>

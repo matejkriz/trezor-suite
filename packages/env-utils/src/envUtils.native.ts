@@ -1,11 +1,10 @@
 import { Dimensions, Platform } from 'react-native';
 
-import { getLocales } from 'expo-localization';
 import Constants from 'expo-constants';
+import { getLocales } from 'expo-localization';
 
-import { publicKey } from '@suite-common/wallet-constants';
-
-import { EnvUtils } from './types';
+import { publicKey } from './jws';
+import { type EnvUtils } from './types';
 
 const isWeb = () => false;
 
@@ -19,19 +18,9 @@ const getUserAgent = () => '';
 
 const isChromeOs = () => false;
 
-const getBrowserName = () => '';
-
-const getBrowserVersion = () => '';
-
-const getDeviceType = () => '';
-
-const getOsVersion = () => `${Platform.Version}`;
-
 const getSuiteVersion = () => Constants.expoConfig?.version || '';
 
 const getCommitHash = () => Constants.expoConfig?.extra?.commitHash;
-
-const isFirefox = () => false;
 
 const getPlatform = () => Platform.OS;
 
@@ -73,10 +62,6 @@ const getOsName = () => {
     return '';
 };
 
-const getOsNameWeb = () => '';
-
-const getOsFamily = (): 'Linux' => 'Linux';
-
 export const getJWSPublicKey = () => (isCodesignBuild() ? publicKey.codesign : publicKey.dev);
 
 export const envUtils: EnvUtils = {
@@ -87,13 +72,8 @@ export const envUtils: EnvUtils = {
     getUserAgent,
     isAndroid,
     isChromeOs,
-    getBrowserName,
-    getBrowserVersion,
     getCommitHash,
-    getDeviceType,
-    getOsVersion,
     getSuiteVersion,
-    isFirefox,
     getPlatform,
     getPlatformLanguages,
     getScreenWidth,
@@ -109,7 +89,5 @@ export const envUtils: EnvUtils = {
     isLinux,
     isCodesignBuild,
     getOsName,
-    getOsNameWeb,
-    getOsFamily,
     getJWSPublicKey,
 };

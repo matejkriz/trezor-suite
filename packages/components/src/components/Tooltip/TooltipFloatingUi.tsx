@@ -1,43 +1,67 @@
 import {
-    useFloating,
-    autoUpdate,
-    offset,
-    flip,
-    shift,
-    useHover,
-    useFocus,
-    useDismiss,
-    useRole,
-    useInteractions,
-    FloatingPortal,
-    useMergeRefs,
-    useTransitionStyles,
-    arrow,
-} from '@floating-ui/react';
-import type { Placement, UseFloatingReturn } from '@floating-ui/react';
-import {
-    useState,
-    useMemo,
+    type CSSProperties,
+    type HTMLProps,
+    type MutableRefObject,
+    type ReactNode,
+    type RefObject,
+    cloneElement,
     createContext,
-    useContext,
-    ReactNode,
-    HTMLProps,
     forwardRef,
     isValidElement,
-    cloneElement,
+    useContext,
+    useMemo,
     useRef,
-    RefObject,
-    CSSProperties,
-    MutableRefObject,
+    useState,
 } from 'react';
+
+import {
+    FloatingPortal,
+    arrow,
+    autoUpdate,
+    flip,
+    offset,
+    shift as shiftFloatingUI,
+    size,
+    useDismiss,
+    useFloating,
+    useFocus,
+    useHover,
+    useInteractions,
+    useMergeRefs,
+    useRole,
+    useTransitionStyles,
+} from '@floating-ui/react';
+import type { Placement, ShiftOptions, UseFloatingReturn } from '@floating-ui/react';
+
+import { throwError } from '@trezor/utils';
 
 /**
  * Based on https://floating-ui.com/docs/tooltip but heavily modified
  */
 
 const TRANSITION_DURATION_MS = 250;
+const TOOLTIP_VIEWPORT_PADDING = 8;
 
-type ArrowRef = RefObject<SVGSVGElement>;
+type ApplyTooltipSizeParams = {
+    availableWidth: number;
+    availableHeight: number;
+    elements: {
+        floating: HTMLElement;
+    };
+};
+
+const applyTooltipSize = ({
+    availableWidth,
+    availableHeight,
+    elements,
+}: ApplyTooltipSizeParams): void => {
+    Object.assign(elements.floating.style, {
+        maxWidth: `${Math.max(0, availableWidth)}px`,
+        maxHeight: `${Math.max(0, availableHeight)}px`,
+    });
+};
+
+type ArrowRef = RefObject<SVGSVGElement | null>;
 
 type Delay = {
     open: number;
@@ -45,40 +69,62 @@ type Delay = {
 };
 
 interface TooltipOptions {
+    isActive?: boolean; // Determines if the tooltip is active - reacts to the hovering
     isInitiallyOpen?: boolean;
     placement?: Placement;
     isOpen?: boolean;
     onOpenChange?: (open: boolean) => void;
     offset: number;
+    shift?: ShiftOptions;
     delay: Delay;
+    disableFlip?: boolean;
 }
 
 type UseTooltipReturn = ReturnType<typeof useInteractions> & {
     open: boolean;
     setOpen: (open: boolean) => void;
-    arrowRef: RefObject<SVGSVGElement>;
+    arrowRef: RefObject<SVGSVGElement | null>;
 } & UseFloatingReturn;
 
 export const useTooltip = ({
+    isActive = true,
     isInitiallyOpen = false,
     placement = 'top',
     isOpen: isControlledOpen,
     onOpenChange: setControlledOpen,
     offset: offsetValue,
     delay,
+    shift,
+    disableFlip = false,
 }: TooltipOptions): UseTooltipReturn => {
-    const arrowRef = useRef<SVGSVGElement>(null);
+    const arrowRef = useRef<SVGSVGElement | null>(null);
     const [isUncontrolledTooltipOpen, setIsUncontrolledTooltipOpen] = useState(isInitiallyOpen);
 
-    const open = isControlledOpen ?? isUncontrolledTooltipOpen;
+    // NOTE: if the tooltip is overall inactive (isActive === false), always hide it / never display it
+    const open = isActive === false ? false : (isControlledOpen ?? isUncontrolledTooltipOpen);
     const setOpen = setControlledOpen ?? setIsUncontrolledTooltipOpen;
+
+    const middleware = useMemo(() => {
+        const shiftOptions = shift || { padding: TOOLTIP_VIEWPORT_PADDING };
+
+        return [
+            offset(offsetValue),
+            ...(!disableFlip ? [flip()] : []),
+            shiftFloatingUI(shiftOptions),
+            size({
+                apply: applyTooltipSize,
+                padding: shiftOptions.padding,
+            }),
+            arrow({ element: arrowRef }),
+        ];
+    }, [offsetValue, shift, disableFlip, arrowRef]);
 
     const data = useFloating({
         placement,
         open,
         onOpenChange: setOpen,
         whileElementsMounted: autoUpdate,
-        middleware: [offset(offsetValue), flip(), shift(), arrow({ element: arrowRef })],
+        middleware,
     });
 
     const { context } = data;
@@ -112,15 +158,8 @@ type ContextType = ReturnType<typeof useTooltip>;
 
 export const TooltipContext = createContext<ContextType | null>(null);
 
-export const useTooltipState = (): ContextType => {
-    const context = useContext(TooltipContext);
-
-    if (context == null) {
-        throw new Error('Tooltip components must be wrapped in <Tooltip />');
-    }
-
-    return context;
-};
+export const useTooltipState = (): ContextType =>
+    useContext(TooltipContext) ?? throwError('Tooltip components must be wrapped in <Tooltip />');
 
 type TooltipFloatingUiProps = { children: ReactNode } & TooltipOptions;
 
@@ -150,9 +189,9 @@ export const TooltipTrigger = forwardRef<HTMLElement, TooltipTriggerProps>(
             state.getReferenceProps({
                 ref,
                 ...props,
-                ...children.props,
+                ...(children.props || {}),
                 'data-state': state.open ? 'open' : 'closed',
-            }),
+            } as HTMLProps<Element>),
         );
     },
 );
@@ -194,6 +233,9 @@ export const TooltipContent = forwardRef<HTMLDivElement, TooltipContentProps>((p
                     ...state.floatingStyles,
                     ...(style as CSSProperties),
                     ...styles,
+                    boxSizing: 'border-box',
+                    display: 'flex',
+                    flexDirection: 'column',
                 }}
                 {...restOfFloatingProps}
             >

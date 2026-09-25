@@ -1,9 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
-import { GuideCategory, GuideArticle } from '@suite-common/suite-types';
+import { useEffect, useMemo, useState } from 'react';
+
+import { type GuideArticle, type GuideCategory } from '@suite-common/suite-types';
+
 import { loadPageMarkdownFile } from 'src/hooks/guide/useGuideLoadArticle';
 
 const SEARCH_DELAY = 300;
-const MIN_QUERY_LENGTH = 3;
+export const MIN_QUERY_LENGTH = 3;
 const MAX_RESULTS = 5;
 
 type PageMap = {
@@ -36,6 +38,11 @@ const removeAccents = (str: string) =>
         .normalize('NFD') // decouple accents from ascii characters
         .replace(/[\u0300-\u036f]/g, ''); // remove accent characters
 
+const sanitizeQuery = (query: string) =>
+    removeAccents(query)
+        .replace(/\W+/g, ' ') // replace every non-word char sequence with a single space
+        .trim();
+
 const searchInFile = (url: string, query: string, markdown: string) => {
     const sanitized = removeAccents(markdown)
         .replace(/[\\#*]/g, '') // remove some markdown syntax
@@ -52,9 +59,7 @@ const searchInFile = (url: string, query: string, markdown: string) => {
 };
 
 const search = async (query: string, pageMap: PageMap): Promise<SearchResult[]> => {
-    const querySanitized = removeAccents(query)
-        .replace(/\W+/g, ' ') // replace every non-word char sequence with a single space
-        .trim();
+    const querySanitized = sanitizeQuery(query);
     const results =
         querySanitized.length < MIN_QUERY_LENGTH
             ? []
@@ -70,7 +75,11 @@ const search = async (query: string, pageMap: PageMap): Promise<SearchResult[]> 
         .filter(res => res.score)
         .sort((a, b) => b.score - a.score)
         .slice(0, MAX_RESULTS)
-        .map(({ preview, score, url }) => ({ page: pageMap[url], score, preview }));
+        .flatMap(({ preview, score, url }) => {
+            const page = pageMap[url];
+
+            return page ? [{ page, score, preview }] : [];
+        });
 };
 
 export const useGuideSearch = (query: string, pageRoot: GuideCategory | null) => {
@@ -110,8 +119,12 @@ export const useGuideSearch = (query: string, pageRoot: GuideCategory | null) =>
         };
     }, [query, pageMap]);
 
+    const isQueryTooShort =
+        query.trim().length > 0 && sanitizeQuery(query).length < MIN_QUERY_LENGTH;
+
     return {
         searchResult,
         loading,
+        isQueryTooShort,
     };
 };

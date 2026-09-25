@@ -1,4 +1,6 @@
-import { EventEmitter } from 'events';
+import { type EventEmitter } from 'events';
+
+import { type ElectronIpcMainInvokeEvent } from './types';
 
 interface EventEmitterApi {
     on: (event: any, listener: (...args: any[]) => any) => any;
@@ -36,28 +38,30 @@ interface IpcMainEvents<Api> {
     '/request': [string, ...Parameters<ApiUnion<Api>>]; // responseEvent, methodName, ...params
 }
 
-interface IpcMainHandlers<Api> {
+interface IpcMainHandlers {
     '/create': [string, ...any[]]; // channelName, ...params of interface constructor
-    '/invoke': Parameters<ApiUnion<Api>>; // methodName, ...params
 }
 
-interface ElectronIpcMainEvent {
+export interface ElectronIpcMainProxyInvokeEvent extends ElectronIpcMainInvokeEvent {
     // reply: (channel: string, response: any) => any; // in electron it's defined as `Function`
-    // eslint-disable-next-line @typescript-eslint/ban-types
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
     reply: Function; // in electron it's defined as `Function`
 }
 
 interface ElectronIpcMain<Api> {
     on<K extends keyof IpcMainEvents<any>, Key extends string>(
         channel: `${Key}${K}`,
-        listener: (event: ElectronIpcMainEvent, args: IpcMainEvents<Api>[K]) => void,
+        listener: (event: ElectronIpcMainProxyInvokeEvent, args: IpcMainEvents<Api>[K]) => void,
     ): any;
-    on(channel: string, listener: (event: any, ...args: any[]) => void): any; // just to type compatibility with original Electron.IpcMain
-    handle<K extends keyof IpcMainHandlers<Api>, Key extends string>(
+    on(channel: string, listener: (event: ElectronIpcMainInvokeEvent, ...args: any[]) => void): any; // just to type compatibility with original Electron.IpcMain
+    handle<K extends keyof IpcMainHandlers, Key extends string>(
         channel: `${Key}${K}`,
-        listener: (event: any, args: IpcMainHandlers<Api>[K]) => void, // event: Electron.IpcMainInvokeEvent not used, not worth typing
+        listener: (event: ElectronIpcMainInvokeEvent, args: IpcMainHandlers[K]) => void,
     ): any;
-    handle(channel: string, listener: (event: any, ...args: any[]) => void): any;
+    handle(
+        channel: string,
+        listener: (event: ElectronIpcMainInvokeEvent, ...args: any[]) => void,
+    ): any;
     removeAllListeners: (event?: string) => any;
     eventNames: () => (string | symbol)[];
     removeHandler: (name: string) => any;
@@ -122,26 +126,16 @@ export const createIpcProxyHandler = <Api extends EventEmitterApi>(
                 });
             }
         });
-
-        ipcMain.handle(`${instancePrefix}/invoke`, async (_, params) => {
-            const payload = await onRequest(...params);
-
-            return payload;
-        });
     });
 
     return () => {
         // TODO: walk thru all instances, disable, remove listeners, remove references
-        const unregistered = [];
         ipcMain.eventNames().forEach(name => {
             if (typeof name === 'string' && name.startsWith(`${channel}/`)) {
                 ipcMain.removeAllListeners(name);
-                unregistered.push(name);
             }
         });
 
         ipcMain.removeHandler(`${channel}/create`);
-        // ipcMain.removeHandler(`${instancePrefix}/invoke`); // TODO: filter unregistered to get instancePrefix
-        // TODO remove all invoke handlers
     };
 };

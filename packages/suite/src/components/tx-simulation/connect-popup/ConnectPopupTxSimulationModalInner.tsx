@@ -1,0 +1,202 @@
+import { useState } from 'react';
+import { FormProvider } from 'react-hook-form';
+
+import {
+    TxSimulationError,
+    TxSimulationFooter,
+    TxSimulationLoader,
+    TxSimulationProvider,
+    TxSimulationTitle,
+} from '@suite/tx-simulation/src/common';
+import { EvmInsufficientGasWarning } from '@suite/tx-simulation/src/evm';
+import { connectPopupActions } from '@suite-common/connect-popup';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import {
+    TX_METHODS_WITH_FEES,
+    areTxSimulationMethods,
+    getTxSimulationDisclaimerKey,
+    isTxSimulationResultWithMethods,
+    useTxSimulation,
+} from '@suite-common/tx-simulation';
+import { type Account, type TxSimulationAction } from '@suite-common/wallet-types';
+import { Card, Column, Modal } from '@trezor/components';
+import { ERRORS } from '@trezor/connect-common';
+
+import { ConnectCallSource } from 'src/components/suite/ConnectCallSource';
+import { ConnectModalBackdrop } from 'src/components/suite/ConnectModalBackdrop';
+import { Fees } from 'src/components/wallet/Fees/Fees';
+
+import { TxSimulationDisclaimer } from '../common/components/TxSimulationDisclaimer';
+import { TxSimulationErrorBoundary } from '../common/components/TxSimulationErrorBoundary';
+import { TxSimulationHeader } from '../common/components/TxSimulationHeader';
+import { TxSimulationSuccessResult } from '../common/components/TxSimulationSuccessResult';
+import { useEvmTxSimulationFeesForm } from '../common/hooks/useEvmTxSimulationFeesForm';
+
+interface ConnectPopupTxSimulationModalInnerProps {
+    action: TxSimulationAction;
+    account: Account;
+}
+
+export function ConnectPopupTxSimulationModalInner({
+    action,
+    account,
+}: ConnectPopupTxSimulationModalInnerProps) {
+    const { dispatch } = useServices(injectDispatch);
+    const [acceptedDisclaimerKey, setAcceptedDisclaimerKey] = useState<string | null>(null);
+    const [hasRenderFailure, setHasRenderFailure] = useState(false);
+    const [renderFailureAccepted, setRenderFailureAccepted] = useState(false);
+
+    const {
+        form,
+        changeFeeLevel,
+        feeInfo,
+        composedLevels,
+        handleTxSimulationResult,
+        getSelectedFee,
+    } = useEvmTxSimulationFeesForm({
+        accountBalance: account.balance,
+        networkType: account.networkType,
+        networkSymbol: account.symbol,
+        defaultGasLimit: areTxSimulationMethods(TX_METHODS_WITH_FEES, action)
+            ? action.payload.transaction.gasLimit
+            : undefined,
+    });
+
+    const selectedFeeLevel = form.watch('selectedFee') || 'normal';
+    const currentComposedLevel = composedLevels?.[selectedFeeLevel];
+
+    const simulation = useTxSimulation(action, {
+        onSuccess(result) {
+            if (isTxSimulationResultWithMethods(TX_METHODS_WITH_FEES, result)) {
+                handleTxSimulationResult(result.payload);
+            }
+        },
+    });
+
+    if (!simulation) return null;
+
+    const { txSimulationQuery, network, targetContract } = simulation;
+
+    // Acceptance is tracked by what was accepted, not by a bare flag: a refetch that starts warning
+    // about something else invalidates it and the user has to acknowledge the new reason.
+    const disclaimerKey = getTxSimulationDisclaimerKey(txSimulationQuery.data);
+    const disclaimerAccepted = disclaimerKey !== null && disclaimerKey === acceptedDisclaimerKey;
+
+    function acceptDisclaimer(isAccepted: boolean) {
+        setAcceptedDisclaimerKey(isAccepted ? disclaimerKey : null);
+    }
+
+    function confirm() {
+        const selectedFee = getSelectedFee();
+
+        if (areTxSimulationMethods(TX_METHODS_WITH_FEES, action) && selectedFee) {
+            dispatch(
+                connectPopupActions.setSelectedFee({
+                    selectedFee:
+                        selectedFee.type === 'eip1559'
+                            ? {
+                                  maxFeePerGas: selectedFee.maxFeePerGas,
+                                  maxPriorityFeePerGas: selectedFee.maxPriorityFeePerGas,
+                                  gasLimit: selectedFee.gasLimit,
+                                  gasPrice: undefined,
+                              }
+                            : {
+                                  gasPrice: selectedFee.gasPrice,
+                                  gasLimit: selectedFee.gasLimit,
+                                  maxFeePerGas: undefined,
+                                  maxPriorityFeePerGas: undefined,
+                              },
+                }),
+            );
+        }
+
+        dispatch(connectPopupActions.approvePermissions());
+    }
+
+    function cancel() {
+        dispatch(connectPopupActions.rejectPermissions(ERRORS.TypedError('Method_Cancel')));
+    }
+
+    const isConfirmDisabled = Boolean(
+        txSimulationQuery.isLoading ||
+        (txSimulationQuery.data?.payload?.needsDisclaimer && !disclaimerAccepted) ||
+        (hasRenderFailure && !renderFailureAccepted),
+    );
+
+    return (
+        <ConnectModalBackdrop canSwitchDevice>
+            <Modal.ModalBase
+                width={600}
+                heading={<TxSimulationTitle method={action.method} />}
+                description={
+                    <TxSimulationHeader account={account}>
+                        <ConnectCallSource />
+                    </TxSimulationHeader>
+                }
+                bottomContent={
+                    <TxSimulationFooter
+                        onConfirm={confirm}
+                        onCancel={cancel}
+                        isConfirmDisabled={isConfirmDisabled}
+                    />
+                }
+                // Disable shadow bottom to make `Fees` component fully visible
+                shadowBottom={false}
+            >
+                <Column gap={8}>
+                    <TxSimulationError error={txSimulationQuery.error?.message}>
+                        <TxSimulationLoader isLoading={txSimulationQuery.isLoading}>
+                            {txSimulationQuery.isSuccess && (
+                                <TxSimulationErrorBoundary
+                                    isAccepted={renderFailureAccepted}
+                                    onChange={setRenderFailureAccepted}
+                                    onError={setHasRenderFailure}
+                                    resetKey={txSimulationQuery.data}
+                                >
+                                    <TxSimulationSuccessResult
+                                        result={txSimulationQuery.data}
+                                        network={network}
+                                        targetContract={targetContract}
+                                    />
+                                    <TxSimulationDisclaimer
+                                        result={txSimulationQuery.data}
+                                        isAccepted={disclaimerAccepted}
+                                        onChange={acceptDisclaimer}
+                                    />
+                                </TxSimulationErrorBoundary>
+                            )}
+                        </TxSimulationLoader>
+                    </TxSimulationError>
+
+                    <Column margin={{ left: 8 }} gap={16}>
+                        <TxSimulationProvider />
+
+                        {areTxSimulationMethods(TX_METHODS_WITH_FEES, action) && (
+                            <FormProvider {...form}>
+                                <Card>
+                                    <Fees
+                                        account={account}
+                                        feeInfo={feeInfo}
+                                        changeFeeLevel={changeFeeLevel}
+                                        composedLevels={
+                                            txSimulationQuery.isSuccess ? composedLevels : null
+                                        }
+                                    />
+                                </Card>
+                            </FormProvider>
+                        )}
+
+                        {areTxSimulationMethods(TX_METHODS_WITH_FEES, action) && (
+                            <EvmInsufficientGasWarning
+                                composedLevel={currentComposedLevel}
+                                accountBalance={account.balance}
+                                networkSymbol={account.symbol}
+                            />
+                        )}
+                    </Column>
+                </Column>
+            </Modal.ModalBase>
+        </ConnectModalBackdrop>
+    );
+}

@@ -2,10 +2,16 @@
     "extends": "../../tsconfig.base.json",
     "compilerOptions": { "outDir": "libDev" },
     "references": [
+        {
+            "path": "../../suite-common/suite-constants"
+        },
         { "path": "../blockchain-link" },
         { "path": "../blockchain-link-types" },
         { "path": "../blockchain-link-utils" },
+        { "path": "../eslint" },
+        { "path": "../type-utils" },
         { "path": "../utils" },
-        { "path": "../utxo-lib" }
+        { "path": "../utxo-lib" },
+        { "path": "../node-utils" }
     ]
 }

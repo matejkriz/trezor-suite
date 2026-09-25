@@ -1,114 +1,73 @@
-import { ReactNode, MouseEvent } from 'react';
-import styled, { css, useTheme } from 'styled-components';
-import { Icon, IconProps } from '../../assets/Icon/Icon';
-import { TypographyStyle, spacings, typography, typographyStylesBase } from '@trezor/theme';
+import { type HTMLProps, type MouseEvent, type ReactNode } from 'react';
 
-type AProps = {
-    $type?: TypographyStyle;
-    $variant?: 'default' | 'nostyle' | 'underline';
-};
+import styled from 'styled-components';
+
+import { type TransientProps } from '../../../utils/transientProps';
+import { allowedTextTextProps } from '../Text/Text';
+import {
+    type TextProps as TextPropsCommon,
+    type TextPropsKeys,
+    pickAndPrepareTextProps,
+    withTextProps,
+} from '../utils';
+
+export const allowedLinkTextProps = [
+    'typographyStyle',
+    'textWrap',
+    'wordBreak',
+    'overflowWrap',
+] as const satisfies TextPropsKeys[];
+type AllowedLinkTextProps = Pick<TextPropsCommon, (typeof allowedLinkTextProps)[number]>;
+
+type AProps = TransientProps<AllowedLinkTextProps>;
 
 const A = styled.a<AProps>`
-    ${({ $type }) => ($type ? typography[$type] : typography.body)}
-    text-decoration: none;
-    cursor: pointer;
-    color: ${({ theme }) => theme.textDefault};
-    font-weight: 500;
-    display: inline-flex;
-    align-items: center;
+    background-color: unset;
+    border: unset;
+    text-decoration: underline;
+    color: inherit;
 
     &:hover {
-        text-decoration: underline;
+        text-decoration: none;
     }
 
-    ${({ $variant }) =>
-        $variant === 'underline' &&
-        css`
-            text-decoration: underline;
-        `}
-
-    ${({ $variant }) =>
-        $variant === 'nostyle' &&
-        css`
-            color: inherit;
-            font-weight: inherit;
-
-            &:visited,
-            &:active,
-            &:hover {
-                text-decoration: none;
-                color: inherit;
-            }
-        `}
+    ${withTextProps}
 `;
 
-const IconWrapper = styled.div`
-    margin-left: ${spacings.xxs};
-`;
+export type LinkProps = Pick<HTMLProps<HTMLAnchorElement>, 'href' | 'target' | 'onClick'> &
+    AllowedLinkTextProps & {
+        children?: ReactNode;
+        'data-testid'?: string;
+    };
 
-interface LinkProps {
-    href?: string;
-    target?: string;
-    type?: TypographyStyle;
-    onClick?: (event: MouseEvent<any>) => void;
-    children?: ReactNode;
-    className?: string;
-    variant?: 'default' | 'nostyle' | 'underline';
-    icon?: IconProps['icon'];
-    iconProps?: IconProps;
-    'data-test'?: string;
-}
-
-const Link = ({
+export const Link = ({
     href,
     target,
-    icon,
-    iconProps,
-    type,
     onClick,
-    'data-test': dataTest,
+    'data-testid': dataTest,
     children,
-    className,
-    variant,
+    typographyStyle,
+    ...rest
 }: LinkProps) => {
-    const theme = useTheme();
-
-    const iconSize = typographyStylesBase[type || 'body'].fontSize;
-
-    const {
-        variant: iconVariant,
-        color: iconColor,
-        ...restIconVariant
-    } = iconProps ?? { variant: undefined };
+    const textProps = pickAndPrepareTextProps({ ...rest, typographyStyle }, allowedTextTextProps);
 
     return (
         <A
             href={href}
-            target={target || '_blank'}
+            target={target ?? '_blank'}
             rel="noreferrer noopener"
-            data-test={dataTest}
-            onClick={(e: MouseEvent<any>) => {
-                e.stopPropagation();
-                onClick?.(e);
+            data-testid={dataTest}
+            data-component="Link"
+            data-typography-style={typographyStyle}
+            onClick={(e: MouseEvent<HTMLAnchorElement>) => {
+                if (onClick !== undefined) {
+                    e.stopPropagation();
+                    onClick(e);
+                }
             }}
-            $variant={variant}
-            className={className}
+            {...textProps}
         >
             {children}
-            {icon && (
-                <IconWrapper>
-                    <Icon
-                        size={iconSize}
-                        icon={icon}
-                        {...(variant !== undefined
-                            ? { variant: iconVariant }
-                            : { color: iconColor ?? theme.iconSubdued })}
-                        {...restIconVariant}
-                    />
-                </IconWrapper>
-            )}
         </A>
     );
 };
-export type { LinkProps };
-export { Link };

@@ -1,27 +1,31 @@
 import { useCallback, useState } from 'react';
-import styled, { css, DefaultTheme, keyframes } from 'styled-components';
+
+import { lighten, rgba } from 'polished';
+import styled, { type DefaultTheme, css, keyframes } from 'styled-components';
+
+import {
+    coinjoinSessionAutostop,
+    selectCurrentCoinjoinWheelStates,
+    selectSessionProgressByAccountKey,
+    selectStartCoinjoinSessionArguments,
+    startCoinjoinSessionThunk,
+    stopCoinjoinSessionThunk,
+} from '@suite/coinjoin';
+import { Translation } from '@suite/intl';
+import { openModal } from '@suite/modal';
+import { gotoThunk } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { type AccountKey } from '@suite-common/wallet-types';
 import { Tooltip } from '@trezor/components';
+
+import { useCoinjoinSessionBlockers } from 'src/hooks/coinjoin/useCoinjoinSessionBlockers';
+import { useSelector } from 'src/hooks/suite';
+
 import {
     CoinjoinProgressContent,
     Container as ProgressContentContainer,
 } from './CoinjoinProgressContent';
-import { lighten, rgba } from 'polished';
-import { useSelector } from 'src/hooks/suite/useSelector';
-import {
-    selectCurrentCoinjoinWheelStates,
-    selectSessionProgressByAccountKey,
-    selectStartCoinjoinSessionArguments,
-} from 'src/reducers/wallet/coinjoinReducer';
-import { useDispatch } from 'src/hooks/suite/useDispatch';
-import { useCoinjoinSessionBlockers } from 'src/hooks/coinjoin/useCoinjoinSessionBlockers';
-import { goto } from 'src/actions/suite/routerActions';
-import { Translation } from 'src/components/suite/Translation';
-import { openModal } from 'src/actions/suite/modalActions';
-import { stopCoinjoinSession } from 'src/actions/wallet/coinjoinClientActions';
-import {
-    startCoinjoinSession,
-    coinjoinSessionAutostop,
-} from 'src/actions/wallet/coinjoinAccountActions';
 
 export const DELAYED_SPIN = keyframes`
     0% {
@@ -36,14 +40,13 @@ export const DELAYED_SPIN = keyframes`
 `;
 
 const getOutlineSvg = (theme: DefaultTheme) =>
-    `url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='100' ry='100' stroke='${theme.TYPE_LIGHT_GREY.replace(
+    `url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='100' ry='100' stroke='${theme.contentSecondary.replace(
         /#/g,
         '%23',
     )}' stroke-width='5' stroke-dasharray='7' stroke-dashoffset='35' stroke-linecap='butt'/%3e%3c/svg%3e")`;
 
 const ProgressIndicator = styled.div`
     position: absolute;
-    top: 11px;
     width: 94px;
     height: 94px;
     background: conic-gradient(#fff0 20deg, #ccc);
@@ -70,8 +73,8 @@ const Wheel = styled.div<{
     height: 94px;
     border-radius: 50%;
     background: ${({ theme, $progress }) =>
-        `conic-gradient(${theme.BG_GREEN} ${3.6 * $progress}deg, ${rgba(
-            theme.STROKE_GREY,
+        `conic-gradient(${theme.elementFillBrandBold} ${3.6 * $progress}deg, ${rgba(
+            theme.borderNeutral,
             0.6,
         )} 0)`};
     transition:
@@ -86,7 +89,7 @@ const Wheel = styled.div<{
 
             &:active {
                 ${ProgressContentContainer} {
-                    background: ${({ theme }) => lighten(0.02, theme.BG_GREY)};
+                    background: ${({ theme }) => lighten(0.02, theme.surfaceFillRaised)};
                 }
             }
         `}
@@ -95,13 +98,13 @@ const Wheel = styled.div<{
         $isWithoutProgressOutline &&
         css`
             background: none;
-            color: ${({ theme }) => theme.TYPE_GREEN};
+            color: ${({ theme }) => theme.contentBrand};
 
             ${ProgressContentContainer} {
-                background: ${({ theme }) => theme.BG_LIGHT_GREEN};
+                background: ${({ theme }) => theme.elementFillBrandBold};
 
                 path {
-                    fill: ${({ theme }) => theme.TYPE_GREEN};
+                    fill: ${({ theme }) => theme.contentBrand};
                 }
             }
         `}
@@ -124,7 +127,7 @@ const Wheel = styled.div<{
                     height: calc(100% - 12px);
 
                     span {
-                        color: ${theme.TYPE_GREEN};
+                        color: ${theme.contentBrand};
                     }
                 }
             }
@@ -133,14 +136,14 @@ const Wheel = styled.div<{
     ${({ $isPaused, $hasCriticalError, theme, $progress }) =>
         $isPaused &&
         css`
-            background: ${`conic-gradient(${theme.TYPE_LIGHTER_GREY} ${3.6 * $progress}deg, ${rgba(
-                theme.STROKE_GREY,
+            background: ${`conic-gradient(${theme.surfaceFillPage} ${3.6 * $progress}deg, ${rgba(
+                theme.borderNeutral,
                 0.6,
             )} 0)`};
 
             &:hover {
                 path {
-                    fill: ${!$hasCriticalError && theme.TYPE_GREEN};
+                    fill: ${!$hasCriticalError && theme.contentBrand};
                 }
             }
         `}
@@ -152,13 +155,13 @@ const Wheel = styled.div<{
             color: inherit;
 
             ${ProgressContentContainer} {
-                background: ${theme.BG_GREY};
+                background: ${theme.surfaceFillRaised};
             }
         `}
 `;
 
 interface CoinjoinProgressWheelProps {
-    accountKey: string;
+    accountKey: AccountKey;
 }
 
 export const CoinjoinProgressWheel = ({ accountKey }: CoinjoinProgressWheelProps) => {
@@ -184,7 +187,7 @@ export const CoinjoinProgressWheel = ({ accountKey }: CoinjoinProgressWheelProps
 
     const [isWheelHovered, setIsWheelHovered] = useState(false);
 
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
     const { isCoinjoinSessionBlocked, coinjoinSessionBlocker, coinjoinSessionBlockedMessage } =
         useCoinjoinSessionBlockers(accountKey);
 
@@ -197,7 +200,7 @@ export const CoinjoinProgressWheel = ({ accountKey }: CoinjoinProgressWheelProps
             if (isCriticalPhase) {
                 dispatch(coinjoinSessionAutostop(accountKey, !isAutoStopEnabled));
             } else if (!isAutoStopEnabled) {
-                dispatch(stopCoinjoinSession(accountKey));
+                dispatch(stopCoinjoinSessionThunk(accountKey));
             }
 
             return;
@@ -210,12 +213,12 @@ export const CoinjoinProgressWheel = ({ accountKey }: CoinjoinProgressWheelProps
         }
 
         if (isLegalDocumentConfirmed && startCoinjoinArgs) {
-            dispatch(startCoinjoinSession(...startCoinjoinArgs));
+            dispatch(startCoinjoinSessionThunk(...startCoinjoinArgs));
 
             return;
         }
 
-        dispatch(goto('wallet-anonymize', { preserveParams: true }));
+        dispatch(gotoThunk({ routeName: 'wallet-anonymize', preserveParams: true }));
     }, [
         isCoinjoinSessionBlocked,
         isAllPrivate,
@@ -254,7 +257,7 @@ export const CoinjoinProgressWheel = ({ accountKey }: CoinjoinProgressWheelProps
 
     return (
         <Tooltip content={getTooltipMessage()}>
-            <>
+            <div>
                 {isProgressIndicatorShown && <ProgressIndicator />}
 
                 <Wheel
@@ -275,7 +278,7 @@ export const CoinjoinProgressWheel = ({ accountKey }: CoinjoinProgressWheelProps
                         isWheelHovered={isWheelHovered}
                     />
                 </Wheel>
-            </>
+            </div>
         </Tooltip>
     );
 };

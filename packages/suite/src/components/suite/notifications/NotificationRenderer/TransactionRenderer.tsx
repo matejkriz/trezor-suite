@@ -1,88 +1,178 @@
+import { HiddenPlaceholder } from '@suite/discreet-mode';
+import { Translation } from '@suite/intl';
+import { openModal } from '@suite/modal';
+import { getTxAnchor, gotoThunk, selectRouteName, selectRouterApp } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { selectDeviceThunk, selectDevices, selectSelectedDevice } from '@suite-common/device';
+import { injectDispatch } from '@suite-common/redux-utils';
 import {
-    selectDevice as selectDeviceSelector,
-    selectDevices,
     selectAccounts,
-    selectBlockchainState,
+    selectNetworkBlockchainInfo,
     selectTransactions,
-    selectDeviceThunk,
 } from '@suite-common/wallet-core';
 import {
-    findAccountsByNetwork,
-    findAccountsByDescriptor,
     findAccountDevice,
-    getAccountTransactions,
+    findAccountsByDescriptor,
+    findAccountsByNetwork,
     findTransaction,
+    getAccountTransactions,
     getConfirmations,
+    isStakeTypeTx,
 } from '@suite-common/wallet-utils';
-
+import { Row } from '@trezor/components';
 import {
-    AccountLabeling,
-    HiddenPlaceholder,
-    NotificationRendererProps,
-    NotificationViewProps,
-} from 'src/components/suite';
-import { goto } from 'src/actions/suite/routerActions';
-import { useDispatch, useSelector } from 'src/hooks/suite';
-import { getTxAnchor } from 'src/utils/suite/anchor';
-import { isStakeTypeTx } from '@suite-common/suite-utils';
+    TransactionNotification,
+    type TransactionNotificationType,
+} from '@trezor/product-components';
+
+import { FormattedCryptoAmount } from 'src/components/suite/FormattedCryptoAmount';
+import { AccountLabeling } from 'src/components/suite/labeling/AccountLabeling';
+import type { NotificationRendererProps } from 'src/components/suite/notifications/NotificationRenderer/NotificationRenderer';
+import type { NotificationViewProps } from 'src/components/suite/notifications/Notifications/NotificationGroup/NotificationList/NotificationView';
+import { useSelector } from 'src/hooks/suite';
 
 type TransactionRendererProps = NotificationViewProps &
-    NotificationRendererProps<
-        'tx-sent' | 'tx-received' | 'tx-confirmed' | 'tx-staked' | 'tx-unstaked' | 'tx-claimed'
-    >;
+    NotificationRendererProps<TransactionNotificationType>;
 
 export const TransactionRenderer = ({ render: View, ...props }: TransactionRendererProps) => {
+    const { symbol, descriptor, txid, device } = props.notification;
     const accounts = useSelector(selectAccounts);
     const transactions = useSelector(selectTransactions);
-    const blockchain = useSelector(selectBlockchainState);
+    const blockchain = useSelector(state => selectNetworkBlockchainInfo(state, symbol));
     const devices = useSelector(selectDevices);
-    const currentDevice = useSelector(selectDeviceSelector);
-    const dispatch = useDispatch();
-
-    const { symbol, descriptor, txid, formattedAmount, device } = props.notification;
+    const currentDevice = useSelector(selectSelectedDevice);
+    const routeName = useSelector(selectRouteName);
+    const routerApp = useSelector(selectRouterApp);
+    const { dispatch } = useServices(injectDispatch);
 
     const networkAccounts = findAccountsByNetwork(symbol, accounts);
-    const found = findAccountsByDescriptor(descriptor, networkAccounts);
-    // fallback: account not found, it should never happen tho
-    if (!found.length) return <View {...props} />;
+    const account = findAccountsByDescriptor(descriptor, networkAccounts).at(0);
 
-    const account = found[0];
+    // fallback: account not found, it should never happen tho
+    if (!account) return <View {...props} />;
+
     const accountTxs = getAccountTransactions(account.key, transactions);
     const tx = findTransaction(txid, accountTxs);
     const accountDevice = findAccountDevice(account, devices);
-    const confirmations = tx ? getConfirmations(tx, blockchain[account.symbol].blockHeight) : 0;
+    const confirmations = tx ? getConfirmations(tx, blockchain.blockHeight) : 0;
     const destinationRoute = isStakeTypeTx(tx?.ethereumSpecific?.parsedData?.methodId)
         ? 'wallet-staking'
         : 'wallet-index';
+    const isTradingRoute = !!routeName?.includes('wallet-trading');
+    // Keep the user inside the yield flow: the toast action navigates away (goto) which makes
+    // users think the approve step is the whole transaction. Mirror the trading behavior above.
+    const isYieldRoute = routerApp === 'earn-yield';
+    const transactionToken = 'token' in props.notification ? props.notification.token : undefined;
+    const notificationAmount =
+        'amount' in props.notification ? props.notification.amount : undefined;
+    // An approval prints the ticker itself, next to the amount.
+    const isSymbolRenderedBesideAmount =
+        props.notification.type === 'tx-approved' || props.notification.type === 'tx-revoked';
+    const toastTestIdPrefix = `@toast/${props.notification.type}`;
+
+    const handleTransactionClick = () => {
+        const deviceToSelect = accountDevice || device;
+        if (deviceToSelect?.id !== currentDevice?.id) {
+            dispatch(selectDeviceThunk({ device: deviceToSelect }));
+        }
+
+        const txAnchor = getTxAnchor(tx?.txid);
+        dispatch(
+            gotoThunk({
+                routeName: destinationRoute,
+                params: {
+                    accountIndex: account.index,
+                    accountType: account.accountType,
+                    symbol: account.symbol,
+                },
+                anchor: txAnchor,
+            }),
+        );
+
+        if (tx?.txid) {
+            dispatch(
+                openModal({
+                    type: 'transaction-detail',
+                    txid: tx.txid,
+                    descriptor: account.descriptor,
+                    symbol: account.symbol,
+                    deviceState: account.deviceState,
+                    flow: 'detail',
+                }),
+            );
+        }
+    };
 
     return (
         <View
             {...props}
+            message="TOAST_TX_COMPOSED"
             messageValues={{
-                amount: <HiddenPlaceholder>{formattedAmount}</HiddenPlaceholder>,
-                account: <AccountLabeling account={found} />,
-                confirmations,
+                content: (
+                    <TransactionNotification
+                        data-testid={toastTestIdPrefix}
+                        message={
+                            <Translation
+                                id={props.message}
+                                values={{
+                                    ...props.messageValues,
+                                    account: (
+                                        <Row
+                                            display="inline-flex"
+                                            alignItems="center"
+                                            data-testid={`${toastTestIdPrefix}/account`}
+                                        >
+                                            <AccountLabeling
+                                                account={account}
+                                                showAccountTypeBadge
+                                                accountTypeBadgeSize="small"
+                                            />
+                                        </Row>
+                                    ),
+                                    confirmations,
+                                }}
+                            />
+                        }
+                        notificationType={props.notification.type}
+                        symbol={props.notification.symbol}
+                        token={transactionToken}
+                        amount={
+                            notificationAmount !== undefined ? (
+                                <FormattedCryptoAmount
+                                    value={notificationAmount}
+                                    symbol={
+                                        isSymbolRenderedBesideAmount
+                                            ? undefined
+                                            : (transactionToken?.symbol ?? symbol)
+                                    }
+                                    contractAddress={transactionToken?.contract}
+                                    tokenDecimals={transactionToken?.decimals}
+                                    isCompact
+                                    disableHiddenPlaceholder
+                                />
+                            ) : undefined
+                        }
+                        isInfiniteApproval={
+                            props.notification.type === 'tx-approved' &&
+                            props.notification.isInfiniteApproval
+                        }
+                        unlimitedApprovalLabel={<Translation id="TR_APPROVE_AMOUNT_UNLIMITED" />}
+                        renderAmount={amount => (
+                            <HiddenPlaceholder data-testid={`${toastTestIdPrefix}/amount`}>
+                                {amount}
+                            </HiddenPlaceholder>
+                        )}
+                    />
+                ),
             }}
-            action={{
-                onClick: () => {
-                    const deviceToSelect = accountDevice || device;
-                    if (deviceToSelect?.id !== currentDevice?.id) {
-                        dispatch(selectDeviceThunk(deviceToSelect));
-                    }
-                    const txAnchor = getTxAnchor(tx?.txid);
-                    dispatch(
-                        goto(destinationRoute, {
-                            params: {
-                                accountIndex: account.index,
-                                accountType: account.accountType,
-                                symbol: account.symbol,
-                            },
-                            anchor: txAnchor,
-                        }),
-                    );
-                },
-                label: 'TOAST_TX_BUTTON',
-            }}
+            action={
+                tx && !isTradingRoute && !isYieldRoute
+                    ? {
+                          onClick: handleTransactionClick,
+                          label: 'TOAST_TX_BUTTON',
+                      }
+                    : undefined
+            }
         />
     );
 };

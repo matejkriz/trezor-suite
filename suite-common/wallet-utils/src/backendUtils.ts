@@ -1,16 +1,24 @@
-import { parseElectrumUrl } from '@trezor/utils';
+import { type LegacyNetworkSymbol } from '@suite-common/legacy-network-config';
+import {
+    type BackendType,
+    type NetworkSymbol,
+    TREZOR_CONNECT_BACKENDS,
+    getNetworkType,
+} from '@suite-common/wallet-config';
 import type {
-    CustomBackend,
-    BlockchainNetworks,
+    Account,
     BackendSettings,
+    Blockchain,
+    BlockchainNetworks,
+    CustomBackend,
 } from '@suite-common/wallet-types';
-import { TREZOR_CONNECT_BACKENDS, BackendType, NetworkSymbol } from '@suite-common/wallet-config';
+import { parseElectrumUrl } from '@trezor/utils';
 
-export const getDefaultBackendType = (coin: NetworkSymbol) => {
-    if (coin === 'ada' || coin === 'tada') {
+export const getDefaultBackendType = (symbol: NetworkSymbol) => {
+    if (symbol === 'ada') {
         return 'blockfrost';
     }
-    if (coin === 'sol' || coin === 'dsol') {
+    if (symbol === 'sol' || symbol === 'dsol') {
         return 'solana';
     }
 
@@ -18,14 +26,14 @@ export const getDefaultBackendType = (coin: NetworkSymbol) => {
 };
 
 export const getBackendFromSettings = (
-    coin: NetworkSymbol,
+    symbol: NetworkSymbol,
     settings?: BackendSettings,
 ): CustomBackend => {
-    const type = settings?.selected ?? getDefaultBackendType(coin);
+    const type = settings?.selected ?? getDefaultBackendType(symbol);
     const urls = (settings?.selected && settings?.urls?.[type]) ?? [];
 
     return {
-        coin,
+        symbol,
         type,
         urls,
     };
@@ -34,10 +42,18 @@ export const getBackendFromSettings = (
 const isBackend = (backend: Partial<CustomBackend>): backend is CustomBackend =>
     !!(backend.type && backend.urls?.length);
 
-export const getCustomBackends = (blockchains: BlockchainNetworks): CustomBackend[] =>
-    Object.entries(blockchains)
-        .map(([coin, { backends }]) => ({
-            coin: coin as NetworkSymbol,
+export const getCustomBackends = (
+    blockchains: BlockchainNetworks,
+    supportedNetworks: readonly NetworkSymbol[],
+): CustomBackend[] =>
+    supportedNetworks
+        .map(symbol => ({ symbol, blockchain: blockchains[symbol as LegacyNetworkSymbol] }))
+        .filter(
+            (entry): entry is { symbol: NetworkSymbol; blockchain: Blockchain } =>
+                !!entry.blockchain,
+        )
+        .map(({ symbol, blockchain: { backends } }) => ({
+            symbol,
             type: backends.selected,
             urls: backends.selected && backends.urls?.[backends.selected],
         }))
@@ -52,3 +68,12 @@ export const isTrezorConnectBackendType = (type?: BackendType) => {
 
     return !!TREZOR_CONNECT_BACKENDS.find(b => b === type);
 };
+
+export const shouldUseIdentities = (symbol: NetworkSymbol) => getNetworkType(symbol) === 'ethereum';
+
+export const shouldSubscribeBlocks = (symbol: NetworkSymbol) => getNetworkType(symbol) !== 'solana';
+
+export const getAccountIdentity = (account: Pick<Account, 'deviceState'>) => account.deviceState;
+
+export const tryGetAccountIdentity = (account: Pick<Account, 'networkType' | 'deviceState'>) =>
+    account.networkType === 'ethereum' ? getAccountIdentity(account) : undefined;

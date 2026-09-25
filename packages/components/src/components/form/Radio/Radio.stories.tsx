@@ -1,72 +1,57 @@
-import { useArgs } from '@storybook/client-api';
-import styled from 'styled-components';
-import { Meta, StoryObj } from '@storybook/react';
+import { type Meta, type StoryObj } from '@storybook/react';
+import { useArgs } from 'storybook/preview-api';
 
-import { Radio as RadioComponent, RadioProps } from './Radio';
-import { H2 } from '../../typography/Heading/Heading';
+import { Radio as RadioComponent } from './Radio';
+import { getFramePropsStory } from '../../../utils/frameProps';
+import { allowedCheckboxFrameProps } from '../Checkbox/Checkbox';
+import { labelAlignments, verticalAlignments } from '../Checkbox/types';
 
-const Wrapper = styled.div`
-    display: flex;
-    flex-direction: column;
-
-    & > * {
-        padding: 10px;
-    }
-`;
-
-const meta: Meta = {
-    title: 'Form/RadioButton',
+const meta: Meta<typeof RadioComponent> = {
+    title: '✏️ Form',
     component: RadioComponent,
-} as Meta;
+};
 export default meta;
 
-export const RadioButton: StoryObj<RadioProps> = {
+export const Radio: StoryObj<typeof meta> = {
     render: ({ ...args }) => {
         // eslint-disable-next-line
         const [{ isChecked }, updateArgs] = useArgs();
         const handleIsChecked = () => updateArgs({ isChecked: !isChecked });
 
         return (
-            <RadioComponent {...args} onClick={handleIsChecked} isChecked={isChecked}>
+            <RadioComponent {...args} onChange={handleIsChecked} isChecked={isChecked}>
                 {args.children}
             </RadioComponent>
         );
     },
-    args: { children: 'RadioButton' },
-};
-
-export const RadioButtonGroup: StoryObj = {
-    render: () => {
-        // eslint-disable-next-line
-        const [{ option }, updateArgs] = useArgs();
-
-        const setOption = (option: string) => updateArgs({ option });
-
-        return (
-            <Wrapper>
-                <RadioComponent
-                    onClick={() => setOption('option1')}
-                    isChecked={option === 'option1'}
-                >
-                    <div>
-                        <H2>Some heading</H2>
-                        First option (example of custom content)
-                    </div>
-                </RadioComponent>
-                <RadioComponent
-                    onClick={() => setOption('option2')}
-                    isChecked={option === 'option2'}
-                >
-                    Second option
-                </RadioComponent>
-                <RadioComponent
-                    onClick={() => setOption('option3')}
-                    isChecked={option === 'option3'}
-                >
-                    Third option
-                </RadioComponent>
-            </Wrapper>
-        );
+    args: {
+        children: 'Label',
+        isChecked: false,
+        isDisabled: false,
+        labelAlignment: 'end',
+        verticalAlignment: 'start',
+        ...getFramePropsStory(allowedCheckboxFrameProps).args,
     },
-    args: { option: 'option1' },
+
+    argTypes: {
+        isChecked: {
+            control: 'boolean',
+        },
+        isDisabled: {
+            control: 'boolean',
+        },
+        labelAlignment: {
+            control: {
+                type: 'radio',
+            },
+            options: labelAlignments,
+        },
+        verticalAlignment: {
+            control: {
+                type: 'radio',
+            },
+            options: verticalAlignments,
+        },
+        ...getFramePropsStory(allowedCheckboxFrameProps).argTypes,
+    },
 };

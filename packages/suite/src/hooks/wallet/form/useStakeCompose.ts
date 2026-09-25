@@ -1,19 +1,22 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
-import { FieldPath, UseFormReturn } from 'react-hook-form';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { type FieldPath, type UseFormReturn } from 'react-hook-form';
 
-import { useAsyncDebounce } from '@trezor/react-utils';
-import { useDispatch, useTranslation } from 'src/hooks/suite';
-import { composeTransaction } from 'src/actions/wallet/stakeActions';
-import { findComposeErrors } from '@suite-common/wallet-utils';
-import {
-    StakeFormState,
-    StakeContextValues,
-    ComposeActionContext,
-    PrecomposedTransaction,
-    PrecomposedLevels,
-} from '@suite-common/wallet-types';
+import { isTranslationKey, useTranslation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
 import { COMPOSE_ERROR_TYPES } from '@suite-common/wallet-constants';
-import { FeeLevel } from '@trezor/connect';
+import {
+    type ComposeActionContext,
+    type PrecomposedLevels,
+    type PrecomposedTransaction,
+    type StakeFormState,
+} from '@suite-common/wallet-types';
+import { findComposeErrors } from '@suite-common/wallet-utils';
+import { type FeeLevel } from '@trezor/connect';
+import { useDebounce } from '@trezor/react-utils';
+
+import { composeTransaction } from 'src/actions/wallet/stakeActions';
+import { type StakeContextValues } from 'src/components/earn/forms/StakeFormContext';
 
 const DEFAULT_FIELD = 'outputs.0.amount';
 
@@ -32,16 +35,17 @@ export const useStakeCompose = <TFieldValues extends StakeFormState>({
 }: Props<TFieldValues>) => {
     const [isLoading, setLoading] = useState(false);
     const composeRequestIDRef = useRef(0);
+    const prevFeeInfoRef = useRef(state?.feeInfo);
     const defaultFieldRef = useRef(defaultField || DEFAULT_FIELD);
     const [composedLevels, setComposedLevels] =
         useState<StakeContextValues['composedLevels']>(undefined);
     const [composeField, setComposeField] = useState<string | undefined>(undefined);
     const { translationString } = useTranslation();
 
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
 
     // actions
-    const debounce = useAsyncDebounce();
+    const debounce = useDebounce();
 
     // Type assertion allowing to make the hook reusable, see https://stackoverflow.com/a/73624072
     // This allows the hook to set values and errors for fields shared among multiple forms without passing them as arguments.
@@ -75,6 +79,15 @@ export const useStakeCompose = <TFieldValues extends StakeFormState>({
                 const values = getValues();
 
                 return dispatch(composeTransaction(values, state));
+            }).catch(error => {
+                // The compose thunk reaches TrezorConnect, whose rejection messages may embed the
+                // composed account payload. `composeRequest` is fired without a `.catch` from the
+                // effects below, so a rejection escaping here would become an unhandled rejection
+                // and get reported verbatim by Sentry's global handler. Only the error name, never
+                // its message, is safe to log.
+                console.warn('Stake compose failed', error instanceof Error ? error.name : error);
+
+                return undefined;
             });
 
             // RACE-CONDITION NOTE:
@@ -99,9 +112,11 @@ export const useStakeCompose = <TFieldValues extends StakeFormState>({
     const updateComposedValues = useCallback(
         (composed: PrecomposedTransaction) => {
             const values = getValues();
+            if (!composed) return;
+
             if (composed.type === 'error') {
                 const { error, errorMessage } = composed;
-                if (!errorMessage) {
+                if (!errorMessage || !isTranslationKey(errorMessage.id)) {
                     // composed tx doesn't have an errorMessage (Translation props)
                     // this error is unexpected and should be handled in sendFormActions
                     console.warn('Compose unexpected error', error);
@@ -153,20 +168,27 @@ export const useStakeCompose = <TFieldValues extends StakeFormState>({
                 const levels = {
                     ...composedLevels,
                     custom: prevLevel,
-                } as PrecomposedLevels & { custom: PrecomposedTransaction };
+                } as PrecomposedLevels & {
+                    custom: PrecomposedTransaction;
+                };
                 setComposedLevels(levels);
             } else {
                 const currentLevel = composedLevels[current || 'normal'];
-                updateComposedValues(currentLevel);
+                if (currentLevel) {
+                    updateComposedValues(currentLevel);
+                }
             }
         },
         [composedLevels, updateComposedValues],
     );
 
     const switchToNearestFee = useCallback(
-        (composedLevels: NonNullable<StakeContextValues['composedLevels']>) => {
+        (composedLevels: PrecomposedLevels) => {
             const { selectedFee, setMaxOutputId } = getValues();
             let composed = composedLevels[selectedFee || 'normal'];
+
+            // composed transaction does not exists (should never happen)
+            if (!composed) return;
 
             // selectedFee was not set yet (no interaction with Fees) and default (normal) fee tx is not valid
             // OR setMax option was used
@@ -177,22 +199,24 @@ export const useStakeCompose = <TFieldValues extends StakeFormState>({
                 // find nearest possible tx
                 const nearest = Object.keys(composedLevels)
                     .reverse()
-                    .find((key): key is FeeLevel['label'] => composedLevels[key].type !== 'error');
+                    .find((key): key is FeeLevel['label'] => composedLevels[key]?.type !== 'error');
                 // switch to it
-                if (nearest) {
+                if (nearest && composedLevels[nearest]) {
                     composed = composedLevels[nearest];
                     setValue('selectedFee', nearest);
                     if (nearest === 'custom') {
                         // @ts-expect-error: type = error already filtered above
-                        const { feePerByte, feeLimit } = composed;
+                        const { feePerByte, feeLimit, maxFeePerGas, maxPriorityFeePerGas } =
+                            composed;
+
                         setValue('feePerUnit', feePerByte);
                         setValue('feeLimit', feeLimit || '');
+                        setValue('maxPriorityFeePerGas', maxPriorityFeePerGas);
+                        setValue('maxFeePerGas', maxFeePerGas || '');
                     }
                 }
                 // or do nothing, use default composed tx
             }
-            // composed transaction does not exists (should never happen)
-            if (!composed) return;
 
             updateComposedValues(composed);
         },
@@ -205,6 +229,16 @@ export const useStakeCompose = <TFieldValues extends StakeFormState>({
             composeRequest();
         }
     }, [state, composeRequest]);
+
+    useEffect(() => {
+        const hasFeeInfoChanged =
+            state && state?.feeInfo.blockHeight !== prevFeeInfoRef.current?.blockHeight;
+
+        if (hasFeeInfoChanged) {
+            prevFeeInfoRef.current = state.feeInfo;
+            composeRequest();
+        }
+    }, [state, state?.feeInfo, composeRequest]);
 
     // handle composedLevels change
     useEffect(() => {

@@ -2,10 +2,14 @@
     "extends": "../../tsconfig.base.json",
     "compilerOptions": { "outDir": "libDev" },
     "references": [
+        { "path": "../device" },
+        { "path": "../message-system" },
+        { "path": "../persistent-device-data" },
         { "path": "../redux-utils" },
         { "path": "../suite-types" },
         { "path": "../test-utils" },
         { "path": "../toast-notifications" },
-        { "path": "../../packages/connect" }
+        { "path": "../../packages/connect" },
+        { "path": "../../packages/type-utils" }
     ]
 }

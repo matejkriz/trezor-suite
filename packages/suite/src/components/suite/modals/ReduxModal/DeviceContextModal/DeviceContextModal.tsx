@@ -1,73 +1,64 @@
 import { useIntl } from 'react-intl';
 
-import TrezorConnect, { UI } from '@trezor/connect';
-import { selectDevice } from '@suite-common/wallet-core';
-import messages from 'src/support/messages';
-import { MODAL } from 'src/actions/suite/constants';
+import { selectSelectedAccount } from '@suite/account';
+import { messages } from '@suite/intl';
+import { type MODAL_CONTEXT_DEVICE } from '@suite/modal';
+import { selectConnectPopupCall } from '@suite-common/connect-popup';
+import { selectSelectedDevice } from '@suite-common/device';
+import TrezorConnect, { UI_EVENTS, UI_REQUESTS } from '@trezor/connect';
+
 import { useSelector } from 'src/hooks/suite';
-import {
-    PinModal,
-    PinInvalidModal,
-    PassphraseModal,
-    PassphraseSourceModal,
-    PassphraseOnDeviceModal,
-    ConfirmActionModal,
-    ConfirmFingerprintModal,
-    WordModal,
-    WordAdvancedModal,
-    TransactionReviewModal,
-    ConfirmAddressModal,
-    ConfirmXpubModal,
-} from 'src/components/suite/modals';
-import type { ReduxModalProps } from '../ReduxModal';
+
+import { ConfirmActionModal } from './ConfirmActionModal';
+import { ConfirmFingerprintModal } from './ConfirmFingerprintModal';
+import { ConfirmPassphraseBeforeAction } from './ConfirmPassphraseBeforeAction';
+import { PassphraseOnDeviceModal } from './PassphraseOnDeviceModal';
+import { PinModal } from './PinModal';
+import { SignMessageModal } from './SignMessageModal';
+import { ConfirmXpubModal } from '../ConfirmXpubModal';
+import type { ReduxModalProps } from '../ReduxModalProps';
+import { TransactionReviewModal } from '../TransactionReviewModal/TransactionReviewModal';
+import { ConnectAddressConfirmation } from '../UserContextModal/ConnectAddressConfirmation';
+import { ConnectSelectAccount } from '../UserContextModal/ConnectSelectAccount/ConnectSelectAccount';
 
 /** Modals requested by Device from `trezor-connect` */
 export const DeviceContextModal = ({
     windowType,
-    renderer,
     data,
-}: ReduxModalProps<typeof MODAL.CONTEXT_DEVICE>) => {
-    const device = useSelector(selectDevice);
+}: ReduxModalProps<typeof MODAL_CONTEXT_DEVICE>) => {
+    const device = useSelector(selectSelectedDevice);
     const intl = useIntl();
+    const selectedAccount = useSelector(selectSelectedAccount);
+    const popupCallState = useSelector(state => selectConnectPopupCall(state)?.state);
 
     if (!device) return null;
-
-    const abort = () => TrezorConnect.cancel(intl.formatMessage(messages.TR_CANCELLED));
+    const abort = () => TrezorConnect.cancel({ reason: intl.formatMessage(messages.TR_CANCELLED) });
 
     switch (windowType) {
         // T1B1 firmware
-        case UI.REQUEST_PIN:
-            return <PinModal device={device} renderer={renderer} />;
-        // T1B1 firmware
-        case UI.INVALID_PIN:
-            return <PinInvalidModal device={device} renderer={renderer} />;
-
-        // Passphrase on host
-        case UI.REQUEST_PASSPHRASE:
-            return <PassphraseModal device={device} />;
-
-        case 'WordRequestType_Plain':
-            return <WordModal renderer={renderer} />;
-        case 'WordRequestType_Matrix6':
-            return <WordAdvancedModal count={6} renderer={renderer} />;
-        case 'WordRequestType_Matrix9':
-            return <WordAdvancedModal count={9} renderer={renderer} />;
-        case 'ButtonRequest_PassphraseType':
-            return <PassphraseSourceModal device={device} />;
+        case UI_REQUESTS.REQUEST_PIN:
+        case UI_EVENTS.PIN_INVALID:
+            return <PinModal device={device} />;
+        case UI_REQUESTS.REQUEST_PASSPHRASE:
+            return <ConfirmPassphraseBeforeAction />;
         // T2T1 firmware
-        case UI.REQUEST_PASSPHRASE_ON_DEVICE:
+        case UI_EVENTS.PASSPHRASE_ON_DEVICE:
         case 'ButtonRequest_PassphraseEntry':
             return <PassphraseOnDeviceModal device={device} />;
         case 'ButtonRequest_ConfirmOutput':
         case 'ButtonRequest_FeeOverThreshold':
         case 'ButtonRequest_SignTx': {
+            if (data?.type === 'message') return <SignMessageModal device={device} {...data} />;
+
             return <TransactionReviewModal type="sign-transaction" />;
         }
         case 'ButtonRequest_Other': {
-            return <ConfirmActionModal device={device} renderer={renderer} />;
+            if (data?.type === 'message') return <SignMessageModal device={device} {...data} />;
+
+            return <ConfirmActionModal device={device} />;
         }
         case 'ButtonRequest_FirmwareCheck':
-            return <ConfirmFingerprintModal device={device} renderer={renderer} />;
+            return <ConfirmFingerprintModal device={device} />;
         // Generic Button requests
         // todo: consider fallback (if windowType.contains('ButtonRequest')). but add also possibility to blacklist some buttonRequests
         case 'ButtonRequest_Warning':
@@ -75,22 +66,36 @@ export const DeviceContextModal = ({
         case 'ButtonRequest_RecoveryHomepage':
         case 'ButtonRequest_MnemonicWordCount':
         case 'ButtonRequest_MnemonicInput':
-        case 'ButtonRequest_ProtectCall':
         case 'ButtonRequest_ResetDevice': // dispatched on BackupDevice call for T2T1, weird but true
         case 'ButtonRequest_ConfirmWord': // dispatched on BackupDevice call for T1B1
         case 'ButtonRequest_WipeDevice':
         case 'ButtonRequest_UnknownDerivationPath':
         case 'ButtonRequest_FirmwareUpdate':
         case 'ButtonRequest_PinEntry':
-            return <ConfirmActionModal device={device} renderer={renderer} />;
-        case 'ButtonRequest_Address':
-            return data ? (
-                <ConfirmAddressModal
-                    value={data.address}
-                    addressPath={data.serializedPath}
-                    onCancel={abort}
-                />
-            ) : null;
+            return <ConfirmActionModal device={device} />;
+        case 'ButtonRequest_ProtectCall': {
+            // This is a special case for T1B1 devices (Stellar).
+            // See https://github.com/trezor/trezor-firmware/issues/5120
+            if (selectedAccount?.networkType === 'stellar') {
+                return <TransactionReviewModal type="sign-transaction" />;
+            } else {
+                return <ConfirmActionModal device={device} />;
+            }
+        }
+        case 'ButtonRequest_Address': {
+            if (data?.type !== 'address') {
+                return null;
+            }
+
+            if (popupCallState === 'address-confirmation') {
+                return <ConnectAddressConfirmation />;
+            }
+            if (popupCallState === 'select-account') {
+                return <ConnectSelectAccount />;
+            }
+
+            return <ConfirmActionModal device={device} title="TR_COMPARE_ADDRESS_ON_TREZOR" />;
+        }
         case 'ButtonRequest_PublicKey':
             return <ConfirmXpubModal onCancel={abort} />;
         default:

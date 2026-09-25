@@ -1,45 +1,26 @@
-import styled from 'styled-components';
-
-import {
-    ActionButton,
-    ActionColumn,
-    SectionItem,
-    TextColumn,
-    Translation,
-    TrezorLink,
-} from 'src/components/suite';
-import { useDevice, useDispatch } from 'src/hooks/suite';
-import { goto } from 'src/actions/suite/routerActions';
+import { useDevice } from '@suite/device';
+import { getSuiteFirmwareTypeString } from '@suite/firmware-upgrade';
+import { Translation } from '@suite/intl';
+import { Anchor, SettingsAnchor, gotoThunk } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { firmwareActions } from '@suite-common/firmware';
+import { injectDispatch } from '@suite-common/redux-utils';
 import { Button } from '@trezor/components';
-import { useAnchor } from 'src/hooks/suite/useAnchor';
-import { SettingsAnchor } from 'src/constants/suite/anchors';
 import {
     getFirmwareVersion,
     hasBitcoinOnlyFirmware,
     isBitcoinOnlyDevice,
 } from '@trezor/device-utils';
+import { ActionButton, ActionColumn, SectionItem, TextColumn } from '@trezor/product-components';
 import { HELP_FIRMWARE_TYPE } from '@trezor/urls';
-import { getSuiteFirmwareTypeString } from 'src/utils/firmware';
-
-const Version = styled.div`
-    span {
-        display: flex;
-        align-items: center;
-
-        > :last-child {
-            margin-left: 6px;
-        }
-    }
-`;
 
 interface FirmwareTypeProps {
     isDeviceLocked: boolean;
 }
 
 export const FirmwareTypeChange = ({ isDeviceLocked }: FirmwareTypeProps) => {
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
     const { device } = useDevice();
-    const { anchorRef, shouldHighlight } = useAnchor(SettingsAnchor.FirmwareType);
 
     if (!device?.features) {
         return null;
@@ -52,60 +33,70 @@ export const FirmwareTypeChange = ({ isDeviceLocked }: FirmwareTypeProps) => {
         ? 'TR_SWITCH_TO_REGULAR'
         : 'TR_SWITCH_TO_BITCOIN_ONLY';
 
-    const handleAction = () => dispatch(goto('firmware-type', { params: { cancelable: true } }));
+    const handleAction = () => {
+        dispatch(gotoThunk({ routeName: 'firmware-type', params: { cancelable: true } }));
+        dispatch(firmwareActions.setSwitchFirmwareType(true));
+    };
 
     return (
-        <SectionItem
-            data-test="@settings/device/firmware-type"
-            ref={anchorRef}
-            shouldHighlight={shouldHighlight}
-        >
-            <TextColumn
-                title={<Translation id="TR_FIRMWARE_TYPE" />}
-                description={
-                    currentFwVersion && currentFwType ? (
-                        <Version>
-                            <Translation
-                                id="TR_YOUR_FIRMWARE_TYPE"
-                                values={{
-                                    version: (
-                                        <TrezorLink href={HELP_FIRMWARE_TYPE} variant="nostyle">
+        <Anchor anchorId={SettingsAnchor.FirmwareType}>
+            {({ anchorId, anchorRef, shouldHighlight }) => (
+                <SectionItem
+                    data-testid={anchorId}
+                    ref={anchorRef}
+                    shouldHighlight={shouldHighlight}
+                >
+                    <TextColumn
+                        title={<Translation id="TR_FIRMWARE_TYPE" />}
+                        description={
+                            currentFwVersion && currentFwType ? (
+                                <Translation
+                                    id="TR_YOUR_FIRMWARE_TYPE"
+                                    values={{
+                                        version: (
                                             <Button
-                                                variant="tertiary"
-                                                size="tiny"
-                                                icon="EXTERNAL_LINK"
-                                                iconAlignment="right"
+                                                intent="neutral"
+                                                priority="secondary"
+                                                size="small"
+                                                href={HELP_FIRMWARE_TYPE}
+                                                margin={{ left: 4 }}
                                             >
                                                 <Translation id={currentFwType} />
                                             </Button>
-                                        </TrezorLink>
-                                    ),
-                                }}
-                            />
-                        </Version>
-                    ) : (
-                        <Translation id="TR_YOUR_CURRENT_FIRMWARE_UNKNOWN" />
-                    )
-                }
-            />
-            {!bitcoinOnlyDevice && (
-                <ActionColumn>
-                    <ActionButton
-                        variant="secondary"
-                        onClick={handleAction}
-                        data-test="@settings/device/switch-fw-type-button"
-                        isDisabled={isDeviceLocked}
-                    >
-                        <Translation
-                            id={actionButtonId}
-                            values={{
-                                bitcoinOnly: <Translation id="TR_FIRMWARE_TYPE_BITCOIN_ONLY" />,
-                                regular: <Translation id="TR_FIRMWARE_TYPE_REGULAR" />,
-                            }}
-                        />
-                    </ActionButton>
-                </ActionColumn>
+                                        ),
+                                    }}
+                                />
+                            ) : (
+                                <Translation id="TR_YOUR_CURRENT_FIRMWARE_UNKNOWN" />
+                            )
+                        }
+                    />
+                    {!bitcoinOnlyDevice && (
+                        <ActionColumn>
+                            <ActionButton
+                                intent="brand"
+                                onClick={handleAction}
+                                data-testid="@settings/device/switch-fw-type-button"
+                                isDisabled={isDeviceLocked}
+                                isTooltipActive={isDeviceLocked}
+                                tooltipContent={
+                                    <Translation id="TR_SETTINGS_DEVICE_BANNER_TITLE_REMEMBERED" />
+                                }
+                            >
+                                <Translation
+                                    id={actionButtonId}
+                                    values={{
+                                        bitcoinOnly: (
+                                            <Translation id="TR_FIRMWARE_TYPE_BITCOIN_ONLY" />
+                                        ),
+                                        regular: <Translation id="TR_FIRMWARE_TYPE_REGULAR" />,
+                                    }}
+                                />
+                            </ActionButton>
+                        </ActionColumn>
+                    )}
+                </SectionItem>
             )}
-        </SectionItem>
+        </Anchor>
     );
 };

@@ -1,34 +1,63 @@
-import { useEffect, useState } from 'react';
-import useDebounce from 'react-use/lib/useDebounce';
-import { useDispatch } from 'src/hooks/suite';
-import { updateWindowSize } from 'src/actions/suite/resizeActions';
+import { useEffect } from 'react';
 
-/**
- * Window resize handler
- * Handle changes of window size and dispatch Action with current state to the reducer
- * @returns null
- */
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import {
+    type BreakpointFlagName,
+    type BreakpointFlags,
+    aboveBreakpoint,
+    belowBreakpoint,
+    breakpoints,
+    getBreakpointFlagNames,
+} from '@trezor/theme';
+import { typedObjectEntries } from '@trezor/utils';
+
+import { updateBreakpoints } from 'src/actions/suite/windowActions';
 
 const Resize = () => {
-    // useDebounce is triggered on every change of size value
-    const [size, setSize] = useState({ width: 0, height: 0 });
-
-    const dispatch = useDispatch();
-
-    useDebounce(() => dispatch(updateWindowSize(size.width, size.height)), 300, [size]);
+    const { dispatch } = useServices(injectDispatch);
 
     useEffect(() => {
-        const handleResize = () => {
-            setSize({ width: window.innerWidth, height: window.innerHeight });
-        };
+        const queryList: Array<{ mq: MediaQueryList; flag: BreakpointFlagName }> =
+            typedObjectEntries(breakpoints).flatMap(([breakpoint, breakpointValue]) => {
+                const [belowFlag, aboveFlag] = getBreakpointFlagNames(breakpoint);
 
-        window.addEventListener('resize', handleResize);
-        handleResize();
+                return [
+                    {
+                        mq: window.matchMedia(belowBreakpoint(breakpointValue)),
+                        flag: belowFlag,
+                    },
+                    {
+                        mq: window.matchMedia(aboveBreakpoint(breakpointValue)),
+                        flag: aboveFlag,
+                    },
+                ];
+            });
+
+        const initialFlags = queryList.reduce<Partial<BreakpointFlags>>((acc, { mq, flag }) => {
+            acc[flag] = mq.matches;
+
+            return acc;
+        }, {});
+
+        const handlers = queryList.map(({ mq, flag }) => {
+            const handler = (e: MediaQueryListEvent) => {
+                dispatch(updateBreakpoints({ [flag]: e.matches }));
+            };
+
+            mq.addEventListener('change', handler);
+
+            return { mq, handler };
+        });
+
+        dispatch(updateBreakpoints(initialFlags));
 
         return () => {
-            window.removeEventListener('resize', handleResize);
+            handlers.forEach(({ mq, handler }) => {
+                mq.removeEventListener('change', handler);
+            });
         };
-    }, []);
+    }, [dispatch]);
 
     return null;
 };

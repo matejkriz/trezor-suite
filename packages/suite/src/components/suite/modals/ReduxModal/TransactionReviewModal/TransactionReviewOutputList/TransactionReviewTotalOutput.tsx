@@ -1,56 +1,78 @@
-import { forwardRef } from 'react';
-import BigNumber from 'bignumber.js';
-
-import { formatAmount, formatNetworkAmount, isTestnet } from '@suite-common/wallet-utils';
-import { selectDevice } from '@suite-common/wallet-core';
-import { TrezorDevice } from 'src/types/suite';
-import { Translation } from 'src/components/suite/Translation';
-import { useSelector } from 'src/hooks/suite/useSelector';
+import { Translation, useTranslation } from '@suite/intl';
+import { isApprovalFlowSupported, selectSelectedDevice } from '@suite-common/device';
+import { type NetworkType } from '@suite-common/wallet-config';
 import {
-    getOutputState,
-    getIsUpdatedSendFlow,
+    type Account,
+    type FormState,
+    type GeneralPrecomposedTransactionFinal,
+    type StakeFormState,
+    type StakeType,
+} from '@suite-common/wallet-types';
+import {
+    getEvmTransactionTextSignature,
     getIsUpdatedEthereumSendFlow,
-} from 'src/utils/wallet/reviewTransactionUtils';
-import { TransactionReviewStepIndicator } from './TransactionReviewStepIndicator';
+    getIsUpdatedSendFlow,
+    isClearSignedEvmTradingSwapTransaction,
+    isClearSignedWrappedNativeTransaction,
+    isEvmApprovalTx,
+    isEvmYieldTxByTextSignature,
+    isTestnet,
+} from '@suite-common/wallet-utils';
+import type { TokenInfo } from '@trezor/blockchain-link-types';
+import { BigNumber } from '@trezor/utils';
+
+import { useSelector } from 'src/hooks/suite';
+import { type TrezorDevice } from 'src/types/suite';
+
 import {
+    type OutputElementLine,
     TransactionReviewOutputElement,
-    OutputElementLine,
+    type TransactionReviewOutputElementProps,
 } from './TransactionReviewOutputElement';
-import type { TransactionReviewOutputListProps } from './TransactionReviewOutputList';
 
-type StepIndicatorProps = Pick<
-    TransactionReviewOutputListProps,
-    'signedTx' | 'outputs' | 'buttonRequestsCount'
->;
+interface GetLinesParams {
+    device: TrezorDevice;
+    networkType: NetworkType;
+    precomposedTx: GeneralPrecomposedTransactionFinal;
+    precomposedForm: FormState | StakeFormState;
+    isRbfAction?: boolean;
+    stakeType?: StakeType;
+    nativeToken?: TokenInfo;
+    isClearSignedTradingSwap: boolean;
+    isClearSignedWrapUnwrap: boolean;
+    isTronStakeFreeze: boolean;
+    tronResourceLabel: string;
+}
 
-const StepIndicator = ({ signedTx, outputs, buttonRequestsCount }: StepIndicatorProps) => {
-    const state = signedTx ? 'success' : getOutputState(outputs.length, buttonRequestsCount);
-
-    return <TransactionReviewStepIndicator state={state} size={16} />;
-};
-
-type TransactionReviewTotalOutputProps = Omit<
-    TransactionReviewOutputListProps,
-    'precomposedForm' | 'decision' | 'detailsOpen' | 'isRbfAction' | 'actionText'
->;
-
-const getLines = (
-    device: TrezorDevice,
-    networkType: TransactionReviewOutputListProps['account']['networkType'],
-    symbol: TransactionReviewOutputListProps['account']['symbol'],
-    precomposedTx: TransactionReviewOutputListProps['precomposedTx'],
-): Array<OutputElementLine> => {
+const getLines = ({
+    device,
+    networkType,
+    precomposedTx,
+    precomposedForm,
+    isRbfAction,
+    stakeType,
+    nativeToken,
+    isClearSignedTradingSwap,
+    isClearSignedWrapUnwrap,
+    isTronStakeFreeze,
+    tronResourceLabel,
+}: GetLinesParams): OutputElementLine[] => {
     const isUpdatedSendFlow = getIsUpdatedSendFlow(device);
-    const isUpdatedEthereumSendFlow = getIsUpdatedEthereumSendFlow(device, networkType);
+    const isUpdatedEthereumSendFlow = getIsUpdatedEthereumSendFlow(device, networkType, stakeType);
     const isEthereum = networkType === 'ethereum';
     const isSolana = networkType === 'solana';
     const showAmountWithoutFee = isEthereum || isSolana;
-    const feeLabel = ((network: TransactionReviewOutputListProps['account']['networkType']) => {
+    const evmTxType = getEvmTransactionTextSignature(precomposedForm.transactionData);
+    const isYieldOrClaimOperation = isEvmYieldTxByTextSignature(evmTxType) || evmTxType === 'claim';
+
+    const feeLabelId = ((network: NetworkType) => {
         switch (network) {
             case 'ethereum':
                 return 'MAX_FEE';
+            case 'stellar':
+                return 'MAX_FEE';
             case 'solana':
-                return 'TR_TX_FEE';
+                return 'TR_TX_FEE_INCLUDING_RENT';
             default:
                 return 'TR_INCLUDING_FEE';
         }
@@ -60,81 +82,190 @@ const getLines = (
         .minus(precomposedTx.fee)
         .toString();
 
-    if (isUpdatedEthereumSendFlow) {
+    if (isTronStakeFreeze) {
         return [
             {
-                id: 'amount', // In updated ethereum send flow there is no total amount shown, only amount without fee
+                id: 'amount',
                 label: <Translation id="AMOUNT" />,
-                value: tokenInfo
-                    ? formatAmount(precomposedTx.totalSpent, tokenInfo.decimals)
-                    : formatNetworkAmount(amountWithoutFee, symbol),
+                value: amountWithoutFee,
+                type: 'amount',
             },
             {
-                id: 'fee',
-                label: <Translation id="MAX_FEE" />,
-                value: formatNetworkAmount(precomposedTx.fee, symbol),
+                id: 'resource',
+                label: <Translation id="TR_TRON_RESOURCE" />,
+                value: tronResourceLabel,
+                type: 'default',
             },
         ];
     }
+
+    if (precomposedForm.trading?.isSlip24Active || isClearSignedTradingSwap) {
+        const feeOnlyLabelId = isEthereum || networkType === 'stellar' ? 'MAX_FEE' : 'TR_TX_FEE';
+
+        return [
+            {
+                id: 'fee',
+                label: <Translation id={feeOnlyLabelId} />,
+                value: precomposedTx.fee,
+                type: 'amount',
+            },
+        ];
+    }
+
+    if (isUpdatedEthereumSendFlow) {
+        const isUnknownStakingValue = isRbfAction && stakeType !== 'stake';
+
+        const amountLine: OutputElementLine = {
+            id: 'amount', // In updated ethereum send flow there is no total amount shown, only amount without fee
+            label: <Translation id="AMOUNT" />,
+            value: tokenInfo ? precomposedTx.totalSpent : amountWithoutFee,
+            token: tokenInfo ?? nativeToken,
+            type: 'amount',
+        };
+
+        const feeLine: OutputElementLine = {
+            id: 'fee',
+            label: <Translation id="MAX_FEE" />,
+            value: precomposedTx.fee,
+            token: nativeToken,
+            type: 'amount',
+        };
+
+        const isFeeOnly =
+            isUnknownStakingValue ||
+            (isEvmApprovalTx(precomposedForm.transactionData) && isApprovalFlowSupported(device)) ||
+            isYieldOrClaimOperation ||
+            // A clear-signed wrap/unwrap already confirms the amount on its own row, and the
+            // device leaves it off its summary screen for the same reason.
+            isClearSignedWrapUnwrap;
+
+        return isFeeOnly ? [feeLine] : [amountLine, feeLine];
+    }
     if (isUpdatedSendFlow) {
+        const amount = showAmountWithoutFee ? amountWithoutFee : precomposedTx.totalSpent;
+
         return [
             {
                 id: 'total',
                 label: <Translation id={showAmountWithoutFee ? 'AMOUNT' : 'TR_TOTAL_AMOUNT'} />,
-                value: tokenInfo
-                    ? formatAmount(precomposedTx.totalSpent, tokenInfo.decimals)
-                    : formatNetworkAmount(
-                          showAmountWithoutFee ? amountWithoutFee : precomposedTx.totalSpent,
-                          symbol,
-                      ),
+                value: tokenInfo ? precomposedTx.totalSpent : amount,
+                token: tokenInfo,
+                type: 'amount',
             },
             {
                 id: 'fee',
-                label: <Translation id={feeLabel} />,
-                value: formatNetworkAmount(precomposedTx.fee, symbol),
+                label: <Translation id={feeLabelId} />,
+                value: precomposedTx.fee,
+                type: 'amount',
             },
         ];
     }
 
-    return [
-        {
-            id: 'total',
-            label: <Translation id="TR_TOTAL" />,
-            value: formatNetworkAmount(precomposedTx.totalSpent, symbol),
-        },
-    ];
+    const totalLine: OutputElementLine = {
+        id: 'total',
+        label: <Translation id="TR_TOTAL" />,
+        value: precomposedTx.totalSpent,
+        token: tokenInfo,
+        type: 'amount',
+    };
+
+    if (isYieldOrClaimOperation) {
+        return [
+            totalLine,
+            {
+                id: 'fee',
+                label: <Translation id={feeLabelId} />,
+                value: precomposedTx.fee,
+                type: 'amount',
+            },
+        ];
+    }
+
+    return [totalLine];
 };
 
-export const TransactionReviewTotalOutput = forwardRef<
-    HTMLDivElement,
-    TransactionReviewTotalOutputProps
->(({ account, signedTx, outputs, buttonRequestsCount, precomposedTx }, ref) => {
-    const device = useSelector(selectDevice);
+export type TransactionReviewTotalOutputProps = {
+    state: TransactionReviewOutputElementProps['state'];
+    precomposedTx: GeneralPrecomposedTransactionFinal;
+    precomposedForm: FormState | StakeFormState;
+    account: Account;
+    isRbf: boolean;
+    stakeType?: StakeType;
+};
+
+export const TransactionReviewTotalOutput = ({
+    account,
+    state,
+    precomposedTx,
+    precomposedForm,
+    stakeType,
+    isRbf,
+}: TransactionReviewTotalOutputProps) => {
+    const device = useSelector(selectSelectedDevice);
+    const { translationString } = useTranslation();
 
     if (!device) {
         return null;
     }
 
-    const { symbol, networkType } = account;
+    const { networkType } = account;
+    const { tronStaking } = precomposedForm;
+    const isTronStakeFreeze =
+        networkType === 'tron' &&
+        (tronStaking?.kind === 'freeze' || tronStaking?.kind === 'unstake');
+    const tronResourceLabel =
+        (tronStaking?.kind === 'freeze' || tronStaking?.kind === 'unstake') &&
+        tronStaking.resource === 'energy'
+            ? translationString('TR_TRON_ENERGY')
+            : translationString('TR_TRON_BANDWIDTH');
+    const nativeToken =
+        account.accountType === 'placeholder' && 'nativeToken' in precomposedTx
+            ? precomposedTx.nativeToken
+            : undefined;
+    const isFiatVisible = !isTestnet(account.symbol) && account.accountType !== 'placeholder';
+    const isClearSignedTradingSwap = isClearSignedEvmTradingSwapTransaction({
+        account,
+        device,
+        precomposedTx,
+        transactionData: precomposedForm.transactionData,
+        trading: precomposedForm.trading,
+    });
+    const isClearSignedWrapUnwrap = isClearSignedWrappedNativeTransaction({
+        account,
+        device,
+        precomposedTx,
+        transactionData: precomposedForm.transactionData,
+    });
+    const lines = getLines({
+        device,
+        networkType,
+        precomposedTx,
+        precomposedForm,
+        isRbfAction: isRbf,
+        stakeType,
+        nativeToken,
+        isClearSignedTradingSwap,
+        isClearSignedWrapUnwrap,
+        isTronStakeFreeze,
+        tronResourceLabel,
+    });
 
-    const lines = getLines(device, networkType, symbol, precomposedTx);
+    const titleId = (() => {
+        // Both list the fee alone, so "Total including fee" would be misleading.
+        if (isClearSignedTradingSwap || isClearSignedWrapUnwrap) return 'TR_NETWORK_FEE';
+        if (precomposedForm.trading?.isSlip24Active) return 'TR_SUMMARY';
+        if (isTronStakeFreeze) return 'TR_SUMMARY';
+
+        return 'TR_TOTAL_INCLUDING_FEE';
+    })();
 
     return (
         <TransactionReviewOutputElement
+            title={<Translation id={titleId} />}
             account={account}
-            indicator={
-                <StepIndicator
-                    signedTx={signedTx}
-                    outputs={outputs}
-                    buttonRequestsCount={buttonRequestsCount}
-                />
-            }
             lines={lines}
-            cryptoSymbol={symbol}
-            fiatSymbol={symbol}
-            fiatVisible={!isTestnet(symbol)}
-            ref={ref}
-            token={precomposedTx?.token}
+            state={state}
+            fiatVisible={isFiatVisible}
         />
     );
-});
+};

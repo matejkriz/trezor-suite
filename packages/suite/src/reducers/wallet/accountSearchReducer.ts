@@ -1,49 +1,62 @@
-import produce from 'immer';
+import { type PayloadAction, createSlice } from '@reduxjs/toolkit';
 
-import { deviceActions } from '@suite-common/wallet-core';
+import { deviceActions } from '@suite-common/device';
+import { type NetworkSymbol } from '@suite-common/wallet-config';
+import { changeNetworks } from '@suite-common/wallet-core';
 
-import { ACCOUNT_SEARCH } from 'src/actions/wallet/constants';
-import * as walletSettingsActions from 'src/actions/settings/walletSettingsActions';
-import { Action } from 'src/types/suite';
-import { Account as AccountType } from 'src/types/wallet';
+import { type AppState } from 'src/types/suite';
 
-export interface State {
-    coinFilter: AccountType['symbol'] | undefined;
+export const ACCOUNT_SEARCH_PREFIX = '@suite/account-search';
+
+export type AccountSearchState = {
+    coinFilter: Array<NetworkSymbol>;
     searchString: string | undefined;
-}
+};
 
-export const initialState: State = {
-    coinFilter: undefined,
+export const accountSearchInitialState: AccountSearchState = {
+    coinFilter: [],
     searchString: undefined,
 };
 
-const accountSearchReducer = (state: State = initialState, action: Action): State =>
-    produce(state, draft => {
-        switch (action.type) {
-            case ACCOUNT_SEARCH.SET_SEARCH_STRING:
-                draft.searchString = action.payload;
-                break;
-            case ACCOUNT_SEARCH.SET_COIN_FILTER:
-                draft.coinFilter = action.payload;
-                break;
-            // reset coin filter on:
-            // 1) disabling/enabling coins
-            // 2) switching to another device/wallet
-            // * 3) adding a new account is handled directly in add account modal, reacting on ACCOUNT.CREATE would cause resetting during initial accounts discovery
-            case walletSettingsActions.changeNetworks.type: {
-                if (walletSettingsActions.changeNetworks.match(action)) {
-                    draft.coinFilter = undefined;
-                    draft.searchString = undefined;
-                }
-                break;
-            }
-            case deviceActions.selectDevice.type:
-                draft.coinFilter = undefined;
-                draft.searchString = undefined;
-                break;
+const accountSearchSlice = createSlice({
+    name: ACCOUNT_SEARCH_PREFIX,
+    initialState: accountSearchInitialState,
+    reducers: {
+        setCoinFilter(state: AccountSearchState, action: PayloadAction<Array<NetworkSymbol>>) {
+            state.coinFilter = action.payload ?? [];
+        },
+        toggleCoinFilter(state: AccountSearchState, action: PayloadAction<NetworkSymbol>) {
+            const symbol = action.payload;
+            if (!symbol) return;
 
-            // no default
-        }
-    });
+            if (state.coinFilter.includes(symbol)) {
+                state.coinFilter = state.coinFilter.filter(s => s !== symbol);
+            } else {
+                state.coinFilter.push(symbol);
+            }
+        },
+        setSearchString(state: AccountSearchState, action: PayloadAction<string | undefined>) {
+            state.searchString = action.payload;
+        },
+    },
+    extraReducers: builder => {
+        // reset coin filter on:
+        // 1) disabling/enabling coins
+        // 2) adding a new account is handled directly in add account modal, reacting on ACCOUNT.CREATE would cause resetting during initial accounts discovery
+        builder.addCase(changeNetworks, state => {
+            state.coinFilter = [];
+            state.searchString = undefined;
+        });
+        // reset coin filter search
+        builder.addCase(deviceActions.selectDevice, state => {
+            state.searchString = undefined;
+        });
+    },
+});
+
+export const accountSearchActions = accountSearchSlice.actions;
+export const accountSearchReducer = accountSearchSlice.reducer;
+
+export const selectAccountSearch = (state: AppState) => state.wallet.accountSearch;
 
 export default accountSearchReducer;

@@ -1,27 +1,28 @@
-import { TouchableOpacity, View } from 'react-native';
-import { ReactNode } from 'react';
+import { type ReactNode } from 'react';
+import { View } from 'react-native';
 
-import { useTranslate } from '@suite-native/intl';
-import { useNativeStyles, prepareNativeStyle } from '@trezor/styles';
+import { Translation } from '@suite-native/intl';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
 
-import { VStack } from './Stack';
-import { Box } from './Box';
 import { Badge } from './Badge';
-import { Text } from './Text';
+import { Box } from './Box';
+import { PressableOpacity } from './Pressable';
 import { Radio } from './Radio';
+import { VStack } from './Stack';
+import { Text } from './Text';
 
 const cardStyle = prepareNativeStyle((utils, { isSelected }: { isSelected: boolean }) => ({
-    backgroundColor: utils.colors.backgroundSurfaceElevation1,
-    borderRadius: utils.borders.radii.medium,
-    padding: utils.spacings.medium,
+    backgroundColor: utils.colors.surfaceFillRaised,
+    borderRadius: utils.borders.radii.r16,
+    padding: utils.spacings.sp16,
     ...utils.boxShadows.small,
     extend: [
         {
             condition: isSelected,
             style: {
-                borderColor: utils.colors.iconPrimaryDefault,
+                borderColor: utils.colors.contentBrand,
                 borderWidth: utils.borders.widths.large,
-                padding: utils.spacings.medium - utils.borders.widths.large,
+                padding: utils.spacings.sp16 - utils.borders.widths.large,
                 ...utils.boxShadows.medium,
             },
         },
@@ -33,26 +34,27 @@ const titleWrapperStyle = prepareNativeStyle(_ => ({
     justifyContent: 'space-between',
 }));
 
-const radioWrapperStyle = prepareNativeStyle(_ => ({
+const radioWrapperStyle = prepareNativeStyle(utils => ({
     width: '100%',
     alignItems: 'flex-end',
-    paddingTop: 12,
+    paddingTop: utils.spacings.sp12,
 }));
 
 const subtitleWrapperStyle = prepareNativeStyle(utils => ({
-    paddingBottom: utils.spacings.extraSmall,
+    paddingBottom: utils.spacings.sp4,
 }));
 
 const badgeWrapperStyle = prepareNativeStyle(utils => ({
-    paddingTop: utils.spacings.extraSmall,
+    paddingTop: utils.spacings.sp4,
 }));
 
 type SelectableItemProps = {
-    title: string;
-    subtitle?: string;
+    title: ReactNode;
+    subtitle?: ReactNode;
     content?: ReactNode;
     isSelected: boolean;
     isDefault: boolean;
+    testID?: string;
     onSelected: () => void;
 };
 
@@ -65,31 +67,30 @@ export const SelectableItem = ({
     onSelected,
 }: SelectableItemProps) => {
     const { applyStyle, utils } = useNativeStyles();
-    const { translate } = useTranslate();
 
     return (
-        <TouchableOpacity
-            onPress={onSelected}
-            activeOpacity={0.6}
-            style={applyStyle(cardStyle, { isSelected })}
-        >
-            <VStack spacing={utils.spacings.extraSmall}>
+        <PressableOpacity onPress={onSelected} style={applyStyle(cardStyle, { isSelected })}>
+            <VStack spacing={utils.spacings.sp4}>
                 <Box style={applyStyle(titleWrapperStyle)}>
-                    <Text variant="titleSmall" color="textDefault">
+                    <Text variant="headline-sm" color="contentPrimary">
                         {title}
                     </Text>
                     {isDefault && (
                         <View style={applyStyle(badgeWrapperStyle)}>
                             <Badge
                                 key="defaultType"
-                                variant="green"
-                                label={translate('generic.default')}
-                                icon="checkCircleSolid"
+                                intent="brand"
+                                label={<Translation id="generic.default" />}
+                                icon="checkCircle"
                             />
                         </View>
                     )}
                 </Box>
-                <Text variant="hint" color="textDefault" style={applyStyle(subtitleWrapperStyle)}>
+                <Text
+                    variant="body-sm"
+                    color="contentPrimary"
+                    style={applyStyle(subtitleWrapperStyle)}
+                >
                     {subtitle}
                 </Text>
                 <Box>{content}</Box>
@@ -97,6 +98,6 @@ export const SelectableItem = ({
             <View style={applyStyle(radioWrapperStyle)}>
                 <Radio value="toggle" onPress={onSelected} isChecked={isSelected} />
             </View>
-        </TouchableOpacity>
+        </PressableOpacity>
     );
 };

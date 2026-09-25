@@ -1,11 +1,13 @@
 import styled, { useTheme } from 'styled-components';
-import { SignValue } from '@suite-common/suite-types';
+
 import { isSignValuePositive } from '@suite-common/formatters';
+import { type SignValue } from '@suite-common/suite-types';
 
 const StyledSign = styled.span<{ $color: string }>`
     color: ${({ $color }) => $color};
     width: 1ch;
-    margin-right: 0.3ch;
+    /* stylelint-disable-next-line trezor/dimension-token-values -- Optical spacing relative to the sign glyph. */
+    margin-right: 0.1ch;
 `;
 
 interface SignProps {
@@ -24,7 +26,7 @@ export const Sign = ({
     grayscaleColor,
 }: SignProps) => {
     const theme = useTheme();
-    const defaultColor = grayscaleColor ?? theme.textDefault;
+    const defaultColor = grayscaleColor ?? 'inherit';
 
     if (value === undefined || value === null) {
         return null;
@@ -37,13 +39,11 @@ export const Sign = ({
     }
 
     if (isValuePositive) {
-        return (
-            <StyledSign $color={grayscale ? defaultColor : theme.textPrimaryDefault}>+</StyledSign>
-        );
+        return <StyledSign $color={grayscale ? defaultColor : theme.contentBrand}>+</StyledSign>;
     }
 
     if (!isValuePositive && showMinusSign) {
-        return <StyledSign $color={grayscale ? defaultColor : theme.textAlertRed}>–</StyledSign>;
+        return <StyledSign $color={grayscale ? defaultColor : theme.contentCritical}>–</StyledSign>;
     }
 
     return null;

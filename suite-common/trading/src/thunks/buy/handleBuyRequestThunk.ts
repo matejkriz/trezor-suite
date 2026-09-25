@@ -1,0 +1,162 @@
+import { type BuyTrade, type BuyTradeQuoteRequest } from 'invity-api';
+
+import { createThunk } from '@suite-common/redux-utils';
+import { type Network } from '@suite-common/wallet-config';
+import { convertAmountSubunitsToUnits } from '@suite-common/wallet-utils';
+
+import { TRADING_BUY_THUNK_PREFIX } from '../../constants';
+import { tradingBuyActions } from '../../reducers/buyReducer';
+import { type TradingRootState, tradingActions } from '../../reducers/tradingCommonReducer';
+import {
+    selectTradingBuyQuotesRequest,
+    selectTradingCoinSymbolByCryptoId,
+} from '../../selectors/tradingSelectors';
+import { tradeApi } from '../../tradeApi';
+import type { HandleBuyRequestThunkProps, TradingBuyFormProps, TradingBuyType } from '../../types';
+import {
+    addIdsToQuotes,
+    filterQuotesAccordingTags,
+    getNetworkDecimalsWithFallback,
+    tradingGetSuccessQuotes,
+} from '../../utils';
+import { buyUtils } from '../../utils/buy/buyUtils';
+import { isCountrySubdivisionEmpty } from '../../utils/countryUtils';
+
+type GetQuotesRequest = {
+    requestData: BuyTradeQuoteRequest;
+    signal: AbortSignal | null;
+};
+
+const getQuotesRequest = ({ requestData, signal }: GetQuotesRequest) =>
+    tradeApi.getBuyQuotes(requestData, signal);
+
+type GetQuoteRequestData = {
+    formValues: TradingBuyFormProps;
+    quotesRequest: BuyTradeQuoteRequest | undefined;
+    network: Network;
+    shouldSendInSats: boolean | undefined;
+};
+
+const getQuoteRequestData = ({
+    formValues,
+    quotesRequest,
+    network,
+    shouldSendInSats,
+}: GetQuoteRequestData): BuyTradeQuoteRequest | undefined => {
+    const {
+        fiatInput,
+        cryptoInput,
+        currencySelect,
+        cryptoSelect,
+        countrySelect,
+        amountInCrypto,
+        countrySubdivisionSelect,
+    } = formValues;
+
+    const decimals = getNetworkDecimalsWithFallback(network.symbol);
+    const cryptoStringAmount =
+        cryptoInput && shouldSendInSats
+            ? convertAmountSubunitsToUnits(cryptoInput, decimals)
+            : cryptoInput;
+
+    const request = {
+        wantCrypto: amountInCrypto,
+        fiatCurrency: currencySelect
+            ? currencySelect?.value.toUpperCase()
+            : (quotesRequest?.fiatCurrency ?? ''),
+        receiveCurrency: cryptoSelect?.id ?? quotesRequest?.receiveCurrency,
+        country: countrySelect?.value ?? quotesRequest?.country,
+        fiatStringAmount: fiatInput ?? quotesRequest?.fiatStringAmount,
+        cryptoStringAmount: cryptoStringAmount ?? quotesRequest?.cryptoStringAmount,
+        receiveAddress: formValues.receiveAddress,
+    };
+
+    // no need to fetch quotes if amount is not set
+    if ((!request.fiatStringAmount && !request.cryptoStringAmount) || !request.receiveCurrency) {
+        return undefined;
+    }
+
+    // do not fetch quotes until subdivision is set when country has subdivisions
+    if (isCountrySubdivisionEmpty(request.country, countrySubdivisionSelect?.value)) {
+        return undefined;
+    }
+
+    return {
+        ...request,
+        subdivision: countrySubdivisionSelect?.value,
+    };
+};
+
+type HandleBuyRequestThunkState = TradingRootState;
+
+export const handleBuyRequestThunk = createThunk<
+    BuyTrade[],
+    HandleBuyRequestThunkProps,
+    {
+        rejectValue: string;
+        state: HandleBuyRequestThunkState;
+    }
+>(
+    `${TRADING_BUY_THUNK_PREFIX}/handleRequest`,
+    async (
+        { formValues, network, shouldSendInSats },
+        { dispatch, getState, fulfillWithValue, rejectWithValue, signal },
+    ) => {
+        const quotesRequest = selectTradingBuyQuotesRequest(getState());
+
+        const requestData = getQuoteRequestData({
+            formValues,
+            quotesRequest,
+            network,
+            shouldSendInSats,
+        });
+
+        if (!requestData) {
+            dispatch(tradingActions.stopRefetchQuotes());
+
+            return rejectWithValue('Invalid request data');
+        }
+
+        const allQuotes = (await getQuotesRequest({ requestData, signal })) ?? [];
+
+        if (signal.aborted) {
+            dispatch(tradingActions.stopRefetchQuotes());
+
+            return rejectWithValue('Request was aborted');
+        }
+
+        if (!Array.isArray(allQuotes) || allQuotes.length === 0) {
+            dispatch(tradingActions.stopRefetchQuotes());
+
+            const quotesSuccess: BuyTrade[] = [];
+            dispatch(tradingBuyActions.setAmountLimits(undefined));
+            dispatch(tradingBuyActions.saveQuotes(quotesSuccess));
+            dispatch(tradingBuyActions.saveQuoteRequest(requestData));
+
+            return fulfillWithValue(quotesSuccess);
+        }
+
+        // processed quotes and without alternative quotes
+        const quotesDefault = filterQuotesAccordingTags<TradingBuyType>(
+            addIdsToQuotes<TradingBuyType>(allQuotes, 'buy'),
+        );
+        // without errors
+        const quotesSuccess = tradingGetSuccessQuotes<TradingBuyType>(quotesDefault);
+
+        const symbol =
+            selectTradingCoinSymbolByCryptoId(getState(), requestData.receiveCurrency) ??
+            requestData.receiveCurrency;
+        const limits = buyUtils.getAmountLimits({
+            request: requestData,
+            quotes: quotesDefault,
+            currency: symbol,
+        }); // from all quotes except alternative
+
+        dispatch(tradingBuyActions.saveQuotes(quotesSuccess));
+        dispatch(tradingBuyActions.setAmountLimits(limits));
+        dispatch(tradingBuyActions.saveQuoteRequest(requestData));
+        dispatch(tradingActions.setRefetchQuotesTimestamp(Date.now()));
+
+        return fulfillWithValue(quotesSuccess);
+    },
+);

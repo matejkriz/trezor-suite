@@ -1,27 +1,9 @@
-version: "3.9"
 services:
   trezor-user-env-unix:
-    image: ghcr.io/trezor/trezor-user-env
+    image: ghcr.io/trezor/trezor-user-env:0126ecbed6edc132a4210803707a66fd04add700
     environment:
       - SDL_VIDEODRIVER=dummy
       - XDG_RUNTIME_DIR=/var/tmp
-    network_mode: bridge
-
-  test-run:
-    image: registry.gitlab.com/satoshilabs/trezor/trezor-suite/base:latest
-    environment:
-      - TESTS_FIRMWARE=$TESTS_FIRMWARE
-      - TESTS_FIRMWARE_MODEL=$TESTS_FIRMWARE_MODEL
-      - TESTS_FIRMWARE_URL=$TESTS_FIRMWARE_URL
-      - TESTS_INCLUDED_METHODS=$TESTS_INCLUDED_METHODS
-      - TESTS_EXCLUDED_METHODS=$TESTS_EXCLUDED_METHODS
-      - TESTS_PATTERN=$TESTS_PATTERN
-      - TESTS_USE_TX_CACHE=false
-      - TESTS_USE_WS_CACHE=false
-    depends_on:
-      - trezor-user-env-unix
-    network_mode: service:trezor-user-env-unix
-    working_dir: /trezor-suite
-    command: bash -c "$TESTS_SCRIPT $TESTS_PATTERN"
     volumes:
-      - ../:/trezor-suite
+      - ../:/trezor-user-env/trezor-suite
+    network_mode: host

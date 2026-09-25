@@ -1,0 +1,253 @@
+import {
+    type BuyCryptoPaymentMethod,
+    type BuyTradeQuoteRequest,
+    type CryptoId,
+    type ExchangeTradeQuoteRequest,
+    type SellCryptoPaymentMethod,
+    type SellFiatTradeQuoteRequest,
+} from 'invity-api';
+
+import { gotoThunk } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import {
+    parseCryptoId,
+    tradingActions,
+    tradingBuyActions,
+    tradingExchangeActions,
+    tradingSellActions,
+} from '@suite-common/trading';
+import { selectAccounts } from '@suite-common/wallet-core';
+import { type FeeLevel, type TokenInfo } from '@trezor/connect';
+
+import { useSelector } from 'src/hooks/suite';
+import { type Account } from 'src/types/wallet';
+
+interface BuyOfferRedirectParams {
+    symbol: Account['symbol'];
+    index: Account['index'];
+    accountType: Account['accountType'];
+    wantCrypto: boolean;
+    fiatCurrency: string;
+    receiveCurrency: CryptoId;
+    amount: string;
+    country: string;
+    paymentMethod: BuyCryptoPaymentMethod;
+}
+
+interface SellOfferRedirectParams {
+    symbol: Account['symbol'];
+    index: Account['index'];
+    accountType: Account['accountType'];
+    amountInCrypto: boolean;
+    fiatCurrency: string;
+    cryptoCurrency: CryptoId;
+    amount: string;
+    country: string;
+    paymentMethod: SellCryptoPaymentMethod;
+    orderId?: string;
+    selectedFee?: FeeLevel['label'];
+    feePerByte?: string;
+    feeLimit?: string;
+    maxFeePerGas?: string;
+    maxPriorityFeePerGas?: string;
+}
+
+interface ExchangeOfferRedirectParams {
+    symbol: Account['symbol'];
+    index: Account['index'];
+    accountType: Account['accountType'];
+    send: CryptoId;
+    receive: CryptoId;
+    amount: string;
+    orderId: string;
+    selectedFee?: FeeLevel['label'];
+    feePerByte?: string;
+    feeLimit?: string;
+    maxFeePerGas?: string;
+    maxPriorityFeePerGas?: string;
+}
+
+interface DetailRedirectParams {
+    symbol: Account['symbol'];
+    index: Account['index'];
+    accountType: Account['accountType'];
+    transactionId: string;
+}
+
+const getTokenInfo = (cryptoId: CryptoId): TokenInfo | undefined => {
+    const { contractAddress } = parseCryptoId(cryptoId);
+
+    if (!contractAddress) return;
+
+    // TODO this conversion is not valid, not all required fields are present
+    return {
+        // Load-bearing widening: with the branded TokenAddress the outer `as TokenInfo`
+        // conversion is rejected (TS2352); the lint rule mis-reports the assertion as a no-op.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+        contract: contractAddress as string,
+    } as TokenInfo;
+};
+
+const findAccountKey = (
+    accounts: Account[],
+    params: Pick<Account, 'symbol' | 'index' | 'accountType'>,
+) =>
+    accounts.find(
+        a =>
+            a.symbol === params.symbol &&
+            a.index === params.index &&
+            a.accountType === params.accountType,
+    )?.key;
+
+export const useTradingRedirect = () => {
+    const { dispatch } = useServices(injectDispatch);
+    const accounts = useSelector(selectAccounts);
+
+    const prefilledAccountFromRedirect = (
+        params: Pick<Account, 'symbol' | 'index' | 'accountType'>,
+    ) => {
+        const key = findAccountKey(accounts, params);
+        if (key) {
+            dispatch(tradingActions.setTradingFromPrefilledAccount({ key, cryptoId: undefined }));
+        }
+    };
+
+    const redirectToBuyOffers = (params: BuyOfferRedirectParams) => {
+        const { wantCrypto, fiatCurrency, receiveCurrency, amount, country, paymentMethod } =
+            params;
+        let request: BuyTradeQuoteRequest;
+        const commonParams = { fiatCurrency, receiveCurrency, country, paymentMethod };
+
+        if (wantCrypto) {
+            request = {
+                ...commonParams,
+                wantCrypto,
+                cryptoStringAmount: amount,
+            };
+        } else {
+            request = {
+                ...commonParams,
+                wantCrypto,
+                fiatStringAmount: amount,
+            };
+        }
+        prefilledAccountFromRedirect(params);
+        dispatch(tradingBuyActions.saveQuoteRequest(request));
+        dispatch(tradingBuyActions.setIsFromRedirect(true));
+        dispatch(gotoThunk({ routeName: 'wallet-trading-buy' }));
+    };
+
+    const redirectToSellOffers = (params: SellOfferRedirectParams) => {
+        const {
+            amountInCrypto,
+            fiatCurrency,
+            cryptoCurrency,
+            amount,
+            country,
+            paymentMethod,
+            orderId,
+            feeLimit,
+            feePerByte,
+            selectedFee,
+            maxFeePerGas,
+            maxPriorityFeePerGas,
+        } = params;
+        let request: SellFiatTradeQuoteRequest;
+        const commonParams = { fiatCurrency, cryptoCurrency, country, paymentMethod };
+        const token = getTokenInfo(cryptoCurrency);
+
+        if (amountInCrypto) {
+            request = {
+                ...commonParams,
+                amountInCrypto,
+                cryptoStringAmount: amount,
+            };
+        } else {
+            request = {
+                ...commonParams,
+                amountInCrypto,
+                fiatStringAmount: amount,
+            };
+        }
+        prefilledAccountFromRedirect(params);
+        dispatch(tradingSellActions.saveQuoteRequest(request));
+        dispatch(tradingSellActions.setIsFromRedirect(true));
+        const composed = {
+            feeLimit,
+            feePerByte: feePerByte || '',
+            fee: '', // fee is not passed by redirect, will be recalculated
+            maxFeePerGas,
+            maxPriorityFeePerGas,
+            token,
+        };
+        dispatch(
+            tradingActions.saveComposedTransactionInfo({
+                selectedFee: selectedFee || 'normal',
+                composed,
+            }),
+        );
+        dispatch(tradingSellActions.saveTransactionId(orderId));
+        dispatch(
+            gotoThunk({
+                routeName: orderId ? 'wallet-trading-sell-confirm' : 'wallet-trading-sell',
+            }),
+        );
+    };
+
+    const redirectToExchangeOffers = (params: ExchangeOfferRedirectParams) => {
+        const {
+            send,
+            receive,
+            amount,
+            orderId,
+            feeLimit,
+            feePerByte,
+            maxFeePerGas,
+            maxPriorityFeePerGas,
+            selectedFee,
+        } = params;
+        const request: ExchangeTradeQuoteRequest = {
+            send,
+            receive,
+            sendStringAmount: amount,
+        };
+        const token = getTokenInfo(send);
+
+        const composed = {
+            feeLimit,
+            feePerByte: feePerByte || '',
+            fee: '', // fee is not passed by redirect, will be recalculated
+            maxFeePerGas,
+            maxPriorityFeePerGas,
+            token,
+        };
+
+        prefilledAccountFromRedirect(params);
+        dispatch(tradingExchangeActions.saveQuoteRequest(request));
+        dispatch(tradingExchangeActions.setIsFromRedirect(true));
+        dispatch(
+            tradingActions.saveComposedTransactionInfo({
+                selectedFee: selectedFee || 'normal',
+                composed,
+            }),
+        );
+        dispatch(tradingExchangeActions.saveTransactionId(orderId));
+        dispatch(gotoThunk({ routeName: 'wallet-trading-exchange-confirm' }));
+    };
+
+    const redirectToBuyDetail = (params: DetailRedirectParams) => {
+        const { transactionId } = params;
+
+        prefilledAccountFromRedirect(params);
+        dispatch(tradingBuyActions.saveTransactionId(transactionId));
+        dispatch(gotoThunk({ routeName: 'wallet-trading-buy-detail' }));
+    };
+
+    return {
+        redirectToBuyOffers,
+        redirectToBuyDetail,
+        redirectToSellOffers,
+        redirectToExchangeOffers,
+    };
+};

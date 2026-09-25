@@ -1,15 +1,16 @@
-import { HANDSHAKE } from './constants/messages';
-import * as RESPONSES from './constants/responses';
+import type { Block, ContractInfoResponse, MempoolTransactionNotification } from './blockbook';
+import { type Eip1559Fees, type EthereumGasData } from './blockbook-api';
 import type {
-    ServerInfo,
-    AccountInfo,
-    Utxo,
-    FiatRatesLegacy,
-    Transaction,
     AccountBalanceHistory,
+    AccountInfo,
     ChannelMessage,
+    FiatRatesBySymbol,
+    ServerInfo,
+    Transaction,
+    Utxo,
 } from './common';
-import type { MempoolTransactionNotification, Block } from './blockbook';
+import { type HANDSHAKE } from './constants/messages';
+import type * as RESPONSES from './constants/responses';
 
 // messages sent from worker to blockchain.js
 
@@ -70,7 +71,7 @@ export interface GetCurrentFiatRates {
     type: typeof RESPONSES.GET_CURRENT_FIAT_RATES;
     payload: {
         ts: number;
-        rates: FiatRatesLegacy;
+        rates: FiatRatesBySymbol;
     };
 }
 
@@ -79,7 +80,7 @@ export interface GetFiatRatesForTimestamps {
     payload: {
         tickers: {
             ts: number;
-            rates: FiatRatesLegacy;
+            rates: FiatRatesBySymbol;
         }[];
     };
 }
@@ -97,8 +98,17 @@ export interface EstimateFee {
     payload: {
         feePerUnit: string;
         feePerTx?: string;
+        feePayer?: string;
         feeLimit?: string;
+        eip1559?: Eip1559Fees;
     }[];
+}
+
+export interface RpcCall {
+    type: typeof RESPONSES.RPC_CALL;
+    payload: {
+        data: string;
+    };
 }
 
 export interface Subscribe {
@@ -116,6 +126,7 @@ export interface BlockEvent {
     payload: {
         blockHeight: number;
         blockHash: string;
+        evmData?: EthereumGasData | null;
     };
 }
 
@@ -135,7 +146,7 @@ export interface NotificationEvent {
 export interface FiatRatesEvent {
     type: 'fiatRates';
     payload: {
-        rates: FiatRatesLegacy;
+        rates: FiatRatesBySymbol;
     };
 }
 
@@ -149,10 +160,20 @@ export interface PushTransaction {
     payload: string;
 }
 
+export interface GetEvmChainId {
+    type: typeof RESPONSES.GET_EVM_CHAIN_ID;
+    payload: number;
+}
+
+export interface GetContractInfo {
+    type: typeof RESPONSES.GET_CONTRACT_INFO;
+    payload: ContractInfoResponse;
+}
+
 interface WithoutPayload {
     id: number;
     type: typeof HANDSHAKE | typeof RESPONSES.CONNECTED;
-    payload?: typeof undefined;
+    payload?: never;
 }
 
 // extended
@@ -173,7 +194,10 @@ export type Response =
     | ChannelMessage<GetFiatRatesForTimestamps>
     | ChannelMessage<GetFiatRatesTickersList>
     | ChannelMessage<EstimateFee>
+    | ChannelMessage<RpcCall>
     | ChannelMessage<Subscribe>
     | ChannelMessage<Unsubscribe>
     | ChannelMessage<Notification>
-    | ChannelMessage<PushTransaction>;
+    | ChannelMessage<PushTransaction>
+    | ChannelMessage<GetEvmChainId>
+    | ChannelMessage<GetContractInfo>;

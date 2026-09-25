@@ -1,19 +1,19 @@
-import { CustomError } from '@trezor/blockchain-link-types/src/constants/errors';
-import { MESSAGES, RESPONSES } from '@trezor/blockchain-link-types/src/constants';
-import { BaseWorker, CONTEXT, ContextType } from '../baseWorker';
-import { BlockfrostAPI } from './websocket';
+import { CustomError, MESSAGES, RESPONSES } from '@trezor/blockchain-link-types';
+import type {
+    BlockfrostBlockContent as BlockContent,
+    BlockfrostTransaction,
+    MessageTypes,
+    Response,
+    SubscriptionAccountInfo,
+} from '@trezor/blockchain-link-types';
 import {
-    transformUtxos,
     transformAccountInfo,
     transformTransaction,
+    transformUtxos,
 } from '@trezor/blockchain-link-utils/src/blockfrost';
-import type { SubscriptionAccountInfo } from '@trezor/blockchain-link-types/src/common';
-import type { Response } from '@trezor/blockchain-link-types';
-import type {
-    BlockfrostTransaction,
-    BlockContent,
-} from '@trezor/blockchain-link-types/src/blockfrost';
-import type * as MessageTypes from '@trezor/blockchain-link-types/src/messages';
+
+import { BaseWorker, CONTEXT, type ContextType } from '../baseWorker';
+import { BlockfrostAPI } from './websocket';
 
 type Context = ContextType<BlockfrostAPI>;
 type Request<T> = T & Context;
@@ -26,6 +26,7 @@ const getInfo = async (request: Request<MessageTypes.GetInfo>) => {
         type: RESPONSES.GET_INFO,
         payload: {
             url: api.options.url,
+            network: info.shortcut,
             ...info,
         },
     } as const;
@@ -55,8 +56,13 @@ const getAccountBalanceHistory = async (
 
 const getTransaction = async (request: Request<MessageTypes.GetTransaction>) => {
     const api = await request.connect();
-    const txData = await api.getTransaction(request.payload);
-    const tx = transformTransaction({ txData });
+    const { txid, descriptor } = request.payload;
+    const txData = await api.getTransaction(txid);
+    const account = descriptor ? request.state.getAccount(descriptor) : undefined;
+    const tx = transformTransaction(
+        { txData },
+        account?.addresses ?? account?.descriptor ?? descriptor,
+    );
 
     return {
         type: RESPONSES.GET_TRANSACTION,
@@ -79,7 +85,7 @@ const estimateFee = async (request: Request<MessageTypes.EstimateFee>) => {
 
 const pushTransaction = async (request: Request<MessageTypes.PushTransaction>) => {
     const api = await request.connect();
-    const payload = await api.pushTransaction(request.payload);
+    const payload = await api.pushTransaction(request.payload.hex);
 
     return {
         type: RESPONSES.PUSH_TRANSACTION,
@@ -89,7 +95,8 @@ const pushTransaction = async (request: Request<MessageTypes.PushTransaction>) =
 
 const getAccountInfo = async (request: Request<MessageTypes.GetAccountInfo>) => {
     const api = await request.connect();
-    const info = await api.getAccountInfo(request.payload);
+    const { details = 'basic', ...rest } = request.payload;
+    const info = await api.getAccountInfo({ details, ...rest });
 
     return {
         type: RESPONSES.GET_ACCOUNT_INFO,

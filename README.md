@@ -2,9 +2,9 @@
 
 Welcome to the Trezor Suite repository! This repository contains the source code for 3 projects:
 
--   **Connect** - tool that offers developers an easy way to integrate Trezor's functionality into their own applications
--   **Trezor Suite** - desktop and web application for managing Trezor hardware wallet
--   **Trezor Suite Lite** - Mobile application designed for tracking user portfolios
+- **Connect** - tool that offers developers an easy way to integrate Trezor's functionality into their own applications
+- **Trezor Suite** - desktop and web application for managing Trezor hardware wallet
+- **Trezor Suite Mobile** - Mobile/Tablet application designed for managing Trezor hardware wallet
 
 ![img](https://repository-images.githubusercontent.com/148657224/439f6100-765f-11e9-9bff-b725eef3c4a6)
 
@@ -12,38 +12,55 @@ Welcome to the Trezor Suite repository! This repository contains the source code
 
 ### Prerequisities
 
--   [NVM](https://github.com/nvm-sh/nvm)
--   [Yarn](https://yarnpkg.com/lang/en/docs/install/)
--   [Git LFS](https://git-lfs.github.com/) (For Linux/Ubuntu, [after adding the repository](https://packagecloud.io/github/git-lfs/install) do `sudo apt-get install git-lfs`, more info [here](https://github.com/git-lfs/git-lfs/blob/main/INSTALLING.md))
+- Install [NVM](https://github.com/nvm-sh/nvm)
+    - _Hint: you can have your shell [automatically switch versions](https://github.com/nvm-sh/nvm/blob/master/README.md#calling-nvm-use-automatically-in-a-directory-with-a-nvmrc-file) in each repo_
+- Enable [Yarn](https://yarnpkg.com/getting-started/install) through npm
+- Install [Git LFS](https://git-lfs.github.com/) (For Linux/Ubuntu, [after adding the repository](https://packagecloud.io/github/git-lfs/install) do `sudo apt-get install git-lfs`, more info [here](https://github.com/git-lfs/git-lfs/blob/main/INSTALLING.md))
+- Optional recommended: [setup PMG](https://docs.trezor.io/trezor-suite/misc/local-development-security.html)
 
 ### Getting started
 
--   `git clone git@github.com:trezor/trezor-suite.git`
--   `git submodule update --init --recursive`
--   `git lfs install` // Set up Git LFS for your user account. You only need to run this once per user account.
--   `git lfs pull`
--   `nvm install`
--   `yarn`
--   `yarn build:libs`
+- `git clone git@github.com:trezor/trezor-suite.git`
+- `cd trezor-suite`
+- `git submodule update --init --recursive`
+- `git lfs install` // Set up Git LFS for your user account. You only need to run this once per user account.
+- `git lfs pull`
+- `nvm install`
+- `yarn`
+- `yarn build:essential`
 
 It's recommended to enable `git config --global submodule.recurse true` so you don't need to run `git submodule update --init --recursive` every time when submodules are updated.
 
 > You don't need a Trezor device to get into the app, you can use emulator. There is a [Trezor User Env](https://github.com/trezor/trezor-user-env) to help you set it up and run emulator for any Trezor model 🎉
 
+> You can use Nix to set up the repository — see [Nix Documentation](docs/misc/development-on-nix.md).
+
 ## **Connect** @trezor/connect
 
-This repository is used for development of version 9 of @trezor/connect. For detailed documentation, please refer to this [page](./docs/packages/connect/index.md).
+This repository is used for development of version 10 of @trezor/connect. For detailed documentation, please refer to this [page](./docs/packages/connect/index.md).
 
 Historically, Trezor Connect had its [own repository](https://github.com/trezor/connect). This repository is now archived.
 
 ## **Trezor Suite** @trezor/suite
 
+Dev environment is primarily supported on **macOS or Linux**,
+though development on Windows is possible by following [this guide](https://docs.trezor.io/trezor-suite/misc/development-on-windows.html).
+
 Run a dev build:
 
--   `yarn suite:dev` (web app)
--   `yarn suite:dev:desktop` (electron app)
+- `yarn suite:dev` (web app)
+- `yarn suite:dev:vite` (⚠️ EXPERIMENTAL: web app with Vite bundler used for **development only**, use `yarn suite:dev` if you want fidelity to production app)
+- `yarn suite:dev:desktop` (electron app)
+    - React dev tools are available with a known caveat: you need to reload the renderer process (Ctrl+R or Cmd+R) while having the dev tools open
+- `yarn suite:build:web:preview` (localhost of production web app with applied security headers)
 
-## **Trezor Suite Lite** @suite-native/app
+Local `.env` setup (optional):
+
+- Rename `env.local.example` to `.env.local` in the repo root.
+- Set `TANSTACK_REACT_QUERY_DEV_TOOLS=true` to enable TanStack React Query Devtools on localhost.
+- Set `TRANSPORT_BROWSER_PING=false` to disable transport period ping.
+
+## **Trezor Suite Mobile** @suite-native/app
 
 > To set up your dev environment for a native platform (iOS/Android) follow [these additional steps](https://github.com/trezor/trezor-suite/tree/develop/suite-native/app#prerequisites).
 
@@ -55,7 +72,7 @@ Using [Conventional Commits](COMMITS.md) is required.
 
 ## Security vulnerability disclosure
 
-Please report suspected security vulnerabilities in private to [security@satoshilabs.com](mailto:security@satoshilabs.com), also see [the disclosure section on the Trezor.io website](https://trezor.io/support/a/how-to-report-a-security-issue). Please do NOT create publicly viewable issues for suspected security vulnerabilities.
+Please report suspected security vulnerabilities in private to [security@satoshilabs.com](mailto:security@satoshilabs.com), also see [the disclosure section on the Trezor.io website](https://trezor.io/security). Please do NOT create publicly viewable issues for suspected security vulnerabilities.
 
 ## IDE specific settings
 

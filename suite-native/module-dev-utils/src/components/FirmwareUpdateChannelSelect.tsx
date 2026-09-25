@@ -1,0 +1,47 @@
+import React from 'react';
+import { useSelector } from 'react-redux';
+
+import { reloadAppAsync } from 'expo';
+
+import { useServices } from '@suite-common/dependency-injection';
+import { firmwareActions, selectFirmwareChannel } from '@suite-common/firmware';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { useAlert } from '@suite-native/alerts';
+import { Select, type SelectItemType } from '@suite-native/atoms';
+import { type FirmwareChannel } from '@trezor/connect-common/src/types/firmware';
+
+const options: SelectItemType<FirmwareChannel>[] = [
+    { label: 'Production', value: 'production' },
+    { label: 'Production Early Access', value: 'production-early-access' },
+    { label: 'Test Unsigned', value: 'test-unsigned' },
+    { label: 'Test Unsigned Stable', value: 'test-unsigned-stable' },
+    { label: 'Test Unsigned Nightly', value: 'test-unsigned-nightly' },
+    { label: 'Test Signed', value: 'test-signed' },
+];
+
+export const FirmwareUpdateChannelSelect = () => {
+    const { dispatch } = useServices(injectDispatch);
+    const { showAlert } = useAlert();
+
+    const selectedFirmwareChannel = useSelector(selectFirmwareChannel);
+
+    const handleSelectEnvironment = (environment: FirmwareChannel) => {
+        dispatch(firmwareActions.setFirmwareChannel(environment));
+        showAlert({
+            title: 'Restart the app to apply the change?',
+            primaryButtonTitle: 'Restart',
+            onPressPrimaryButton: reloadAppAsync,
+            secondaryButtonTitle: 'Cancel',
+        });
+    };
+
+    return (
+        <Select<FirmwareChannel>
+            title="Channel"
+            items={options}
+            value={selectedFirmwareChannel}
+            onSelectItem={handleSelectEnvironment}
+            isLabelShown
+        />
+    );
+};

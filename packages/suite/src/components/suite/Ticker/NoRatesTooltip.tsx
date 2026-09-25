@@ -1,34 +1,31 @@
-import { Translation, TooltipSymbol } from 'src/components/suite';
 import styled from 'styled-components';
-import { Tooltip, variables } from '@trezor/components';
-import { TranslationKey } from '../Translation';
+
+import { Translation, type TranslationKey } from '@suite/intl';
+import { Tooltip } from '@trezor/components';
+import { typography } from '@trezor/theme';
 
 const NoRatesMessage = styled.div`
+    ${typography['body-xs']};
     display: flex;
     align-items: center;
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    font-size: ${variables.FONT_SIZE.TINY};
-    font-weight: ${variables.FONT_WEIGHT.REGULAR};
+    color: ${({ theme }) => theme.contentSecondary};
     text-transform: none;
 `;
 
-interface NoRatesTooltipProps extends Partial<typeof Tooltip> {
+interface NoRatesTooltipProps {
     customText?: TranslationKey;
     customTooltip?: TranslationKey;
-    iconOnly?: boolean;
     className?: string;
 }
 
-export const NoRatesTooltip = ({
-    customText,
-    iconOnly,
-    customTooltip,
-    className,
-}: NoRatesTooltipProps) => (
+export const NoRatesTooltip = ({ customText, customTooltip, className }: NoRatesTooltipProps) => (
     <NoRatesMessage className={className}>
-        {!iconOnly && <Translation id={customText || 'TR_FIAT_RATES_NOT_AVAILABLE'} />}
-        <TooltipSymbol
-            content={<Translation id={customTooltip || 'TR_FIAT_RATES_NOT_AVAILABLE_TOOLTIP'} />}
-        />
+        <Tooltip
+            content={<Translation id={customTooltip || 'TR_EXCHANGE_RATE_NOT_AVAILABLE_TOOLTIP'} />}
+            maxWidth={250}
+            hasIcon
+        >
+            <Translation id={customText || 'TR_FIAT_RATES_NOT_AVAILABLE'} />
+        </Tooltip>
     </NoRatesMessage>
 );

@@ -1,26 +1,26 @@
-import { useRef, useState, ReactNode } from 'react';
+import { type ReactNode, memo, useRef } from 'react';
+
 import styled from 'styled-components';
 
-import { ElevationContext, ElevationDown, ElevationUp, variables } from '@trezor/components';
-import { spacingsPx } from '@trezor/theme';
-import { SuiteBanners } from 'src/components/suite/banners';
-import { Metadata } from 'src/components/suite';
-import { GuideRouter, GuideButton } from 'src/components/guide';
-import { HORIZONTAL_LAYOUT_PADDINGS, MAX_CONTENT_WIDTH } from 'src/constants/suite/layout';
-import { DiscoveryProgress } from 'src/components/wallet';
-import { useLayoutSize, useSelector } from 'src/hooks/suite';
-import { LayoutContext, LayoutContextPayload } from 'src/support/suite/LayoutContext';
-import { useResetScrollOnUrl } from 'src/hooks/suite/useResetScrollOnUrl';
-import { useClearAnchorHighlightOnClick } from 'src/hooks/suite/useClearAnchorHighlightOnClick';
-import { ModalContextProvider } from 'src/support/suite/ModalContext';
-import { ModalSwitcher } from '../../modals/ModalSwitcher/ModalSwitcher';
-import { MobileMenu } from './MobileMenu/MobileMenu';
-import { Sidebar } from './Sidebar/Sidebar';
-import { CoinjoinBars } from './CoinjoinBars/CoinjoinBars';
-import { MobileAccountsMenu } from 'src/components/wallet/WalletLayout/AccountsMenu/MobileAccountsMenu';
-import { selectSelectedAccount } from 'src/reducers/wallet/selectedAccountReducer';
+import { Modal, variables } from '@trezor/components';
 
-export const SCROLL_WRAPPER_ID = 'layout-scroll';
+import { GuideButton, GuideRouter } from 'src/components/guide';
+import { SuiteBanners } from 'src/components/suite/banners';
+import { DiscoveryProgress } from 'src/components/wallet';
+
+import { ContentContainer } from '../ContentContainer';
+import { AddPassphraseWalletFlow } from './AddPassphraseWalletFlow';
+import { AnchorHighlightHandler } from './AnchorHighlightHandler';
+import { CoinjoinBars } from './CoinjoinBars/CoinjoinBars';
+import { LayoutPayloadProvider } from './LayoutPayloadProvider';
+import { AboveTabletOnly, BelowTabletOnly } from './LayoutSizeOnly';
+import { LayoutFooterSlot, LayoutHeaderSlot, LayoutMetadata } from './LayoutSlots';
+import { PowerMonitorManager } from './PowerMonitor/PowerMonitor';
+import { ScrollProvider } from './ScrollProvider';
+import { Sidebar } from './Sidebar/Sidebar';
+import { SwitchDeviceLayer } from './SwitchDeviceLayer';
+import { useResponsiveContextOnChange } from './useResponsiveContextOnChange';
+import { ModalSwitcher } from '../../modals/ModalSwitcher/ModalSwitcher';
 
 export const Wrapper = styled.div`
     display: flex;
@@ -34,7 +34,7 @@ export const PageWrapper = styled.div`
     display: flex;
     flex: 1;
     flex-direction: column;
-    height: 100vh;
+    height: 100dvh;
     overflow-x: hidden;
 `;
 
@@ -42,7 +42,7 @@ export const Body = styled.div`
     display: flex;
     flex-direction: column;
     flex: 1;
-    overflow: hidden hidden;
+    overflow: hidden;
 `;
 
 // AppWrapper and MenuSecondary creates own scrollbars independently
@@ -60,7 +60,7 @@ export const AppWrapper = styled.div`
     flex-direction: column;
     overflow: auto scroll;
     width: 100%;
-    background: ${({ theme }) => theme.backgroundSurfaceElevation0};
+    background: ${({ theme }) => theme.surfaceFillPage};
     align-items: center;
     position: relative;
 
@@ -69,82 +69,98 @@ export const AppWrapper = styled.div`
     }
 `;
 
-export const ContentWrapper = styled.div`
-    position: relative;
+export const MainContentContainer = styled.div`
     display: flex;
-    flex-direction: column;
     flex: 1;
-    width: 100%;
-    max-width: ${MAX_CONTENT_WIDTH};
-    padding: ${spacingsPx.lg} ${HORIZONTAL_LAYOUT_PADDINGS} 134px ${HORIZONTAL_LAYOUT_PADDINGS};
-
-    ${variables.SCREEN_QUERY.MOBILE} {
-        padding-bottom: ${spacingsPx.xxxxl};
-    }
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
 `;
+
+type MainContentProps = {
+    children: ReactNode;
+};
+
+export const MainContent = ({ children }: MainContentProps) => {
+    const ref = useRef<HTMLDivElement>(null);
+
+    useResponsiveContextOnChange(ref);
+
+    return <MainContentContainer ref={ref}>{children}</MainContentContainer>;
+};
 
 interface SuiteLayoutProps {
     children: ReactNode;
+    ['data-testid']?: string;
 }
 
-export const SuiteLayout = ({ children }: SuiteLayoutProps) => {
-    const selectedAccount = useSelector(selectSelectedAccount);
-
-    const [{ title, TopMenu }, setLayoutPayload] = useState<LayoutContextPayload>({});
-
-    const { isMobileLayout } = useLayoutSize();
+/**
+ * Memoised because it is the app root of every page: `Preloader` re-renders on a long list of
+ * store subscriptions, and without this every one of those re-renders would walk the whole
+ * layout — sidebar, banners, page. `children` comes from `Preloader`'s own props, so it stays
+ * referentially stable and React can bail out here.
+ */
+export const SuiteLayout = memo(({ children, 'data-testid': dataTest }: SuiteLayoutProps) => {
     const wrapperRef = useRef<HTMLDivElement>(null);
-    const { scrollRef } = useResetScrollOnUrl();
-
-    useClearAnchorHighlightOnClick(wrapperRef);
-
-    const isAccountPage = !!selectedAccount;
+    const scrollRef = useRef<HTMLDivElement>(null);
 
     return (
-        <ElevationContext baseElevation={-1}>
-            <Wrapper ref={wrapperRef}>
+        <ScrollProvider scrollRef={scrollRef}>
+            <Wrapper ref={wrapperRef} data-testid="@suite-layout">
+                <AnchorHighlightHandler elementRef={wrapperRef} />
                 <PageWrapper>
-                    <ModalContextProvider>
-                        <Metadata title={title} />
+                    <Modal.Provider>
+                        <LayoutPayloadProvider>
+                            <LayoutMetadata />
 
-                        <ModalSwitcher />
+                            <ModalSwitcher />
+                            <SwitchDeviceLayer />
+                            <AddPassphraseWalletFlow />
 
-                        <SuiteBanners />
-                        <CoinjoinBars />
+                            <PowerMonitorManager />
 
-                        {isMobileLayout && <MobileMenu />}
+                            <BelowTabletOnly>
+                                <CoinjoinBars />
+                            </BelowTabletOnly>
 
-                        <DiscoveryProgress />
+                            <DiscoveryProgress />
 
-                        <LayoutContext.Provider value={setLayoutPayload}>
-                            <Body data-test="@suite-layout/body">
+                            <Body data-testid="@suite-layout/body">
                                 <Columns>
-                                    <ElevationDown>{!isMobileLayout && <Sidebar />}</ElevationDown>
+                                    <Sidebar />
+                                    <MainContent>
+                                        <AboveTabletOnly>
+                                            <CoinjoinBars />
+                                        </AboveTabletOnly>
+                                        <SuiteBanners />
+                                        <AppWrapper data-testid="@app" ref={scrollRef}>
+                                            <LayoutHeaderSlot />
 
-                                    <AppWrapper
-                                        data-test="@app"
-                                        ref={scrollRef}
-                                        id={SCROLL_WRAPPER_ID}
-                                    >
-                                        <ElevationUp>
-                                            {isMobileLayout && isAccountPage && (
-                                                <MobileAccountsMenu />
-                                            )}
-                                            {TopMenu && <TopMenu />}
-
-                                            <ContentWrapper>{children}</ContentWrapper>
-                                        </ElevationUp>
-                                    </AppWrapper>
+                                            <ContentContainer
+                                                data-testid={
+                                                    dataTest
+                                                        ? `${dataTest}/content`
+                                                        : '@app/content'
+                                                }
+                                            >
+                                                {children}
+                                            </ContentContainer>
+                                            <LayoutFooterSlot />
+                                        </AppWrapper>
+                                    </MainContent>
                                 </Columns>
                             </Body>
-                        </LayoutContext.Provider>
-
-                        {!isMobileLayout && <GuideButton />}
-                    </ModalContextProvider>
+                            <AboveTabletOnly>
+                                <GuideButton />
+                            </AboveTabletOnly>
+                        </LayoutPayloadProvider>
+                    </Modal.Provider>
                 </PageWrapper>
 
                 <GuideRouter />
             </Wrapper>
-        </ElevationContext>
+        </ScrollProvider>
     );
-};
+});
+
+SuiteLayout.displayName = 'SuiteLayout';

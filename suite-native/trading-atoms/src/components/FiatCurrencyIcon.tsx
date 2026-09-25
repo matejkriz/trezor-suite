@@ -1,0 +1,32 @@
+import type { FiatCurrencyCode } from 'invity-api';
+
+import { getFiatCurrencyFlag } from '@suite-common/flags';
+import { Flag, type IconCircleSize } from '@suite-native/atoms';
+import { Icon } from '@suite-native/icons';
+
+export type FiatCurrencyIconProps = {
+    size: 'tiny' | 'extraSmall' | 'small' | 'medium';
+    value?: FiatCurrencyCode;
+};
+
+const fiatIconSizes: Record<FiatCurrencyIconProps['size'], IconCircleSize> = {
+    tiny: 20,
+    extraSmall: 24,
+    small: 32,
+    medium: 40,
+};
+
+export const FiatCurrencyIcon = ({ size, value }: FiatCurrencyIconProps) => {
+    const flag = getFiatCurrencyFlag(value);
+
+    return flag ? (
+        <Flag country={flag} size={fiatIconSizes[size]} />
+    ) : (
+        <Icon
+            name="coin"
+            size={fiatIconSizes[size]}
+            color="contentSecondary"
+            testID="@trading/fiat-currency-icon-fallback"
+        />
+    );
+};

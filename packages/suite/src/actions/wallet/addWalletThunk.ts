@@ -1,0 +1,53 @@
+import { type GotoThunkDeps, type GotoThunkState, findRoute, gotoThunk } from '@suite/router';
+import { DEVICE_MODULE_PREFIX } from '@suite-common/device';
+import { createThunk } from '@suite-common/redux-utils';
+
+type RedirectAfterWalletSelectedThunkState = GotoThunkState;
+
+type RedirectAfterWalletSelectedThunkDeps = GotoThunkDeps;
+
+export const redirectAfterWalletSelectedThunk = createThunk<
+    void,
+    { forceDeviceDashboard?: boolean } | undefined,
+    { state: RedirectAfterWalletSelectedThunkState; extra: RedirectAfterWalletSelectedThunkDeps }
+>(
+    `${DEVICE_MODULE_PREFIX}/redirectAfterWalletSelectedThunk`,
+    async (options, { dispatch, extra }) => {
+        const location = extra.services.suiteRouterHistory.getLocation();
+        const backgroundRoute = findRoute(location.pathname);
+
+        // NOTE: the URL is being static when you switch device like /btc/4/norma
+        // when you switch to other device (wallet), there might not be /btc/4, but just /btc/1
+        // this causes Account not found error, so we allow this option
+        if (options?.forceDeviceDashboard) {
+            dispatch(gotoThunk({ routeName: 'suite-index' }));
+
+            return;
+        }
+        // Preserve route for dashboard or wallet context only. Redirect from other routes to dashboard index.
+        const isWalletOrDashboardContext =
+            backgroundRoute && ['wallet', 'dashboard'].includes(backgroundRoute.app);
+        if (!isWalletOrDashboardContext) {
+            await dispatch(gotoThunk({ routeName: 'suite-index' }));
+        }
+
+        // Subpaths of wallet are not available to all account types (e.g. Tokens tab not available to BTC accounts).
+        const isWalletSubpath =
+            backgroundRoute?.app === 'wallet' && backgroundRoute?.name !== 'wallet-index';
+        if (isWalletSubpath) {
+            await dispatch(gotoThunk({ routeName: 'wallet-index' }));
+        }
+    },
+);
+
+type OpenSwitchDeviceDialogThunkState = GotoThunkState;
+
+type OpenSwitchDeviceDialogThunkDeps = GotoThunkDeps;
+
+export const openSwitchDeviceDialogThunk = createThunk<
+    void,
+    void,
+    { state: OpenSwitchDeviceDialogThunkState; extra: OpenSwitchDeviceDialogThunkDeps }
+>(`${DEVICE_MODULE_PREFIX}/openSwitchDeviceDialog`, (_, { dispatch }) => {
+    dispatch(gotoThunk({ routeName: 'suite-switch-device', params: { cancelable: true } }));
+});

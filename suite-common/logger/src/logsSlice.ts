@@ -1,16 +1,16 @@
-import { AnyAction, createSlice } from '@reduxjs/toolkit';
+import { type PayloadAction, createSlice } from '@reduxjs/toolkit';
 
-export type LogEntry = { datetime: string; type: any; payload?: Record<any, any> };
+import { type LogEntry } from './types';
 
-type LogsSliceState = {
+export type LogsSliceState = {
     logEntries: LogEntry[];
 };
 
-type LogsSliceRootState = {
+export type LogsSliceRootState = {
     logs: LogsSliceState;
 };
 
-const logsSliceInitialState: LogsSliceState = {
+export const logsSliceInitialState: LogsSliceState = {
     logEntries: [],
 };
 
@@ -21,7 +21,7 @@ export const logsSlice = createSlice({
     initialState: logsSliceInitialState,
     reducers: {
         addLog: {
-            reducer: (state, action: AnyAction) => {
+            reducer: (state, action: PayloadAction<LogEntry>) => {
                 state.logEntries.push({
                     ...action.payload,
                 });
@@ -42,7 +42,5 @@ export const logsSlice = createSlice({
         },
     },
 });
-
-export const selectLogs = (state: LogsSliceRootState) => state.logs.logEntries;
 
 export const { addLog } = logsSlice.actions;

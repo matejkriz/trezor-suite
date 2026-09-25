@@ -4,8 +4,9 @@ import { addBasePath } from 'next/dist/client/add-base-path';
 import { useRouter } from 'next/router';
 import { GlobeIcon } from 'nextra/icons';
 
-import { useConfig } from '../contexts';
-import { Select } from './select';
+import { Select } from '@trezor/components';
+
+import { useConfig } from '../contexts/useConfig';
 
 interface LocaleSwitchProps {
     lite?: boolean;
@@ -23,18 +24,18 @@ export function LocaleSwitch({ lite, className }: LocaleSwitchProps): ReactEleme
 
     return (
         <Select
-            title="Change language"
+            label="Change language"
             className={className}
             onChange={option => {
                 const date = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
                 document.cookie = `NEXT_LOCALE=${
-                    option.key
+                    option.value
                 }; expires=${date.toUTCString()}; path=/`;
                 location.href = addBasePath(asPath);
             }}
-            selected={{
-                key: selected?.locale || '',
-                name: (
+            value={{
+                value: selected?.locale || '',
+                label: (
                     <span className="nx-flex nx-items-center nx-gap-2">
                         <GlobeIcon />
                         <span className={lite ? 'nx-hidden' : ''}>{selected?.text}</span>
@@ -42,8 +43,8 @@ export function LocaleSwitch({ lite, className }: LocaleSwitchProps): ReactEleme
                 ),
             }}
             options={options.map(l => ({
-                key: l.locale,
-                name: l.text,
+                value: l.locale,
+                label: l.text,
             }))}
         />
     );

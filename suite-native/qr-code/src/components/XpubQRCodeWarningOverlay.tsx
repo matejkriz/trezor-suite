@@ -1,10 +1,11 @@
-import { Box, Pictogram } from '@suite-native/atoms';
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
+import { Box, PictogramTitleHeader } from '@suite-native/atoms';
+import { Translation } from '@suite-native/intl';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
 
 const overlayStyle = prepareNativeStyle(utils => ({
     justifyContent: 'center',
     alignItems: 'center',
-    padding: utils.spacings.medium,
+    padding: utils.spacings.sp16,
 }));
 
 export const XpubOverlayWarning = () => {
@@ -12,12 +13,10 @@ export const XpubOverlayWarning = () => {
 
     return (
         <Box style={applyStyle(overlayStyle)}>
-            <Pictogram
-                variant="yellow"
-                icon="warningCircleLight"
-                title="Handle your public key (XPUB) with caution"
-                subtitle="Sharing your public key (XPUB) with a third party gives them the ability to
-                        view your transaction history."
+            <PictogramTitleHeader
+                variant="warning"
+                title={<Translation id="qrCode.cautionWarning.title" />}
+                subtitle={<Translation id="qrCode.cautionWarning.subtitle" />}
             />
         </Box>
     );

@@ -1,14 +1,23 @@
-import { TouchableOpacity } from 'react-native';
-import { useDispatch } from 'react-redux';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
-import { Message, Variant, CTA } from '@suite-common/suite-types';
+import { useServices } from '@suite-common/dependency-injection';
 import { messageSystemActions } from '@suite-common/message-system';
-import { Color } from '@trezor/theme';
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-import { HStack, Box, Text, RoundedIcon, VStack } from '@suite-native/atoms';
-import { IconName, Icon } from '@suite-common/icons';
-import { Link } from '@suite-native/link';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { type Message, type Variant } from '@suite-common/suite-types';
+import {
+    Box,
+    HStack,
+    IconCircle,
+    type IconCircleIntent,
+    PressableOpacity,
+    Text,
+    VStack,
+} from '@suite-native/atoms';
+import { Icon, type IconName } from '@suite-native/icons';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
+import { type Color } from '@trezor/theme';
+
+import { MessageLink } from './MessageLink';
 
 type MessageBannerProps = {
     message: Message;
@@ -20,34 +29,34 @@ type MessageBannerStyle = {
     backgroundColor: Color;
     icon: IconName;
     iconColor: Color;
-    iconBackgroundColor: Color;
+    iconIntent: IconCircleIntent;
 };
 
 const MessageBannerVariantToStyleMap = {
     info: {
-        backgroundColor: 'backgroundAlertBlueSubtleOnElevation0',
+        backgroundColor: 'elementFillInfoSoft',
         icon: 'info',
-        iconColor: 'iconAlertBlue',
-        iconBackgroundColor: 'backgroundAlertBlueSubtleOnElevation1',
+        iconColor: 'contentInfo',
+        iconIntent: 'info',
     },
     warning: {
-        backgroundColor: 'backgroundAlertYellowSubtleOnElevation0',
-        icon: 'warningTriangle',
-        iconColor: 'iconAlertYellow',
-        iconBackgroundColor: 'backgroundAlertYellowSubtleOnElevation1',
+        backgroundColor: 'elementFillWarningSoft',
+        icon: 'warning',
+        iconColor: 'contentWarning',
+        iconIntent: 'warning',
     },
     critical: {
-        backgroundColor: 'backgroundAlertRedSubtleOnElevation0',
-        icon: 'warningOctagon',
-        iconColor: 'iconAlertRed',
-        iconBackgroundColor: 'backgroundAlertRedSubtleOnElevation1',
+        backgroundColor: 'elementFillCriticalSoft',
+        icon: 'warning',
+        iconColor: 'contentCritical',
+        iconIntent: 'critical',
     },
 } as const satisfies Record<Variant, MessageBannerStyle>;
 
 const messageContainerStyle = prepareNativeStyle<{ backgroundColor: Color }>(
     (utils, { backgroundColor }) => ({
         backgroundColor: utils.colors[backgroundColor],
-        padding: utils.spacings.medium,
+        padding: utils.spacings.sp16,
         flexShrink: 1,
     }),
 );
@@ -64,52 +73,26 @@ const messageTextContainerStyle = prepareNativeStyle(() => ({
     justifyContent: 'center',
 }));
 
-const MessageLink = ({ messageCTA }: { messageCTA?: CTA }) => {
-    // TODO: We use only English locale in suite-native so far. When the localization to other
-    // languages is implemented, the language selection logic has to be added here.
-    const messageLinkLabel = messageCTA?.label.en;
-    const messageLink = messageCTA?.link;
-    const isExternalLink = messageCTA?.action === 'external-link';
-
-    const isLinkDisplayable = isExternalLink && messageLinkLabel && messageLink;
-
-    if (!isLinkDisplayable) return null;
-
-    return (
-        <Link
-            href={messageLink}
-            label={messageLinkLabel}
-            isUnderlined
-            textColor="textDefault"
-            textPressedColor="textSubdued"
-        />
-    );
-};
-
 const MessageCloseButton = ({
-    backgroundColor,
+    intent,
     onClose,
 }: {
-    backgroundColor: Color;
+    intent: IconCircleIntent;
     onClose: () => void;
 }) => (
-    <TouchableOpacity onPress={onClose}>
-        <RoundedIcon
-            name="close"
-            iconSize="medium"
-            containerSize={44}
-            backgroundColor={backgroundColor}
-        />
-    </TouchableOpacity>
+    <PressableOpacity onPress={onClose}>
+        <IconCircle name="x" intent={intent} size={40} />
+    </PressableOpacity>
 );
 
 export const MessageBanner = ({ message }: MessageBannerProps) => {
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
     const { applyStyle } = useNativeStyles();
 
     // TODO: We use only English locale in suite-native so far. When the localization to other
     // languages is implemented, the language selection logic has to be added here.
-    const messageContent = message.content.en;
+    const language = 'en';
+    const messageContent = message.content[language];
 
     const isMessageDismissible = message.dismissible;
 
@@ -122,7 +105,7 @@ export const MessageBanner = ({ message }: MessageBannerProps) => {
         );
     };
 
-    const { backgroundColor, iconColor, icon, iconBackgroundColor } =
+    const { backgroundColor, iconColor, icon, iconIntent } =
         MessageBannerVariantToStyleMap[message.variant];
 
     return (
@@ -132,7 +115,7 @@ export const MessageBanner = ({ message }: MessageBannerProps) => {
             style={applyStyle(messageContainerStyle, { backgroundColor })}
         >
             <HStack
-                spacing={12}
+                spacing="sp12"
                 alignItems="center"
                 justifyContent="space-between"
                 style={{ maxWidth: '100%' }}
@@ -140,18 +123,21 @@ export const MessageBanner = ({ message }: MessageBannerProps) => {
                 <Box style={applyStyle(IconContainerStyle)}>
                     <Icon name={icon} color={iconColor} size="mediumLarge" />
                 </Box>
-                <VStack spacing={4} style={applyStyle(messageTextContainerStyle)}>
-                    <Text color="textSubdued" variant="hint">
+                <VStack spacing="sp4" style={applyStyle(messageTextContainerStyle)}>
+                    <Text color="contentSecondary" variant="body-sm">
                         {messageContent}
                     </Text>
 
-                    {message.cta && <MessageLink messageCTA={message.cta} />}
+                    {message.cta && (
+                        <MessageLink
+                            messageCTA={message.cta}
+                            language={language}
+                            textVariant="body-md"
+                        />
+                    )}
                 </VStack>
                 {isMessageDismissible && (
-                    <MessageCloseButton
-                        backgroundColor={iconBackgroundColor}
-                        onClose={handleDismissMessage}
-                    />
+                    <MessageCloseButton intent={iconIntent} onClose={handleDismissMessage} />
                 )}
             </HStack>
         </Animated.View>

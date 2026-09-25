@@ -1,0 +1,171 @@
+import { Callout } from 'nextra/components';
+
+import { EthereumSignTransaction } from '@trezor/connect-common/src/types/api/ethereum/common';
+
+import { ApiPlayground } from '../../../components/ApiPlayground';
+import { CommonParamsLink } from '../../../components/CommonParamsLink';
+import { ParamsTable } from '../../../components/ParamsTable';
+import signTransaction_erc20_known from '../../../data/methods/ethereum/signTransaction-erc20-known.ts';
+import signTransaction_erc20_unknown from '../../../data/methods/ethereum/signTransaction-erc20-unknown.ts';
+import signTransaction from '../../../data/methods/ethereum/signTransaction.ts';
+import signTransaction7702 from '../../../data/methods/ethereum/signTransaction7702.ts';
+
+<ApiPlayground
+    options={[
+        { title: 'ERC20 known token', legacyConfig: signTransaction_erc20_known[0] },
+        { title: 'ERC20 unknown token', legacyConfig: signTransaction_erc20_unknown[0] },
+        { title: 'Regular', legacyConfig: signTransaction[0] },
+        { title: 'EIP-7702', legacyConfig: signTransaction7702[0] },
+        {
+            title: 'Advanced schema',
+            method: 'ethereumSignTransaction',
+            schema: EthereumSignTransaction,
+        },
+    ]}
+/>
+
+export const paramDescriptions = {
+    path: 'minimum length is `3`. [read more](/details/path)',
+    transaction:
+        'type of [`EthereumTransactionEIP1559`](https://github.com/trezor/trezor-suite/blob/develop/packages/connect-common/src/types/api/ethereum/common.ts)`|`[`EthereumSignTransaction`](https://github.com/trezor/trezor-suite/blob/develop/packages/connect-common/src/types/api/ethereum/common.ts) "0x" prefix for each field is optional',
+    chunkify:
+        'determines if recipient address will be displayed in chunks of 4 characters. Default is set to `false`',
+    to: "recipient's address, contract address or `null` in case of contract creation",
+};
+
+## Ethereum: Sign transaction
+
+Asks device to sign given transaction using the private key derived by given BIP32 path. User is asked to confirm all transaction
+details on Trezor.
+
+```javascript
+const result = await TrezorConnect.ethereumSignTransaction(params);
+```
+
+### Params
+
+<CommonParamsLink />
+
+#### EthereumSignTransaction
+
+<ParamsTable schema={EthereumSignTransaction} descriptions={paramDescriptions} />
+
+### Examples
+
+#### EIP1559 ([after The London Upgrade](https://ethereum.org/en/developers/docs/gas/#post-london))
+
+<Callout type="warning">**Supported firmware versions** T1B1 v1.10.4 and T2T1 v2.4.2</Callout>
+
+If both parameters `maxFeePerGas` and `maxPriorityFeePerGas` are defined, transaction will be signed as the new type introduced in [EIP1559](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559.md).
+
+```javascript
+TrezorConnect.ethereumSignTransaction({
+    path: "m/44'/60'/0'",
+    transaction: {
+        to: '0xd0d6d6c5fe4a677d343cc433536bb717bae167dd',
+        value: '0xf4240',
+        data: '0xa',
+        chainId: 1,
+        nonce: '0x0',
+        maxFeePerGas: '0x14',
+        maxPriorityFeePerGas: '0x0',
+        gasLimit: '0x14',
+    },
+});
+```
+
+#### Legacy
+
+For T1B1 and T2T1 with firmware older than 2.4.2 (but supported newer firmware versions too).
+
+```javascript
+TrezorConnect.ethereumSignTransaction({
+    path: "m/44'/60'/0'",
+    transaction: {
+        to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+        value: '0xf4240',
+        data: '0x01',
+        chainId: 1,
+        nonce: '0x0',
+        gasLimit: '0x5208',
+        gasPrice: '0xbebc200',
+    },
+});
+```
+
+#### EIP-7702 ([set code for EOAs](https://eips.ethereum.org/EIPS/eip-7702))
+
+<Callout type="warning">
+    **Experimental feature**, opted into by passing `__experimental: true`. It may change without a
+    major version bump. Requires Core firmware 2.12.5 or newer; T1B1 does not support it at all.
+</Callout>
+
+Adding an `authorizationList` to an EIP-1559 transaction turns it into a type-4 (set-code)
+transaction. The device signs one authorization for the signing account, deriving its `chainId`
+from the transaction and setting its `nonce` to the transaction `nonce + 1`, and embeds the
+signed authorization into the returned `serializedTx`. Firmware currently supports at most one
+authorization per transaction. Delegating to the zero address revokes an existing delegation.
+
+The device also has to be configured up front, using
+[trezorctl](https://trezor.io/guides/trezorctl):
+
+```bash
+# Required for every call - the underlying protobuf field is experimental.
+trezorctl set experimental-features on
+
+# Required to authorize a delegate. Revocation works under the default strict checks.
+trezorctl set safety-checks prompt
+```
+
+```javascript
+TrezorConnect.ethereumSignTransaction({
+    path: "m/44'/60'/0'/0/0",
+    transaction: {
+        to: '0x14495e5ef84823170b62176913d798b26a1a1a69',
+        value: '0x0',
+        chainId: 1,
+        nonce: '0x0',
+        maxFeePerGas: '0x7ea8163',
+        maxPriorityFeePerGas: '0x186a0',
+        gasLimit: '0x10fc5',
+        authorizationList: [{ address: '0x63c0c19a282a1b52b07dd5a65b58948a07dae32b' }],
+    },
+    __experimental: true,
+});
+```
+
+### Result
+
+[EthereumSignedTx type](https://github.com/trezor/trezor-suite/blob/develop/packages/connect-common/src/types/api/ethereum/common.ts)
+
+```javascript
+{
+    success: true,
+    payload: {
+        v: string, // hexadecimal string with "0x" prefix
+        r: string, // hexadecimal string with "0x" prefix
+        s: string, // hexadecimal string with "0x" prefix
+        serializedTx: string, // signed and serialized transaction ready to broadcast
+        // present only for EIP-7702 transactions (when `authorizationList` was provided):
+        authorizationList?: Array<{
+            chainId: number,
+            address: string, // delegate address
+            nonce: number,
+            yParity: number, // 0 or 1
+            r: string, // hexadecimal string with "0x" prefix
+            s: string, // hexadecimal string with "0x" prefix
+        }>,
+    }
+}
+```
+
+Error
+
+```javascript
+{
+    success: false,
+    error: {
+        message: string // error message
+    }
+}
+```

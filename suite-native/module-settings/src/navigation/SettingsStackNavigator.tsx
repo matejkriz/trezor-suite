@@ -1,54 +1,98 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import {
-    SettingsStackParamList,
+    type SettingsStackParamList,
     SettingsStackRoutes,
     stackNavigationOptionsConfig,
 } from '@suite-native/navigation';
+import { SettingsTradingLocationScreen } from '@suite-native/trading-residence';
 
-import { SettingsScreen } from '../screens/SettingsScreen';
-import { SettingsLocalizationScreen } from '../screens/SettingsLocalizationScreen';
-import { SettingsCustomizationScreen } from '../screens/SettingsCustomizationScreen';
-import { SettingsPrivacyAndSecurity } from '../screens/SettingsPrivacyAndSecurity';
-import { SettingsAboutUsScreen } from '../screens/SettingsAboutUsScreen';
-import { SettingsFAQScreen } from '../screens/SettingsFAQScreen';
+import { NetworkBackendsScreen } from '../screens/NetworkBackendsScreen';
+import { SettingsAdvancedScreen } from '../screens/SettingsAdvancedScreen';
+import { SettingsAppLogScreen } from '../screens/SettingsAppLogScreen';
+import { SettingsAutoEjectScreen } from '../screens/SettingsAutoEjectScreen';
+import { SettingsDustPhishingScreen } from '../screens/SettingsDustPhishingScreen';
+import { SettingsExperimentalScreen } from '../screens/SettingsExperimentalScreen';
+import { SettingsNetworksScreen } from '../screens/SettingsNetworksScreen';
+import { SettingsPreferencesScreen } from '../screens/SettingsPreferencesScreen';
+import { SettingsPrivacyScreen } from '../screens/SettingsPrivacyScreen';
+import { SettingsSecurityScreen } from '../screens/SettingsSecurityScreen';
+import { SettingsSuiteSyncScreen } from '../screens/SettingsSuiteSyncScreen';
+import { SettingsSupportScreen } from '../screens/SettingsSupportScreen';
+import { TurnOffDeviceAuthenticityCheckScreen } from '../screens/TurnOffDeviceAuthenticityCheckScreen';
+import { TurnOffFirmwareAuthenticityCheckScreen } from '../screens/TurnOffFirmwareAuthenticityCheckScreen';
 
-export const SettingsStack = createNativeStackNavigator<SettingsStackParamList>();
+const SettingsStack = createNativeStackNavigator<SettingsStackParamList>();
 
 export const SettingsStackNavigator = () => (
-    <SettingsStack.Navigator
-        initialRouteName={SettingsStackRoutes.Settings}
-        screenOptions={stackNavigationOptionsConfig}
-    >
+    <SettingsStack.Navigator screenOptions={stackNavigationOptionsConfig}>
         <SettingsStack.Screen
-            options={{ title: SettingsStackRoutes.Settings }}
-            name={SettingsStackRoutes.Settings}
-            component={SettingsScreen}
+            options={{ title: SettingsStackRoutes.SettingsPreferences }}
+            name={SettingsStackRoutes.SettingsPreferences}
+            component={SettingsPreferencesScreen}
         />
         <SettingsStack.Screen
-            options={{ title: SettingsStackRoutes.SettingsLocalization }}
-            name={SettingsStackRoutes.SettingsLocalization}
-            component={SettingsLocalizationScreen}
+            options={{ title: SettingsStackRoutes.SettingsPrivacy }}
+            name={SettingsStackRoutes.SettingsPrivacy}
+            component={SettingsPrivacyScreen}
         />
         <SettingsStack.Screen
-            options={{ title: SettingsStackRoutes.SettingsCustomization }}
-            name={SettingsStackRoutes.SettingsCustomization}
-            component={SettingsCustomizationScreen}
+            options={{ title: SettingsStackRoutes.SettingsViewOnly }}
+            name={SettingsStackRoutes.SettingsViewOnly}
+            component={SettingsAutoEjectScreen}
         />
         <SettingsStack.Screen
-            options={{ title: SettingsStackRoutes.SettingsPrivacyAndSecurity }}
-            name={SettingsStackRoutes.SettingsPrivacyAndSecurity}
-            component={SettingsPrivacyAndSecurity}
+            options={{ title: SettingsStackRoutes.SettingsSupport }}
+            name={SettingsStackRoutes.SettingsSupport}
+            component={SettingsSupportScreen}
         />
         <SettingsStack.Screen
-            options={{ title: SettingsStackRoutes.SettingsFAQ }}
-            name={SettingsStackRoutes.SettingsFAQ}
-            component={SettingsFAQScreen}
+            options={{ title: SettingsStackRoutes.SettingsAppLog }}
+            name={SettingsStackRoutes.SettingsAppLog}
+            component={SettingsAppLogScreen}
         />
         <SettingsStack.Screen
-            options={{ title: SettingsStackRoutes.SettingsAbout }}
-            name={SettingsStackRoutes.SettingsAbout}
-            component={SettingsAboutUsScreen}
+            options={{ title: SettingsStackRoutes.SettingsNetworks }}
+            name={SettingsStackRoutes.SettingsNetworks}
+            component={SettingsNetworksScreen}
+        />
+        <SettingsStack.Screen
+            name={SettingsStackRoutes.SettingsNetworkBackends}
+            component={NetworkBackendsScreen}
+        />
+        <SettingsStack.Screen
+            options={{ title: SettingsStackRoutes.SettingsSuiteSync }}
+            name={SettingsStackRoutes.SettingsSuiteSync}
+            component={SettingsSuiteSyncScreen}
+        />
+        <SettingsStack.Screen
+            name={SettingsStackRoutes.SettingsSecurity}
+            component={SettingsSecurityScreen}
+        />
+        <SettingsStack.Screen
+            name={SettingsStackRoutes.SettingsAdvanced}
+            component={SettingsAdvancedScreen}
+        />
+        <SettingsStack.Screen
+            name={SettingsStackRoutes.SettingsDustPhishing}
+            component={SettingsDustPhishingScreen}
+        />
+        <SettingsStack.Screen
+            name={SettingsStackRoutes.SettingsExperimental}
+            component={SettingsExperimentalScreen}
+        />
+        <SettingsStack.Screen
+            name={SettingsStackRoutes.TurnOffFirmwareAuthenticityCheck}
+            component={TurnOffFirmwareAuthenticityCheckScreen}
+        />
+        <SettingsStack.Screen
+            name={SettingsStackRoutes.TurnOffDeviceAuthenticityCheck}
+            component={TurnOffDeviceAuthenticityCheckScreen}
+        />
+        <SettingsStack.Screen
+            options={{ title: SettingsStackRoutes.SettingsTradingLocation }}
+            name={SettingsStackRoutes.SettingsTradingLocation}
+            component={SettingsTradingLocationScreen}
         />
     </SettingsStack.Navigator>
 );

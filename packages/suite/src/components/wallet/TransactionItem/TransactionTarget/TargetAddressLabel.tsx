@@ -1,51 +1,85 @@
-import styled from 'styled-components';
-import { WalletAccountTransaction } from 'src/types/wallet';
-import { ArrayElement } from '@trezor/type-utils';
-import { Translation, AddressLabeling } from 'src/components/suite';
-import { AccountLabels } from 'src/types/suite/metadata';
-import { NetworkSymbol } from '@suite-common/wallet-config';
+import { useMemo } from 'react';
 
-const TruncatedSpan = styled.span<{ $isBlurred?: boolean }>`
-    overflow: hidden;
-    text-overflow: ellipsis;
-`;
+import { Address, selectAddressLabelsForAccount } from '@suite/address';
+import { Translation } from '@suite/intl';
+import { selectAccounts } from '@suite-common/wallet-core';
+import type { AccountKey } from '@suite-common/wallet-types';
+import { findTransactionSenderAccount } from '@suite-common/wallet-utils';
+import { type ArrayElement } from '@trezor/type-utils';
 
-interface TargetAddressLabelProps {
-    networkSymbol: NetworkSymbol;
+import { AccountLabelForOwnAddress } from 'src/components/suite/labeling/AccountLabelForOwnAddress';
+import { AccountLabeling } from 'src/components/suite/labeling/AccountLabeling';
+import { useSelector } from 'src/hooks/suite';
+import { type WalletAccountTransaction } from 'src/types/wallet';
+
+type TargetAddressLabelProps = {
+    transaction: WalletAccountTransaction;
     target: ArrayElement<WalletAccountTransaction['targets']>;
-    type: WalletAccountTransaction['type'];
-    accountMetadata?: AccountLabels;
-}
+    accountKey: AccountKey;
+};
 
 export const TargetAddressLabel = ({
-    networkSymbol,
+    transaction,
     target,
-    type,
-    accountMetadata,
+    accountKey,
 }: TargetAddressLabelProps) => {
+    const { symbol, type } = transaction;
     const isLocalTarget = (type === 'sent' || type === 'self') && target.isAccountTarget;
+    const addressLabels = useSelector(state =>
+        selectAddressLabelsForAccount(state, {
+            addresses: target.addresses ?? [],
+            accountKey,
+            deviceStaticId: transaction.deviceState,
+        }),
+    );
+    const accounts = useSelector(selectAccounts);
+
+    // Targets of a received transaction hold the account's own receiving address, so the sender is
+    // resolved instead — a transfer from a sibling account shows its label, like token transfers do.
+    const senderAccount = useMemo(
+        () => (type === 'recv' ? findTransactionSenderAccount(transaction, accounts) : undefined),
+        [type, transaction, accounts],
+    );
 
     if (isLocalTarget) {
-        return (
-            <TruncatedSpan>
-                <Translation id="TR_SENT_TO_SELF" />
-            </TruncatedSpan>
-        );
+        return <Translation id="TR_SENT_TO_SELF" />;
     }
 
     return (
-        <TruncatedSpan>
-            {target.addresses?.map((a, i) =>
-                // either it may be AddressLabeling - sent to another account associated with this device, e.g: "Bitcoin #2"
-                // or it may show address metadata label added from receive tab e.g "My address for illegal things"
-                type === 'sent' ? (
-                    // Using index as a key is safe as the array doesn't change (no filter/reordering, pushing new items)
+        <span data-testid="@wallet/transaction/target-address">
+            {target.addresses?.map((a, i) => {
+                if (a.startsWith('OP_RETURN ')) {
+                    return <span key={i}>{a}</span>;
+                }
 
-                    <AddressLabeling key={i} address={a} networkSymbol={networkSymbol} />
-                ) : (
-                    <span key={i}>{accountMetadata?.addressLabels[a] || a}</span>
-                ),
-            )}
-        </TruncatedSpan>
+                // either it may be AccountLabelForOwnAddress - sent to another account associated with this device, e.g: "Bitcoin #2"
+                // or it may show address metadata label added from receive tab e.g "My address for illegal things"
+                if (type === 'sent') {
+                    // Using index as a key is safe as the array doesn't change (no filter/reordering, pushing new items)
+                    return <AccountLabelForOwnAddress key={i} address={a} symbol={symbol} />;
+                }
+
+                if (addressLabels[a]) {
+                    return <span key={i}>{addressLabels[a]}</span>;
+                }
+
+                if (senderAccount) {
+                    return (
+                        <AccountLabeling
+                            key={i}
+                            account={senderAccount}
+                            accountTypeBadgeSize="small"
+                            showAccountTypeBadge
+                        />
+                    );
+                }
+
+                return (
+                    <span key={i}>
+                        <Address value={a} isTruncated />
+                    </span>
+                );
+            })}
+        </span>
     );
 };

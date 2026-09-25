@@ -1,9 +1,16 @@
 import { createAction } from '@reduxjs/toolkit';
 
-import { createActionWithExtraDeps } from '@suite-common/redux-utils';
+import { createThunk } from '@suite-common/redux-utils';
 
 import { selectVisibleNotificationsByType } from './notificationsSelectors';
-import { NotificationId, NotificationEntry, NotificationEventPayload, ToastPayload } from './types';
+import {
+    type AddNotificationAction,
+    type NotificationEntry,
+    type NotificationEventPayload,
+    type NotificationId,
+    type NotificationsRootState,
+    type ToastPayload,
+} from './types';
 
 export const ACTION_PREFIX = '@common/in-app-notifications';
 
@@ -25,37 +32,41 @@ const remove = createAction(
     }),
 );
 
-export const addToast = createActionWithExtraDeps(
+// Shared function to transform payload to NotificationEntry
+const toastPayloadTransform = (payload: ToastPayload): NotificationEntry => ({
+    context: 'toast' as const,
+    id: new Date().getTime(),
+    seen: true,
+    ...payload,
+});
+
+export const addToast = createAction(
     `${ACTION_PREFIX}/addToast`,
-    (payload: ToastPayload, { getState, extra }): NotificationEntry => ({
-        context: 'toast',
-        id: new Date().getTime(),
-        device: extra.selectors.selectDevice(getState()),
-        seen: true,
-        ...payload,
+    (payload: ToastPayload): AddNotificationAction => ({
+        payload: toastPayloadTransform(payload),
     }),
 );
 
-// Adds a Toast if there is not one of same type visible.
-export const addToastOnce = createActionWithExtraDeps(
-    `${ACTION_PREFIX}/addToastOnce`,
-    (payload: ToastPayload, { getState, dispatch }): NotificationEntry | undefined => {
-        const notifications = selectVisibleNotificationsByType(getState(), payload.type);
-        if (notifications.length > 0) {
-            return;
-        }
+type AddToastOnceThunkState = NotificationsRootState;
 
-        return dispatch(addToast(payload));
+// Adds a Toast if there is not one of same type visible.
+export const addToastOnceThunk = createThunk<void, ToastPayload, { state: AddToastOnceThunkState }>(
+    `${ACTION_PREFIX}/addToastOnce`,
+    (payload, { getState, dispatch }) => {
+        const notifications = selectVisibleNotificationsByType(getState(), payload.type);
+        if (notifications.length > 0) return;
+        dispatch(addToast(payload));
     },
 );
 
-export const addEvent = createActionWithExtraDeps(
+export const addEvent = createAction(
     `${ACTION_PREFIX}/addEvent`,
-    (payload: NotificationEventPayload, { getState, extra }): NotificationEntry => ({
-        context: 'event',
-        id: new Date().getTime(),
-        device: extra.selectors.selectDevice(getState()),
-        ...payload,
+    (payload: NotificationEventPayload): AddNotificationAction => ({
+        payload: {
+            context: 'event',
+            id: new Date().getTime(),
+            ...payload,
+        },
     }),
 );
 
@@ -65,5 +76,4 @@ export const notificationsActions = {
     remove,
     addToast,
     addEvent,
-    addToastOnce,
 };

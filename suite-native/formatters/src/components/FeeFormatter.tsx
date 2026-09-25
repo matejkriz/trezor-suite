@@ -1,23 +1,21 @@
 import { useMemo } from 'react';
 
-import { fromWei } from 'web3-utils';
-
+import { getNetwork } from '@suite-common/wallet-config';
+import { type WalletAccountTransaction } from '@suite-common/wallet-types';
+import { fromWei, getEffectiveGasPrice, getFeeRate, getFeeUnits } from '@suite-common/wallet-utils';
 import { Text } from '@suite-native/atoms';
-import { WalletAccountTransaction } from '@suite-common/wallet-types';
-import { getFeeRate, getFeeUnits } from '@suite-common/wallet-utils';
-import { networks } from '@suite-common/wallet-config';
 
 type FeeFormatterProps = {
     transaction: WalletAccountTransaction;
 };
 
 export const FeeFormatter = ({ transaction }: FeeFormatterProps) => {
-    const { networkType } = networks[transaction.symbol];
+    const { networkType } = getNetwork(transaction.symbol);
 
     const formattedValue = useMemo(
         () =>
             networkType === 'ethereum'
-                ? fromWei(transaction.ethereumSpecific?.gasPrice ?? '0', 'gwei')
+                ? fromWei(getEffectiveGasPrice(transaction.ethereumSpecific)).toGwei()
                 : transaction.feeRate || getFeeRate(transaction),
         [networkType, transaction],
     );

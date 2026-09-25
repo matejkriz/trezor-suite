@@ -25,13 +25,13 @@
             }
         },
         {
-            "files": ["packages/suite-data/files/translations/*.json"],
+            "files": ["suite/app-assets/files/translations/*.json"],
             "options": {
                 "tabWidth": 2
             }
         },
         {
-            "files": ["tsconfig.json"],
+            "files": ["tsconfig*.json"],
             "options": {
                 "trailingComma": "none",
                 "printWidth": 50

@@ -1,89 +1,28 @@
-import { useSelector } from 'react-redux';
-import { forwardRef, useImperativeHandle, useRef } from 'react';
+import { forwardRef } from 'react';
+import { LinearTransition } from 'react-native-reanimated';
 
-import { useNavigation } from '@react-navigation/native';
-
-import { Box, Button, Divider, VStack } from '@suite-native/atoms';
 import { Assets } from '@suite-native/assets';
-import { FeatureFlag, useFeatureFlag } from '@suite-native/feature-flags';
-import {
-    AccountsImportStackRoutes,
-    RootStackParamList,
-    RootStackRoutes,
-    StackNavigationProps,
-} from '@suite-native/navigation';
-import { selectIsPortfolioTrackerDevice } from '@suite-common/wallet-core';
-import { useTranslate } from '@suite-native/intl';
+import { AnimatedVStack, VStack } from '@suite-native/atoms';
+import { PromoBanners } from '@suite-native/banners';
 
-import { PortfolioGraph, PortfolioGraphRef } from './PortfolioGraph';
+import { HomescreenAlerts } from './HomescreenAlerts';
+import { PortfolioGraph, type PortfolioGraphRef } from './PortfolioGraph';
+import { ReferralButton } from './ReferralButton';
+import { TransferButtons } from './TransferButtons';
 
-export type PortfolioContentRef = {
-    refetchGraph?: () => Promise<void>;
-};
-
-export const PortfolioContent = forwardRef<PortfolioContentRef>((_props, ref) => {
-    const { translate } = useTranslate();
-    const graphRef = useRef<PortfolioGraphRef>(null);
-
-    const navigation = useNavigation<StackNavigationProps<RootStackParamList, RootStackRoutes>>();
-
-    const isPortfolioTrackerDevice = useSelector(selectIsPortfolioTrackerDevice);
-
-    const [isUsbDeviceConnectFeatureEnabled] = useFeatureFlag(FeatureFlag.IsDeviceConnectEnabled);
-
-    const handleImportAssets = () => {
-        navigation.navigate(RootStackRoutes.AccountsImport, {
-            screen: AccountsImportStackRoutes.SelectNetwork,
-        });
-    };
-
-    const handleReceive = () => {
-        navigation.navigate(RootStackRoutes.ReceiveModal, { closeActionType: 'back' });
-    };
-
-    useImperativeHandle(
-        ref,
-        () => ({
-            refetchGraph: graphRef.current?.refetch,
-        }),
-        [],
-    );
-
-    return (
-        <VStack spacing="large" marginTop="small">
-            <PortfolioGraph ref={graphRef} />
-            <VStack spacing="large" marginHorizontal="small">
-                <Box>
+export const PortfolioContent = forwardRef<PortfolioGraphRef>((_props, ref) => (
+    <VStack spacing="sp32" marginTop="sp8">
+        <HomescreenAlerts />
+        <AnimatedVStack spacing="sp32" layout={LinearTransition}>
+            <PortfolioGraph ref={ref} />
+            <VStack spacing="sp64" marginHorizontal="sp16">
+                <VStack spacing="sp24">
+                    <TransferButtons />
+                    <PromoBanners />
                     <Assets />
-                </Box>
-                {isPortfolioTrackerDevice && (
-                    <Box>
-                        <Button
-                            data-testID="@home/portfolio/sync-coins-button"
-                            colorScheme="tertiaryElevation0"
-                            size="large"
-                            onPress={handleImportAssets}
-                        >
-                            {translate('moduleHome.buttons.syncMyCoins')}
-                        </Button>
-                    </Box>
-                )}
-                {!isUsbDeviceConnectFeatureEnabled && (
-                    <>
-                        <Divider />
-                        <Box>
-                            <Button
-                                data-testID="@home/portolio/recieve-button"
-                                size="large"
-                                onPress={handleReceive}
-                                iconLeft="receive"
-                            >
-                                {translate('moduleHome.buttons.receive')}
-                            </Button>
-                        </Box>
-                    </>
-                )}
+                </VStack>
+                <ReferralButton />
             </VStack>
-        </VStack>
-    );
-});
+        </AnimatedVStack>
+    </VStack>
+));

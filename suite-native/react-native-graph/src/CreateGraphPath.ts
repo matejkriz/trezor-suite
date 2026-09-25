@@ -1,23 +1,14 @@
-import { SkPath, Skia, SkPoint } from '@shopify/react-native-skia';
+import { type SkPath, type SkPoint, Skia } from '@shopify/react-native-skia';
 
-import type { GraphPoint, GraphRange } from './LineGraphProps';
+import type {
+    GraphPathRange,
+    GraphPoint,
+    GraphRange,
+    GraphXRange,
+    GraphYRange,
+} from './LineGraphProps';
 
 const PIXEL_RATIO = 2;
-
-export interface GraphXRange {
-    min: Date;
-    max: Date;
-}
-
-export interface GraphYRange {
-    min: number;
-    max: number;
-}
-
-export interface GraphPathRange {
-    x: GraphXRange;
-    y: GraphYRange;
-}
 
 type GraphPathConfig = {
     /**
@@ -119,18 +110,20 @@ function createGraphPathBase({
     canvasWidth: width,
     shouldFillGradient,
 }: GraphPathConfigWithGradient | GraphPathConfigWithoutGradient): SkPath | GraphPathWithGradient {
-    const path = Skia.Path.Make();
+    const pathBuilder = Skia.PathBuilder.Make();
 
     // Canvas width substracted by the horizontal padding => Actual drawing width
     const drawingWidth = width - 2 * horizontalPadding;
     // Canvas height substracted by the vertical padding => Actual drawing height
     const drawingHeight = height - 2 * verticalPadding;
 
-    if (graphData[0] == null) return path;
+    if (graphData[0] == null) {
+        return pathBuilder.build();
+    }
 
     const points: SkPoint[] = [];
 
-    const startX = getXInRange(drawingWidth, graphData[0]!.date, range.x) + horizontalPadding;
+    const startX = getXInRange(drawingWidth, graphData[0].date, range.x) + horizontalPadding;
     const endX =
         getXInRange(drawingWidth, graphData[graphData.length - 1]!.date, range.x) +
         horizontalPadding;
@@ -175,12 +168,16 @@ function createGraphPathBase({
         const point = points[i]!;
 
         // first point needs to start the path
-        if (i === 0) path.moveTo(point.x, point.y);
+        if (i === 0) {
+            pathBuilder.moveTo(point.x, point.y);
+        }
 
         const prev = points[i - 1];
         const prevPrev = points[i - 2];
 
-        if (prev == null) continue;
+        if (prev == null) {
+            continue;
+        }
 
         const p0 = prevPrev ?? prev;
         const p1 = prev;
@@ -191,21 +188,23 @@ function createGraphPathBase({
         const cp3x = (p0.x + 4 * p1.x + point.x) / 6;
         const cp3y = (p0.y + 4 * p1.y + point.y) / 6;
 
-        path.cubicTo(cp1x, cp1y, cp2x, cp2y, cp3x, cp3y);
+        pathBuilder.cubicTo(cp1x, cp1y, cp2x, cp2y, cp3x, cp3y);
 
         if (i === points.length - 1) {
-            path.cubicTo(point.x, point.y, point.x, point.y, point.x, point.y);
+            pathBuilder.cubicTo(point.x, point.y, point.x, point.y, point.x, point.y);
         }
     }
 
-    if (!shouldFillGradient) return path;
+    if (!shouldFillGradient) {
+        return pathBuilder.build();
+    }
 
-    const gradientPath = path.copy();
+    const path = pathBuilder.build();
 
-    gradientPath.lineTo(endX, height + verticalPadding);
-    gradientPath.lineTo(0 + horizontalPadding, height + verticalPadding);
+    pathBuilder.lineTo(endX, height + verticalPadding);
+    pathBuilder.lineTo(horizontalPadding, height + verticalPadding);
 
-    return { path, gradientPath };
+    return { path, gradientPath: pathBuilder.build() };
 }
 
 export function createGraphPath(props: GraphPathConfig): SkPath {

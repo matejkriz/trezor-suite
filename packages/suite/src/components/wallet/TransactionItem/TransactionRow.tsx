@@ -1,15 +1,21 @@
-import BigNumber from 'bignumber.js';
-import { FiatValue, Translation } from 'src/components/suite';
+import { type ExtendedMessageDescriptor, Translation } from '@suite/intl';
+import { type SignOperator } from '@suite-common/suite-types';
+import { selectBaseCurrency, selectHistoricFiatRatesByTimestamp } from '@suite-common/wallet-core';
+import { type Timestamp } from '@suite-common/wallet-types';
 import {
-    formatCardanoWithdrawal,
     formatCardanoDeposit,
+    formatCardanoWithdrawal,
     formatNetworkAmount,
+    getCardanoStakingSignValue,
+    getFiatRateKey,
 } from '@suite-common/wallet-utils';
-import { WalletAccountTransaction } from 'src/types/wallet';
+import { BigNumber } from '@trezor/utils';
+
+import { BaseCurrencyValue, FormattedCryptoAmount, Sign } from 'src/components/suite';
+import { useSelector } from 'src/hooks/suite';
+import { type WalletAccountTransaction } from 'src/types/wallet';
+
 import { TransactionTargetLayout } from './TransactionTargetLayout';
-import { ExtendedMessageDescriptor } from 'src/types/suite';
-import { SignOperator } from '@suite-common/suite-types';
-import { StyledFormattedCryptoAmount } from './CommonComponents';
 
 export const CustomRow = ({
     transaction,
@@ -24,32 +30,40 @@ export const CustomRow = ({
     title: ExtendedMessageDescriptor['id'];
     transaction: WalletAccountTransaction;
     useFiatValues?: boolean;
-    isFirst?: boolean;
-    isLast?: boolean;
-    className?: string;
-}) => (
-    <TransactionTargetLayout
-        {...baseLayoutProps}
-        addressLabel={<Translation id={title} />}
-        amount={
-            <StyledFormattedCryptoAmount
-                value={amount}
-                symbol={transaction.symbol}
-                signValue={sign}
-            />
-        }
-        fiatAmount={
-            useFiatValues ? (
-                <FiatValue
-                    amount={amount}
+}) => {
+    const fiatCurrencyCode = useSelector(selectBaseCurrency);
+    const fiatRateKey = getFiatRateKey(transaction.symbol, fiatCurrencyCode);
+    const historicRate = useSelector(state =>
+        selectHistoricFiatRatesByTimestamp(state, fiatRateKey, transaction.blockTime as Timestamp),
+    );
+
+    return (
+        <TransactionTargetLayout
+            {...baseLayoutProps}
+            addressLabel={<Translation id={title} />}
+            amount={
+                <FormattedCryptoAmount
+                    value={amount}
                     symbol={transaction.symbol}
-                    source={transaction.rates}
-                    useCustomSource
+                    signValue={sign}
                 />
-            ) : undefined
-        }
-    />
-);
+            }
+            fiatAmount={
+                useFiatValues && historicRate ? (
+                    <>
+                        <Sign value={sign} grayscale />
+                        <BaseCurrencyValue
+                            amount={amount}
+                            symbol={transaction.symbol}
+                            historicRate={historicRate}
+                            useHistoricRate
+                        />
+                    </>
+                ) : undefined
+            }
+        />
+    );
+};
 
 export const FeeRow = ({
     fee,
@@ -60,9 +74,6 @@ export const FeeRow = ({
     fee: string;
     transaction: WalletAccountTransaction;
     useFiatValues?: boolean;
-    isFirst?: boolean;
-    isLast?: boolean;
-    className?: string;
 }) => (
     <CustomRow
         {...baseLayoutProps}
@@ -81,9 +92,6 @@ export const WithdrawalRow = ({
 }: {
     transaction: WalletAccountTransaction;
     useFiatValues?: boolean;
-    isFirst?: boolean;
-    isLast?: boolean;
-    className?: string;
 }) => (
     <CustomRow
         {...baseLayoutProps}
@@ -102,53 +110,55 @@ export const DepositRow = ({
 }: {
     transaction: WalletAccountTransaction;
     useFiatValues?: boolean;
-    isFirst?: boolean;
-    isLast?: boolean;
-    className?: string;
 }) => (
     <CustomRow
         {...baseLayoutProps}
         title="TR_TX_DEPOSIT"
-        sign="negative"
+        sign={getCardanoStakingSignValue(transaction)}
         amount={formatCardanoDeposit(transaction) ?? '0'}
         transaction={transaction}
         useFiatValues={useFiatValues}
     />
 );
 
-export const CoinjoinRow = ({
-    transaction,
-    useFiatValues,
-}: {
+type CoinjoinRowProps = {
     transaction: WalletAccountTransaction;
     useFiatValues?: boolean;
-}) => (
-    <TransactionTargetLayout
-        fiatAmount={
-            useFiatValues ? (
-                <FiatValue
-                    amount={formatNetworkAmount(
-                        new BigNumber(transaction.amount).abs().toString(),
-                        transaction.symbol,
-                    )}
-                    symbol={transaction.symbol}
-                    source={transaction.rates}
-                    useCustomSource
+};
+
+export const CoinjoinRow = ({ transaction, useFiatValues }: CoinjoinRowProps) => {
+    const baseCurrencyCode = useSelector(selectBaseCurrency);
+    const fiatRateKey = getFiatRateKey(transaction.symbol, baseCurrencyCode);
+    const historicRate = useSelector(state =>
+        selectHistoricFiatRatesByTimestamp(state, fiatRateKey, transaction.blockTime as Timestamp),
+    );
+
+    return (
+        <TransactionTargetLayout
+            fiatAmount={
+                useFiatValues ? (
+                    <BaseCurrencyValue
+                        amount={formatNetworkAmount(
+                            new BigNumber(transaction.amount).abs().toString(),
+                            transaction.symbol,
+                        )}
+                        symbol={transaction.symbol}
+                        historicRate={historicRate}
+                        useHistoricRate
+                    />
+                ) : undefined
+            }
+            addressLabel={
+                <Translation
+                    id="TR_JOINT_TRANSACTION_TARGET"
+                    values={{
+                        in: transaction.details.vin.length,
+                        inMy: transaction.details.vin.filter(v => v.isAccountOwned).length,
+                        out: transaction.details.vout.length,
+                        outMy: transaction.details.vout.filter(v => v.isAccountOwned).length,
+                    }}
                 />
-            ) : undefined
-        }
-        addressLabel={
-            <Translation
-                id="TR_JOINT_TRANSACTION_TARGET"
-                values={{
-                    in: transaction.details.vin.length,
-                    inMy: transaction.details.vin.filter(v => v.isAccountOwned).length,
-                    out: transaction.details.vout.length,
-                    outMy: transaction.details.vout.filter(v => v.isAccountOwned).length,
-                }}
-            />
-        }
-        isFirst
-        isLast
-    />
-);
+            }
+        />
+    );
+};

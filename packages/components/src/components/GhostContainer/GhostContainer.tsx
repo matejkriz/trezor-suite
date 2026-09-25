@@ -1,0 +1,81 @@
+import { type HTMLProps } from 'react';
+
+import { type Color } from '@trezor/theme';
+
+import {
+    type FrameProps,
+    type FramePropsKeys,
+    pickAndPrepareFrameProps,
+} from '../../utils/frameProps';
+import { Box } from '../Box/Box';
+
+export const allowedGhostContainerFrameProps = [
+    'flex',
+    'margin',
+    'padding',
+    'width',
+    'height',
+    'minWidth',
+    'minHeight',
+    'maxWidth',
+    'maxHeight',
+    'overflow',
+    'position',
+    'display',
+    'zIndex',
+    'cursor',
+    'borderRadius',
+] as const satisfies FramePropsKeys[];
+type AllowedGhostContainerFrameProps = Pick<
+    FrameProps,
+    (typeof allowedGhostContainerFrameProps)[number]
+>;
+
+type GhostContainerProps = AllowedGhostContainerFrameProps &
+    Pick<HTMLProps<HTMLElement>, 'onClick' | 'tabIndex'> & {
+        children: React.ReactNode;
+        isDisabled?: boolean;
+        isActive?: boolean;
+        backgroundColorOnInteraction?: Color;
+        as?: React.ElementType;
+        'data-testid'?: string;
+        'data-component'?: string;
+    };
+
+export const GhostContainer = ({
+    isDisabled,
+    isActive,
+    backgroundColorOnInteraction = 'elementFillGhostHovered',
+    onClick,
+    children,
+    'data-testid': dataTestId,
+    'data-component': dataComponent = 'GhostContainer',
+    tabIndex,
+    as = 'button',
+    borderRadius = 10,
+    cursor,
+    ...rest
+}: GhostContainerProps) => {
+    const frameProps = pickAndPrepareFrameProps(rest, allowedGhostContainerFrameProps, false);
+
+    return (
+        <Box
+            onClick={isDisabled ? undefined : onClick}
+            backgroundColor={isActive ? 'elementFillElevated' : 'transparent'}
+            backgroundColorOnInteraction={
+                isActive || isDisabled ? undefined : backgroundColorOnInteraction
+            }
+            as={as}
+            data-testid={dataTestId}
+            data-component={dataComponent}
+            tabIndex={tabIndex}
+            {...frameProps}
+            borderRadius={borderRadius}
+            cursor={cursor ?? (isDisabled ? 'default' : 'pointer')}
+        >
+            {children}
+        </Box>
+    );
+};
+
+export type { GhostContainerProps };

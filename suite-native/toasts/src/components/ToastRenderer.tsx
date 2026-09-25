@@ -3,18 +3,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAtomValue } from 'jotai';
 
 import { Box, VStack } from '@suite-native/atoms';
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
 
 import { toastsAtom } from '../toastsAtoms';
 import { Toast } from './Toast';
 
 const toastsContainerStyle = prepareNativeStyle<{ topSafeAreaInset: number }>(
-    (utils, { topSafeAreaInset }) => ({
+    ({ spacings }, { topSafeAreaInset }) => ({
         width: '100%',
         position: 'absolute',
         justifyContent: 'center',
-        marginTop: topSafeAreaInset,
-        paddingHorizontal: utils.spacings.medium,
+        // top margin = screen top padding + screen header top padding
+        marginTop: Math.max(topSafeAreaInset, spacings.sp8) + spacings.sp8,
+        paddingHorizontal: spacings.sp16,
     }),
 );
 

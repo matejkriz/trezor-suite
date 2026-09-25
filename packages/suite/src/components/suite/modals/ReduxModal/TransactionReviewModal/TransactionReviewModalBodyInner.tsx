@@ -1,0 +1,327 @@
+import { useEffect, useRef, useState } from 'react';
+
+import { events, injectDesktopAnalytics } from '@suite/analytics';
+import { Translation } from '@suite/intl';
+import { closeModal } from '@suite/modal';
+import { selectRouteName } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import type { DeviceRootState } from '@suite-common/device';
+import { injectDispatch } from '@suite-common/redux-utils';
+import {
+    type SerializedTx,
+    selectIsTxOutputInternal,
+    selectSendFormReviewButtonRequestsCount,
+    selectSendFormReviewLastButtonCode,
+} from '@suite-common/wallet-core';
+import {
+    type Account,
+    type FormState,
+    type GeneralPrecomposedTransactionFinal,
+    type ReviewOutput,
+    type StakeType,
+    type YieldClaimReward,
+} from '@suite-common/wallet-types';
+import {
+    getDecreaseOutputId,
+    getStakeType,
+    getTxValidityTimeoutInMs,
+    isDeviceReviewOnlyTransaction,
+    isEvmApprovalTx,
+    isRbfBumpFeeTransaction,
+    isRbfCancelTransaction,
+} from '@suite-common/wallet-utils';
+import { Modal, Row } from '@trezor/components';
+import { type Deferred } from '@trezor/utils';
+
+import { ConnectModalBackdrop } from 'src/components/suite/ConnectModalBackdrop';
+import { useSelector } from 'src/hooks/suite';
+import { getTransactionReviewModalActionTranslation } from 'src/utils/suite/transactionReview';
+
+import { TransactionReviewModalBottomContent } from './TransactionReviewOutputList/TransactionReviewModalBottomContent';
+import { TransactionReviewModalConfirmOnDevice } from './TransactionReviewOutputList/TransactionReviewModalConfirmOnDevice';
+import { TransactionReviewModalContent } from './TransactionReviewOutputList/TransactionReviewModalContent';
+import { TransactionReviewOutputTimer } from './TransactionReviewOutputList/TransactionReviewOutputTimer';
+import { TransactionReviewSummary } from './TransactionReviewSummary';
+import { type TxInfoState } from './utils';
+
+export const hasTxValidityExpired = (deadline: number) => deadline <= Date.now();
+
+type ShouldShowTxValidityTimerProps = {
+    deadline: number;
+    buttonRequestsCount: number;
+    serializedTx: SerializedTx | undefined;
+    stakeType: StakeType | null;
+    shouldCheckTxTimeValidity: boolean;
+    isInternalTransfer: boolean;
+    isTrading: boolean;
+};
+
+const shouldShowTxValidityTimer = ({
+    deadline,
+    buttonRequestsCount,
+    serializedTx,
+    stakeType,
+    shouldCheckTxTimeValidity,
+    isInternalTransfer,
+    isTrading,
+}: ShouldShowTxValidityTimerProps) => {
+    if (!shouldCheckTxTimeValidity || hasTxValidityExpired(deadline)) {
+        return false;
+    }
+
+    const isFirstStep = buttonRequestsCount <= 1;
+    const isStaking = stakeType && !serializedTx;
+
+    return isInternalTransfer || !isFirstStep || serializedTx || isStaking || isTrading;
+};
+
+export type TransactionReviewModalBodyInnerProps = {
+    outputs: ReviewOutput[];
+    account: Account;
+    decision: Deferred<boolean, string | number | undefined> | undefined;
+    txInfoState: TxInfoState;
+    tryAgainSignTx: () => void;
+    cancelSignTx: () => void;
+    precomposedForm: FormState;
+    vaultName?: string;
+    availableRewards?: YieldClaimReward[];
+    precomposedTx: GeneralPrecomposedTransactionFinal;
+    isSending: boolean;
+    setIsSending: (value: boolean) => void;
+    handleTryAgain: (cancel: boolean) => void;
+    hasTxReviewExpired: boolean;
+    isRbfConfirmedError?: boolean;
+};
+
+export const TransactionReviewModalBodyInner = ({
+    account,
+    outputs,
+    decision,
+    handleTryAgain,
+    precomposedTx,
+    txInfoState,
+    isRbfConfirmedError,
+    cancelSignTx,
+    precomposedForm,
+    vaultName,
+    availableRewards,
+    isSending,
+    setIsSending,
+    hasTxReviewExpired,
+}: TransactionReviewModalBodyInnerProps) => {
+    const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
+    const [areDetailsVisible, setAreDetailsVisible] = useState(false);
+    const { symbol, networkType } = account;
+    const { options } = precomposedForm;
+    const { serializedTx } = txInfoState;
+    const routeName = useSelector(selectRouteName);
+
+    const isApprovalTx = isEvmApprovalTx(precomposedForm.transactionData);
+    // A contract call's single "address" row is the contract, not a payment recipient, so the
+    // step-back heuristic below must not treat its ConfirmOutput as a re-confirmed output. A vault
+    // deposit otherwise matches every condition and walks the review backwards mid-signing.
+    const isContractCall = !!precomposedForm.transactionData;
+
+    const totalRecipients = outputs.filter(({ type }) => type === 'address').length;
+    const hasOpReturn = outputs.some(output => output.type === 'opreturn');
+
+    const isBumpFeeRbfAction =
+        precomposedTx !== undefined && isRbfBumpFeeTransaction(precomposedTx);
+
+    const decreaseOutputId = getDecreaseOutputId(precomposedTx, precomposedForm);
+
+    const buttonRequestsCount = useSelector((state: DeviceRootState) =>
+        selectSendFormReviewButtonRequestsCount(state, account?.symbol, decreaseOutputId),
+    );
+
+    const lastButtonRequestCount = useRef(buttonRequestsCount);
+
+    const lastButtonRequestCode = useSelector((state: DeviceRootState) =>
+        selectSendFormReviewLastButtonCode(state, symbol),
+    );
+
+    const [reviewStep, setReviewStep] = useState(0);
+
+    const isStellar = networkType === 'stellar';
+
+    useEffect(() => {
+        if (lastButtonRequestCount.current < buttonRequestsCount) {
+            lastButtonRequestCount.current = buttonRequestsCount;
+            if (
+                !isStellar && // We don't want to go back for Stellar transactions
+                reviewStep === 1 &&
+                totalRecipients === 1 && // Currently we only support going bak for =1
+                lastButtonRequestCode === 'ButtonRequest_ConfirmOutput' &&
+                !hasOpReturn &&
+                !isApprovalTx &&
+                !isContractCall
+            ) {
+                setReviewStep(prev => prev - 1);
+            } else {
+                setReviewStep(prev => prev + 1);
+            }
+        }
+    }, [
+        isStellar,
+        buttonRequestsCount,
+        lastButtonRequestCode,
+        reviewStep,
+        totalRecipients,
+        hasOpReturn,
+        isApprovalTx,
+        isContractCall,
+    ]);
+
+    const isInternalTransfer = useSelector(state =>
+        selectIsTxOutputInternal(state, account?.symbol, outputs[0]),
+    );
+
+    const createdTxTimestamp = txInfoState?.precomposedTx?.createdTimestamp ?? 0;
+    const deadline = createdTxTimestamp + getTxValidityTimeoutInMs(account?.networkType);
+
+    const stakeType = getStakeType(precomposedForm);
+    const shouldCheckTxTimeValidity = account?.networkType === 'solana' && createdTxTimestamp !== 0;
+
+    const onCancel = () => {
+        dispatch(closeModal());
+
+        cancelSignTx();
+        decision?.resolve(false);
+    };
+
+    const isDeviceOnlyReview = isDeviceReviewOnlyTransaction(precomposedTx);
+    const isAwaitingDeviceReview = isDeviceOnlyReview && !serializedTx;
+
+    const isCancelRbfAction = isRbfCancelTransaction(precomposedTx);
+    const isTronStakeFreeze =
+        networkType === 'tron' &&
+        (precomposedForm.tronStaking?.kind === 'freeze' ||
+            precomposedForm.tronStaking?.kind === 'unstake');
+    const showSummary =
+        !(isBumpFeeRbfAction && networkType === 'bitcoin') &&
+        (networkType !== 'tron' || isTronStakeFreeze);
+
+    const showTxValidityTimer = shouldShowTxValidityTimer({
+        deadline,
+        buttonRequestsCount,
+        serializedTx,
+        stakeType,
+        shouldCheckTxTimeValidity,
+        isInternalTransfer,
+        isTrading: !!precomposedForm.trading?.activeSection,
+    });
+
+    const actionTranslation = (source: 'heading' | 'button') =>
+        getTransactionReviewModalActionTranslation({
+            symbol,
+            stakeType,
+            precomposedForm,
+            approvalToken: precomposedTx.token,
+            routeName,
+            isBumpFeeRbfAction,
+            isCancelRbfAction,
+            isSending,
+            source,
+        });
+
+    const isBroadcastEnabled = options.includes('broadcast');
+
+    const handleDetailsClick = () => {
+        setAreDetailsVisible(areVisible => {
+            if (!areVisible) {
+                analytics.report({
+                    type: events.sendDetailOpenedEvent.name,
+                    payload: {
+                        assetSymbol: symbol,
+                    },
+                });
+            }
+
+            return !areVisible;
+        });
+    };
+
+    return (
+        <ConnectModalBackdrop canSwitchDevice>
+            {!isRbfConfirmedError && (
+                <TransactionReviewModalConfirmOnDevice
+                    totalSteps={
+                        isDeviceOnlyReview ? undefined : outputs.length + (showSummary ? 1 : 0)
+                    }
+                    serializedTx={serializedTx}
+                    isSending={isSending}
+                    reviewStep={reviewStep}
+                    onCancel={onCancel}
+                />
+            )}
+            <Modal.ModalBase
+                heading={
+                    <Translation
+                        {...(areDetailsVisible
+                            ? { id: 'TR_DETAIL' }
+                            : actionTranslation('heading'))}
+                    />
+                }
+                onBackClick={areDetailsVisible ? () => setAreDetailsVisible(false) : undefined}
+                description={
+                    areDetailsVisible ? null : (
+                        <TransactionReviewSummary
+                            tx={precomposedTx}
+                            account={account}
+                            broadcast={isBroadcastEnabled}
+                            onDetailsClick={handleDetailsClick}
+                            stakeType={stakeType}
+                            timer={
+                                showTxValidityTimer ? (
+                                    <Row gap={8}>
+                                        <TransactionReviewOutputTimer
+                                            deadline={deadline}
+                                            onTryAgain={handleTryAgain}
+                                            isMinimal
+                                            isSending={isSending}
+                                        />
+                                    </Row>
+                                ) : undefined
+                            }
+                        />
+                    )
+                }
+                bottomContent={
+                    areDetailsVisible || isAwaitingDeviceReview ? null : (
+                        <TransactionReviewModalBottomContent
+                            decision={decision}
+                            isSending={isSending}
+                            onSend={setIsSending}
+                            onCancel={onCancel}
+                            handleTryAgain={handleTryAgain}
+                            txInfoState={txInfoState}
+                            actionTranslation={actionTranslation('button')}
+                            hasTxReviewExpired={hasTxReviewExpired}
+                            stakeType={stakeType || undefined}
+                            isRbfConfirmedError={isRbfConfirmedError}
+                            account={account}
+                            precomposedForm={precomposedForm}
+                            outputs={outputs}
+                        />
+                    )
+                }
+                width={isDeviceOnlyReview ? 480 : 600}
+            >
+                <TransactionReviewModalContent
+                    account={account}
+                    precomposedTx={precomposedTx}
+                    precomposedForm={precomposedForm}
+                    vaultName={vaultName}
+                    availableRewards={availableRewards}
+                    serializedTx={serializedTx}
+                    isSending={isSending}
+                    reviewStep={reviewStep}
+                    isRbfConfirmedError={isRbfConfirmedError}
+                    onTryAgain={handleTryAgain}
+                    areDetailsVisible={areDetailsVisible}
+                    hasTxReviewExpired={hasTxReviewExpired}
+                />
+            </Modal.ModalBase>
+        </ConnectModalBackdrop>
+    );
+};

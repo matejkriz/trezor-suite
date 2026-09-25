@@ -1,0 +1,74 @@
+import { DEVICE_MODULE_PREFIX, getIsIgnoredEntropyCheckError } from '@suite-common/device';
+import { persistentDeviceDataActions } from '@suite-common/persistent-device-data';
+import { type WithServices, createThunk } from '@suite-common/redux-utils';
+import { type AcquiredDevice, type ReportSecurityCheckDep } from '@suite-common/suite-types';
+import { notificationsActions } from '@suite-common/toast-notifications';
+import type TrezorConnect from '@trezor/connect';
+import type { SerializedError } from '@trezor/connect-common/src/constants/errors';
+import { getFirmwareVersion } from '@trezor/device-utils';
+
+type FailEntropyCheckParams = {
+    device: AcquiredDevice;
+    error: SerializedError;
+};
+
+type FailEntropyCheckThunkDeps = WithServices<ReportSecurityCheckDep>;
+
+const failEntropyCheckThunk = createThunk<
+    void,
+    FailEntropyCheckParams,
+    { extra: FailEntropyCheckThunkDeps }
+>(`${DEVICE_MODULE_PREFIX}/failEntropyCheckThunk`, ({ device, error }, { dispatch, extra }) => {
+    const contextData = {
+        model: device?.features?.internal_model,
+        revision: device?.features?.revision,
+        version: getFirmwareVersion(device),
+        vendor: device?.features?.fw_vendor,
+    };
+    extra.services.reportSecurityCheck({
+        level: 'error',
+        checkType: 'Entropy',
+        contextData,
+        payload: error,
+    });
+
+    if (!getIsIgnoredEntropyCheckError(error.message)) {
+        dispatch(
+            persistentDeviceDataActions.setEntropyCheckResult({
+                deviceId: device.id,
+                success: false,
+            }),
+        );
+    }
+});
+
+type ProcessEntropyCheckResultThunkParams = {
+    device: AcquiredDevice;
+    result: Awaited<ReturnType<typeof TrezorConnect.resetDevice>>;
+};
+
+type ProcessEntropyCheckResultThunkDeps = FailEntropyCheckThunkDeps;
+
+export const processEntropyCheckResultThunk = createThunk<
+    void,
+    ProcessEntropyCheckResultThunkParams,
+    { extra: ProcessEntropyCheckResultThunkDeps }
+>(
+    `${DEVICE_MODULE_PREFIX}/processEntropyCheckResultThunk`,
+    ({ device, result }: ProcessEntropyCheckResultThunkParams, { dispatch }) => {
+        if (result.success) {
+            dispatch(
+                persistentDeviceDataActions.setEntropyCheckResult({
+                    deviceId: device.id,
+                    success: true,
+                    xpubHashes: result.payload.xpubHashes,
+                }),
+            );
+        } else {
+            dispatch(notificationsActions.addToast({ type: 'error', error: result.error.message }));
+            if (result.error.code === 'Failure_EntropyCheck') {
+                dispatch(failEntropyCheckThunk({ device, error: result.error }));
+            }
+        }
+    },
+);

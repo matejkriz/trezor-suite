@@ -1,99 +1,97 @@
-import { ReactNode, useCallback } from 'react';
-import styled from 'styled-components';
+import { type ReactNode, useRef } from 'react';
 
-import { SkeletonRectangle } from '@trezor/components';
-import { AppState, ExtendedMessageDescriptor } from 'src/types/suite';
-import { useTranslation, useLayout } from 'src/hooks/suite';
+import { type TranslationKey, useTranslation } from '@suite/intl';
+import { Column, Skeleton } from '@trezor/components';
+import { type PrimitiveType, exhaustive } from '@trezor/type-utils';
+
 import { PageHeader } from 'src/components/suite/layouts/SuiteLayout';
+import { useLayout } from 'src/hooks/suite';
+import { AccountHeaderProvider } from 'src/support/suite/AccountHeaderProvider';
+import { type AppState } from 'src/types/suite';
 
 import { AccountBanners } from './AccountBanners/AccountBanners';
 import { AccountException } from './AccountException/AccountException';
+import { AccountNavigation } from './AccountNavigation';
 import { CoinjoinAccountDiscovery } from './CoinjoinAccountDiscovery/CoinjoinAccountDiscovery';
-import { AccountTopPanel } from './AccountTopPanel/AccountTopPanel';
-import { AccountNavigation } from './AccountTopPanel/AccountNavigation';
 
-// This placeholder makes the "Receive" and "Trade" tabs look aligned with other tabs in "Accounts" view,
-// which implement some kind of toolbar.
-// Height computation: 24px toolbarHeight + 20px marginBottom = 44px;
-const EmptyHeaderPlaceholder = styled.div`
-    width: 100%;
-    height: 44px;
-`;
+type WalletPageHeaderProps = {
+    balanceSectionRef: React.RefObject<HTMLDivElement | null>;
+    isSubpage?: boolean;
+};
+
+const WalletPageHeader = ({ balanceSectionRef, isSubpage }: WalletPageHeaderProps) => (
+    <AccountHeaderProvider balanceSectionRef={balanceSectionRef}>
+        <PageHeader />
+        {!isSubpage && <AccountNavigation />}
+    </AccountHeaderProvider>
+);
+
+type WalletBodyProps = {
+    account: AppState['wallet']['selectedAccount'];
+    children?: ReactNode;
+};
+
+const WalletBody = ({ account, children }: WalletBodyProps) => {
+    const { status, account: selectedAccount, loader, network } = account;
+
+    switch (status) {
+        case 'loading': {
+            if (selectedAccount?.accountType === 'coinjoin') {
+                return <CoinjoinAccountDiscovery />;
+            }
+
+            return (
+                <Skeleton
+                    width="100%"
+                    height={300}
+                    borderRadius={12}
+                    animate={loader === 'account-loading'}
+                />
+            );
+        }
+
+        case 'exception':
+            return children ?? <AccountException loader={loader} network={network} />;
+
+        case 'loaded':
+        case 'none':
+            return children;
+
+        default:
+            return exhaustive(status);
+    }
+};
 
 type WalletLayoutProps = {
-    title: ExtendedMessageDescriptor['id'];
+    title: TranslationKey;
+    titleValues?: Record<string, PrimitiveType>;
     account: AppState['wallet']['selectedAccount'];
     isSubpage?: boolean;
-    showEmptyHeaderPlaceholder?: boolean;
-    className?: string;
     children?: ReactNode;
 };
 
 export const WalletLayout = ({
-    showEmptyHeaderPlaceholder = false,
     title,
+    titleValues,
     account,
     isSubpage,
-    className,
     children,
 }: WalletLayoutProps) => {
     const { translationString } = useTranslation();
-    const l10nTitle = translationString(title);
+    const l10nTitle = translationString(title, titleValues);
+    const balanceSectionRef = useRef<HTMLDivElement>(null);
 
-    const WalletPageHeader = useCallback(
-        () => (
-            <>
-                <PageHeader />
-                {!isSubpage && <AccountTopPanel />}
-                {!isSubpage && <AccountNavigation />}
-            </>
-        ),
-        [isSubpage],
+    useLayout(
+        l10nTitle,
+        <WalletPageHeader balanceSectionRef={balanceSectionRef} isSubpage={isSubpage} />,
     );
 
-    useLayout(l10nTitle, WalletPageHeader);
-
-    const { status, account: selectedAccount, loader, network } = account;
-
-    const getPageContent = () => {
-        if (status === 'loading') {
-            if (selectedAccount?.accountType === 'coinjoin') {
-                return (
-                    <>
-                        <AccountBanners account={selectedAccount} />
-                        {showEmptyHeaderPlaceholder && <EmptyHeaderPlaceholder />}
-                        <CoinjoinAccountDiscovery />
-                    </>
-                );
-            } else {
-                return (
-                    <>
-                        {showEmptyHeaderPlaceholder && <EmptyHeaderPlaceholder />}
-                        <SkeletonRectangle
-                            width="100%"
-                            height="300px"
-                            borderRadius="12px"
-                            animate={loader === 'account-loading'}
-                        />
-                    </>
-                );
-            }
-        } else {
-            return (
-                <>
-                    <AccountBanners account={selectedAccount} />
-                    {showEmptyHeaderPlaceholder && <EmptyHeaderPlaceholder />}
-                    {status === 'exception' ? (
-                        <AccountException loader={loader} network={network} />
-                    ) : (
-                        <div className={className}>{children}</div>
-                    )}
-                </>
-            );
-        }
-    };
-
-    const pageContent = getPageContent();
-
-    return pageContent;
+    return (
+        <AccountHeaderProvider balanceSectionRef={balanceSectionRef}>
+            <Column gap={40}>
+                <AccountBanners account={account.account} />
+                <WalletBody account={account}>{children}</WalletBody>
+            </Column>
+        </AccountHeaderProvider>
+    );
 };

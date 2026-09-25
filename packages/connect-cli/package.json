@@ -1,0 +1,28 @@
+{
+    "name": "@trezor/connect-cli",
+    "version": "1.0.0",
+    "private": true,
+    "license": "See LICENSE.md in repo root",
+    "sideEffects": false,
+    "main": "src/index",
+    "scripts": {
+        "depcheck": "yarn g:depcheck",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
+        "type-check": "yarn g:tsc --build",
+        "cli": "tsx ./src/index.ts",
+        "usb": "tsx ./src/index.ts --usb",
+        "udp": "tsx ./src/index.ts --udp",
+        "bridge": "tsx ./src/index.ts --bridge",
+        "bluetooth": "tsx ./src/index.ts --bluetooth"
+    },
+    "dependencies": {
+        "@trezor/connect": "workspace:*",
+        "@trezor/transport": "workspace:*",
+        "@trezor/transport-bluetooth": "workspace:*",
+        "@trezor/transport-common": "workspace:*"
+    },
+    "devDependencies": {
+        "@trezor/requirements": "workspace:*",
+        "tsx": "^4.21.0"
+    }
+}

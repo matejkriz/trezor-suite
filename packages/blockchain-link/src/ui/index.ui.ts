@@ -1,10 +1,12 @@
-import BlockbookWorker from '../workers/blockbook/index';
-import RippleWorker from '../workers/ripple/index';
-import BlockfrostWorker from '../workers/blockfrost/index';
 import CONFIG from './config';
-import BlockchainLink from '../index';
-import { getInputValue, fillValues, onClear } from './utils';
+import { BlockchainLink } from '../index';
+import { fillValues, getInputValue, onClear } from './utils';
+import BlockbookWorker from '../workers/blockbook/index';
+import BlockfrostWorker from '../workers/blockfrost/index';
+import EvmRpcWorker from '../workers/evm-rpc';
+import RippleWorker from '../workers/ripple/index';
 import SolanaWorker from '../workers/solana';
+import StellarWorker from '../workers/stellar';
 
 const instances: BlockchainLink[] = [];
 
@@ -62,7 +64,7 @@ const handleClick = (event: MouseEvent) => {
         case 'get-tx': {
             try {
                 blockchain
-                    .getTransaction(getInputValue('get-tx-id'))
+                    .getTransaction({ txid: getInputValue('get-tx-id') })
                     .then(onResponse)
                     .catch(onError);
             } catch (error) {
@@ -80,7 +82,7 @@ const handleClick = (event: MouseEvent) => {
         case 'push-transaction': {
             const hexString = getInputValue('push-transaction-tx');
 
-            blockchain.pushTransaction(hexString).then(onResponse).catch(onError);
+            blockchain.pushTransaction({ hex: hexString }).then(onResponse).catch(onError);
             break;
         }
 
@@ -273,9 +275,13 @@ const prepareResponse = (parent: HTMLElement, response: any, isError = false) =>
     const otherResponses = parent.getElementsByClassName('response');
     if (otherResponses.length > 0) {
         if (otherResponses.length >= 3) {
-            parent.removeChild(otherResponses[2]);
+            // @ts-expect-error: indexing with noUncheckedIndexedAccess
+            const third: Element = otherResponses[2];
+            parent.removeChild(third);
         }
-        parent.insertBefore(div, otherResponses[0]);
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const first: Element = otherResponses[0];
+        parent.insertBefore(div, first);
     } else {
         parent.appendChild(div);
     }
@@ -380,6 +386,14 @@ CONFIG.forEach(i => {
 
     if (i.blockchain.worker.includes('solana')) {
         worker = SolanaWorker;
+    }
+
+    if (i.blockchain.worker.includes('stellar')) {
+        worker = StellarWorker;
+    }
+
+    if (i.blockchain.worker.includes('evm-rpc')) {
+        worker = EvmRpcWorker;
     }
 
     const b = new BlockchainLink({

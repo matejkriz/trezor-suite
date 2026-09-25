@@ -1,0 +1,40 @@
+import type { HDNodeResponse } from '@trezor/connect-common/src/types/api/account/getPublicKey';
+import type { MessagesSchema as Messages } from '@trezor/protobuf';
+import { convertTaprootXpub, isNotNull, isNotNullOrUndefined } from '@trezor/utils';
+
+interface ResolveDescriptorForTaprootParams {
+    response: HDNodeResponse;
+    publicKey: Messages.PublicKey;
+}
+
+export const resolveDescriptorForTaproot = ({
+    response,
+    publicKey,
+}: ResolveDescriptorForTaprootParams) => {
+    if (isNotNullOrUndefined(publicKey.descriptor)) {
+        const splittedDescriptor = publicKey.descriptor.split('#');
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const xpub: string = splittedDescriptor[0];
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const checksum: string = splittedDescriptor[1];
+
+        // This is here to keep backwards compatibility, suite and block-books
+        // are still using `'` over `h`.
+        const correctedXpub = convertTaprootXpub({ xpub, direction: 'h-to-apostrophe' });
+
+        if (isNotNull(correctedXpub)) {
+            return { xpub: correctedXpub, checksum };
+        }
+    }
+
+    // wrap regular xpub into bitcoind native descriptor
+    const fingerprint = Number(publicKey.root_fingerprint || 0)
+        .toString(16)
+        .padStart(8, '0');
+    const descriptorPath = `${fingerprint}${response.serializedPath.substring(1)}`;
+
+    return {
+        xpub: `tr([${descriptorPath}]${response.xpub}/<0;1>/*)`,
+        checksum: undefined,
+    };
+};

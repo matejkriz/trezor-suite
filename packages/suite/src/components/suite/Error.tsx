@@ -1,90 +1,58 @@
-import styled from 'styled-components';
-import { H2, Paragraph, Button, variables } from '@trezor/components';
-import { db } from 'src/storage';
-import { reloadApp } from 'src/utils/suite/reload';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectReloadApp } from '@suite-common/suite-types';
+import { Button, Column, Divider, H2, Paragraph, Row } from '@trezor/components';
+import { RepeatIcon } from '@trezor/icons';
 
-const Wrapper = styled.div`
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    flex: 1;
-    padding: 20px;
-`;
-
-const Buttons = styled.div`
-    display: flex;
-    justify-content: space-between;
-    width: 60%;
-    min-width: 320px;
-    max-width: 500px;
-
-    @media only screen and (max-width: ${variables.SCREEN_SIZE.MD}) {
-        width: 80%;
-    }
-`;
-
-const Separator = styled.div`
-    background: ${({ theme }) => theme.STROKE_GREY};
-    height: 1px;
-    margin: 30px 0;
-    width: 80%;
-    min-width: 320px;
-    max-width: 800px;
-
-    @media only screen and (max-width: ${variables.SCREEN_SIZE.MD}) {
-        width: 90%;
-    }
-`;
-
-const StyledButton = styled(Button)`
-    margin: 6px 12px;
-`;
-
-const GenericMessage = styled(Paragraph)`
-    margin-bottom: 10px;
-    text-align: center;
-`;
-
-const ErrorMessage = styled.span`
-    text-align: center;
-    max-width: 600px;
-    font-family: Consolas, Menlo, Courier, monospace;
-    font-size: ${variables.FONT_SIZE.TINY};
-    color: ${({ theme }) => theme.TYPE_DARK_GREY};
-`;
+import { injectDb } from 'src/storage/createDb';
 
 type ErrorProps = {
     error: string;
 };
 
-export const Error = ({ error }: ErrorProps) => (
-    <Wrapper>
-        <H2>Error occurred</H2>
-        <GenericMessage>It appears something is broken.</GenericMessage>
-        <ErrorMessage>{error}</ErrorMessage>
-        <Separator />
-        <Buttons>
-            <StyledButton
-                icon="REFRESH"
-                variant="tertiary"
-                onClick={() => {
-                    reloadApp();
-                }}
-            >
-                Reload window
-            </StyledButton>
+export const Error = ({ error }: ErrorProps) => {
+    const { reloadApp, db } = useServices(injectReloadApp, injectDb);
 
-            <StyledButton
-                icon="REFRESH"
-                variant="tertiary"
-                onClick={() => {
-                    db.removeDatabase();
-                    reloadApp();
-                }}
-            >
-                Clear storage and reload
-            </StyledButton>
-        </Buttons>
-    </Wrapper>
-);
+    return (
+        <Column
+            flex="1"
+            alignItems="center"
+            justifyContent="center"
+            padding={20}
+            maxWidth="800px"
+            width="100%"
+        >
+            <H2>Error occurred</H2>
+            <Paragraph margin={{ bottom: 8 }} align="center">
+                It appears something is broken.
+            </Paragraph>
+            <Paragraph align="center" typographyStyle="body-xs" isMonospaced>
+                {error}
+            </Paragraph>
+            <Divider margin={{ vertical: 24 }} />
+            <Row width="100%" justifyContent="center" gap={16} flexWrap="wrap">
+                <Button
+                    iconLeft={RepeatIcon}
+                    intent="neutral"
+                    priority="secondary"
+                    onClick={() => {
+                        reloadApp();
+                    }}
+                >
+                    Reload window
+                </Button>
+
+                <Button
+                    iconLeft={RepeatIcon}
+                    intent="neutral"
+                    priority="secondary"
+                    onClick={() => {
+                        db.removeDatabase();
+                        reloadApp();
+                    }}
+                >
+                    Clear storage and reload
+                </Button>
+            </Row>
+        </Column>
+    );
+};

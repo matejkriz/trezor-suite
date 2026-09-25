@@ -1,62 +1,126 @@
-import { useArgs } from '@storybook/client-api';
-import { Meta, StoryObj } from '@storybook/react';
+import { type Meta, type StoryObj } from '@storybook/react';
+import { useArgs } from 'storybook/preview-api';
 
-import { Select as SelectComponent, SelectProps } from './Select';
+import {
+    type Option,
+    Select as SelectComponent,
+    type SelectProps,
+    allowedSelectFrameProps,
+} from './Select';
+import { getFramePropsStory } from '../../../utils/frameProps';
+import { inputSizes } from '../types';
 
-const values: any = {
-    'None (default)': null,
-    Low: { label: 'low', value: 'low' },
-    Medium: { label: 'medium', value: 'medium' },
-    High: { label: 'high', value: 'high' },
-    Custom: { label: 'custom', value: 'custom' },
+const groupedValues: Record<string, Record<string, Option>> = {
+    Common: {
+        Low: { label: 'Low', value: 'low' },
+        Medium: { label: 'Medium', value: 'medium' },
+        High: { label: 'High', value: 'high' },
+        Custom: { label: 'Custom', value: 'custom' },
+        Auto: { label: 'Auto', value: 'auto' },
+        Default: { label: 'Default', value: 'default' },
+    },
+    Performance: {
+        Eco: { label: 'Eco', value: 'eco' },
+        Balanced: { label: 'Balanced', value: 'balanced' },
+        Turbo: { label: 'Turbo', value: 'turbo' },
+        Extreme: { label: 'Extreme', value: 'extreme' },
+        Burst: { label: 'Burst', value: 'burst' },
+        Sustained: { label: 'Sustained', value: 'sustained' },
+    },
+    Security: {
+        Standard: { label: 'Standard', value: 'standard' },
+        Strict: { label: 'Strict', value: 'strict' },
+        Hardened: { label: 'Hardened', value: 'hardened' },
+        Maximum: { label: 'Maximum', value: 'maximum' },
+        Paranoid: { label: 'Paranoid', value: 'paranoid' },
+        Lockdown: { label: 'Lockdown', value: 'lockdown' },
+    },
+    Network: {
+        Offline: { label: 'Offline', value: 'offline' },
+        Limited: { label: 'Limited', value: 'limited' },
+        Normal: { label: 'Normal', value: 'normal' },
+        Preferred: { label: 'Preferred', value: 'preferred' },
+        Priority: { label: 'Priority', value: 'priority' },
+        Realtime: { label: 'Realtime', value: 'realtime' },
+    },
 };
 
-const options = Object.keys(values)
-    .filter((k: string) => values[k])
-    .map((k: string) => values[k]);
+const groupedOptions = Object.entries(groupedValues).map(([label, values]) => ({
+    label,
+    options: Object.values(values),
+}));
 
-const meta: Meta = {
-    title: 'Form/Select',
+const meta: Meta<typeof SelectComponent> = {
+    title: '✏️ Form',
     component: SelectComponent,
-} as Meta;
+};
 export default meta;
 
 export const Select: StoryObj<SelectProps> = {
     render: ({ ...args }) => {
         // eslint-disable-next-line
         const [{ option }, updateArgs] = useArgs();
-        const setOption = (option: { label: string; value: 'string' }) => updateArgs({ option });
+        const setOption = (option2: Option) => updateArgs({ option: option2 });
 
-        return <SelectComponent {...args} value={option} onChange={setOption} options={options} />;
+        return (
+            <SelectComponent
+                {...args}
+                value={option}
+                onChange={setOption}
+                options={groupedOptions}
+            />
+        );
+    },
+    args: {
+        label: 'Label',
+        hasError: false,
+        isDisabled: false,
+        isSearchable: false,
+        isLoading: false,
+        isClean: false,
+        size: 'large',
+        isMenuOpen: undefined,
+        ...getFramePropsStory(allowedSelectFrameProps).args,
     },
     argTypes: {
-        isSearchable: {
-            control: {
-                type: 'boolean',
-            },
-        },
+        label: { control: 'text' },
         isDisabled: {
-            control: {
-                type: 'boolean',
-            },
+            control: 'boolean',
+        },
+        isSearchable: {
+            control: 'boolean',
+        },
+        isLoading: {
+            control: 'boolean',
+        },
+        isClean: {
+            control: 'boolean',
         },
         bottomText: {
             control: { type: 'text' },
         },
+        labelHoverRight: { control: 'text' },
+        labelLeft: { control: 'text' },
+        labelRight: { control: 'text' },
         size: {
             control: {
-                options: { 'Large (default)': null, Small: 'small' },
-                type: 'radio',
+                type: 'select',
             },
+            options: inputSizes,
         },
-        label: {
-            control: { type: 'text' },
+        minValueWidth: {
+            control: 'number',
         },
+        isMenuOpen: {
+            control: 'boolean',
+        },
+        hasError: { control: 'boolean' },
         placeholder: {
-            control: { type: 'text' },
+            control: 'text',
         },
-    },
-    args: {
-        label: 'Label',
+        'data-testid': {
+            control: 'text',
+        },
+        ...getFramePropsStory(allowedSelectFrameProps).argTypes,
     },
 };

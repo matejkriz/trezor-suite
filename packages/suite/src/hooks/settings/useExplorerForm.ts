@@ -1,0 +1,165 @@
+import { useMemo } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
+
+import { useTranslation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { type Explorer, type NetworkSymbol } from '@suite-common/wallet-config';
+import { selectNetworkExplorers, setNetworkExplorerThunk } from '@suite-common/wallet-core';
+import { deepEqual, isUrl } from '@trezor/utils';
+
+import { useSelector } from 'src/hooks/suite';
+
+const useExplorerInput = (currentValues: Explorer) => {
+    const {
+        register,
+        formState: { isDirty, errors },
+        trigger,
+        control,
+        reset,
+    } = useForm<Explorer>({
+        mode: 'onChange',
+        defaultValues: currentValues,
+    });
+
+    const [base, tx, address, token, nft, queryString] = useWatch({
+        control,
+        name: ['base', 'tx', 'address', 'token', 'nft', 'queryString'],
+    });
+
+    const { translationString } = useTranslation();
+
+    const validateBaseUrl = (value: string) => {
+        if (!isUrl(value)) {
+            return translationString('TR_EXPLORER_INVALID_URL');
+        }
+    };
+
+    const validateSuffix = (value?: string) => {
+        if (value?.trim() === '') {
+            return translationString('TR_EXPLORER_INVALID_SUFFIX');
+        }
+    };
+
+    const { ref: baseInputRef, ...baseInputField } = register('base', {
+        validate: validateBaseUrl,
+    });
+
+    const { ref: txInputRef, ...txInputField } = register('tx', {
+        validate: validateSuffix,
+    });
+
+    const { ref: addressInputRef, ...addressInputField } = register('address', {
+        validate: validateSuffix,
+    });
+
+    const { ref: tokenInputRef, ...tokenInputField } = register('token', {
+        validate: validateSuffix,
+    });
+
+    const { ref: nftInputRef, ...nftInputField } = register('nft', {
+        validate: validateSuffix,
+    });
+
+    const { ref: queryStringInputRef, ...queryStringInputField } = register('queryString');
+
+    return {
+        validateBaseUrl,
+        validateSuffix,
+
+        trigger,
+        register,
+        reset,
+        isDirty,
+        errors,
+
+        fields: {
+            base: {
+                ref: baseInputRef,
+                value: base,
+                field: baseInputField,
+                error: errors.base?.message,
+            },
+            tx: {
+                ref: txInputRef,
+                value: tx,
+                field: txInputField,
+                error: errors.tx?.message,
+            },
+            address: {
+                ref: addressInputRef,
+                value: address,
+                field: addressInputField,
+                error: errors.address?.message,
+            },
+            token: {
+                ref: tokenInputRef,
+                value: token,
+                field: tokenInputField,
+                error: errors.token?.message,
+            },
+            nft: {
+                ref: nftInputRef,
+                value: nft,
+                field: nftInputField,
+                error: errors.nft?.message,
+            },
+            queryString: {
+                ref: queryStringInputRef,
+                value: queryString,
+                field: queryStringInputField,
+                error: errors.queryString?.message,
+            },
+        },
+    };
+};
+
+export const useExplorerForm = (symbol: NetworkSymbol) => {
+    const { dispatch } = useServices(injectDispatch);
+
+    const explorerConfig = useSelector(state => selectNetworkExplorers(state, symbol));
+
+    const input = useExplorerInput(explorerConfig.custom ?? explorerConfig.default);
+    const { base, tx, address, token, nft, queryString } = input.fields;
+
+    const explorer: Explorer = useMemo(
+        () => ({
+            base: base.value,
+            tx: tx.value,
+            address: address.value,
+            token: token.value,
+            nft: nft.value,
+            queryString: queryString.value,
+        }),
+        [base, tx, address, token, nft, queryString],
+    );
+
+    const save = () => {
+        if (input.isDirty) {
+            dispatch(setNetworkExplorerThunk({ symbol, explorer }));
+        }
+    };
+
+    const setDefaultValues = () => {
+        input.reset(explorerConfig.default, { keepDefaultValues: true });
+        input.trigger();
+    };
+
+    const isValid =
+        !input.fields.base.error &&
+        !input.fields.tx.error &&
+        !input.fields.address.error &&
+        !input.fields.token.error &&
+        !input.fields.nft.error &&
+        !input.fields.queryString.error;
+
+    return {
+        save,
+        setDefaultValues,
+        usesDefaultExplorer: deepEqual(explorer, explorerConfig.default),
+        explorerConfig,
+        input,
+        isValid,
+        explorer,
+    };
+};

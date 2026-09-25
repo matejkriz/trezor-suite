@@ -1,141 +1,98 @@
-import { useMemo } from 'react';
-import { Dimensions, ImageBackground } from 'react-native';
+import { ImageBackground, StyleSheet } from 'react-native';
 
-import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { FeatureFlag, useFeatureFlag } from '@suite-native/feature-flags';
-import { Link } from '@suite-native/link';
-import { Box, Text, TrezorSuiteLiteHeader } from '@suite-native/atoms';
+import { Box, Button, Text, VStack } from '@suite-native/atoms';
+import { Icon } from '@suite-native/icons';
+import { Translation } from '@suite-native/intl';
 import {
-    OnboardingStackParamList,
+    type OnboardingStackParamList,
     OnboardingStackRoutes,
     Screen,
-    StackNavigationProps,
+    type StackProps,
 } from '@suite-native/navigation';
-import { Translation, useTranslate } from '@suite-native/intl';
-import { Icon } from '@suite-common/icons';
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-import { useActiveColorScheme } from '@suite-native/theme';
+import { getWindowHeight } from '@trezor/env-utils';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
+import { colorVariants } from '@trezor/theme';
+import { hexToRgba } from '@trezor/utils';
 
-import { OnboardingFooter } from '../components/OnboardingFooter';
+const GRADIENT_HEIGHT = getWindowHeight() / 3;
+const BLACK_BACKGROUND_COLOR = '#000000';
 
-const titleStyle = prepareNativeStyle(_ => ({
-    textAlign: 'center',
-    marginBottom: 12,
-    alignItems: 'center',
-}));
-
-const imageContainerStyle = prepareNativeStyle(() => ({
-    position: 'absolute',
-    left: 0,
-    top: 0,
+const gradientBackgroundBottomStyle = prepareNativeStyle(() => ({
     width: '100%',
-    aspectRatio: 390 / 296,
+    height: GRADIENT_HEIGHT,
 }));
 
-const contentStyle = prepareNativeStyle(utils => ({
+const buttonWrapperStyle = prepareNativeStyle(_ => ({
     width: '100%',
-    height: '100%',
-    backgroundColor: utils.colors.backgroundSurfaceElevation0,
-    alignItems: 'center',
 }));
 
-const cardStyle = prepareNativeStyle(utils => ({
-    marginTop: utils.spacings.medium,
-    padding: utils.spacings.large,
-    borderRadius: 20,
-    borderColor: utils.colors.borderSubtleInverted,
-    flex: 1,
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: utils.borders.widths.small,
-    width: Dimensions.get('window').width - 48,
+const textColorStyle = prepareNativeStyle(() => ({
+    // the text needs to be white to be visible on image background, ignoring the theme
+    color: colorVariants.dark.contentPrimary,
 }));
 
-export const WelcomeScreen = () => {
-    const { translate } = useTranslate();
+const screenContainerStyle = prepareNativeStyle(() => ({
+    // Black background is needed to keep screen dark and prevent flashing while is the image still loading.
+    backgroundColor: BLACK_BACKGROUND_COLOR,
+}));
 
-    const [isUsbDeviceConnectFeatureEnabled] = useFeatureFlag(FeatureFlag.IsDeviceConnectEnabled);
-
-    const navigation =
-        useNavigation<
-            StackNavigationProps<OnboardingStackParamList, OnboardingStackRoutes.Welcome>
-        >();
-
+export const WelcomeScreen = ({
+    navigation,
+}: StackProps<OnboardingStackParamList, OnboardingStackRoutes.Welcome>) => {
     const { applyStyle, utils } = useNativeStyles();
 
-    const colorScheme = useActiveColorScheme();
-
-    const handleRedirect = () => {
-        navigation.navigate(
-            isUsbDeviceConnectFeatureEnabled
-                ? OnboardingStackRoutes.ConnectTrezor
-                : OnboardingStackRoutes.TrackBalances,
-        );
+    const transparentColor = hexToRgba(utils.colors.transparent, 0.01);
+    const navigateToAnalyticsConsent = () => {
+        navigation.navigate(OnboardingStackRoutes.AnalyticsConsent);
     };
 
-    const isDarkMode = colorScheme === 'dark';
-
-    const getImageSource = useMemo(() => {
-        if (isDarkMode) {
-            return require('../assets/darkRectangles.png');
-        }
-
-        return require('../assets/rectangles.png');
-    }, [isDarkMode]);
-
     return (
-        <Box style={applyStyle(contentStyle)}>
+        <Box flex={1} style={applyStyle(screenContainerStyle)}>
             <ImageBackground
-                source={getImageSource}
+                source={require('../assets/welcomeScreenBackground.jpeg')}
+                style={StyleSheet.absoluteFill}
                 resizeMode="cover"
-                style={applyStyle(imageContainerStyle)}
-            />
-            <Screen backgroundColor="transparent">
-                <LinearGradient
-                    style={applyStyle(cardStyle)}
-                    colors={[
-                        utils.colors.gradientNeutralBottomFadeSurfaceElevation1Start,
-                        utils.colors.gradientNeutralBottomFadeSurfaceElevation1End,
-                    ]}
-                >
-                    <Box flex={1} />
-                    <Box alignItems="center" justifyContent="center">
-                        <Box alignItems="center">
-                            <Box marginBottom="large">
-                                <Icon size="extraLarge" name="trezor" color="iconDefault" />
-                            </Box>
-                            <Box style={applyStyle(titleStyle)}>
-                                <Text variant="titleMedium" textAlign="center">
-                                    <Translation id="moduleOnboarding.welcomeScreen.welcome" />
-                                </Text>
-                                <TrezorSuiteLiteHeader textVariant="titleMedium" />
-                            </Box>
-                        </Box>
-                        <Text color="textSubdued" textAlign="center">
-                            {translate('moduleOnboarding.welcomeScreen.subtitle')}
-                        </Text>
-                    </Box>
-                    <Box flex={1} justifyContent="flex-end">
-                        <Text variant="hint" textAlign="center">
-                            <Translation
-                                id="moduleOnboarding.welcomeScreen.trezorLink"
-                                values={{
-                                    trezorLink: chunks => (
-                                        <Link href="https://trezor.io" label={chunks} />
-                                    ),
-                                }}
-                            />
-                        </Text>
-                    </Box>
-                </LinearGradient>
-                <Box alignItems="center" marginTop="large">
-                    <OnboardingFooter
-                        redirectTarget={handleRedirect}
-                        nextButtonTitle={translate('moduleOnboarding.welcomeScreen.nextButton')}
+                fadeDuration={0}
+            >
+                <Box flex={1} justifyContent="space-between">
+                    <LinearGradient
+                        colors={[BLACK_BACKGROUND_COLOR, transparentColor]}
+                        style={applyStyle(gradientBackgroundBottomStyle)}
+                    />
+                    <LinearGradient
+                        colors={[transparentColor, BLACK_BACKGROUND_COLOR]}
+                        style={applyStyle(gradientBackgroundBottomStyle)}
                     />
                 </Box>
+            </ImageBackground>
+            <Screen isScrollable={false} backgroundColor="transparent">
+                <VStack flex={1} justifyContent="flex-end" alignItems="center" spacing={48}>
+                    <VStack alignItems="center" spacing="sp16">
+                        <Icon
+                            name="trezorLogo"
+                            color={colorVariants.dark.contentPrimary}
+                            size={50}
+                        />
+                        <Box alignItems="center">
+                            <Text variant="headline-lg" style={applyStyle(textColorStyle)}>
+                                <Translation id="generic.trezorSuite" />
+                            </Text>
+                            <Text variant="headline-sm" style={applyStyle(textColorStyle)}>
+                                <Translation id="moduleOnboarding.welcomeScreen.subtitle" />
+                            </Text>
+                        </Box>
+                    </VStack>
+                    <Box style={applyStyle(buttonWrapperStyle)}>
+                        <Button
+                            onPress={navigateToAnalyticsConsent}
+                            testID="@onboarding/Welcome/nextBtn"
+                        >
+                            <Translation id="moduleOnboarding.welcomeScreen.button" />
+                        </Button>
+                    </Box>
+                </VStack>
             </Screen>
         </Box>
     );

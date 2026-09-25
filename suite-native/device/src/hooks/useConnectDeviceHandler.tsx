@@ -1,0 +1,64 @@
+import { useCallback } from 'react';
+import { Platform } from 'react-native';
+import { useSelector } from 'react-redux';
+
+import { useNavigation } from '@react-navigation/native';
+
+import { bluetoothActions } from '@suite-common/bluetooth';
+import { useServices } from '@suite-common/dependency-injection';
+import {
+    acquireDeviceThunk,
+    selectIsAnyPhysicalDeviceConnectedViaUsb,
+    selectIsDeviceAuthorized,
+    selectIsDeviceThpLocked,
+} from '@suite-common/device';
+import { injectDispatch } from '@suite-common/redux-utils';
+import {
+    AuthorizeDeviceStackRoutes,
+    type HomeStackParamList,
+    type HomeStackRoutes,
+    type RootStackParamList,
+    RootStackRoutes,
+    type StackToStackCompositeNavigationProps,
+} from '@suite-native/navigation';
+
+type NavigationProps = StackToStackCompositeNavigationProps<
+    HomeStackParamList,
+    HomeStackRoutes.Home,
+    RootStackParamList
+>;
+
+export const useConnectDeviceHandler = () => {
+    const { dispatch } = useServices(injectDispatch);
+    const navigation = useNavigation<NavigationProps>();
+
+    const isDeviceAuthorized = useSelector(selectIsDeviceAuthorized);
+    const isDeviceThpLocked = useSelector(selectIsDeviceThpLocked);
+    const isAnyPhysicalDeviceConnectedViaUsb = useSelector(
+        selectIsAnyPhysicalDeviceConnectedViaUsb,
+    );
+
+    const onConnectDevicePress = useCallback(() => {
+        if (!isDeviceAuthorized || isDeviceThpLocked) {
+            dispatch(acquireDeviceThunk({}));
+        } else if (isAnyPhysicalDeviceConnectedViaUsb || Platform.OS === 'ios') {
+            // Make sure auto-connect is enabled in case some device was manually disconnected.
+            dispatch(bluetoothActions.enableAutoConnect());
+            navigation.navigate(RootStackRoutes.AuthorizeDeviceStack, {
+                screen: AuthorizeDeviceStackRoutes.TurnOnAndUnlockDevice,
+            });
+        } else {
+            navigation.navigate(RootStackRoutes.AuthorizeDeviceStack, {
+                screen: AuthorizeDeviceStackRoutes.ConnectDeviceCrossroads,
+            });
+        }
+    }, [
+        dispatch,
+        isDeviceAuthorized,
+        isDeviceThpLocked,
+        isAnyPhysicalDeviceConnectedViaUsb,
+        navigation,
+    ]);
+
+    return { onConnectDevicePress };
+};

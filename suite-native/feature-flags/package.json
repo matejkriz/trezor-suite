@@ -6,12 +6,18 @@
     "sideEffects": false,
     "main": "src/index",
     "scripts": {
-        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "type-check": "yarn g:tsc --build"
+        "depcheck": "yarn g:depcheck",
+        "type-check": "yarn g:tsc --build",
+        "test:unit": "yarn g:jest:native",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'"
     },
     "dependencies": {
-        "@reduxjs/toolkit": "1.9.5",
-        "react-native": "0.73.2",
-        "react-redux": "8.0.7"
+        "@reduxjs/toolkit": "2.12.0",
+        "@suite-common/dependency-injection": "workspace:*",
+        "@suite-common/redux-utils": "workspace:*",
+        "@suite-native/config": "workspace:*",
+        "@trezor/env-utils": "workspace:*",
+        "react-native": "0.86.0",
+        "react-redux": "9.3.0"
     }
 }

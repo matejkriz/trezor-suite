@@ -1,10 +1,12 @@
 {
     "extends": "../../tsconfig.base.json",
     "compilerOptions": { "outDir": "libDev" },
+    "include": [".", "**/*.json"],
     "references": [
+        { "path": "../http-client" },
         { "path": "../wallet-config" },
-        { "path": "../wallet-types" },
-        { "path": "../../packages/styles" },
-        { "path": "../../packages/theme" }
+        {
+            "path": "../../networks/ethereum/network-ethereum-suite-common"
+        }
     ]
 }

@@ -1,0 +1,65 @@
+import { useCallback } from 'react';
+import { useSelector } from 'react-redux';
+
+import { useNavigation } from '@react-navigation/native';
+import { isFulfilled } from '@reduxjs/toolkit';
+
+import { events } from '@suite-common/analytics';
+import { useServices } from '@suite-common/dependency-injection';
+import { selectSelectedDevice } from '@suite-common/device';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { wipeDeviceThunk } from '@suite-common/wallet-core';
+import { injectNativeAnalytics } from '@suite-native/analytics';
+import { requestPrioritizedDeviceAccess } from '@suite-native/device-mutex';
+import { setWasDeviceOnboardingCancelled } from '@suite-native/device-onboarding';
+import {
+    type DeviceSettingsStackParamList,
+    DeviceSettingsStackRoutes,
+    type StackNavigationProps,
+    WipeDeviceStackRoutes,
+} from '@suite-native/navigation';
+
+type NavigationProps = StackNavigationProps<
+    DeviceSettingsStackParamList,
+    DeviceSettingsStackRoutes.WipeDeviceStack
+>;
+
+export const useWipeDevice = () => {
+    const { analytics, dispatch } = useServices(injectNativeAnalytics, injectDispatch);
+    const navigation = useNavigation<NavigationProps>();
+
+    const device = useSelector(selectSelectedDevice);
+
+    const navigateToWipeDeviceStack = useCallback(() => {
+        navigation.navigate(DeviceSettingsStackRoutes.WipeDeviceStack);
+    }, [navigation]);
+
+    const wipeDevice = async () => {
+        if (!device) return;
+
+        // After wipe, device gets changed and reconnected. That would trigger redirect to device onboarding which is
+        // not wanted here. We want to treat it differently since it was wiped so user goes to onboarding through homescreen.
+        dispatch(setWasDeviceOnboardingCancelled(true));
+
+        navigation.navigate(DeviceSettingsStackRoutes.WipeDeviceStack);
+
+        const response = await requestPrioritizedDeviceAccess(
+            async () => await dispatch(wipeDeviceThunk()),
+        );
+
+        if (response.success && isFulfilled(response.payload)) {
+            analytics.report({
+                type: events.settingsDeviceWipeEvent.name,
+            });
+            navigation.navigate(DeviceSettingsStackRoutes.WipeDeviceStack, {
+                screen: WipeDeviceStackRoutes.WipeDeviceLoadingScreen,
+            });
+        } else {
+            if (navigation.canGoBack()) {
+                navigation.goBack();
+            }
+        }
+    };
+
+    return { navigateToWipeDeviceStack, wipeDevice };
+};

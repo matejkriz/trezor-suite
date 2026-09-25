@@ -1,18 +1,31 @@
-import { TrezorDevice } from 'src/types/suite';
-import { Image, ImageProps } from '@trezor/components';
+import { getDeviceModelWithFlagshipFallback } from '@suite-common/suite-utils';
+import { type ImageProps } from '@trezor/components';
+import { type Device } from '@trezor/connect';
+import { DeviceWithScene } from '@trezor/product-components';
 
-interface DeviceConfirmImageProps extends Omit<ImageProps, 'image'> {
-    device: TrezorDevice;
-}
+type DeviceConfirmImageProps = Omit<ImageProps, 'image'> & {
+    device?: Pick<Device, 'features' | 'thp'>;
+} & {
+    width?: number;
+    height?: number;
+};
 
-export const DeviceConfirmImage = ({ device, ...rest }: DeviceConfirmImageProps) => {
-    const deviceModelInternal = device.features?.internal_model;
+export const DeviceConfirmImage = ({
+    device,
+    height = 300,
+    width,
+    ...rest
+}: DeviceConfirmImageProps) => {
+    const deviceModelInternal = getDeviceModelWithFlagshipFallback(device);
 
-    if (!deviceModelInternal) {
-        return null;
-    }
-
-    const imgName = `DEVICE_CONFIRM_TREZOR_${deviceModelInternal}` as const;
-
-    return <Image {...rest} image={imgName} />;
+    return (
+        <DeviceWithScene
+            deviceModel={deviceModelInternal}
+            width={width}
+            unitColor={device?.features?.unit_color}
+            height={height}
+            margin={20}
+            {...rest}
+        />
+    );
 };

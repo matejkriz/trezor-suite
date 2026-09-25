@@ -1,23 +1,25 @@
+import CopyWebpackPlugin from 'copy-webpack-plugin';
+import HtmlWebpackPlugin from 'html-webpack-plugin';
 import path from 'path';
 import webpack from 'webpack';
-import HtmlWebpackPlugin from 'html-webpack-plugin';
-import CopyPlugin from 'copy-webpack-plugin';
-import { execSync } from 'child_process';
 
-const commitHash = execSync('git rev-parse HEAD').toString().trim();
+if (!process.env.__SUITE_WEB_URL__) {
+    console.warn(`
+╔══════════════════════════════════════════════════════════════════╗
+║                                                                  ║
+║   ⚠️  __SUITE_WEB_URL__ is not set!                              ║
+║                                                                  ║
+║   The webextension build will fall back to the production        ║
+║   suite.trezor.io URL.                                           ║
+║                                                                  ║
+║   Set __SUITE_WEB_URL__ env variable to point to a custom        ║
+║   suite-web instance.                                            ║
+║                                                                  ║
+╚══════════════════════════════════════════════════════════════════╝
+`);
+}
 
 const DIST = path.resolve(__dirname, '../build-webextension');
-const CONNECT_WEB_PATH = path.join(__dirname, '..', '..', 'connect-web');
-
-const CONNECT_WEB_EXTENSION_PATH = path.join(CONNECT_WEB_PATH, 'src', 'webextension');
-
-const CONNECT_WEB_EXTENSION_PACKAGE_PATH = path.join(
-    __dirname,
-    '..',
-    '..',
-    'connect-webextension',
-    'build',
-);
 
 const config: webpack.Configuration = {
     target: 'web',
@@ -31,14 +33,6 @@ const config: webpack.Configuration = {
             'extension-popup',
             'index.tsx',
         ),
-        connectExplorer: path.join(
-            __dirname,
-            '..',
-            'src-webextension',
-            'pages',
-            'connect-explorer',
-            'index.tsx',
-        ),
         serviceWorker: path.join(
             __dirname,
             '..',
@@ -47,10 +41,14 @@ const config: webpack.Configuration = {
             'serviceWorker.ts',
         ),
     },
+    experiments: {
+        outputModule: true,
+    },
     output: {
         filename: '[name].bundle.js',
         path: DIST,
         publicPath: './',
+        module: true,
     },
     module: {
         rules: [
@@ -71,7 +69,6 @@ const config: webpack.Configuration = {
                             '@babel/preset-typescript',
                         ],
                         plugins: [
-                            '@babel/plugin-proposal-class-properties',
                             [
                                 'babel-plugin-styled-components',
                                 {
@@ -84,7 +81,7 @@ const config: webpack.Configuration = {
                 },
             },
             {
-                test: /\.(gif|jpe?g|png|svg)$/,
+                test: /\.(gif|jpe?g|png|svg|webp)$/,
                 type: 'asset/resource',
                 generator: {
                     filename: './images/[name][contenthash][ext]',
@@ -105,6 +102,9 @@ const config: webpack.Configuration = {
         hints: false,
     },
     plugins: [
+        new webpack.DefinePlugin({
+            __SUITE_WEB_URL__: JSON.stringify(process.env.__SUITE_WEB_URL__),
+        }),
         new HtmlWebpackPlugin({
             chunks: ['extensionPopup'],
             filename: 'extension-popup.html',
@@ -119,63 +119,19 @@ const config: webpack.Configuration = {
             inject: true,
             minify: false,
         }),
-        new HtmlWebpackPlugin({
-            chunks: ['connectExplorer'],
-            filename: 'connect-explorer.html',
-            template: path.join(
-                __dirname,
-                '..',
-                'src-webextension',
-                'pages',
-                'connect-explorer',
-                'index.html',
-            ),
-            inject: true,
-            minify: false,
-        }),
-        new CopyPlugin({
+        new CopyWebpackPlugin({
             patterns: [
                 {
                     from: path.join(__dirname, '..', 'src-webextension', 'manifest.json'),
                     to: `${DIST}/`,
                 },
-                {
-                    from: path.join(__dirname, '..', 'src', 'fonts'),
-                    to: `${DIST}/fonts/`,
-                },
-                {
-                    from: path.join(
-                        CONNECT_WEB_EXTENSION_PACKAGE_PATH,
-                        'trezor-connect-webextension.js',
-                    ),
-                    to: `${DIST}/vendor`,
-                    info: { minimized: false },
-                },
-                {
-                    from: path.join(CONNECT_WEB_EXTENSION_PATH, 'trezor-usb-permissions.js'),
-                    to: `${DIST}/vendor`,
-                },
-                {
-                    from: path.join(CONNECT_WEB_EXTENSION_PATH, 'trezor-usb-permissions.html'),
-                    to: `${DIST}`,
-                },
-                {
-                    from: path.resolve(__dirname, '../../../docs/packages/connect'),
-                    to: path.resolve(DIST, 'docs'),
-                },
             ],
         }),
-        new webpack.DefinePlugin({
-            'process.env.__TREZOR_CONNECT_SRC': JSON.stringify(process.env.__TREZOR_CONNECT_SRC),
-            'process.env.COMMIT_HASH': JSON.stringify(commitHash),
-        }),
-        // Imports from @trezor/connect-web in @trezor/connect-explorer package need to be replaced by imports from @trezor/connect-webextension/src/proxy
-        // in order to work properly with @trezor/connect-webextension service worker.
-        new webpack.NormalModuleReplacementPlugin(
-            /@trezor\/connect-web$/,
-            '@trezor/connect-webextension/src/proxy',
-        ),
     ],
+    optimization: {
+        minimize: false,
+        minimizer: [],
+    },
 };
 
 export default config;

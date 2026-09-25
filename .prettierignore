@@ -9,6 +9,7 @@ build-electron
 build-renderer
 .build-storybook
 *.cpuprofile
+.next
 
 # Dependency directory
 node_modules
@@ -94,38 +95,19 @@ buck-out/
 *.keystore
 !debug.keystore
 
-# fastlane
-#
-# It is recommended to not store the screenshots in the git repo. Instead, use fastlane to re-generate the
-# screenshots whenever they are needed.
-# For more information about the recommended setup visit:
-# https://docs.fastlane.tools/best-practices/source-control/
-
-**/android/fastlane/report.xml
-**/android/fastlane/Preview.html
-**/android/fastlane/screenshots
-**/android/fastlane/test_output
-**/ios/fastlane/report.xml
-**/ios/fastlane/Preview.html
-**/ios/fastlane/screenshots
-**/ios/fastlane/test_output
-**/fastlane/report.xml
-**/fastlane/Preview.html
-**/fastlane/screenshots
-**/fastlane/test_output
-
-*.cer
-*.certSigningRequest
-*.p12
-*.mobileprovision
-
 # scan temporary files
-**/android/fastlane/test_output
 
 !**/suite-native/app/.env.debug
 !**/suite-native/app/.env.develop
 !**/suite-native/app/.env.production
 !**/suite-native/app/.env.staging
+
+suite-native/atoms/src/Spinner/refresh-spinner-*.json
+suite-native/confirm-on-trezor/src/assets/confirm-on-trezor-lottie.json
+suite-native/module-home/src/assets/auto-eject-*-lottie.json
+suite-native/transaction-management/assets/send-arrows-lottie.json
+suite-native/thp/src/assets/create-secure-connection-lottie.json
+suite-native/storybook/.rnstorybook/storybook.requires.ts
 
 # ios
 **/ios/*.xcarchive
@@ -152,14 +134,24 @@ buck-out/
 !.yarn/sdks
 !.yarn/versions
 
-# @trezor/suite-data
-packages/suite-data/files/browser-detection
-packages/suite-data/files/guide
-packages/suite-data/files/translations/master.json
+# @suite/app-assets
+suite/app-assets/files/browser-detection
+suite/app-assets/files/guide
+suite/app-assets/files/translations/master.json
 
 # lottie animations
-packages/suite-data/files/videos/lottie/*.json
+suite/app-assets/files/videos/lottie/*.json
 
-# js files which look like ts files
-packages/protobuf/scripts/**
 /.nx/cache
+
+/.nx/workspace-data
+
+suite/app-assets/files/favicon.js
+
+# Generated asm.js build of Cardano Serialization Lib (Git LFS)
+networks/cardano/network-cardano/generated/csl-asmjs
+
+# Symlinks committed to repo, prettier can't handle them (that's ok; it will format the orig files anyway)
+docs/symlink/**
+CLAUDE.md
+CODEOWNERS

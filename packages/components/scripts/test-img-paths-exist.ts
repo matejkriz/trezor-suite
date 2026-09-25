@@ -1,0 +1,52 @@
+/* eslint-disable no-console */
+
+import fs from 'fs';
+import path from 'path';
+
+import { IMAGES } from '../src/components/Image/images';
+
+const imageDir = path.join(__dirname, '../../../suite/app-assets/files/images/images');
+
+const notFound: string[] = [];
+const caseMismatch: string[] = [];
+
+function fileExistsWithCaseSync(filepath: string) {
+    const dir = path.dirname(filepath);
+    if (dir === path.dirname(dir)) {
+        return true;
+    }
+    const filenames = fs.readdirSync(dir);
+    if (!filenames.includes(path.basename(filepath))) {
+        return false;
+    }
+
+    return fileExistsWithCaseSync(dir);
+}
+
+const checkImgSet = (imgSet: Record<string, string>) => {
+    for (const value of Object.values(imgSet)) {
+        const imagePath = path.join(imageDir, value);
+
+        const caseMatches = fileExistsWithCaseSync(imagePath);
+        const fileExists = fs.existsSync(imagePath);
+
+        if (!fileExists) {
+            notFound.push(imagePath);
+        } else if (!caseMatches) {
+            caseMismatch.push(imagePath);
+        }
+    }
+};
+
+checkImgSet(IMAGES);
+
+console.log('=== NOT FOUND ===');
+console.log(notFound);
+
+console.log('=== CASE MISMATCH ===');
+console.log(caseMismatch);
+
+if (notFound.length > 0 || caseMismatch.length > 0) {
+    console.error('Image check failed');
+    process.exit(1);
+}

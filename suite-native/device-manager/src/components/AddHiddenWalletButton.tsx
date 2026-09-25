@@ -1,27 +1,72 @@
-import { useSetAtom } from 'jotai';
+import { useSelector } from 'react-redux';
 
+import { useNavigation } from '@react-navigation/native';
+
+import { useServices } from '@suite-common/dependency-injection';
+import { selectSelectedDevice } from '@suite-common/device';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { runDiscoveryThunk, startDiscoveryThunk } from '@suite-common/wallet-core';
+import { events, injectNativeAnalytics } from '@suite-native/analytics';
 import { Button } from '@suite-native/atoms';
-import { isPassphraseModalVisibleAtom } from '@suite-native/passphrase';
-import { useTranslate } from '@suite-native/intl';
+import { Translation } from '@suite-native/intl';
+import {
+    type PassphraseStackParamList,
+    PassphraseStackRoutes,
+    type RootStackParamList,
+    RootStackRoutes,
+    type StackToStackCompositeNavigationProps,
+} from '@suite-native/navigation';
 
 import { useDeviceManager } from '../hooks/useDeviceManager';
 
-export const AddHiddenWalletButton = () => {
-    const { translate } = useTranslate();
+type NavigationProp = StackToStackCompositeNavigationProps<
+    PassphraseStackParamList,
+    PassphraseStackRoutes.PassphraseForm,
+    RootStackParamList
+>;
 
-    const setIsPassphraseVisibleAtom = useSetAtom(isPassphraseModalVisibleAtom);
+type AddHiddenWalletButtonProps = {
+    isDisabled?: boolean;
+};
+
+export const AddHiddenWalletButton = ({ isDisabled }: AddHiddenWalletButtonProps) => {
+    const { analytics, dispatch } = useServices(injectNativeAnalytics, injectDispatch);
+
+    const navigation = useNavigation<NavigationProp>();
+
+    const device = useSelector(selectSelectedDevice);
 
     const { setIsDeviceManagerVisible } = useDeviceManager();
 
     const handleAddHiddenWallet = () => {
+        if (!device) return;
         setIsDeviceManagerVisible(false);
-        setIsPassphraseVisibleAtom(true);
-        // await dispatch(createDeviceInstance({ device: instance }));
+
+        analytics.report({ type: events.passphraseAddHiddenWalletEvent.name });
+        dispatch(
+            startDiscoveryThunk({
+                device,
+                isAddingHiddenWallet: true,
+                isAddingExistingWallet: false,
+            }),
+        );
+        dispatch(runDiscoveryThunk({ device }));
+
+        navigation.navigate(RootStackRoutes.PassphraseStack, {
+            screen: PassphraseStackRoutes.PassphraseForm,
+        });
     };
 
     return (
-        <Button colorScheme="tertiaryElevation1" onPress={handleAddHiddenWallet}>
-            {translate('deviceManager.deviceButtons.addHiddenWallet')}
+        <Button
+            intent="neutral"
+            priority="secondary"
+            iconLeft="password"
+            isDisabled={isDisabled}
+            onPress={handleAddHiddenWallet}
+            testID="@device-manager/passphrase/add"
+        >
+            <Translation id="deviceManager.deviceButtons.addHiddenWallet" />
         </Button>
     );
 };

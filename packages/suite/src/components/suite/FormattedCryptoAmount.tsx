@@ -1,99 +1,155 @@
-import styled from 'styled-components';
-import { HiddenPlaceholder, Sign } from 'src/components/suite';
-import { NetworkSymbol } from 'src/types/wallet';
-import { NETWORKS } from 'src/config/wallet';
-import { useSelector } from 'src/hooks/suite';
-import { useBitcoinAmountUnit } from 'src/hooks/wallet/useBitcoinAmountUnit';
+import { useMemo } from 'react';
 
-import { SignValue } from '@suite-common/suite-types';
+import { HiddenPlaceholder, RedactNumericalValue } from '@suite/discreet-mode';
+import { isSignValuePositive, useFormatters } from '@suite-common/formatters';
+import { type SignValue } from '@suite-common/suite-types';
 import {
-    formatCoinBalance,
-    localizeNumber,
-    networkAmountToSatoshi,
-} from '@suite-common/wallet-utils';
-import { isSignValuePositive } from '@suite-common/formatters';
+    type NetworkSymbolExtended,
+    getDisplaySymbol,
+    getNetworkOptional,
+} from '@suite-common/wallet-config';
+import { LOW_BALANCE_THRESHOLD } from '@suite-common/wallet-constants';
+import { type AmountUnit } from '@suite-common/wallet-utils';
+import { Text } from '@trezor/components';
+import { BigNumber } from '@trezor/utils';
 
-const Container = styled.span`
-    max-width: 100%;
-`;
+import { Sign } from 'src/components/suite/Sign';
+import { useBitcoinAmountUnit } from 'src/hooks/wallet/useBitcoinAmountUnit';
+import { BlurUrls } from 'src/views/wallet/tokens/common/BlurUrls';
 
-const Value = styled.span`
-    font-variant-numeric: tabular-nums;
-    overflow: hidden;
-    text-overflow: ellipsis;
-`;
-
-const Symbol = styled.span``;
+const MAX_TOKEN_DISPLAYED_DECIMALS = 18;
 
 export interface FormattedCryptoAmountProps {
-    value?: string | number;
-    symbol?: string;
-    isBalance?: boolean;
+    value?: string | number | AmountUnit; // Todo: remove `string | number`, its for Back Compatibility only
+    symbol?: NetworkSymbolExtended;
+    contractAddress?: string | null;
+    /** Compact formatting, for a balance shown next to its fiat value. */
+    isCompact?: boolean;
+    tokenDecimals?: number;
+    showApproximation?: boolean;
     signValue?: SignValue;
+    signGrayscale?: boolean;
     disableHiddenPlaceholder?: boolean;
+    /**
+     * If true, the `FormattedCryptoAmount` expects the `HiddenPlaceholder` upstream (it provides the `RedactNumbersContext`), else an error is thrown.
+     */
     isRawString?: boolean;
-    'data-test'?: string;
+    isTabular?: boolean;
+    'data-testid'?: string;
     className?: string;
 }
 
 export const FormattedCryptoAmount = ({
     value, // expects a value in full units (BTC not sats)
     symbol,
-    isBalance,
+    contractAddress, // include contractAddress whenever the symbol is an token
+    isCompact = false,
+    tokenDecimals,
+    showApproximation = false,
     signValue,
+    signGrayscale,
     disableHiddenPlaceholder,
     isRawString,
-    'data-test': dataTest,
+    isTabular = true,
     className,
+    'data-testid': dataTest,
 }: FormattedCryptoAmountProps) => {
-    const locale = useSelector(state => state.suite.settings.language);
+    const { CryptoAmountFormatter } = useFormatters();
 
     const { areSatsDisplayed } = useBitcoinAmountUnit();
+
+    const isAmountLow = useMemo(() => {
+        if (!value || !showApproximation) return false;
+        const valueBn = new BigNumber(value);
+
+        return !valueBn.isZero() && valueBn.lt(LOW_BALANCE_THRESHOLD);
+    }, [value, showApproximation]);
 
     if (!value) {
         return null;
     }
 
     const lowerCaseSymbol = symbol?.toLowerCase();
-    const { features: networkFeatures, testnet: isTestnet } =
-        NETWORKS.find(network => network.symbol === lowerCaseSymbol) ?? {};
+    // A token's ticker can match a network symbol (`pol`, `op`, `arb`), so only the contract
+    // address tells the two apart.
+    const isToken = contractAddress !== undefined && contractAddress !== null;
+    const {
+        features: networkFeatures,
+        testnet: isTestnet,
+        symbol: networkSymbol,
+        decimals: networkDecimals,
+    } = (isToken ? undefined : getNetworkOptional(lowerCaseSymbol)) ?? {};
 
     const areSatsSupported = !!networkFeatures?.includes('amount-unit');
 
-    let formattedValue = value;
-    let formattedSymbol = symbol?.toUpperCase();
+    let formattedSymbol = symbol && getDisplaySymbol(symbol, contractAddress);
 
     const isSatoshis = areSatsSupported && areSatsDisplayed;
 
-    // convert to satoshis if needed
-    if (isSatoshis) {
-        formattedValue = networkAmountToSatoshi(String(value), lowerCaseSymbol as NetworkSymbol);
-
-        formattedSymbol = isTestnet ? `sat ${symbol?.toUpperCase()}` : 'sat';
+    if (isSatoshis && networkSymbol) {
+        formattedSymbol = isTestnet ? `sat ${formattedSymbol}` : 'sat';
     }
 
-    // format truncation + locale (used for balances) or just locale
-    if (isBalance) {
-        formattedValue = formatCoinBalance(String(formattedValue), locale);
-    } else {
-        formattedValue = localizeNumber(formattedValue, locale);
+    const formatterContext = {
+        symbol: networkSymbol,
+        smallestUnitsOverride: isSatoshis,
+        withSymbol: false,
+        isEllipsisAppended: !isCompact,
+        // Stated token decimals win: the symbol may resolve to an unrelated network.
+        maxDisplayedDecimals: isCompact
+            ? undefined
+            : (tokenDecimals ?? networkDecimals ?? MAX_TOKEN_DISPLAYED_DECIMALS),
+        formatStyle: isCompact ? 'compact-balance' : 'exact',
+        tokenDecimals,
+    } as const;
+
+    let formattedValue = CryptoAmountFormatter.format(String(value), formatterContext);
+
+    // Formatted, not hand-built, so the threshold is localized and in the unit shown beside it.
+    if (isAmountLow && !isCompact) {
+        formattedValue = `<${CryptoAmountFormatter.format(LOW_BALANCE_THRESHOLD, {
+            ...formatterContext,
+            maxDisplayedDecimals: undefined,
+            formatStyle: 'exact',
+        })}`;
     }
 
     // output as a string, mostly for compatibility with graphs
     if (isRawString) {
         const displayedSignValue = signValue ? `${isSignValuePositive(signValue) ? '+' : '-'}` : '';
 
-        return <>{`${displayedSignValue} ${formattedValue} ${formattedSymbol}`}</>;
+        return (
+            <>
+                {displayedSignValue}
+                {disableHiddenPlaceholder ? (
+                    formattedValue
+                ) : (
+                    <RedactNumericalValue value={formattedValue} />
+                )}{' '}
+                {formattedSymbol}
+            </>
+        );
     }
 
+    const renderedValue = disableHiddenPlaceholder ? (
+        formattedValue
+    ) : (
+        <RedactNumericalValue value={formattedValue} />
+    );
+
     const content = (
-        <Container className={className}>
-            {!!signValue && <Sign value={signValue} />}
-
-            <Value data-test={dataTest}>{formattedValue}</Value>
-
-            {symbol && <Symbol>&nbsp;{formattedSymbol}</Symbol>}
-        </Container>
+        <span data-testid={`${dataTest}-with-symbol`}>
+            <span data-testid={dataTest}>
+                {!!signValue && <Sign value={signValue} grayscale={signGrayscale} />}
+                <Text isTabular={isTabular}>{renderedValue}</Text>
+            </span>
+            {formattedSymbol && (
+                <>
+                    {' '}
+                    <BlurUrls text={formattedSymbol} />
+                </>
+            )}
+        </span>
     );
 
     if (disableHiddenPlaceholder) {

@@ -4,10 +4,10 @@
 
 blockchain-link is a client and unified interface for several backends (_BE_ further on) of various blockchain networks. Currently, there are implementations for
 
--   [blockbook](https://github.com/trezor/blockbook): BE developed and deployed by SatoshiLabs. Provides access to Bitcoin(like) and Ethereum(like) networks.
--   [ripple](https://xrpl.org/): third party BE that provides access to the Ripple network.
--   [blockfrost](https://blockfrost.io): third party BE that provides access to the Cardano network.
--   [electrum](https://electrumx-spesmilo.readthedocs.io/en/latest/): protocol implemented by multiple third party backends that provide access to the Bitcoin network.
+- [blockbook](https://github.com/trezor/blockbook): BE developed and deployed by SatoshiLabs. Provides access to Bitcoin(like) and Ethereum(like) networks.
+- [ripple](https://xrpl.org/): third party BE that provides access to the Ripple network.
+- [blockfrost](https://blockfrost.io): third party BE that provides access to the Cardano network.
+- [electrum](https://electrumx-spesmilo.readthedocs.io/en/latest/): protocol implemented by multiple third party backends that provide access to the Bitcoin network.
 
 ## Usage
 
@@ -20,8 +20,8 @@ yarn add @trezor/blockchain-link
 And use it.
 
 ```javascript
-import BlockchainLink from '@trezor/blockchain-link';
-import Blockbook from '@trezor/blockchain-link/lib/workers/blockbook';
+import { BlockchainLink } from '@trezor/blockchain-link';
+import Blockbook from '@trezor/blockchain-link/lib/workers/blockbook/index.js';
 
 const link = new BlockchainLink({
     name: 'Name used in logs.',
@@ -78,7 +78,3 @@ yarn workspace @trezor/blockchain-link build:lib
 yarn workspace @trezor/blockchain-link build:workers
 yarn workspace @trezor/blockchain-link test:integration
 ```
-
-### Publishing
-
-[Follow instructions](../../docs/releases/npm-packages.md) how to publish @trezor package to npm registry.

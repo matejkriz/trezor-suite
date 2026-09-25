@@ -1,0 +1,39 @@
+import { Translation } from '@suite/intl';
+import { type Network } from '@suite-common/wallet-config';
+import { Table } from '@trezor/components';
+
+import { BaseCurrencyValue } from 'src/components/suite';
+
+import { AssetTableExtraRowsSection as Section } from './AssetTableExtraRowsSection';
+
+interface AssetTokenProps {
+    tokenIconSetWrapper: React.ReactNode;
+    network: Network;
+    tokensDisplayFiatBalance: string;
+}
+
+export const AssetTokenRow = ({
+    tokenIconSetWrapper,
+    network,
+    tokensDisplayFiatBalance,
+}: AssetTokenProps) => {
+    if (!tokenIconSetWrapper) return null;
+
+    return (
+        <Table.Row hasBorderTop={false}>
+            <Table.Cell align="center">
+                <Section $dashedLinePosition="topToMiddle">{tokenIconSetWrapper}</Section>
+            </Table.Cell>
+            <Table.Cell padding={{ left: 0 }}>
+                <Translation id="TR_NAV_TOKENS" />
+            </Table.Cell>
+            <Table.Cell colSpan={4}>
+                <BaseCurrencyValue
+                    amount={tokensDisplayFiatBalance ?? '0'}
+                    symbol={network.symbol}
+                    shouldConvert={false}
+                />
+            </Table.Cell>
+        </Table.Row>
+    );
+};

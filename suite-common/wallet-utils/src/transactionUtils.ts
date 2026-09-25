@@ -1,27 +1,42 @@
-import BigNumber from 'bignumber.js';
-import { fromWei, toWei } from 'web3-utils';
 import { addDays, startOfMonth } from 'date-fns';
 
+import { Calldata } from '@suite-common/calldata';
+import { type SignOperator } from '@suite-common/suite-types';
+import { type NetworkFeature, type NetworkType, getNetworkType } from '@suite-common/wallet-config';
 import {
-    Account,
-    RbfTransactionParams,
-    WalletAccountTransaction,
-    ChainedTransactions,
-    PrecomposedTransactionFinal,
-    AccountKey,
+    type Account,
+    type AccountKey,
+    type ChainedTransactions,
+    type FormState,
+    type GeneralPrecomposedTransactionFinal,
+    type PrecomposedTransactionFinal,
+    type PrecomposedTransactionFinalBumpFeeRbf,
+    type PrecomposedTransactionFinalCancelRbf,
+    type RatesByTimestamps,
+    type RbfTransactionParamsBitcoin,
+    type RbfTransactionParamsEthereum,
+    type Timestamp,
+    type TokenAddress,
+    type WalletAccountTransaction,
+    asBaseCurrencyAmount,
 } from '@suite-common/wallet-types';
+import type { BaseCurrencyCode, TokenStandard } from '@trezor/blockchain-link-types';
 import {
-    AccountAddress,
-    AccountTransaction,
-    TokenTransfer,
-    InternalTransfer,
+    type AccountAddress,
+    type AccountTransaction,
+    type InternalTransfer,
+    type TokenInfo,
+    type TokenTransfer,
 } from '@trezor/connect';
-import { SignOperator } from '@suite-common/suite-types';
-import { arrayPartition } from '@trezor/utils';
-import { AccountLabels } from '@suite-common/metadata-types';
+import { type Branded } from '@trezor/type-utils';
+import { BigNumber, arrayPartition, isNotNullOrUndefined, typedObjectKeys } from '@trezor/utils';
 
-import { formatAmount, formatNetworkAmount } from './accountUtils';
+import { convertAmountSubunitsToUnits, formatNetworkAmount } from './amountUtils';
+import { fromGwei, fromWei } from './ethConverter';
+import { getEvmTransactionTextSignature } from './ethUtils';
 import { toFiatCurrency } from './fiatConverterUtils';
+import { getFiatRateKey, roundTimestampToNearestPastHour } from './fiatRatesUtils';
+import { getMyInputsFromTransaction } from './getMyInputsFromTransaction';
 
 export const sortByBlockHeight = (a: { blockHeight?: number }, b: { blockHeight?: number }) => {
     // if both are missing the blockHeight don't change their order
@@ -41,8 +56,8 @@ export const sortByBlockHeight = (a: { blockHeight?: number }, b: { blockHeight?
  * for transactions that have not been fetched yet. (This affects pagination.)
  */
 export const getAccountTransactions = (
-    accountKey: string,
-    transactions: Record<string, WalletAccountTransaction[]>,
+    accountKey: AccountKey,
+    transactions: Record<AccountKey, WalletAccountTransaction[]>,
 ) => transactions[accountKey] || [];
 
 export const isPending = (tx: WalletAccountTransaction | AccountTransaction) => {
@@ -52,6 +67,288 @@ export const isPending = (tx: WalletAccountTransaction | AccountTransaction) => 
 
     return !!tx && (!tx.blockHeight || tx.blockHeight < 0);
 };
+
+// isAccountOwned is set by enhanceVinVout at transform time; the descriptor comparison is the
+// fallback for records where it is absent, and is case-insensitive because EVM addresses reach us in
+// mixed EIP-55 casing (cf. isOutgoing in blockchain-link-utils).
+const isSignedByDescriptor = (details: AccountTransaction['details'], descriptor: string) =>
+    !!details?.vin?.some(
+        vin =>
+            vin.isAccountOwned ||
+            vin.addresses?.some(address => address.toLowerCase() === descriptor.toLowerCase()),
+    );
+
+/**
+ * Whether the account itself signed (and paid for) the transaction.
+ *
+ * Deliberately not `tx.type`, which is a display label: it reads 'sent' for any transaction moving
+ * value out of the account — including one signed by a stranger, since an ERC-20 Transfer log or a
+ * transferFrom(account, …) call may name any `from` — and 'failed' for the account's own reverted
+ * sends. EVM nonce arithmetic needs authorship instead: a foreign transaction carries the *signer's*
+ * nonce, which says nothing about this account, while an own failed or contract-deployment
+ * transaction consumes a nonce exactly like a plain send.
+ */
+export const isSignedByAccount = (tx: Pick<WalletAccountTransaction, 'details' | 'descriptor'>) =>
+    isSignedByDescriptor(tx.details, tx.descriptor);
+
+// Shared by the transaction list and its detail modal so both agree on which pending transactions
+// offer a cancel action. Cancelling replaces the tx with a 0-value self-send at the same
+// nonce/inputs, so it needs both rbfParams (getRbfParams omits these for received 'recv' txs and for
+// swaps it cannot resolve as our own replaceable send) and a network that actually supports RBF.
+// Gating on the 'rbf' network feature — the same signal isTransactionBumpable uses — keeps the list
+// in sync with the detail modal, which only performs the cancel when the tx is replaceable. Without
+// both checks a dead "does nothing" cancel button would show for receive txs, non-replaceable swaps,
+// and coins whose networkType is bitcoin/ethereum but that lack RBF (e.g. LTC, BCH, DOGE, ZEC, ETC).
+export const isTransactionCancellable = (
+    tx: Pick<WalletAccountTransaction, 'rbfParams' | 'type'>,
+    isPendingTx: boolean,
+    networkFeatures: NetworkFeature[] | undefined,
+) =>
+    isPendingTx &&
+    !!tx.rbfParams &&
+    tx.type !== 'self' &&
+    tx.type !== 'joint' &&
+    !!networkFeatures?.includes('rbf');
+
+export const isTransactionBumpable = (
+    tx: Pick<WalletAccountTransaction, 'rbfParams' | 'deadline' | 'type'>,
+    networkFeatures: NetworkFeature[] | undefined,
+) => !!tx.rbfParams && !!networkFeatures?.includes('rbf') && !tx.deadline && tx.type !== 'joint';
+
+export type EvmNonceInfo = {
+    confirmedNonce: number;
+    nextNonce: number;
+    pendingNonces: number[];
+    // The account's own locally-known confirmed nonces. Exposed so a 'superseded' reading can be
+    // corroborated against a real confirmed tx at that nonce (see getPendingEvmNonceStatus) rather
+    // than inferred from a scalar confirmedNonce that can transiently run ahead of the tx list.
+    confirmedNonces: number[];
+};
+
+export const getOwnEvmNonceSets = (transactions: WalletAccountTransaction[]) => {
+    const ownNonceTxs = transactions.filter(isSignedByAccount);
+
+    // A nonce that's confirmed locally is ground truth. If a stale "pending" record for the same
+    // nonce also lingers (e.g. a speed-up/cancel replacement got confirmed but the original's
+    // local record was never swept — see replaceTransactionThunk), drop the pending duplicate so
+    // it can't inflate nextNonce past where it actually is.
+    const confirmedNonces = new Set(
+        ownNonceTxs
+            .filter(tx => !isPending(tx))
+            .map(tx => tx.ethereumSpecific?.nonce)
+            .filter((nonce): nonce is number => typeof nonce === 'number'),
+    );
+
+    const pendingNonceSet = new Set(
+        ownNonceTxs
+            .filter(isPending)
+            .map(tx => tx.ethereumSpecific?.nonce)
+            .filter((nonce): nonce is number => typeof nonce === 'number')
+            .filter(nonce => !confirmedNonces.has(nonce)),
+    );
+
+    return { confirmedNonces, pendingNonceSet };
+};
+
+/**
+ * Returns the next EVM nonce to use, walking past any contiguous outgoing pending txs starting
+ * from `accountNonce`. Stops at the first gap so a stuck/gapped tx does not inflate the result.
+ * Takes the account's full (unfiltered) local tx list — it needs both pending and confirmed
+ * entries to spot a pending tx whose nonce was already confirmed under a different txid.
+ *
+ * `accountNonce` here is treated as *untrusted* (e.g. `account.misc.nonce`, which can be
+ * stale/pending-inclusive — trezor/blockbook#1562) and is reconciled against local tx data. When
+ * a properly mined-only nonce is already available (fetched live via
+ * `TrezorConnect.getAccountInfo({ confirmedNonce: true })`), use `getEvmNonceInfoFromConfirmedNonce`
+ * instead — running an already-trustworthy value through this reconciliation is not just
+ * redundant, it's actively harmful: a single bad locally-known nonce (e.g. corrupted/malformed tx
+ * data) can override an otherwise-correct backend answer.
+ */
+export const getEvmNonceInfo = (
+    accountNonce: number,
+    transactions: WalletAccountTransaction[],
+): EvmNonceInfo => {
+    const { confirmedNonces, pendingNonceSet } = getOwnEvmNonceSets(transactions);
+
+    // accountNonce (e.g. account.misc.nonce) can lag behind the local tx list if it hasn't been
+    // refreshed since a confirmed tx was locally picked up. A locally confirmed nonce proves a
+    // higher true nonce exists, so it's a floor accountNonce can't be below. The floor walks up
+    // contiguously rather than jumping to max(confirmedNonces): an isolated outlier (a corrupted
+    // record, or a nonce that never belonged to this account) is then never reached — see
+    // getEvmNonceInfoFromConfirmedNonce for the same reasoning.
+    let effectiveAccountNonce = accountNonce;
+    while (confirmedNonces.has(effectiveAccountNonce)) effectiveAccountNonce += 1;
+
+    // effectiveAccountNonce may still overstate reality via blockbook's pending nonce
+    // (eth_getTransactionCount("pending")), which already advances past consecutive mempool txs —
+    // including ones Suite doesn't know about (sent from another wallet). A locally-known pending
+    // tx at nonce N proves the chain hasn't confirmed N yet, so the true confirmed nonce can't
+    // exceed the lowest pending nonce we see.
+    const lowestPendingNonce =
+        pendingNonceSet.size > 0 ? Math.min(...pendingNonceSet) : effectiveAccountNonce;
+    const confirmedNonce = Math.min(effectiveAccountNonce, lowestPendingNonce);
+
+    let nextNonce = confirmedNonce;
+    while (pendingNonceSet.has(nextNonce)) nextNonce += 1;
+
+    return {
+        confirmedNonce,
+        nextNonce,
+        pendingNonces: [...pendingNonceSet],
+        confirmedNonces: [...confirmedNonces],
+    };
+};
+
+/**
+ * Same shape as `getEvmNonceInfo`, but for a `confirmedNonce` that's already trustworthy (fetched
+ * live from the backend). Skips `getEvmNonceInfo`'s local-data reconciliation entirely — that
+ * logic exists only to compensate for an unreliable `account.misc.nonce`, and applying it here
+ * would let a single bad locally-known nonce override a correct backend answer. The only local
+ * adjustment still needed is walking forward past the account's own contiguous txs, since those are
+ * what a new send must avoid colliding with.
+ *
+ * The walk advances over both pending and locally-confirmed nonces. Advancing over pending covers
+ * the queue a new send must skip; advancing over confirmed bridges the brief window while a tx is
+ * confirming, when the tx list has already recorded it as confirmed but the backend `confirmedNonce`
+ * hasn't caught up yet (fetchAndUpdateAccountThunk updates the tx list before it re-fetches
+ * account.misc.nonce). Without bridging that just-confirmed slot, `nextNonce` would momentarily lag,
+ * making the higher still-pending txs read as a nonce gap and flash a false warning in the tx list.
+ * The walk stays contiguous from `confirmedNonce`, so an isolated bad/outlier local nonce can't
+ * inflate the result the way `getEvmNonceInfo`'s global-max floor would (a non-contiguous nonce is
+ * never reached).
+ */
+export const getEvmNonceInfoFromConfirmedNonce = (
+    confirmedNonce: number,
+    transactions: WalletAccountTransaction[],
+): EvmNonceInfo => {
+    const { confirmedNonces, pendingNonceSet } = getOwnEvmNonceSets(transactions);
+
+    let nextNonce = confirmedNonce;
+    while (pendingNonceSet.has(nextNonce) || confirmedNonces.has(nextNonce)) nextNonce += 1;
+
+    return {
+        confirmedNonce,
+        nextNonce,
+        pendingNonces: [...pendingNonceSet],
+        confirmedNonces: [...confirmedNonces],
+    };
+};
+
+/**
+ * Builds the blockbook `privatePending` hint (trezor/blockbook#1639) for an EVM account from the
+ * wallet's own pending sends, which blockbook's public provider may not see (private-relay
+ * broadcast, or lag — trezor/blockbook#1562). The nonces raise its reported pending nonce to max+1;
+ * the txids let it fetch-back each body (eth_getTransactionByHash) so the tx shows up in history.
+ *
+ * Nonces come from `getOwnEvmNonceSets`' `pendingNonceSet` — Suite's own local pending-nonce view,
+ * already excluding locally-confirmed nonces. Returns `undefined` when nothing is pending, so
+ * callers omit the field (blockbook must not receive an empty array).
+ */
+export const getEvmPrivatePendingHint = (
+    transactions: WalletAccountTransaction[],
+): { nonces: number[]; txids?: string[] } | undefined => {
+    const { pendingNonceSet } = getOwnEvmNonceSets(transactions);
+
+    if (pendingNonceSet.size === 0) return undefined;
+
+    // hashes of those same pending sends (confirmed nonces are already out of pendingNonceSet)
+    const txids = [
+        ...new Set(
+            transactions
+                .filter(isPending)
+                .filter(isSignedByAccount)
+                .filter(tx => {
+                    const nonce = tx.ethereumSpecific?.nonce;
+
+                    return typeof nonce === 'number' && pendingNonceSet.has(nonce);
+                })
+                .map(tx => tx.txid)
+                .filter(Boolean),
+        ),
+    ].sort();
+
+    return {
+        nonces: [...pendingNonceSet].sort((a, b) => a - b),
+        ...(txids.length > 0 ? { txids } : {}),
+    };
+};
+
+export type PendingEvmNonceStatus = 'ok' | 'superseded' | 'gap';
+
+/**
+ * Whether an already-pending transaction's own nonce is stuck, given the account's bounds from
+ * `getEvmNonceInfo`. Used by the transaction list and its detail modal to grey out/warn about a
+ * pending tx that can never confirm.
+ *
+ * `superseded` requires *positive* corroboration: a locally-known confirmed tx must actually exist at
+ * that nonce (`confirmedNonces`). The scalar `confirmedNonce` is fetched live from the backend (see
+ * useEvmNonceInfo) and can transiently run ahead of Suite's own tx list — most visibly right after
+ * sending, when the backend already counts the just-broadcast nonce while that tx hasn't landed in
+ * `selectAccountTransactions` yet. Inferring supersession from `nonce < confirmedNonce` alone flashes
+ * a false "nonce already used" warning at a tx that is actually fine. Keying off a real confirmed tx
+ * at the nonce avoids that: during the transient nothing is confirmed there, so it stays `ok` and the
+ * list catches up; only a genuine confirmed tx occupying the slot reports `superseded`.
+ */
+export const getPendingEvmNonceStatus = (
+    nonce: number,
+    {
+        confirmedNonce,
+        nextNonce,
+        confirmedNonces,
+    }: Pick<EvmNonceInfo, 'confirmedNonce' | 'nextNonce' | 'confirmedNonces'>,
+): PendingEvmNonceStatus => {
+    if (nonce < confirmedNonce && confirmedNonces.includes(nonce)) return 'superseded'; // slot taken by a confirmed tx
+    if (nonce > nextNonce) return 'gap'; // a lower nonce is still missing
+
+    return 'ok';
+};
+
+/**
+ * Classifies a *candidate* EVM nonce (e.g. typed into the send-form override) against the bounds
+ * from `getEvmNonceInfo`. Unlike `getPendingEvmNonceStatus`, landing anywhere below `nextNonce` —
+ * whether or not it matches a nonce Suite has a local record for — means the candidate would
+ * replace one of the account's own currently-queued pending txs, which needs a fee bump to be
+ * accepted; only landing exactly on `nextNonce` extends the queue normally. A match against
+ * `pendingNonces` is checked first and takes priority over a gap: a candidate can simultaneously
+ * sit above `nextNonce` (a gap exists below it) and match an existing own pending tx, and
+ * replacement is the actionable case (offer a fee bump) rather than a dead end.
+ */
+export const getEvmNonceStatus = (
+    nonce: number,
+    {
+        confirmedNonce,
+        nextNonce,
+        pendingNonces,
+    }: Pick<EvmNonceInfo, 'confirmedNonce' | 'nextNonce' | 'pendingNonces'>,
+): 'ok' | 'superseded' | 'gap' | 'replacement' => {
+    if (nonce < confirmedNonce) return 'superseded'; // already mined under another tx/txid
+    if (pendingNonces.includes(nonce)) return 'replacement'; // collides with a known own pending tx
+    if (nonce > nextNonce) return 'gap'; // a lower nonce is still missing
+    if (nonce < nextNonce) return 'replacement'; // within the contiguous pending range
+
+    return 'ok'; // nonce === nextNonce, extends the queue normally
+};
+
+export const isRbfTransaction = (
+    tx: GeneralPrecomposedTransactionFinal,
+): tx is PrecomposedTransactionFinalBumpFeeRbf | PrecomposedTransactionFinalCancelRbf =>
+    'rbfType' in tx;
+
+export const isRbfBumpFeeTransaction = (
+    tx: GeneralPrecomposedTransactionFinal,
+): tx is PrecomposedTransactionFinalBumpFeeRbf => isRbfTransaction(tx) && tx.rbfType === 'bump-fee';
+
+export const isRbfCancelTransaction = (
+    tx: GeneralPrecomposedTransactionFinal,
+): tx is PrecomposedTransactionFinalCancelRbf => isRbfTransaction(tx) && tx.rbfType === 'cancel';
+
+export const getDecreaseOutputId = (
+    precomposedTx: GeneralPrecomposedTransactionFinal | undefined,
+    precomposedForm: FormState | null | undefined,
+) =>
+    precomposedTx && isRbfBumpFeeTransaction(precomposedTx) && precomposedTx.useNativeRbf
+        ? precomposedForm?.setMaxOutputId
+        : undefined;
 
 /* Convert date to string in YYYY-MM-DD format */
 const generateTransactionDateKey = (d: Date) =>
@@ -64,23 +361,23 @@ export const parseTransactionDateKey = (key: string) => {
     return new Date(Number(year), Number(month) - 1, Number(day));
 };
 
-export type MonthKey = string & { __type: 'MonthKey' };
+export type MonthKey = string & Branded<'MonthKey'>;
 export const generateTransactionMonthKey = (d: Date): MonthKey =>
     // Adding days because of time zones of UTC
     addDays(startOfMonth(d), 1).toUTCString() as MonthKey;
 
 export const parseTransactionMonthKey = (key: MonthKey): Date => new Date(key);
 
+export type GroupedTransactionsByDate = Record<string, WalletAccountTransaction[]>;
 /**
  * Returns object with transactions grouped by a date. Key is a string in YYYY-MM-DD format.
- * Pending txs are assigned to key 'pending'.
  *
  * @param {WalletAccountTransaction[]} transactions
  */
 export const groupTransactionsByDate = (
     transactions: WalletAccountTransaction[],
     groupBy: 'day' | 'month' = 'day',
-) => {
+): GroupedTransactionsByDate => {
     // Note: We should use ts-belt for sorting this array but currently, there can be undefined inside
     // Built-in sort doesn't include undefined elements but ts-belt does so there will be some refactoring involved.
     const keyFormatter =
@@ -91,12 +388,12 @@ export const groupTransactionsByDate = (
             // There could be some undefined/null in array, not sure how it happens. Maybe related to pagination?
             .filter(transaction => !!transaction)
             .sort(sortByBlockHeight)
-            .reduce<{ [key: string]: WalletAccountTransaction[] }>((r, item) => {
-                const isTxPending = isPending(item);
+            .reduce<GroupedTransactionsByDate>((r, item) => {
+                // pending txs are grouped as 'no-blocktime' only if blockTime is unavailable (otherwise sorted by blockTime)
                 const key =
-                    !isTxPending && item.blockTime && item.blockTime > 0
+                    item.blockTime && item.blockTime > 0
                         ? keyFormatter(new Date(item.blockTime * 1000))
-                        : 'pending';
+                        : 'no-blocktime';
                 const prev = r[key] ?? [];
 
                 return {
@@ -113,15 +410,22 @@ export const groupJointTransactions = (transactions: WalletAccountTransaction[])
             const last = prev.pop();
             if (!last) return [[tx]];
 
-            return tx.type === 'joint' && last[0].type === 'joint'
+            // @ts-expect-error: indexing with noUncheckedIndexedAccess
+            const lastFirst: (typeof last)[number] = last[0];
+
+            return tx.type === 'joint' && lastFirst.type === 'joint'
                 ? [...prev, [...last, tx]]
                 : [...prev, last, [tx]];
         }, [])
-        .map(txs =>
-            txs.length > 1
-                ? ({ type: 'joint-batch', rounds: txs } as const)
-                : ({ type: 'single-tx', tx: txs[0] } as const),
-        );
+        .map(txs => {
+            if (txs.length > 1) {
+                return { type: 'joint-batch', rounds: txs } as const;
+            }
+            // @ts-expect-error: indexing with noUncheckedIndexedAccess
+            const onlyTx: (typeof txs)[number] = txs[0];
+
+            return { type: 'single-tx', tx: onlyTx } as const;
+        });
 
 export const formatCardanoWithdrawal = (tx: WalletAccountTransaction) =>
     tx.cardanoSpecific?.withdrawal
@@ -133,8 +437,60 @@ export const formatCardanoDeposit = (tx: WalletAccountTransaction) =>
         ? formatNetworkAmount(tx.cardanoSpecific.deposit, tx.symbol)
         : undefined;
 
-export const isTxFeePaid = (tx: WalletAccountTransaction) =>
-    !!tx.details.vin.find(vin => vin.isOwn || vin.isAccountOwned) && tx.type !== 'joint';
+// A deregistration refunds the deposit a registration paid, and `deposit` holds the absolute
+// amount for both, so the subtype decides the direction.
+const isCardanoDepositRefunded = (tx: WalletAccountTransaction) =>
+    tx.cardanoSpecific?.subtype === 'stake_deregistration';
+
+export const getCardanoStakingSignValue = (transaction: WalletAccountTransaction) => {
+    if (!transaction?.cardanoSpecific) return 'negative';
+    const subtype = transaction.cardanoSpecific?.subtype;
+
+    switch (subtype) {
+        case 'stake_registration':
+            return 'negative';
+        case 'stake_deregistration':
+        case 'withdrawal':
+            return 'positive';
+    }
+
+    return 'positive';
+};
+
+type CardanoSpecific = NonNullable<WalletAccountTransaction['cardanoSpecific']>;
+
+export const getCardanoStakingAmount = ({
+    subtype,
+    deposit = '0',
+    withdrawal = '0',
+}: CardanoSpecific) => {
+    switch (subtype) {
+        case 'withdrawal':
+            return withdrawal;
+        case 'stake_deregistration':
+            // Unstaking with rewards refunds the deposit and withdraws in one transaction.
+            return new BigNumber(deposit).plus(withdrawal).toString();
+        case 'stake_registration':
+        case 'stake_delegation':
+            return deposit;
+        default:
+            return '0';
+    }
+};
+
+export const isTxFeePaid = (tx: WalletAccountTransaction) => {
+    const showFeeRowForSolSent = !!tx?.solanaSpecific && tx.type === 'sent';
+    const showFeeRowForStellar = tx?.stellarSpecific?.feeSource === tx.descriptor;
+    const isCardano = !!tx?.cardanoSpecific;
+    const showFeeRowForCardano = isCardano && tx.type !== 'recv';
+
+    return (
+        (!!tx.details.vin.find(vin => vin.isOwn || vin.isAccountOwned) && tx.type !== 'joint') ||
+        showFeeRowForSolSent ||
+        showFeeRowForStellar ||
+        showFeeRowForCardano
+    );
+};
 
 /**
  * Returns a sum of sent/recv txs amounts as a BigNumber.
@@ -156,12 +512,14 @@ export const sumTransactions = (transactions: WalletAccountTransaction[]) => {
 
             const cardanoDeposit = formatCardanoDeposit(tx);
             if (cardanoDeposit) {
-                totalAmount = totalAmount.minus(cardanoDeposit);
+                totalAmount = isCardanoDepositRefunded(tx)
+                    ? totalAmount.plus(cardanoDeposit)
+                    : totalAmount.minus(cardanoDeposit);
             }
         }
 
         // count in only if Inputs/Outputs includes my account (EVM does not need to)
-        if (tx.targets.length && tx.type === 'sent') {
+        if (tx.type === 'sent') {
             totalAmount = totalAmount.minus(amount);
         }
 
@@ -190,48 +548,84 @@ export const sumTransactions = (transactions: WalletAccountTransaction[]) => {
 
 export const sumTransactionsFiat = (
     transactions: WalletAccountTransaction[],
-    fiatCurrency: string,
+    fiatCurrency: BaseCurrencyCode,
+    historicFiatRates: RatesByTimestamps | undefined,
 ) => {
     let totalAmount = new BigNumber(0);
     transactions.forEach(tx => {
         const amount = formatNetworkAmount(tx.amount, tx.symbol);
         const fee = formatNetworkAmount(tx.fee, tx.symbol);
 
+        const fiatRateKey = getFiatRateKey(tx.symbol, fiatCurrency);
+        const roundedTimestamp = roundTimestampToNearestPastHour(tx.blockTime as Timestamp);
+        const historicRate = historicFiatRates?.[fiatRateKey]?.[roundedTimestamp];
+
         if (tx.type === 'self') {
             const cardanoWithdrawal = formatCardanoWithdrawal(tx);
             if (cardanoWithdrawal) {
                 totalAmount = totalAmount.plus(
-                    toFiatCurrency(cardanoWithdrawal, fiatCurrency, tx.rates, -1) ?? 0,
+                    toFiatCurrency({ amount: cardanoWithdrawal, rate: historicRate }) ?? 0,
                 );
             }
 
             const cardanoDeposit = formatCardanoDeposit(tx);
             if (cardanoDeposit) {
-                totalAmount = totalAmount.minus(
-                    toFiatCurrency(cardanoDeposit, fiatCurrency, tx.rates, -1) ?? 0,
-                );
+                const depositFiat =
+                    toFiatCurrency({ amount: cardanoDeposit, rate: historicRate }) ?? 0;
+
+                totalAmount = isCardanoDepositRefunded(tx)
+                    ? totalAmount.plus(depositFiat)
+                    : totalAmount.minus(depositFiat);
             }
         }
 
-        // count in only if Inputs/Outputs includes my account (EVM does not need to)
-        if (tx.targets.length && tx.type === 'sent') {
-            totalAmount = totalAmount.minus(
-                toFiatCurrency(amount, fiatCurrency, tx.rates, -1) ?? 0,
-            );
-        }
+        if (tx.tokens.length > 0) {
+            tx.tokens.forEach(token => {
+                const transferType = token.type;
 
-        if (tx.type === 'recv' || tx.type === 'joint') {
-            totalAmount = totalAmount.plus(toFiatCurrency(amount, fiatCurrency, tx.rates, -1) ?? 0);
+                const tokenFiatRateKey = getFiatRateKey(
+                    tx.symbol,
+                    fiatCurrency,
+                    token.contract as TokenAddress,
+                );
+                const historicTokenRate = historicFiatRates?.[tokenFiatRateKey]?.[roundedTimestamp];
+                const tokenAmount = convertAmountSubunitsToUnits(token.amount, token.decimals);
+
+                if (transferType === 'sent') {
+                    totalAmount = totalAmount.minus(
+                        toFiatCurrency({ amount: tokenAmount, rate: historicTokenRate }) ?? 0,
+                    );
+                }
+
+                if (transferType === 'recv') {
+                    totalAmount = totalAmount.plus(
+                        toFiatCurrency({ amount: tokenAmount, rate: historicTokenRate }) ?? 0,
+                    );
+                }
+            });
+        } else {
+            // count in only if Inputs/Outputs includes my account (EVM does not need to)
+            if (tx.type === 'sent') {
+                totalAmount = totalAmount.minus(
+                    toFiatCurrency({ amount, rate: historicRate }) ?? 0,
+                );
+            }
+
+            if (tx.type === 'recv' || tx.type === 'joint') {
+                totalAmount = totalAmount.plus(toFiatCurrency({ amount, rate: historicRate }) ?? 0);
+            }
         }
 
         if (isTxFeePaid(tx)) {
-            totalAmount = totalAmount.minus(toFiatCurrency(fee, fiatCurrency, tx.rates, -1) ?? 0);
+            totalAmount = totalAmount.minus(
+                toFiatCurrency({ amount: fee, rate: historicRate }) ?? 0,
+            );
         }
 
         tx.internalTransfers.forEach(internalTx => {
             const amountInternal = formatNetworkAmount(internalTx.amount, tx.symbol);
             const amountInternalFiat =
-                toFiatCurrency(amountInternal, fiatCurrency, tx.rates, -1) ?? 0;
+                toFiatCurrency({ amount: amountInternal, rate: historicRate }) ?? 0;
 
             if (internalTx.type === 'sent') {
                 totalAmount = totalAmount.minus(amountInternalFiat);
@@ -242,18 +636,25 @@ export const sumTransactionsFiat = (
         });
     });
 
-    return totalAmount;
+    return asBaseCurrencyAmount(totalAmount);
 };
 
 export const findTransaction = (txid: string, transactions: WalletAccountTransaction[]) =>
-    transactions.find(t => t && t.txid === txid);
+    transactions.find(t => t?.txid === txid);
+
+type FoundTransaction = {
+    key: AccountKey;
+    tx: WalletAccountTransaction;
+};
 
 export const findTransactions = (
     txid: string,
-    transactions: { [key: string]: WalletAccountTransaction[] },
-) =>
-    Object.keys(transactions).flatMap(key => {
-        const tx = findTransaction(txid, transactions[key]);
+    transactions: { [key: AccountKey]: WalletAccountTransaction[] },
+): FoundTransaction[] =>
+    typedObjectKeys(transactions).flatMap(key => {
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const txList: WalletAccountTransaction[] = transactions[key];
+        const tx = findTransaction(txid, txList);
         if (!tx) return [];
 
         return [{ key, tx }];
@@ -266,11 +667,13 @@ export const findChainedTransactions = (
     transactions: Record<AccountKey, WalletAccountTransaction[]>,
     result: ChainedTransactions = { own: [], others: [] },
 ) => {
-    Object.keys(transactions).forEach(accountKey => {
+    typedObjectKeys(transactions).forEach(accountKey => {
         const ownTxs = result.own.map(tx => tx.txid);
         const othersTxs = result.others.map(tx => tx.txid);
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const accountTxs: WalletAccountTransaction[] = transactions[accountKey];
         // check if any pending transaction is using the utxo/vin with requested txid
-        const txs = transactions[accountKey].filter(tx => {
+        const txs = accountTxs.filter(tx => {
             if (!isPending(tx) || !tx.details.vin.find(i => i.txid === txid)) {
                 return false;
             }
@@ -326,8 +729,8 @@ const filterAnalyzeResult = (result: Analyze) => {
 
     return {
         newTransactions: result.newTransactions,
-        add: result.add.filter(a => !preserve.find(tx => tx.txid === a.txid)),
-        remove: result.remove.filter(a => !preserve.find(tx => tx.txid === a.txid)),
+        add: result.add.filter(a => !preserve.some(tx => tx.txid === a.txid)),
+        remove: result.remove.filter(a => !preserve.some(tx => tx.txid === a.txid)),
     };
 };
 
@@ -352,11 +755,18 @@ export const analyzeTransactions = (
         };
     }
 
-    const [knownPrepending, knownRest] = arrayPartition(known, tx => 'deadline' in tx);
-
-    const removePrepending = knownPrepending.filter(
-        tx => (tx.deadline && tx.deadline < blockHeight) || fresh.find(fTx => fTx.txid === tx.txid),
+    // The stored list is written by index (transactionsReducer `addTransaction`), so a partially
+    // paginated account has empty slots and reaches here unfiltered via `getAccountTransactions`.
+    const [knownPrepending, knownRest] = arrayPartition(
+        known.filter(isNotNullOrUndefined),
+        tx => 'deadline' in tx,
     );
+
+    // A fake pending record whose txid shows up in `fresh` is deliberately left out of `remove`:
+    // the `addTransaction` reducer upgrades it in place once the real record arrives, so the txid
+    // never leaves the store. Removing it here first would evict the tx for a render, which the
+    // detail modal and every other consumer of the list would see as a missing transaction.
+    const removePrepending = knownPrepending.filter(tx => tx.deadline && tx.deadline < blockHeight);
     // If there are no known confirmed txs
     // remove all known and add all fresh
     const gotConfirmedTxs = knownRest.some(tx => !isPending(tx));
@@ -369,7 +779,7 @@ export const analyzeTransactions = (
     }
 
     // make sure the known transactions are sorted properly
-    const knownSorted = knownRest.filter(tx => tx != null).sort(sortByBlockHeight);
+    const knownSorted = [...knownRest].sort(sortByBlockHeight);
     // run thru all fresh txs
     fresh.forEach((tx, i) => {
         const height = tx.blockHeight;
@@ -382,7 +792,8 @@ export const analyzeTransactions = (
             const len = knownSorted.length;
             // use simple for loop to have possibility to `break`
             for (index; index < len; index++) {
-                const kTx = knownSorted[index];
+                // @ts-expect-error: indexing with noUncheckedIndexedAccess
+                const kTx: (typeof knownSorted)[number] = knownSorted[index];
                 // known tx is pending, it will be removed
                 // move sliceIndex, set firstKnownIndex
                 if (isPending(kTx)) {
@@ -436,38 +847,77 @@ export const getTxOperation = (
     return null;
 };
 
-export const isNftTokenTransfer = (transfer: TokenTransfer) =>
-    ['ERC1155', 'ERC721'].includes(transfer.standard || '');
+export const NFT_SINGLETOKEN_STANDARDS: ReadonlySet<TokenStandard> = new Set([
+    'ERC721',
+    'TRC721',
+    'BEP721',
+]);
 
-export const getNftTokenId = (transfer: TokenTransfer) =>
-    // use 0 index, haven't found an example where multiTokenValues.length > 1
-    transfer.standard === 'ERC1155' && transfer.multiTokenValues?.length
-        ? transfer.multiTokenValues[0].id
-        : transfer.amount;
+export const NFT_MULTITOKEN_STANDARDS: ReadonlySet<TokenStandard> = new Set([
+    'ERC1155',
+    'TRC1155',
+    'BEP1155',
+]);
 
-export const getTxIcon = (txType: WalletAccountTransaction['type']) => {
-    switch (txType) {
-        case 'recv':
-            return 'RECEIVE';
-        case 'sent':
-        case 'contract':
-        case 'self':
-            return 'SEND';
-        case 'failed':
-            return 'CROSS';
-        case 'joint':
-            return 'SHUFFLE';
-        default:
-            return 'QUESTION';
+const NFT_TOKEN_STANDARDS: ReadonlySet<TokenStandard> = new Set([
+    ...NFT_SINGLETOKEN_STANDARDS,
+    ...NFT_MULTITOKEN_STANDARDS,
+]);
+
+export const isNftToken = <T extends Pick<TokenInfo, 'standard'>>(token: T) =>
+    NFT_TOKEN_STANDARDS.has(token.standard);
+
+export const isNftTokenTransfer = <T extends Pick<TokenTransfer, 'standard'>>(transfer: T) =>
+    transfer.standard && NFT_TOKEN_STANDARDS.has(transfer.standard);
+
+export const isNftMultitokenTransfer = (transfer: TokenTransfer) =>
+    !!transfer.multiTokenValues && transfer.multiTokenValues.length > 0;
+
+export const getNftTokenId = (transfer: TokenTransfer) => {
+    if (
+        !transfer.standard ||
+        !NFT_MULTITOKEN_STANDARDS.has(transfer.standard) ||
+        !transfer.multiTokenValues?.length
+    ) {
+        return transfer.amount;
     }
+
+    const { multiTokenValues } = transfer;
+    // @ts-expect-error: indexing with noUncheckedIndexedAccess
+    const firstValue: (typeof multiTokenValues)[number] = multiTokenValues[0];
+
+    // use 0 index, haven't found an example where multiTokenValues.length > 1
+    return firstValue.id;
 };
 
-export const getTargetAmount = (
+export const isSwapTransaction = (transaction: WalletAccountTransaction) => {
+    const { tokens, internalTransfers, targets, cardanoSpecific } = transaction;
+
+    // Swap transaction - 2 tokens, token to native or native to token
+    if (
+        tokens.length === 2 ||
+        (tokens.length === 1 && (internalTransfers.length === 1 || targets.length === 1))
+    ) {
+        const hasSent =
+            tokens.some(t => t.type === 'sent') ||
+            internalTransfers.some(t => t.type === 'sent') ||
+            targets.length > 0;
+
+        const hasRecv =
+            tokens.some(t => t.type === 'recv') || internalTransfers.some(t => t.type === 'recv');
+
+        return hasSent && hasRecv && !cardanoSpecific;
+    }
+
+    return false;
+};
+
+export const getTargetAmountRaw = (
     target: WalletAccountTransaction['targets'][number] | undefined,
     transaction: WalletAccountTransaction,
 ) => {
-    const txAmount = formatNetworkAmount(transaction.amount, transaction.symbol);
-    const validTxAmount = txAmount && txAmount !== '0';
+    const txAmount = new BigNumber(transaction.amount ?? '0');
+    const validTxAmount = txAmount?.gt(0);
     if (!target) {
         return validTxAmount ? txAmount : null;
     }
@@ -475,8 +925,8 @@ export const getTargetAmount = (
     const sentToSelfTarget =
         (transaction.type === 'sent' || transaction.type === 'self') && target.isAccountTarget;
 
-    const amount = target.amount && formatNetworkAmount(target.amount, transaction.symbol);
-    const validTargetAmount = amount && amount !== '0';
+    const amount = target.amount && new BigNumber(target.amount);
+    const validTargetAmount = amount && amount.gt(0);
     if (!sentToSelfTarget && validTargetAmount) {
         // show target amount for all non "sent to myself" targets
         return amount;
@@ -495,6 +945,15 @@ export const getTargetAmount = (
     return null;
 };
 
+export const getTargetAmount = (
+    target: WalletAccountTransaction['targets'][number] | undefined,
+    transaction: WalletAccountTransaction,
+) => {
+    const value = getTargetAmountRaw(target, transaction);
+
+    return value ? formatNetworkAmount(value.toString(), transaction.symbol) : null;
+};
+
 export const getFeeRate = (tx: AccountTransaction) =>
     // calculate fee rate, TODO: add this to blockchain-link tx details
     new BigNumber(tx.fee).div(tx.details.size).integerValue(BigNumber.ROUND_CEIL).toString();
@@ -509,92 +968,143 @@ export const replaceEthereumSpecific = (
     return {
         ...tx.ethereumSpecific,
         gasLimit: Number(precomposedTx.feeLimit),
-        gasPrice: toWei(precomposedTx.feePerByte, 'gwei'),
+        gasPrice: fromGwei(precomposedTx.feePerByte).toWei(),
     };
 };
 
 const getEthereumRbfParams = (
     tx: AccountTransaction,
     account: Account,
-): RbfTransactionParams | undefined => {
-    if (account.networkType !== 'ethereum') return;
-    if (tx.type === 'recv' || !tx.ethereumSpecific || !isPending(tx)) return; // ignore non rbf and mined transactions
+): RbfTransactionParamsEthereum | undefined => {
+    if (
+        account.networkType !== 'ethereum' ||
+        tx.type === 'recv' ||
+        // Replacing a transaction means re-signing at its nonce, which only makes sense for a
+        // transaction the account signed itself. A third-party transfer out of the account is
+        // labelled 'sent' too (see isSignedByAccount) and carries the other signer's nonce.
+        !isSignedByDescriptor(tx.details, account.descriptor) ||
+        !tx.ethereumSpecific ||
+        !isPending(tx) ||
+        !tx.rbf
+    ) {
+        return; // ignore non rbf and mined transactions
+    }
 
     const { vout } = tx.details;
-    const token = tx.tokens[0];
 
-    const output = token
-        ? {
-              address: token.to!,
-              token: token.contract,
-              amount: token.amount,
-              formattedAmount: formatAmount(token.amount, token.decimals),
-          }
-        : {
-              address: vout[0].addresses![0],
-              amount: vout[0].value!,
-              formattedAmount: formatNetworkAmount(vout[0].value!, account.symbol),
-          };
+    const { data, nonce, gasPrice, maxFeePerGas, maxPriorityFeePerGas } = tx.ethereumSpecific;
 
-    const ethereumData =
-        tx.ethereumSpecific.data && tx.ethereumSpecific.data.indexOf('0x') === 0
-            ? tx.ethereumSpecific.data.substring(2)
-            : '';
+    // ignore empty calldata represented as '0x'
+    const transactionData = !data || data === '0x' ? '' : data;
+
+    const txSignature = getEvmTransactionTextSignature(transactionData);
+
+    // @ts-expect-error: indexing with noUncheckedIndexedAccess
+    const firstVout: (typeof vout)[number] = vout[0];
+    const firstVoutAddresses = firstVout.addresses!;
+    // @ts-expect-error: indexing with noUncheckedIndexedAccess
+    const toAddress: string = firstVoutAddresses[0];
+    const nativeOutput = {
+        address: toAddress,
+        amount: firstVout.value!,
+        formattedAmount: formatNetworkAmount(firstVout.value!, account.symbol),
+    };
+
+    let output;
+    switch (txSignature) {
+        case 'transfer': {
+            const { tokens } = tx;
+            // @ts-expect-error: indexing with noUncheckedIndexedAccess
+            const token: (typeof tokens)[number] = tokens[0];
+
+            output = {
+                address: token.to,
+                token: token.contract,
+                amount: token.amount,
+                formattedAmount: convertAmountSubunitsToUnits(token.amount, token.decimals),
+            };
+            break;
+        }
+        case 'approve':
+        case 'revoke': {
+            const approvalData = Calldata.evm.erc20.approve.decode(data);
+            const amount = approvalData?.amount.toString() ?? '0';
+
+            const token = account.tokens?.find(t => t.contract === toAddress);
+
+            output = {
+                address: toAddress,
+                token: toAddress, // approval is send to token address
+                amount,
+                formattedAmount: convertAmountSubunitsToUnits(amount, token?.decimals || 0),
+            };
+            break;
+        }
+        case 'deposit':
+        case 'withdraw':
+        case 'redeem': {
+            const tokenTransfer = tx.tokens?.[0];
+            if (tokenTransfer) {
+                output = {
+                    address: toAddress,
+                    token: tokenTransfer.contract,
+                    amount: tokenTransfer.amount,
+                    formattedAmount: convertAmountSubunitsToUnits(
+                        tokenTransfer.amount,
+                        tokenTransfer.decimals,
+                    ),
+                };
+            } else {
+                output = nativeOutput;
+            }
+            break;
+        }
+        default: {
+            output = nativeOutput;
+        }
+    }
 
     return {
+        type: 'ethereum',
         txid: tx.txid,
-        utxo: [], // irrelevant
         outputs: [
             {
                 type: 'payment',
                 ...output,
             },
         ],
-        ethereumNonce: tx.ethereumSpecific.nonce,
-        ethereumData,
-        feeRate: fromWei(tx.ethereumSpecific?.gasPrice ?? '0', 'gwei'),
-        baseFee: 0, // irrelevant
+        ethereumNonce: nonce,
+        transactionData: txSignature === 'transfer' ? '' : transactionData,
+        gasPrice: gasPrice ? fromWei(gasPrice).toGwei() : '',
+        maxFeePerGas: maxFeePerGas ? fromWei(maxFeePerGas).toGwei() : '',
+        maxPriorityFeePerGas: maxPriorityFeePerGas ? fromWei(maxPriorityFeePerGas).toGwei() : '',
     };
 };
 
 const getBitcoinRbfParams = (
     tx: AccountTransaction,
     account: Account,
-): RbfTransactionParams | undefined => {
+): RbfTransactionParamsBitcoin | undefined => {
     if (account.networkType !== 'bitcoin') return;
-    if (tx.type === 'recv' || !tx.rbf || !tx.details || !isPending(tx)) return; // ignore non rbf and mined transactions
-    const { vin, vout } = tx.details;
+    if (tx.type === 'recv' || !tx.details || !isPending(tx)) return; // ignore mined transactions
+    const { vout } = tx.details;
 
     const changeAddresses = account.addresses ? account.addresses.change : [];
-    const allAddresses = account.addresses
-        ? changeAddresses.concat(account.addresses.used).concat(account.addresses.unused)
-        : [];
-    const utxo = vin.flatMap(input => {
-        // find input AccountAddress
-        const addr = allAddresses.find(a => input.addresses?.includes(a.address));
-        if (!addr) return []; // skip utxo, TODO: set some error? is it even possible?
 
-        // re-create utxo from the input
-        return {
-            amount: input.value!,
-            txid: input.txid!,
-            vout: input.vout || 0,
-            address: addr!.address,
-            path: addr!.path,
-            blockHeight: 0,
-            confirmations: 0,
-            required: true,
-        };
-    });
+    const utxo = getMyInputsFromTransaction({ tx, account });
+
     // find change address and output
     let changeAddress: AccountAddress | undefined;
-    const outputs: RbfTransactionParams['outputs'] = [];
+    const outputs: RbfTransactionParamsBitcoin['outputs'] = [];
     vout.forEach(output => {
+        const outputAddresses = output.addresses!;
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const firstAddress: string = outputAddresses[0];
         if (!output.isAddress) {
             // TODO: this should be done in @trezor/connect, blockchain-link or even blockbook
             // blockbook sends output.hex as scriptPubKey with additional prefix where: 6a - OP_RETURN and XX - data len. this field should be parsed by @trezor/utxo-lib
             // blockbook sends ascii data in output.address[0] field in format: "OP_RETURN (ASCII-VALUE)". as a workaround we are extracting ascii data from here
-            const dataAscii = output.addresses![0].match(/^OP_RETURN \((.*)\)/)?.pop(); // strip ASCII data from brackets
+            const dataAscii = firstAddress.match(/^OP_RETURN \((.*)\)/)?.pop(); // strip ASCII data from brackets
             if (dataAscii) {
                 outputs.push({
                     type: 'opreturn',
@@ -606,7 +1116,7 @@ const getBitcoinRbfParams = (
             const changeOutput = changeAddresses.find(a => output.addresses?.includes(a.address));
             outputs.push({
                 type: changeOutput ? 'change' : 'payment',
-                address: output.addresses![0],
+                address: firstAddress,
                 amount: output.value!,
                 formattedAmount: formatNetworkAmount(output.value!, account.symbol),
             });
@@ -618,8 +1128,8 @@ const getBitcoinRbfParams = (
 
     if (!utxo.length || !outputs.length || outputs.length !== vout.length) return;
 
-    // TODO: get other params, like locktime etc.
     return {
+        type: 'bitcoin',
         txid: tx.txid,
         utxo,
         outputs,
@@ -629,14 +1139,45 @@ const getBitcoinRbfParams = (
         // of displaying fee rate is kept here
         feeRate: tx.feeRate || getFeeRate(tx),
         baseFee: parseInt(tx.fee, 10),
+        locktime: tx.lockTime,
     };
 };
 
 export const getRbfParams = (
     tx: AccountTransaction,
     account: Account,
-): WalletAccountTransaction['rbfParams'] =>
-    getBitcoinRbfParams(tx, account) || getEthereumRbfParams(tx, account);
+): WalletAccountTransaction['rbfParams'] => {
+    switch (account.networkType) {
+        case 'bitcoin':
+            return getBitcoinRbfParams(tx, account);
+        case 'ethereum':
+            return getEthereumRbfParams(tx, account);
+        default:
+            return undefined;
+    }
+};
+
+const enhanceTokenTransfers = (
+    tokenTransfers: AccountTransaction['tokens'],
+    accountSymbol: Account['symbol'],
+) => {
+    if (!tokenTransfers || tokenTransfers.length === 0) {
+        return tokenTransfers;
+    }
+
+    const isEvmNetwork = getNetworkType(accountSymbol) === 'ethereum';
+
+    return tokenTransfers.map(transfer => {
+        if (!transfer.symbol) {
+            return transfer;
+        }
+
+        return {
+            ...transfer,
+            symbol: isEvmNetwork ? transfer.symbol : transfer.symbol.toUpperCase(),
+        };
+    });
+};
 
 /**
  * Attaches fields from the account (descriptor, deviceState, symbol) to the tx object
@@ -653,301 +1194,64 @@ export const enhanceTransaction = (
     deviceState: account.deviceState,
     symbol: account.symbol,
     ...origTx,
+    tokens: enhanceTokenTransfers(origTx.tokens, account.symbol),
     rbfParams: getRbfParams(origTx, account),
     hex: (origTx.blockHeight ?? 0) <= 0 && origTx.rbf ? origTx.hex : undefined, // store tx hex **only** for pending transactions (used by rbf)
 });
 
-export const getOriginalTransaction = ({
-    descriptor,
-    deviceState,
-    symbol,
-    rbfParams,
-    rates,
-    ...tx
-}: WalletAccountTransaction): AccountTransaction => tx;
-
-const groupTransactionIdsByAddress = (transactions: WalletAccountTransaction[]) => {
-    const addresses: { [address: string]: string[] } = {};
-    const addAddress = (txid: string, addrs: string[] | undefined) => {
-        if (!addrs) {
-            return;
-        }
-
-        addrs.forEach(address => {
-            if (!addresses[address]) {
-                addresses[address] = [];
-            }
-
-            if (addresses[address].indexOf(txid) === -1) {
-                addresses[address].push(txid);
-            }
-        });
-    };
-
-    transactions.forEach(t => {
-        // Inputs
-        t.details.vin.forEach(vin => addAddress(t.txid, vin.addresses));
-        // Outputs
-        t.details.vout.forEach(vout => addAddress(t.txid, vout.addresses));
-        // Targets
-        t.targets.forEach(target => addAddress(t.txid, target.addresses));
-    });
-
-    return addresses;
-};
-
-const groupTransactionsByLabel = (accountMetadata: AccountLabels) => {
-    const labels: { [label: string]: string[] } = {};
-    const { outputLabels } = accountMetadata;
-
-    Object.keys(outputLabels).forEach(txid => {
-        Object.values(outputLabels[txid]).forEach(label => {
-            if (!labels[label]) {
-                labels[label] = [];
-            }
-
-            labels[label].push(txid);
-        });
-    });
-
-    return labels;
-};
-
-const groupAddressesByLabel = (accountMetadata: AccountLabels) => {
-    const labels: { [label: string]: string[] } = {};
-    const { addressLabels } = accountMetadata;
-
-    Object.keys(addressLabels).forEach(address => {
-        const label = addressLabels[address];
-
-        if (!labels[label]) {
-            labels[label] = [];
-        }
-
-        labels[label].push(address);
-    });
-
-    return labels;
-};
-
-const getTargetAmounts = (transaction: WalletAccountTransaction) =>
-    transaction.targets.length === 0
-        ? [formatNetworkAmount(transaction.amount, transaction.symbol)]
-        : transaction.targets.flatMap(target => getTargetAmount(target, transaction) || []);
-
-const searchOperators = ['<', '>', '=', '!='] as const;
-const numberSearchFilter = (
-    transaction: WalletAccountTransaction,
-    amount: BigNumber,
-    operator: (typeof searchOperators)[number],
-) => {
-    const targetAmounts = getTargetAmounts(transaction);
-    const op = getTxOperation(transaction.type);
-    if (!op) {
-        return false;
-    }
-
-    return (
-        targetAmounts.filter(targetAmount => {
-            let bnTargetAmount = new BigNumber(targetAmount);
-            if (op === 'negative') {
-                bnTargetAmount = bnTargetAmount.negated();
-            }
-
-            switch (operator) {
-                case '<':
-                    return bnTargetAmount.lte(amount);
-                case '>':
-                    return bnTargetAmount.gte(amount);
-                case '=':
-                    return bnTargetAmount.eq(amount);
-                case '!=':
-                    return !bnTargetAmount.eq(amount);
-                default:
-                    return false;
-            }
-        }).length > 0
-    );
-};
-
-const searchDateRegex = new RegExp(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/);
-export const simpleSearchTransactions = (
-    transactions: WalletAccountTransaction[],
-    accountMetadata: AccountLabels,
-    search: string,
-) => {
-    // Trim
-    search = search.trim();
-
-    // If the string is empty or only contains search operators, there's no search
-    if (['', ...searchOperators].includes(search)) {
-        return transactions;
-    }
-
-    // Check for date
-    if (searchDateRegex.test(search)) {
-        // Add search operator so it gets picked up below
-        search = `=${search}`;
-    }
-
-    // If it's an amount search (starting with <, > or = operator)
-    const searchOperator = searchOperators.find(k => search.startsWith(k));
-    if (searchOperator) {
-        // Remove search operator from search string
-        search = search.replace(searchOperator, '').trim();
-
-        // Is date?
-        if (searchDateRegex.test(search)) {
-            const timestamp = +new Date(`${search}T00:00:00Z`) / 1000;
-            switch (searchOperator) {
-                case '>':
-                    return transactions.filter(t => t.blockTime && t.blockTime > timestamp);
-                case '<':
-                    return transactions.filter(
-                        t => t.blockTime && t.blockTime < timestamp + 24 * 60 * 60,
-                    );
-                case '=':
-                    return transactions.filter(
-                        t =>
-                            t.blockTime &&
-                            t.blockTime > timestamp &&
-                            t.blockTime < timestamp + 24 * 60 * 60,
-                    );
-                case '!=':
-                    return transactions.filter(
-                        t =>
-                            t.blockTime &&
-                            (t.blockTime < timestamp || t.blockTime > timestamp + 24 * 60 * 60),
-                    );
-                // no default
-            }
-        }
-
-        // Is number?
-        if (!Number.isNaN(search)) {
-            const amount = new BigNumber(search);
-
-            return transactions.filter(t => numberSearchFilter(t, amount, searchOperator));
-        }
-
-        return [];
-    }
-
-    const txsToSearch: string[] = [];
-
-    // Searching for an amount (without operator)
-    if (!Number.isNaN(search)) {
-        const foundTxsForNumber = transactions.flatMap(t => {
-            const targetAmounts = getTargetAmounts(t);
-            if (targetAmounts.filter(targetAmount => targetAmount.includes(search)).length === 0) {
-                return [];
-            }
-
-            return t.txid;
-        });
-        txsToSearch.push(...foundTxsForNumber);
-    }
-
-    // Find by output label
-    const txsForOutputLabels = groupTransactionsByLabel(accountMetadata);
-    const foundTxsForOutputLabel = Object.keys(txsForOutputLabels).flatMap(label => {
-        if (label.toLowerCase().includes(search.toLowerCase())) {
-            return txsForOutputLabels[label];
-        }
-
-        return [];
-    });
-    txsToSearch.push(...foundTxsForOutputLabel);
-
-    // Find by address label
-    const addressesForLabel = groupAddressesByLabel(accountMetadata);
-    const foundAddressesForLabel = Object.keys(addressesForLabel).flatMap(label => {
-        if (label.toLowerCase().includes(search.toLowerCase())) {
-            return addressesForLabel[label];
-        }
-
-        return [];
-    });
-
-    // Find by address
-    const txsForAddresses = groupTransactionIdsByAddress(transactions);
-    const foundTxsForAddress = Object.keys(txsForAddresses).flatMap(address => {
-        if (
-            address.toLowerCase().includes(search.toLowerCase()) ||
-            foundAddressesForLabel.includes(address)
-        ) {
-            return txsForAddresses[address];
-        }
-
-        return [];
-    });
-    txsToSearch.push(...foundTxsForAddress);
-
-    // Remove duplicate txIDs
-    return transactions.filter(
-        t => [...new Set(txsToSearch)].includes(t.txid) || t.txid.includes(search),
-    );
-};
-
-export const advancedSearchTransactions = (
-    transactions: WalletAccountTransaction[],
-    accountMetadata: AccountLabels,
-    search: string,
-) => {
-    // No AND/OR operators, just run a simple search
-    if (!search.includes('&') && !search.includes('|')) {
-        return simpleSearchTransactions(transactions, accountMetadata, search);
-    }
-
-    // Split by OR operator first
-    let orSplit = search.split('|').filter(s => s.trim() !== '');
-    if (!orSplit || orSplit.length === 1) {
-        orSplit = [search.replace('|', '')];
-    }
-
-    // Get all TxIDs matching the searches
-    const filteredTxIDs = new Set([
-        ...orSplit.flatMap(or => {
-            // And searches (only keep results that appear X (split) times)
-            const andSplit = or.split('&');
-            if (!andSplit || andSplit.length === 1) {
-                return simpleSearchTransactions(
-                    transactions,
-                    accountMetadata,
-                    or.replace('&', ''),
-                ).flatMap(t => t.txid);
-            }
-
-            const andTxs = andSplit.flatMap(and =>
-                simpleSearchTransactions(transactions, accountMetadata, and).map(t => t.txid),
-            );
-
-            const transactionCount: { [txid: string]: number } = {};
-
-            return andTxs.filter(txid => {
-                if (!transactionCount[txid]) {
-                    transactionCount[txid] = 0;
-                }
-
-                transactionCount[txid]++;
-
-                return transactionCount[txid] === andSplit.length;
-            });
-        }),
-    ]);
-
-    return transactions.filter(t => filteredTxIDs.has(t.txid));
-};
-
-export const isTxFinal = (tx: WalletAccountTransaction, confirmations: number) =>
-    // checks RBF status
-    !tx.rbf || confirmations > 0 || tx.solanaSpecific?.status === 'confirmed';
-
 export const getTxHeaderSymbol = (transaction: WalletAccountTransaction) => {
-    const isSingleTokenTransaction = transaction.tokens.length === 1;
-    const transfer = transaction.tokens[0];
-    // In case of single token transactions show the token symbol instead of symbol of a main network
-    const symbol = !isSingleTokenTransaction || !transfer ? transaction.symbol : transfer.symbol;
+    const { tokens } = transaction;
+    const isSingleTokenTransaction = tokens.length === 1;
+
+    // @ts-expect-error: indexing with noUncheckedIndexedAccess
+    const firstToken: (typeof tokens)[number] = tokens[0];
+    // if there's exactly one token, use its symbol; otherwise, use the main network symbol
+    const symbol = isSingleTokenTransaction ? firstToken.symbol : transaction.symbol;
 
     return symbol;
+};
+
+export const groupTokensTransactionsByContractAddress = (
+    txs: WalletAccountTransaction[],
+): Record<TokenAddress, WalletAccountTransaction[]> => {
+    const groupedTokensTxs: Record<TokenAddress, WalletAccountTransaction[]> = {};
+
+    txs.forEach(tx => {
+        if (tx.tokens && tx.tokens.length > 0) {
+            tx.tokens.forEach(token => {
+                const groupKey = token.contract as TokenAddress;
+                if (!groupedTokensTxs[groupKey]) {
+                    groupedTokensTxs[groupKey] = [];
+                }
+                groupedTokensTxs[groupKey].push(tx);
+            });
+        }
+    });
+
+    return groupedTokensTxs;
+};
+
+export const getTransactionWithLowestNonce = (
+    transactionGroups: GroupedTransactionsByDate,
+): WalletAccountTransaction | null => {
+    const txs = Object.values(transactionGroups)
+        .flat()
+        .filter(tx => tx.ethereumSpecific && isSignedByAccount(tx));
+
+    if (txs.length === 0) return null;
+
+    return txs.reduce((lowestNonceTransaction, tx) =>
+        Number(tx.ethereumSpecific!.nonce) < Number(lowestNonceTransaction.ethereumSpecific!.nonce)
+            ? tx
+            : lowestNonceTransaction,
+    );
+};
+
+export const getTxValidityTimeoutInMs = (networkType?: NetworkType) => {
+    if (networkType === 'solana') {
+        // Blockhash required in Solana tx is valid for 1 minute. Leave 15 seconds for tx confirmation.
+        return 45 * 1000;
+    }
+
+    return 0;
 };

@@ -1,0 +1,93 @@
+import { type NetworkSymbol } from '@suite-common/wallet-config';
+import { type TokenAddress } from '@suite-common/wallet-types';
+import { Icon, type IconName, type IconSize, TokenIcon, icons } from '@suite-native/icons';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
+import { type Color } from '@trezor/theme';
+import { isNotNullOrUndefined } from '@trezor/utils';
+
+import { Box, type BoxProps } from './Box';
+
+export type CompoundRoundedIconProps = {
+    symbol?: NetworkSymbol;
+    contractAddress?: TokenAddress;
+    compoundIcons: {
+        name?: IconName;
+        color?: Color;
+        size?: IconSize;
+    }[];
+    containerSize?: number;
+    backgroundColor?: Color;
+} & BoxProps;
+
+const DEFAULT_CONTAINER_SIZE = 48;
+
+const iconContainerStyle = prepareNativeStyle<{
+    backgroundColor?: Color;
+    containerSizeWidth?: number;
+    containerSizeHeight?: number;
+}>((utils, { backgroundColor, containerSizeWidth, containerSizeHeight }) => ({
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: containerSizeWidth ?? DEFAULT_CONTAINER_SIZE,
+    height: containerSizeHeight ?? DEFAULT_CONTAINER_SIZE,
+    backgroundColor: utils.colors.elementFillNeutralSoft,
+    borderRadius: utils.borders.radii.round,
+    flexDirection: 'row',
+    gap: utils.spacings.sp4,
+
+    extend: {
+        condition: isNotNullOrUndefined(backgroundColor),
+        style: {
+            backgroundColor: utils.colors[backgroundColor as Color],
+        },
+    },
+}));
+
+export const CompoundRoundedIcon = ({
+    symbol,
+    compoundIcons,
+    contractAddress,
+    backgroundColor,
+    containerSize,
+    style,
+    ...boxProps
+}: CompoundRoundedIconProps) => {
+    const { applyStyle } = useNativeStyles();
+
+    const iconsCount = compoundIcons?.length ?? 0;
+    const containerSizeWidth =
+        containerSize && iconsCount > 0 ? iconsCount * containerSize : undefined;
+
+    return (
+        <Box
+            style={[
+                applyStyle(iconContainerStyle, {
+                    backgroundColor,
+                    containerSizeWidth,
+                    containerSizeHeight: containerSize,
+                }),
+                style,
+            ]}
+            {...boxProps}
+        >
+            {compoundIcons.map(({ name, color, size }) =>
+                name && name in icons ? (
+                    <Icon
+                        name={name}
+                        color={color}
+                        size={size}
+                        key={`${name}-${color ?? 'default'}-${size ?? 'default'}`}
+                    />
+                ) : (
+                    symbol && (
+                        <TokenIcon
+                            tokenSymbol={contractAddress ? undefined : symbol}
+                            networkSymbol={symbol}
+                            contractAddress={contractAddress}
+                        />
+                    )
+                ),
+            )}
+        </Box>
+    );
+};

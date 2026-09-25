@@ -1,28 +1,23 @@
-import { useCallback, useEffect, useState, ChangeEvent } from 'react';
-import TrezorConnect, { TokenInfo } from '@trezor/connect';
-import { analytics, EventType } from '@trezor/suite-analytics';
+import { type ChangeEvent, useCallback, useEffect, useState } from 'react';
 
-import { Input, Button, Paragraph } from '@trezor/components';
+import { selectSelectedAccount } from '@suite/account';
+import { events, injectDesktopAnalytics } from '@suite/analytics';
+import { Translation, useTranslation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectAddressValidator } from '@suite-common/networks';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { tryGetAccountIdentity } from '@suite-common/wallet-utils';
+import { Input, Modal } from '@trezor/components';
+import TrezorConnect, { type TokenInfo } from '@trezor/connect';
+import { asCoinSymbol } from '@trezor/connect-common';
+
 import { addToken } from 'src/actions/wallet/tokenActions';
-import { Modal } from 'src/components/suite';
-import { Translation } from 'src/components/suite/Translation';
-import { useDispatch, useSelector, useTranslation } from 'src/hooks/suite';
-import { isAddressValid } from '@suite-common/wallet-utils';
-import { Account } from 'src/types/wallet';
-import { selectSelectedAccount } from 'src/reducers/wallet/selectedAccountReducer';
-import { selectLocalCurrency } from 'src/reducers/wallet/settingsReducer';
-import styled from 'styled-components';
-import { spacingsPx } from '@trezor/theme';
+import { useSelector } from 'src/hooks/suite';
+import { type Account } from 'src/types/wallet';
 
-const StyledP = styled(Paragraph)`
-    color: ${({ theme }) => theme.textSubdued};
-    text-align: left;
-    margin-bottom: ${spacingsPx.lg};
-`;
-
-interface AddTokenModalProps {
+type AddTokenModalProps = {
     onCancel: () => void;
-}
+};
 
 export const AddTokenModal = ({ onCancel }: AddTokenModalProps) => {
     const [contractAddress, setContractAddress] = useState<string>('');
@@ -30,20 +25,25 @@ export const AddTokenModal = ({ onCancel }: AddTokenModalProps) => {
     const [isFetching, setIsFetching] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const account = useSelector(selectSelectedAccount);
-    const localCurrency = useSelector(selectLocalCurrency);
-    const dispatch = useDispatch();
     const { translationString } = useTranslation();
+    const { analytics, addressValidator, dispatch } = useServices(
+        injectDesktopAnalytics,
+        injectAddressValidator,
+        injectDispatch,
+    );
 
     const loadTokenInfo = useCallback(
         async (acc: Account, contractAddress: string) => {
             if (!acc) return;
             setIsFetching(true);
             const response = await TrezorConnect.getAccountInfo({
-                coin: acc.symbol,
+                coin: asCoinSymbol(acc.symbol),
+                identity: tryGetAccountIdentity(acc),
                 descriptor: acc.descriptor,
                 details: 'tokenBalances',
                 contractFilter: contractAddress,
                 suppressBackupWarning: true,
+                protocols: acc.networkType === 'ethereum' ? ['erc4626'] : undefined,
             });
 
             if (response.success) {
@@ -60,7 +60,7 @@ export const AddTokenModal = ({ onCancel }: AddTokenModalProps) => {
                 setTokenInfo(undefined);
                 setError(
                     translationString('TR_ADD_TOKEN_TOAST_ERROR', {
-                        error: response.payload.error,
+                        error: response.error.message,
                     }),
                 );
             }
@@ -85,7 +85,7 @@ export const AddTokenModal = ({ onCancel }: AddTokenModalProps) => {
             t => t.contract.toLowerCase() === addr.toLowerCase(),
         );
 
-        const isValid = isAddressValid(addr, account.symbol);
+        const isValid = addressValidator.isAddressValid(addr, account.symbol);
 
         if (addr && !isValid) {
             setError(translationString('TR_ADD_TOKEN_ADDRESS_NOT_VALID'));
@@ -97,23 +97,17 @@ export const AddTokenModal = ({ onCancel }: AddTokenModalProps) => {
         setTokenInfo(undefined);
         setContractAddress(addr);
     };
-    const getInputState = () => {
-        if (error) return 'error';
-
-        return undefined;
-    };
-
     const handleAddTokenButtonClick = () => {
         if (tokenInfo) {
-            dispatch(addToken(account, tokenInfo, localCurrency));
+            dispatch(addToken(account, tokenInfo));
             onCancel();
 
             analytics.report({
-                type: EventType.AddToken,
+                type: events.addTokenEvent.name,
                 payload: {
                     networkSymbol: account.symbol,
                     addedNth: account.tokens ? account.tokens.length + 1 : 0,
-                    token: tokenInfo[0]?.symbol?.toLowerCase() || '',
+                    token: tokenInfo[0]?.symbol || '',
                 },
             });
         }
@@ -121,29 +115,24 @@ export const AddTokenModal = ({ onCancel }: AddTokenModalProps) => {
 
     return (
         <Modal
-            isCancelable
             onCancel={onCancel}
             heading={<Translation id="TR_ADD_TOKEN_TITLE" />}
-            bottomBarComponents={
-                <Button
+            bottomContent={
+                <Modal.Button
                     onClick={handleAddTokenButtonClick}
                     isDisabled={!tokenInfo || !!error}
                     isLoading={isFetching}
                 >
                     <Translation id="TR_ADD_TOKEN_SUBMIT" />
-                </Button>
+                </Modal.Button>
             }
         >
-            <StyledP typographyStyle="hint">
-                <Translation id="TR_ADD_TOKEN_DESCRIPTION" />
-            </StyledP>
             <Input
                 label={<Translation id="TR_ADD_TOKEN_LABEL" />}
                 value={contractAddress}
                 bottomText={error || null}
-                inputState={getInputState()}
+                hasError={!!error}
                 onChange={onChange}
-                hasBottomPadding={false}
             />
         </Modal>
     );

@@ -1,24 +1,57 @@
-import { useMemo } from 'react';
-import { OnboardingLayout } from 'src/components/onboarding';
-import { ReduxModal } from 'src/components/suite/modals/ReduxModal/ReduxModal';
-import CreateOrRecover from 'src/views/onboarding/steps/CreateOrRecover';
-import { FirmwareStep } from 'src/views/onboarding/steps/FirmwareStep';
-import { DeviceAuthenticity } from './steps/SecurityCheck/DeviceAuthenticity';
-import { ResetDeviceStep } from 'src/views/onboarding/steps/ResetDevice';
-import { RecoveryStep } from 'src/views/onboarding/steps/Recovery';
-import { BackupStep } from 'src/views/onboarding/steps/Backup';
-import SecurityStep from 'src/views/onboarding/steps/Security';
-import SetPinStep from 'src/views/onboarding/steps/Pin';
-import BasicSettingsStep from 'src/views/onboarding/steps/BasicSettings';
-import { FinalStep } from 'src/views/onboarding/steps/Final';
-import UnexpectedState from 'src/views/onboarding/UnexpectedState';
-import { useOnboarding, useFilteredModal } from 'src/hooks/suite';
-import { MODAL } from 'src/actions/suite/constants';
+import { useEffect, useMemo } from 'react';
+
+import { injectDesktopAnalytics } from '@suite/analytics';
+import { gotoThunk } from '@suite/router';
+import { events } from '@suite-common/analytics';
+import { useServices } from '@suite-common/dependency-injection';
+import { selectSelectedDevice } from '@suite-common/device';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { selectThpStep } from '@suite-common/thp';
+import { exhaustive } from '@trezor/type-utils';
+
+import { OnboardingLayout } from 'src/components/onboarding/OnboardingLayout';
+import { getOnboardingStepIndex } from 'src/config/onboarding/steps';
 import * as STEP from 'src/constants/onboarding/steps';
-import { DeviceTutorial } from './steps/DeviceTutorial';
+import { useOnboarding, useSelector } from 'src/hooks/suite';
+import { UnexpectedState } from 'src/views/onboarding/UnexpectedState';
+import { BackupTypeStep } from 'src/views/onboarding/steps/BackupTypeStep';
+import { CreateOrRecoverStep } from 'src/views/onboarding/steps/CreateOrRecoverStep';
+import { DeviceAuthenticityStep } from 'src/views/onboarding/steps/DeviceAuthenticityStep';
+import { DeviceTutorialStep } from 'src/views/onboarding/steps/DeviceTutorialStep';
+import { FinalStep } from 'src/views/onboarding/steps/FinalStep';
+import { FirmwareStep } from 'src/views/onboarding/steps/FirmwareStep';
+import { PinStep } from 'src/views/onboarding/steps/PinStep';
+import { RecoveryStep } from 'src/views/onboarding/steps/RecoveryStep';
+import { SecurityStep } from 'src/views/onboarding/steps/SecurityStep';
 
 export const Onboarding = () => {
+    const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
+
     const { activeStepId } = useOnboarding();
+    const device = useSelector(selectSelectedDevice);
+    const thpStep = useSelector(selectThpStep);
+
+    // This is a temporary hack until we refactor onboarding.
+    // We cant include THP modals in the onboarding flow, so in this specific edge
+    // we redirect user to the dashboard where onboarding starts over and picks up where it ended.
+    useEffect(() => {
+        if (activeStepId !== STEP.ID_FIRMWARE_STEP && thpStep === 'ConfirmOnlyConnection') {
+            dispatch(gotoThunk({ routeName: 'suite-index' }));
+        }
+    }, [device, thpStep, activeStepId, dispatch]);
+
+    // Fires once per step entry. activeStepId is the dep, so it does not fire on
+    // re-render and re-fires on re-entry (e.g. user navigates back and forward).
+    useEffect(() => {
+        analytics.report({
+            type: events.onboardingStepViewedEvent.name,
+            payload: {
+                stepName: activeStepId,
+                stepIndex: getOnboardingStepIndex(activeStepId),
+                platform: 'desktop',
+            },
+        });
+    }, [activeStepId, analytics]);
 
     const StepComponent = useMemo(() => {
         switch (activeStepId) {
@@ -27,49 +60,35 @@ export const Onboarding = () => {
                 return FirmwareStep;
             case STEP.ID_AUTHENTICATE_DEVICE_STEP:
                 // Device authenticity check
-                return DeviceAuthenticity;
+                return DeviceAuthenticityStep;
             case STEP.ID_TUTORIAL_STEP:
                 // Device tutorial
-                return DeviceTutorial;
+                return DeviceTutorialStep;
             case STEP.ID_CREATE_OR_RECOVER:
                 // Selection between a new seed or seed recovery
-                return CreateOrRecover;
-            case STEP.ID_RESET_DEVICE_STEP:
-                // a) Generating a new seed, selection between single seed or shamir seed (only T2T1 supported)
-                return ResetDeviceStep;
+                return CreateOrRecoverStep;
+            case STEP.ID_BACKUP_TYPE_STEP:
+                // Selecting a backup type
+                return BackupTypeStep;
             case STEP.ID_RECOVERY_STEP:
                 // b) Seed recovery
                 return RecoveryStep;
             case STEP.ID_SECURITY_STEP:
-                // Security intro (BACKUP, PIN), option to skip them
+                // Wallet creation + backup (resetDevice with skip_backup: false)
                 return SecurityStep;
-            case STEP.ID_BACKUP_STEP:
-                // Seed backup
-                return BackupStep;
             case STEP.ID_SET_PIN_STEP:
                 // Pin setup
-                return SetPinStep;
-            case STEP.ID_COINS_STEP:
-                // Suite settings
-                return BasicSettingsStep;
+                return PinStep;
             case STEP.ID_FINAL_STEP:
+                // Onboarding success
                 return FinalStep;
             default:
-                console.error('no corresponding component found');
-
-                return () => null;
+                return exhaustive(activeStepId);
         }
     }, [activeStepId]);
 
-    const allowedModal = useFilteredModal(
-        [MODAL.CONTEXT_USER],
-        ['advanced-coin-settings', 'disable-tor'],
-    );
-
     return (
         <OnboardingLayout>
-            {allowedModal && <ReduxModal {...allowedModal} />}
-
             <UnexpectedState>
                 <StepComponent />
             </UnexpectedState>

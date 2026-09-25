@@ -1,10 +1,18 @@
-import { Network, networks } from '@trezor/utxo-lib';
-import { ElectrumAPI, BlockHeader, Version } from '@trezor/blockchain-link-types/src/electrum';
-import { JsonRpcClientOptions } from './json-rpc';
+import {
+    type ElectrumBlockHeader as BlockHeader,
+    type ElectrumAPI,
+    type ElectrumTypes,
+} from '@trezor/blockchain-link-types';
+import { type IntervalId } from '@trezor/type-utils';
+import { type Network, networks } from '@trezor/utxo-lib';
+
 import { BatchingJsonRpcClient } from './batching';
+import { type JsonRpcClientOptions } from './json-rpc';
 import type { ISocket } from '../sockets/interface';
 
 const KEEP_ALIVE_INTERVAL = 120 * 1000; // 2 minutes
+
+type Version = ElectrumTypes.Version;
 
 type ElectrumClientOptions = JsonRpcClientOptions & {
     client: {
@@ -61,7 +69,9 @@ export class ElectrumClient extends BatchingJsonRpcClient implements ElectrumAPI
             this.lastBlock = await (this as ElectrumAPI).request('blockchain.headers.subscribe');
         } catch (err) {
             this.socket = undefined;
-            throw new Error(`Communication with Electrum server failed: [${err}]`);
+            throw Object.assign(new Error(`Communication with Electrum server failed: [${err}]`), {
+                cause: err,
+            });
         }
 
         this.keepAlive();
@@ -90,7 +100,8 @@ export class ElectrumClient extends BatchingJsonRpcClient implements ElectrumAPI
         return super.request(method, ...params);
     }
 
-    private keepAliveHandle?: ReturnType<typeof setInterval>;
+    private keepAliveHandle?: IntervalId;
+
     private keepAlive() {
         if (!this.socket) return;
         this.keepAliveHandle = setInterval(async () => {

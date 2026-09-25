@@ -9,9 +9,21 @@
     "references": [
         { "path": "../blockchain-link-types" },
         { "path": "../blockchain-link-utils" },
+        { "path": "../env-utils" },
+        {
+            "path": "../../networks/ripple/network-ripple"
+        },
+        {
+            "path": "../../networks/solana/network-solana"
+        },
+        {
+            "path": "../../networks/stellar/network-stellar"
+        },
         { "path": "../utils" },
         { "path": "../utxo-lib" },
+        { "path": "../websocket-client" },
         { "path": "../e2e-utils" },
+        { "path": "../eslint" },
         { "path": "../type-utils" }
     ]
 }

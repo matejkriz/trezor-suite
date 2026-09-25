@@ -1,0 +1,21 @@
+{
+    "name": "@suite/sentry",
+    "version": "1.0.0",
+    "private": true,
+    "license": "See LICENSE.md in repo root",
+    "sideEffects": false,
+    "main": "src/index",
+    "scripts": {
+        "depcheck": "yarn g:depcheck",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
+        "type-check": "yarn g:tsc --build"
+    },
+    "dependencies": {
+        "@sentry/browser": "10.69.0",
+        "@sentry/core": "10.69.0",
+        "@suite-common/sentry": "workspace:*",
+        "@suite-common/suite-utils": "workspace:*",
+        "@trezor/env-utils": "workspace:*",
+        "@trezor/utils": "workspace:*"
+    }
+}

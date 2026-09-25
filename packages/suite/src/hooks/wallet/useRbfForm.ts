@@ -1,95 +1,187 @@
-import BigNumber from 'bignumber.js';
-import { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import { useForm } from 'react-hook-form';
-import { fromWei } from 'web3-utils';
-import { useSelector } from 'src/hooks/suite';
-import { DEFAULT_PAYMENT, DEFAULT_OPRETURN, DEFAULT_VALUES } from '@suite-common/wallet-constants';
-import { getFeeLevels } from '@suite-common/wallet-utils';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { type UseFormReturn, useForm } from 'react-hook-form';
+
+import { selectCurrentTargetAnonymity } from '@suite/coinjoin';
+import { type Network, getNetwork } from '@suite-common/wallet-config';
 import {
-    SelectedAccountLoaded,
-    Account,
-    RbfTransactionParams,
-    ChainedTransactions,
+    DEFAULT_OPRETURN,
+    DEFAULT_PAYMENT,
+    DEFAULT_VALUES,
+    ETH_SPEED_UP_TX_MULTIPLIER,
+} from '@suite-common/wallet-constants';
+import { DEFAULT_FEE_INFO, selectRawNetworkFeeInfo } from '@suite-common/wallet-core';
+import {
+    type Account,
+    type ChainedTransactions,
+    type FeeInfo,
+    type FormOptions,
+    type FormState,
+    type Output,
+    type PrecomposedLevels,
+    type PrecomposedLevelsCardano,
+    type RbfTransactionParams,
+    type RbfTransactionParamsBitcoin,
+    type RbfTransactionParamsEthereum,
 } from '@suite-common/wallet-types';
-import { FormState, FeeInfo } from 'src/types/wallet/sendForm';
-import { useFees } from './form/useFees';
-import { useCompose } from './form/useCompose';
-import { selectCurrentTargetAnonymity } from 'src/reducers/wallet/coinjoinReducer';
+import {
+    calculateChainedTransactionsFeeForRbf,
+    getConvertedOrDefaultFeeInfo,
+    isEip1559,
+} from '@suite-common/wallet-utils';
+import { type AccountUtxo, type FeeLevel } from '@trezor/connect';
+import { BigNumber, throwError } from '@trezor/utils';
+
+import { useSelector } from 'src/hooks/suite';
 import { useCoinjoinRegisteredUtxos } from 'src/hooks/wallet/form/useCoinjoinRegisteredUtxos';
+
+import { useCompose } from './form/useCompose';
+import { useFees } from './form/useFees';
 import { useBitcoinAmountUnit } from './useBitcoinAmountUnit';
 
+// Conservative minimum fee rate floor in sat/vB. Bitcoin Core has officially lowered both the min relay tx fee and the incremental relay fee, but actual minimums depend on individual node configurations.
+const MIN_FEE_RATE_PER_VB = 0.2;
+
 export type UseRbfProps = {
-    selectedAccount: SelectedAccountLoaded;
+    account: Account;
     rbfParams: RbfTransactionParams;
-    finalize: boolean;
     chainedTxs?: ChainedTransactions;
 };
 
-const getBitcoinFeeInfo = (info: FeeInfo, feeRate: string) => {
-    // increase FeeLevels (old rate + defined rate)
-    const levels = getFeeLevels('bitcoin', info).map(l => ({
-        ...l,
-        feePerUnit: new BigNumber(l.feePerUnit).plus(feeRate).toString(),
-    }));
-
-    return {
-        ...info,
-        levels,
-        minFee: new BigNumber(feeRate).plus(info.minFee).toNumber(), // increase required minFee rate
+type RbfState = {
+    account: Account;
+    network: Network;
+    feeInfo: FeeInfo;
+    coinjoinRegisteredUtxos: AccountUtxo[];
+    chainedTxs?: ChainedTransactions;
+    shouldSendInSats?: boolean;
+    formValues: Omit<FormState, 'outputs' | 'selectedUtxos'> & {
+        outputs: Array<Omit<Output, 'token'> & { token?: string | null }>;
     };
 };
 
-const getEthereumFeeInfo = (info: FeeInfo, gasPrice: string) => {
-    const current = new BigNumber(gasPrice);
-    const minFeeFromNetwork = new BigNumber(
-        fromWei(info.levels[0].feePerUnit, 'gwei'),
-    ).integerValue(BigNumber.ROUND_FLOOR);
+type RbfFormMethods = Pick<
+    UseFormReturn<FormState>,
+    'control' | 'formState' | 'getValues' | 'register' | 'setValue' | 'trigger'
+>;
 
-    const getFee = () => {
-        if (minFeeFromNetwork.lte(current)) {
-            return current.plus(1);
-        }
-
-        return minFeeFromNetwork;
+export type RbfContextValues = RbfState &
+    RbfFormMethods & {
+        methods: UseFormReturn<FormState>;
+        isLoading: boolean;
+        showDecreasedOutputs: boolean;
+        composedLevels?: PrecomposedLevels | PrecomposedLevelsCardano;
+        changeFeeLevel: (level: FeeLevel['label']) => void;
+        composeRequest: (field?: string) => Promise<void>;
+        signTransaction: () => Promise<boolean | undefined>;
     };
 
-    const fee = getFee();
+const getBitcoinFeeInfo = (info: FeeInfo, rbfParams: RbfTransactionParamsBitcoin) => {
+    const { feeRate } = rbfParams;
+    // increase FeeLevels (old rate + defined rate)
+    const feeInfo = getConvertedOrDefaultFeeInfo({
+        networkType: 'bitcoin',
+        feeInfo: info,
+    });
+    const levels = feeInfo.levels.map(level => ({
+        ...level,
+        feePerUnit: Math.max(
+            new BigNumber(level.feePerUnit).plus(feeRate).toNumber(),
+            new BigNumber(feeRate).plus(MIN_FEE_RATE_PER_VB).toNumber(),
+        ).toString(),
+    }));
+
+    return {
+        ...feeInfo,
+        levels,
+        minFee: Math.max(
+            new BigNumber(feeRate).plus(feeInfo.minFee).toNumber(),
+            new BigNumber(feeRate).plus(MIN_FEE_RATE_PER_VB).toNumber(),
+        ),
+    };
+};
+
+const getEthereumFeeInfo = (info: FeeInfo, rbfParams: RbfTransactionParamsEthereum): FeeInfo => {
+    // use maxFeePerGas as fallback in case backend does not return eip1559 fees
+    const currentGasPrice = new BigNumber(rbfParams.gasPrice || rbfParams.maxFeePerGas);
+    const feeInfo = getConvertedOrDefaultFeeInfo({
+        networkType: 'ethereum',
+        feeInfo: info,
+    });
+
+    const feeLevel = feeInfo.levels[0];
+    if (isEip1559(rbfParams) && isEip1559(feeLevel)) {
+        // to bump fee, both maxFeePerGas and maxPriorityFeePerGas have to be higher
+        const currentMaxFee = new BigNumber(rbfParams.maxFeePerGas);
+        const currentMaxPriorityFee = new BigNumber(rbfParams.maxPriorityFeePerGas);
+
+        const { levels: feeLevelsForEip1559 } = feeInfo;
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const fallbackLevel: (typeof feeLevelsForEip1559)[number] = feeLevelsForEip1559[0];
+        const highLevel =
+            feeLevelsForEip1559.find(level => level.label === 'high') || fallbackLevel;
+        const highMaxFeePerGas = highLevel.maxFeePerGas;
+        const highMaxPriorityFeePerGas = highLevel.maxPriorityFeePerGas;
+        const newMaxFeePerGas = BigNumber.maximum(currentMaxFee, highMaxFeePerGas ?? 0)
+            .multipliedBy(ETH_SPEED_UP_TX_MULTIPLIER)
+            .decimalPlaces(9, BigNumber.ROUND_UP)
+            .toString();
+        const newMaxPriorityFeePerGas = BigNumber.maximum(
+            currentMaxPriorityFee,
+            highMaxPriorityFeePerGas ?? 0,
+        )
+            .multipliedBy(ETH_SPEED_UP_TX_MULTIPLIER)
+            .decimalPlaces(9, BigNumber.ROUND_UP)
+            .toString();
+
+        return {
+            ...feeInfo,
+            levels: [
+                {
+                    ...highLevel,
+                    label: 'normal' as const,
+                    maxFeePerGas: newMaxFeePerGas,
+                    maxPriorityFeePerGas: newMaxPriorityFeePerGas,
+                },
+            ],
+        };
+    }
+
+    const { levels: feeLevels } = feeInfo;
+    // @ts-expect-error: indexing with noUncheckedIndexedAccess
+    const firstLevel: (typeof feeLevels)[number] = feeLevels[0];
+    const minFeeFromNetwork = new BigNumber(firstLevel.feePerUnit);
+    const fee = BigNumber.maximum(minFeeFromNetwork, currentGasPrice.plus(feeInfo.minFee));
 
     // increase FeeLevel only if it's lower than predefined
-    const levels = getFeeLevels('ethereum', info).map(l => ({
-        ...l,
+    const levels = feeInfo.levels.map(level => ({
+        ...level,
         feePerUnit: fee.toString(),
     }));
 
     return {
-        ...info,
+        ...feeInfo,
         levels,
-        minFee: current.plus(1).toNumber(), // increase required minFee rate
+        minFee: currentGasPrice.plus(feeInfo.minFee).toNumber(), // increase required minFee rate
     };
 };
 
-const getFeeInfo = (
-    networkType: Account['networkType'],
-    info: FeeInfo,
-    rbfParams: RbfTransactionParams,
-) => {
-    if (networkType === 'bitcoin') return getBitcoinFeeInfo(info, rbfParams.feeRate);
-    if (networkType === 'ethereum') return getEthereumFeeInfo(info, rbfParams.feeRate);
+const getRbfFeeInfo = (info: FeeInfo, rbfParams: RbfTransactionParams) => {
+    if (rbfParams.type === 'bitcoin') return getBitcoinFeeInfo(info, rbfParams);
+    if (rbfParams.type === 'ethereum') return getEthereumFeeInfo(info, rbfParams);
 
     return info;
 };
 
-const useRbfState = ({ selectedAccount, rbfParams, finalize, chainedTxs }: UseRbfProps) => {
-    const { account, network } = selectedAccount;
-
-    const symbolFees = useSelector(state => state.wallet.fees[account.symbol]);
+const useRbfState = ({ account, rbfParams, chainedTxs }: UseRbfProps): RbfState => {
+    const networkFees = useSelector(state => selectRawNetworkFeeInfo(state, account.symbol));
     const targetAnonymity = useSelector(selectCurrentTargetAnonymity);
     const coinjoinRegisteredUtxos = useCoinjoinRegisteredUtxos({ account });
 
     const { shouldSendInSats } = useBitcoinAmountUnit(account.symbol);
+    const network = getNetwork(account.symbol);
 
     return useMemo(() => {
-        const feeInfo = getFeeInfo(account.networkType, symbolFees, rbfParams);
+        const rbfFeeInfo = networkFees ? getRbfFeeInfo(networkFees, rbfParams) : DEFAULT_FEE_INFO;
         // filter out utxos generated by this transaction
         const otherUtxo = (account.utxo || []).filter(input => input.txid !== rbfParams.txid);
         // filter out utxos with anonymity level below target and currently registered
@@ -105,15 +197,19 @@ const useRbfState = ({ selectedAccount, rbfParams, finalize, chainedTxs }: UseRb
         // override Account data
         const rbfAccount = {
             ...account,
-            utxo: rbfParams.utxo.concat(availableUtxo),
+            // on EVM, when send tx is pending, balance has not been changed yet
+            availableBalance:
+                account.networkType === 'ethereum' ? account.balance : account.availableBalance,
+            utxo: rbfParams.type === 'bitcoin' ? rbfParams.utxo.concat(availableUtxo) : undefined,
             // make sure that the exact same change output will be picked by @trezor/connect > hd-wallet during the tx compose process
             // fallback to default if change address is not present
             addresses: account.addresses
                 ? {
                       ...account.addresses,
-                      change: rbfParams.changeAddress
-                          ? [rbfParams.changeAddress]
-                          : account.addresses.change,
+                      change:
+                          rbfParams.type === 'bitcoin' && rbfParams.changeAddress
+                              ? [rbfParams.changeAddress]
+                              : account.addresses.change,
                   }
                 : undefined,
         };
@@ -136,6 +232,7 @@ const useRbfState = ({ selectedAccount, rbfParams, finalize, chainedTxs }: UseRb
                 token: o.token,
             };
         });
+
         // if there is no change output in the transaction **and** there is no other utxos to add try to decrease amount immediately
         // otherwise use decrease amount only as a fallback (see useEffect below)
         const setMaxOutputId =
@@ -144,18 +241,14 @@ const useRbfState = ({ selectedAccount, rbfParams, finalize, chainedTxs }: UseRb
             availableUtxo.length < 1
                 ? outputs.findIndex(o => o.type === 'payment')
                 : undefined;
-        // set baseFee only if chainedTxs are present.
-        // try to overprice them. offer fee higher than sum of both:
-        // - current tx with higher feeRate
-        // - sum of all fees of all chainedTxs
-        const baseFee =
-            chainedTxs &&
-            chainedTxs.own.concat(chainedTxs.others).reduce((f, ctx) => f + parseFloat(ctx.fee), 0);
+
+        // Set baseFee only if chainedTxs are present.
+        const baseFee = chainedTxs && calculateChainedTransactionsFeeForRbf({ chainedTxs });
 
         return {
             account: rbfAccount,
             network,
-            feeInfo,
+            feeInfo: rbfFeeInfo,
             coinjoinRegisteredUtxos,
             chainedTxs,
             shouldSendInSats,
@@ -164,18 +257,18 @@ const useRbfState = ({ selectedAccount, rbfParams, finalize, chainedTxs }: UseRb
                 outputs,
                 selectedFee: undefined,
                 setMaxOutputId,
-                options: finalize ? ['broadcast'] : ['bitcoinRBF', 'broadcast'],
-                ethereumDataHex: rbfParams.ethereumData,
+                options: ['broadcast'] satisfies FormOptions[],
+                transactionData:
+                    rbfParams.type === 'ethereum' ? rbfParams.transactionData : undefined,
                 rbfParams,
                 baseFee,
-            } as FormState, // TODO: remove type casting (options string[])
+            },
         };
     }, [
         account,
         coinjoinRegisteredUtxos,
         chainedTxs,
-        symbolFees,
-        finalize,
+        networkFees,
         network,
         rbfParams,
         shouldSendInSats,
@@ -183,7 +276,7 @@ const useRbfState = ({ selectedAccount, rbfParams, finalize, chainedTxs }: UseRb
     ]);
 };
 
-export const useRbf = (props: UseRbfProps) => {
+export const useRbf = (props: UseRbfProps): RbfContextValues => {
     // local state
     const state = useRbfState(props);
     const { formValues, feeInfo, account } = state;
@@ -193,7 +286,7 @@ export const useRbf = (props: UseRbfProps) => {
 
     // react-hook-form
     const useFormMethods = useForm<FormState>({ mode: 'onChange', defaultValues: formValues });
-    const { register, control, setValue, getValues, formState } = useFormMethods;
+    const { register, control, setValue, getValues, formState, trigger } = useFormMethods;
 
     // react-hook-form auto register custom form fields (without HTMLElement)
     useEffect(() => {
@@ -219,16 +312,6 @@ export const useRbf = (props: UseRbfProps) => {
         composedLevels,
         ...useFormMethods,
     });
-
-    // handle `finalize` change
-    const { finalize } = props;
-    useEffect(() => {
-        const rbfEnabled = (getValues('options') || []).includes('bitcoinRBF');
-        if (finalize === rbfEnabled) {
-            setValue('options', finalize ? ['broadcast'] : ['broadcast', 'bitcoinRBF']);
-            composeRequest();
-        }
-    }, [finalize, getValues, setValue, composeRequest]);
 
     // If automatically composed transaction throws NOT-ENOUGH-FUNDS error
     useEffect(() => {
@@ -259,7 +342,7 @@ export const useRbf = (props: UseRbfProps) => {
                 composeRequest();
             }
             // set-max was already used and still no effect?
-            // do not try compose again and show error
+            // do not try to compose again and show error
         }
     }, [
         account.networkType,
@@ -272,6 +355,7 @@ export const useRbf = (props: UseRbfProps) => {
 
     return {
         ...state,
+        methods: useFormMethods,
         isLoading,
         showDecreasedOutputs,
         register,
@@ -283,20 +367,14 @@ export const useRbf = (props: UseRbfProps) => {
         changeFeeLevel,
         composeRequest,
         signTransaction,
+        trigger,
     };
 };
-
-// context accepts only valid state (non nullable account)
-type RbfContextValues = ReturnType<typeof useRbf> & NonNullable<ReturnType<typeof useRbfState>>;
 
 export const RbfContext = createContext<RbfContextValues | null>(null);
 RbfContext.displayName = 'RbfContext';
 
 // Used across rbf form components
 // Provide combined context of `react-hook-form` with custom values as RbfContextValues
-export const useRbfContext = () => {
-    const ctx = useContext(RbfContext);
-    if (ctx === null) throw Error('useRbfContext used without Context');
-
-    return ctx;
-};
+export const useRbfContext = () =>
+    useContext(RbfContext) ?? throwError('useRbfContext used without Context');

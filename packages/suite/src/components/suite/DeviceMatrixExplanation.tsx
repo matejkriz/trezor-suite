@@ -1,22 +1,26 @@
-import { ReactNode } from 'react';
+import { type ReactNode } from 'react';
+
 import styled from 'styled-components';
-import { Image, Icon, IconProps, variables } from '@trezor/components';
+
+import { Icon, type IconComponent, type IconProps, Image, variables } from '@trezor/components';
+import { type DeviceModelInternal } from '@trezor/device-utils';
+import { typography } from '@trezor/theme';
+
 import { useGuide } from 'src/hooks/guide';
-import { DeviceModelInternal } from '@trezor/connect';
 
 const Wrapper = styled.div<{ $isGuideOpen?: boolean }>`
     display: flex;
     flex-direction: column;
     align-items: center;
-    background: ${({ theme }) => theme.BG_GREY};
+    background: ${({ theme }) => theme.surfaceFillRaised};
     padding: 20px 24px;
-    margin-right: 34px;
+    margin-right: 32px;
     width: 100%;
     max-width: 360px;
-    border-radius: 5px;
+    border-radius: 4px;
 
     @media only screen and (max-width: ${props =>
-            props.$isGuideOpen ? variables.SCREEN_SIZE.XL : variables.SCREEN_SIZE.MD}) {
+        props.$isGuideOpen ? variables.SCREEN_SIZE.XL : variables.SCREEN_SIZE.MD}) {
         display: none;
     }
 `;
@@ -37,15 +41,10 @@ const ItemIconWrapper = styled.div`
 
 const ItemText = styled.div`
     width: 100%;
-    color: ${({ theme }) => theme.TYPE_DARK_GREY};
-    font-size: ${variables.FONT_SIZE.SMALL};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-    padding: 26px 0;
+    color: ${({ theme }) => theme.contentPrimary};
+    ${typography['body-sm']}
+    padding: 24px 0;
     text-align: left;
-`;
-
-const StyledImage = styled(Image)`
-    height: 40px;
 `;
 
 interface CommonItemProps {
@@ -61,7 +60,7 @@ interface DeviceImageItem extends CommonItemProps {
 
 interface IconItem extends CommonItemProps {
     deviceModelInternal?: DeviceModelInternal;
-    icon: IconProps['icon'];
+    icon: IconComponent;
     iconColor?: IconProps['color'];
     iconSize?: IconProps['size'];
 }
@@ -82,15 +81,16 @@ export const DeviceMatrixExplanation = ({ items }: DeviceMatrixExplanationProps)
                     <ItemIconWrapper>
                         {item.icon ? (
                             <Icon
-                                icon={item.icon}
+                                as={item.icon}
                                 color={item.iconColor}
                                 size={item.iconSize ?? 26}
                             />
                         ) : (
                             item.deviceModelInternal && (
-                                <StyledImage
+                                <Image
                                     alt="Trezor"
                                     image={`TREZOR_${item.deviceModelInternal}`}
+                                    height={40}
                                 />
                             )
                         )}

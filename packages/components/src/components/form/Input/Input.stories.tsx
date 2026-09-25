@@ -1,45 +1,52 @@
-import { ChangeEvent } from 'react';
-import { useArgs } from '@storybook/client-api';
-import { Meta, StoryObj } from '@storybook/react';
+import { type ChangeEvent } from 'react';
 
-import { Input as InputComponent, InputProps } from './Input';
+import { type Meta, type StoryObj } from '@storybook/react';
+import { useArgs } from 'storybook/preview-api';
 
-const meta: Meta = {
-    title: 'Form/Input',
+import { Input as InputComponent, type InputProps, allowedInputFrameProps } from './Input';
+import { getFramePropsStory } from '../../../utils/frameProps';
+import { inputSizes } from '../types';
+
+const meta: Meta<typeof InputComponent> = {
+    title: '✏️ Form',
     args: {
-        value: 'Input',
+        value: 'Value',
         label: 'Label',
-        bottomText: '',
         isDisabled: false,
-        inputState: null,
-        variant: null,
+        size: 'large',
+        hasError: false,
+        showClearButton: false,
+        isMasked: false,
+        isClean: false,
+        ...getFramePropsStory(allowedInputFrameProps).args,
     },
     argTypes: {
-        labelRight: {
-            type: 'string',
-        },
-        placeholder: {
-            type: 'string',
-        },
-        state: {
+        bottomText: { control: 'text' },
+        labelHoverRight: { control: 'text' },
+        labelLeft: { control: 'text' },
+        labelRight: { control: 'text' },
+        leftContent: { control: 'text' },
+        rightContent: { control: 'text' },
+        placeholder: { control: 'text' },
+        size: {
             control: {
-                options: {
-                    'None (default)': null,
-                    Success: 'success',
-                    Warning: 'warning',
-                    Error: 'error',
-                },
-                type: 'radio',
+                type: 'select',
             },
+            options: inputSizes,
         },
-        variant: {
-            control: {
-                options: { 'Large (default)': null, Small: 'small' },
-                type: 'radio',
-            },
+        hasError: { control: { type: 'boolean' } },
+        showClearButton: {
+            control: { type: 'boolean' },
         },
+        isMasked: {
+            control: { type: 'boolean' },
+        },
+        isClean: {
+            control: { type: 'boolean' },
+        },
+        ...getFramePropsStory(allowedInputFrameProps).argTypes,
     },
-} as Meta;
+};
 export default meta;
 
 export const Input: StoryObj<InputProps> = {
@@ -50,6 +57,13 @@ export const Input: StoryObj<InputProps> = {
             updateArgs({ value: e.target.value });
         };
 
-        return <InputComponent value={value} onChange={handleValue} {...args} />;
+        return (
+            <InputComponent
+                value={value}
+                onChange={handleValue}
+                onClear={() => updateArgs({ value: '' })}
+                {...args}
+            />
+        );
     },
 };

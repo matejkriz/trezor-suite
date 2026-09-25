@@ -1,29 +1,29 @@
-import Animated, { FadeInDown, FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import { Pressable } from 'react-native';
+import Animated, { FadeInDown, FadeInUp, FadeOutUp } from 'react-native-reanimated';
 
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-import { Icon } from '@suite-common/icons';
 import { Text, VStack } from '@suite-native/atoms';
-import { useTranslate } from '@suite-native/intl';
+import { Icon } from '@suite-native/icons';
+import { Translation } from '@suite-native/intl';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
 
 type GraphErrorProps = {
     error: string;
     onTryAgain: () => void;
 };
 
-const errorIconStyle = prepareNativeStyle(({ colors }) => ({
+const errorIconStyle = prepareNativeStyle(({ borders, colors }) => ({
     width: 48,
     height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.backgroundAlertYellowSubtleOnElevation1,
-    borderColor: colors.backgroundAlertYellowSubtleOnElevation0,
+    borderRadius: borders.radii.round,
+    backgroundColor: colors.elementFillWarningSofter,
+    borderColor: colors.elementBorderWarningSofter,
     borderWidth: 3,
     alignItems: 'center',
     justifyContent: 'center',
 }));
 
 const tryAgainButtonStyle = prepareNativeStyle(({ spacings }) => ({
-    marginTop: spacings.small,
+    marginTop: spacings.sp8,
 }));
 
 const ErrorIcon = () => {
@@ -31,31 +31,30 @@ const ErrorIcon = () => {
 
     return (
         <Animated.View style={applyStyle(errorIconStyle)} entering={FadeInUp} exiting={FadeInDown}>
-            <Icon name="warningTriangle" color="iconAlertYellow" />
+            <Icon name="warning" color="contentWarning" />
         </Animated.View>
     );
 };
 
 export const GraphError = ({ error, onTryAgain }: GraphErrorProps) => {
     const { applyStyle } = useNativeStyles();
-    const { translate } = useTranslate();
 
     return (
-        <VStack spacing="small" alignItems="center" paddingHorizontal="medium">
+        <VStack spacing="sp8" alignItems="center" paddingHorizontal="sp16">
             <ErrorIcon />
             <Animated.View entering={FadeInDown} exiting={FadeOutUp}>
-                <Text variant="hint" color="textSubdued" textAlign="center">
-                    {translate('graph.errorMessage')}
+                <Text variant="body-sm" color="contentSecondary" textAlign="center">
+                    <Translation id="graph.errorMessage" />
                     {error}
                 </Text>
                 <Pressable onPress={onTryAgain}>
                     <Text
-                        variant="body"
-                        color="textSecondaryHighlight"
+                        variant="body-md"
+                        color="contentBrand"
                         style={applyStyle(tryAgainButtonStyle)}
                         textAlign="center"
                     >
-                        {translate('graph.tryAgain')}
+                        <Translation id="graph.tryAgain" />
                     </Text>
                 </Pressable>
             </Animated.View>

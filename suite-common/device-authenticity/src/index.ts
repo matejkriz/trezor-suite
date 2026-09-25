@@ -1,2 +1,2 @@
-export * from './deviceAuthenticityActions';
-export * from './deviceAuthenticityThunks';
+export { checkDeviceAuthenticityThunk } from './checkDeviceAuthenticityThunk';
+export { isDeviceAuthenticityValid } from './utils';

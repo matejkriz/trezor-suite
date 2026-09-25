@@ -1,49 +1,69 @@
-import { networks, NetworkSymbol } from '@suite-common/wallet-config';
+import { type Control } from 'react-hook-form';
+
+import { type NetworkSymbol, getNetwork } from '@suite-common/wallet-config';
+import { useDisplayBaseCurrency } from '@suite-common/wallet-core';
 import {
-    CryptoAmountFormatter,
-    FiatBalanceFormatter,
+    type AccountFormValues,
+    AccountLabelFieldHint,
+    MAX_ACCOUNT_LABEL_LENGTH,
+} from '@suite-native/accounts';
+import { VStack } from '@suite-native/atoms';
+import {
+    BaseCurrencyAmountLargeFormatter,
+    ExactCryptoAmountFormatter,
     useFiatFromCryptoValue,
 } from '@suite-native/formatters';
-import { RoundedIcon, VStack } from '@suite-native/atoms';
-import { isTestnet } from '@suite-common/wallet-utils';
 import { TextInputField } from '@suite-native/forms';
+import { TokenIcon } from '@suite-native/icons';
+import { useTranslate } from '@suite-native/intl';
 
 import { AccountImportOverviewCard } from './AccountImportOverviewCard';
 
 type AssetsOverviewProps = {
     balance: string;
-    networkSymbol: NetworkSymbol;
+    symbol: NetworkSymbol;
+    formControl: Control<AccountFormValues>;
 };
 
-export const AccountImportOverview = ({ balance, networkSymbol }: AssetsOverviewProps) => {
+export const AccountImportOverview = ({ balance, symbol, formControl }: AssetsOverviewProps) => {
+    const { translate } = useTranslate();
+    const { shallDisplayBaseCurrency } = useDisplayBaseCurrency(symbol);
+
     const fiatBalanceValue = useFiatFromCryptoValue({
         cryptoValue: balance,
-        network: networkSymbol,
+        symbol,
     });
+    const coinLabelFieldLabel = translate(
+        'moduleAccountManagement.accountSettingsScreen.renameForm.coinLabel',
+    );
 
     return (
         <AccountImportOverviewCard
-            icon={<RoundedIcon name={networkSymbol} iconSize="large" />}
-            coinName={networks[networkSymbol].name}
-            symbol={networkSymbol}
+            icon={<TokenIcon tokenSymbol={symbol} networkSymbol={symbol} />}
+            coinName={getNetwork(symbol).name}
             cryptoAmount={
-                <CryptoAmountFormatter
+                <ExactCryptoAmountFormatter
                     value={balance}
-                    network={networkSymbol}
+                    symbol={symbol}
                     isDiscreetText={false}
                     isBalance={false}
-                    variant="label"
+                    variant="body-xs"
                 />
             }
         >
-            <VStack spacing="large">
-                {!isTestnet(networkSymbol) && <FiatBalanceFormatter value={fiatBalanceValue} />}
-                <TextInputField
-                    data-testID="@account-import/coin-synced/label-input"
-                    name="accountLabel"
-                    label="Coin label"
-                    elevation="1"
-                />
+            <VStack spacing="sp24">
+                {shallDisplayBaseCurrency && (
+                    <BaseCurrencyAmountLargeFormatter value={fiatBalanceValue} />
+                )}
+                <VStack spacing="sp8">
+                    <TextInputField
+                        testID="@account-import/coin-synced/label-input"
+                        name="accountLabel"
+                        label={coinLabelFieldLabel}
+                        maxLength={MAX_ACCOUNT_LABEL_LENGTH}
+                    />
+                    <AccountLabelFieldHint formControl={formControl} />
+                </VStack>
             </VStack>
         </AccountImportOverviewCard>
     );

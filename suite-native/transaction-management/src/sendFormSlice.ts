@@ -1,0 +1,78 @@
+import { type PayloadAction, isAnyOf } from '@reduxjs/toolkit';
+
+import { createSliceWithExtraDeps } from '@suite-common/redux-utils';
+import {
+    type SendState as CommonSendState,
+    type SendFormError,
+    type SendFormReducerDeps,
+    initialState as commonInitialState,
+    composeSendFormTransactionFeeLevelsThunk,
+    prepareSendFormReducer as prepareCommonSendFormReducer,
+    pushSendFormTransactionThunk,
+    signTransactionThunk,
+} from '@suite-common/wallet-core';
+import { type GeneralPrecomposedLevels } from '@suite-common/wallet-types';
+
+type NativeSendState = CommonSendState & {
+    error: null | SendFormError;
+    feeLevels: GeneralPrecomposedLevels;
+};
+
+export type NativeSendRootState = {
+    wallet: {
+        send: NativeSendState;
+    };
+};
+
+export const sendFormInitialState: NativeSendState = {
+    ...commonInitialState,
+    error: null,
+    feeLevels: {},
+};
+
+const sendFormSlice = createSliceWithExtraDeps({
+    name: 'send',
+    initialState: sendFormInitialState,
+    reducers: {
+        clearFeeLevels: (state: NativeSendState) => {
+            state.feeLevels = {};
+        },
+        storeFeeLevels: (
+            state: NativeSendState,
+            { payload }: PayloadAction<{ feeLevels: GeneralPrecomposedLevels }>,
+        ) => {
+            state.feeLevels = payload.feeLevels;
+        },
+    },
+    extraReducers: (builder, extra: SendFormReducerDeps) => {
+        const commonSendFormReducer = prepareCommonSendFormReducer(extra);
+        builder
+            .addMatcher(
+                isAnyOf(
+                    composeSendFormTransactionFeeLevelsThunk.pending,
+                    signTransactionThunk.pending,
+                    pushSendFormTransactionThunk.pending,
+                ),
+                state => {
+                    state.error = null;
+                },
+            )
+            .addMatcher(
+                isAnyOf(
+                    composeSendFormTransactionFeeLevelsThunk.rejected,
+                    signTransactionThunk.rejected,
+                    pushSendFormTransactionThunk.rejected,
+                ),
+                (state, { payload: error }) => {
+                    state.error = error ?? null;
+                },
+            )
+            // In case that this reducer does not match the action, try to handle it by suite-common sendFormReducer.
+            .addDefaultCase((state, action) => {
+                commonSendFormReducer(state, action);
+            });
+    },
+});
+
+export const transactionManagementActions = sendFormSlice.actions;
+export const prepareSendFormReducer = sendFormSlice.prepareReducer;

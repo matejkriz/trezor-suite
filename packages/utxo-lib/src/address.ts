@@ -1,14 +1,13 @@
 // upstream: https://github.com/bitcoinjs/bitcoinjs-lib/blob/master/ts_src/address.ts
 // differences:
-// - `fromBase58Check` method is using additional "network" param and bs58check.decodeAddress instead of bs58check.decode. checking multibyte version (Zcash and Decred support).
-// - `toBase58Check` method is using additional "network" param and bs58check.encodeAddress instead of bs58check.encode.
+// - `fromBase58Check` method is using additional "network" param and bs58check.decodeAddress instead of bs58check.decode. checking multibyte version (Zcash support).
 
-import { bech32, bech32m } from 'bech32';
+import { bech32, bech32m } from '@scure/base';
+
 import * as bs58check from './bs58check';
-import * as bscript from './script';
+import { bitcoin as BITCOIN_NETWORK, type Network } from './networks';
 import * as payments from './payments';
-import { bitcoin as BITCOIN_NETWORK, Network } from './networks';
-import * as types from './types';
+import * as bscript from './script';
 
 export interface Base58CheckResult {
     hash: Buffer;
@@ -29,17 +28,23 @@ export function fromBech32(address: string): Bech32Result {
     let result: ReturnType<typeof bech32.decode> | undefined;
     let version: number;
     try {
-        result = bech32.decode(address);
-    } catch (e) {
+        result = bech32.decode(address as `${string}1${string}`);
+    } catch {
         // silent
     }
 
     if (result) {
-        [version] = result.words;
+        const { words } = result;
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const v: number = words[0];
+        version = v;
         if (version !== 0) throw new TypeError(`${address} uses wrong encoding`);
     } else {
-        result = bech32m.decode(address);
-        [version] = result.words;
+        result = bech32m.decode(address as `${string}1${string}`);
+        const { words } = result;
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const v: number = words[0];
+        version = v;
         if (version === 0) throw new TypeError(`${address} uses wrong encoding`);
     }
 
@@ -50,12 +55,6 @@ export function fromBech32(address: string): Bech32Result {
         prefix: result.prefix,
         data: Buffer.from(data),
     };
-}
-
-export function toBase58Check(hash: Buffer, version: number, network = BITCOIN_NETWORK): string {
-    types.typeforce(types.tuple(types.Hash160bit, types.UInt16), [hash, version]);
-
-    return bs58check.encodeAddress(hash, version, network);
 }
 
 export function toBech32(data: Buffer, version: number, prefix: string) {
@@ -77,7 +76,9 @@ function toFutureSegwitAddress(output: Buffer, network = BITCOIN_NETWORK) {
     if (data.length < FUTURE_SEGWIT_MIN_SIZE || data.length > FUTURE_SEGWIT_MAX_SIZE)
         throw new TypeError('Invalid program length for segwit address');
 
-    const version = output[0] - FUTURE_SEGWIT_VERSION_DIFF;
+    // @ts-expect-error: indexing with noUncheckedIndexedAccess
+    const outputByte0: number = output[0];
+    const version = outputByte0 - FUTURE_SEGWIT_VERSION_DIFF;
 
     if (version < FUTURE_SEGWIT_MIN_VERSION || version > FUTURE_SEGWIT_MAX_VERSION)
         throw new TypeError('Invalid version for segwit address');
@@ -90,32 +91,32 @@ function toFutureSegwitAddress(output: Buffer, network = BITCOIN_NETWORK) {
 export function fromOutputScript(output: Buffer, network = BITCOIN_NETWORK) {
     try {
         return payments.p2pkh({ output, network }).address as string;
-    } catch (e) {
+    } catch {
         // empty
     }
     try {
         return payments.p2sh({ output, network }).address as string;
-    } catch (e) {
+    } catch {
         // empty
     }
     try {
         return payments.p2wpkh({ output, network }).address as string;
-    } catch (e) {
+    } catch {
         // empty
     }
     try {
         return payments.p2wsh({ output, network }).address as string;
-    } catch (e) {
+    } catch {
         // empty
     }
     try {
         return payments.p2tr({ output, network }).address as string;
-    } catch (e) {
+    } catch {
         // empty
     }
     try {
         return toFutureSegwitAddress(output, network);
-    } catch (e) {
+    } catch {
         // empty
     }
 

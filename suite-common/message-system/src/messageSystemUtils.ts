@@ -1,35 +1,42 @@
 import * as semver from 'semver';
 
+import type { CountryCode } from '@suite-common/geolocation';
 import {
-    getEnvironment,
-    getBrowserName,
-    getBrowserVersion,
-    getCommitHash,
-    getOsName,
-    getOsVersion,
-    getSuiteVersion,
-    Environment as EnvironmentType,
-} from '@trezor/env-utils';
-import type {
-    TrezorDevice,
-    Duration,
-    MessageSystem,
-    Message,
-    Version,
-    Settings,
-    Transport,
-    Device,
-    Environment,
+    type Action,
+    type Category,
+    type Condition,
+    type Device,
+    type Duration,
+    type Environment,
+    type Experiments,
+    type Localization,
+    type Message,
+    type MessageSystem,
+    type Settings,
+    type Transport,
+    type TrezorDevice,
+    type TrezorHostProtocolTHPProperties,
+    type Version,
 } from '@suite-common/suite-types';
-import type { Network } from '@suite-common/wallet-config';
+import { getBrowserName, getBrowserVersion } from '@suite-common/suite-utils';
+import type { NetworkSymbol } from '@suite-common/wallet-config';
 import type { TransportInfo } from '@trezor/connect';
 import {
     getBootloaderVersion,
     getFirmwareRevision,
     getFirmwareVersion,
 } from '@trezor/device-utils';
+import {
+    type Environment as EnvironmentType,
+    getCommitHash,
+    getEnvironment,
+    getOsName,
+    getSuiteVersion,
+} from '@trezor/env-utils';
+import { exhaustive } from '@trezor/type-utils';
 
-import { ValidMessagesPayload } from './messageSystemActions';
+import { getCachedOsVersion } from './cachedEnvData';
+import { type ValidMessagesPayload } from './messageSystemActions';
 
 export const categorizeMessages = (messages: Message[]): ValidMessagesPayload => {
     const validMessages: ValidMessagesPayload = {
@@ -56,13 +63,14 @@ export const categorizeMessages = (messages: Message[]): ValidMessagesPayload =>
 
 type CurrentSettings = {
     tor: boolean;
-    enabledNetworks: Network['symbol'][];
+    enabledNetworks: NetworkSymbol[];
 };
 
-type Options = {
+export type Options = {
     settings: CurrentSettings;
-    transport?: Partial<TransportInfo>;
+    transports?: TransportInfo[];
     device?: TrezorDevice;
+    countryCode: CountryCode | null;
 };
 
 /**
@@ -87,7 +95,7 @@ export const createVersionRange = (versions: Version | undefined): string | null
 const transformVersionToSemverFormat = (version: string | undefined): string =>
     semver.valid(semver.coerce(version)) || '';
 
-export const validateDurationCompatibility = (durationCondition: Duration): boolean => {
+export const isDurationCompatible = (durationCondition: Duration): boolean => {
     const currentDate = Date.now();
 
     const from = Date.parse(durationCondition.from);
@@ -96,7 +104,7 @@ export const validateDurationCompatibility = (durationCondition: Duration): bool
     return from <= currentDate && currentDate <= to;
 };
 
-export const validateVersionCompatibility = (
+export const isVersionCompatible = (
     condition: { [key: string]: Version | undefined },
     type: string,
     version: string,
@@ -110,7 +118,7 @@ export const validateVersionCompatibility = (
     return semver.satisfies(version, conditionVersion);
 };
 
-export const validateSettingsCompatibility = (
+export const areSettingsCompatible = (
     settingsCondition: Settings[],
     currentSettings: CurrentSettings,
 ): boolean => {
@@ -128,39 +136,73 @@ export const validateSettingsCompatibility = (
     );
 };
 
-export const validateTransportCompatibility = (
+export const isTransportCompatible = (
     transportCondition: Transport,
-    transport?: Partial<TransportInfo>,
-): boolean => {
-    if (!transport || !transport.type || !transport.version) {
+    transports: TransportInfo[],
+): boolean =>
+    transports
+        .flatMap(t => {
+            if (!t.type || !t.version) return [];
+            // transport names were changed in https://github.com/trezor/trezor-suite/pull/7411
+            // to avoid breaking changes with v1 messaging system schema, we introduce this translation
+            if (t.type === 'BridgeTransport') return [{ type: 'bridge', version: t.version }, t];
+            if (t.type === 'WebUsbTransport')
+                return [{ type: 'webusbplugin', version: t.version }, t];
+
+            return [t];
+        })
+        .some(({ type, version }) => isVersionCompatible(transportCondition, type, version));
+
+const isThpPropertiesCompatible = (
+    condition?: TrezorHostProtocolTHPProperties,
+    device?: NonNullable<TrezorDevice['thp']>['properties'],
+) => {
+    if (!condition) return true;
+
+    if (!device) return false;
+
+    if (
+        condition.internalModel &&
+        device.internal_model?.toLowerCase() !== condition.internalModel.toLowerCase()
+    ) {
         return false;
     }
 
-    const { version } = transport;
-    const type = transport.type.toLowerCase();
-
-    // transport names were changed in https://github.com/trezor/trezor-suite/pull/7411
-    // to avoid breaking changes with v1 messaging system schema, we introduce this translation
-    let legacyTransportType: 'bridge' | 'webusbplugin' | undefined;
-
-    if (type === 'BridgeTransport') {
-        legacyTransportType = 'bridge';
-    } else if (type === 'WebUsbTransport') {
-        legacyTransportType = 'webusbplugin';
+    if (condition.modelVariant !== undefined && device.model_variant !== condition.modelVariant) {
+        return false;
     }
 
-    return validateVersionCompatibility(transportCondition, legacyTransportType || type, version);
+    if (
+        condition.protocolVersionMajor !== undefined &&
+        device.protocol_version_major !== condition.protocolVersionMajor
+    ) {
+        return false;
+    }
+
+    if (
+        condition.protocolVersionMinor !== undefined &&
+        device.protocol_version_minor !== condition.protocolVersionMinor
+    ) {
+        return false;
+    }
+
+    if (condition.pairingMethods?.length) {
+        if (!device.pairing_methods?.length) return false;
+
+        if (!condition.pairingMethods.every(method => device.pairing_methods.includes(method))) {
+            return false;
+        }
+    }
+
+    return true;
 };
 
-export const validateDeviceCompatibility = (
-    deviceConditions: Device[],
-    device?: TrezorDevice,
-): boolean => {
+export const isDeviceCompatible = (deviceConditions: Device[], device?: TrezorDevice): boolean => {
     // if device conditions are empty, then device should be empty
     if (!deviceConditions.length) {
         return !device;
     }
-    if (!device || !device.features) {
+    if (!device?.features) {
         return false;
     }
 
@@ -169,7 +211,7 @@ export const validateDeviceCompatibility = (
     const deviceFwRevision = getFirmwareRevision(device);
     const deviceFwType = device.firmwareType;
     const deviceInternalModel = device.features.internal_model.toLowerCase();
-    const deviceVendor = device.features.vendor.toLowerCase();
+    const deviceVendor = device.features.vendor?.toLowerCase();
 
     return deviceConditions.some(deviceCondition => {
         const {
@@ -179,7 +221,13 @@ export const validateDeviceCompatibility = (
             firmware: firmwareCondition,
             bootloader: bootloaderCondition,
             variant: variantCondition,
+            thpProperties: thpPropertiesCondition,
         } = deviceCondition;
+
+        // createVersionRange returns null for '!' / undefined, which by design must not match
+        // (see isVersionCompatible for the same handling).
+        const firmwareRange = createVersionRange(firmwareCondition);
+        const bootloaderRange = createVersionRange(bootloaderCondition);
 
         return (
             modelCondition.toLowerCase() === deviceInternalModel &&
@@ -187,15 +235,17 @@ export const validateDeviceCompatibility = (
             (variantCondition.toLowerCase() === deviceFwType || variantCondition === '*') &&
             (firmwareRevisionCondition.toLowerCase() === deviceFwRevision.toLowerCase() ||
                 firmwareRevisionCondition === '*') &&
-            (semver.satisfies(deviceFwVersion, createVersionRange(firmwareCondition)!) ||
+            ((firmwareRange !== null && semver.satisfies(deviceFwVersion, firmwareRange)) ||
                 firmwareCondition === '*') &&
-            (semver.satisfies(deviceBootloaderVersion, createVersionRange(bootloaderCondition)!) ||
-                bootloaderCondition === '*')
+            ((bootloaderRange !== null &&
+                semver.satisfies(deviceBootloaderVersion, bootloaderRange)) ||
+                bootloaderCondition === '*') &&
+            isThpPropertiesCompatible(thpPropertiesCondition, device.thp?.properties)
         );
     });
 };
 
-export const validateEnvironmentCompatibility = (
+export const isEnvironmentCompatible = (
     environmentCondition: Environment,
     environment: EnvironmentType,
     suiteVersion: string,
@@ -204,28 +254,29 @@ export const validateEnvironmentCompatibility = (
     const { revision, desktop, web, mobile } = environmentCondition;
 
     return (
-        validateVersionCompatibility(
-            {
-                desktop,
-                web,
-                mobile,
-            },
-            environment,
-            suiteVersion,
-        ) &&
+        isVersionCompatible({ desktop, web, mobile }, environment, suiteVersion) &&
         (revision === commitHash || revision === '*' || revision === undefined)
     );
 };
 
-export const getValidMessages = (config: MessageSystem | null, options: Options): Message[] => {
-    if (!config) {
-        return [];
+export const isCountryCodeCompatible = (
+    allowedCountryCodes: CountryCode[],
+    userCountryCode: CountryCode,
+): boolean => {
+    if (!allowedCountryCodes.length) {
+        return true;
     }
 
-    const { device, transport, settings } = options;
+    return allowedCountryCodes.some(
+        location => location.toUpperCase() === userCountryCode.toUpperCase(),
+    );
+};
+
+export const validateConditions = (condition: Condition, options: Options) => {
+    const { device, transports = [], settings, countryCode } = options;
 
     const currentOsName = getOsName();
-    const currentOsVersion = transformVersionToSemverFormat(getOsVersion());
+    const currentOsVersion = transformVersionToSemverFormat(getCachedOsVersion());
 
     const currentBrowserName = getBrowserName();
     const currentBrowserVersion = transformVersionToSemverFormat(getBrowserVersion());
@@ -234,76 +285,260 @@ export const getValidMessages = (config: MessageSystem | null, options: Options)
     const suiteVersion = transformVersionToSemverFormat(getSuiteVersion());
     const commitHash = getCommitHash();
 
+    const {
+        duration: durationCondition,
+        environment: environmentCondition,
+        os: osCondition,
+        browser: browserCondition,
+        transport: transportCondition,
+        settings: settingsCondition,
+        devices: deviceCondition,
+        countryCodes: countryCodeCondition,
+    } = condition;
+
+    if (durationCondition && !isDurationCompatible(durationCondition)) {
+        return false;
+    }
+
+    if (
+        environmentCondition &&
+        !isEnvironmentCompatible(environmentCondition, environment, suiteVersion, commitHash)
+    ) {
+        return false;
+    }
+
+    if (osCondition && !isVersionCompatible(osCondition, currentOsName, currentOsVersion)) {
+        return false;
+    }
+
+    if (
+        environment === 'web' &&
+        browserCondition &&
+        !isVersionCompatible(browserCondition, currentBrowserName, currentBrowserVersion)
+    ) {
+        return false;
+    }
+
+    if (settingsCondition && !areSettingsCompatible(settingsCondition, settings)) {
+        return false;
+    }
+
+    if (transportCondition && !isTransportCompatible(transportCondition, transports)) {
+        return false;
+    }
+
+    if (deviceCondition && !isDeviceCompatible(deviceCondition, device)) {
+        return false;
+    }
+
+    if (
+        countryCodeCondition &&
+        (!countryCode || !isCountryCodeCompatible(countryCodeCondition, countryCode))
+    ) {
+        return false;
+    }
+
+    return true;
+};
+
+export const getValidMessages = (config: MessageSystem | null, options: Options): Message[] => {
+    if (!config) {
+        return [];
+    }
+
     return config.actions
         .filter(
             action =>
                 !action.conditions.length ||
-                action.conditions.some(condition => {
-                    const {
-                        duration: durationCondition,
-                        environment: environmentCondition,
-                        os: osCondition,
-                        browser: browserCondition,
-                        transport: transportCondition,
-                        settings: settingsCondition,
-                        devices: deviceCondition,
-                    } = condition;
-
-                    if (durationCondition && !validateDurationCompatibility(durationCondition)) {
-                        return false;
-                    }
-
-                    if (
-                        environmentCondition &&
-                        !validateEnvironmentCompatibility(
-                            environmentCondition,
-                            environment,
-                            suiteVersion,
-                            commitHash,
-                        )
-                    ) {
-                        return false;
-                    }
-
-                    if (
-                        osCondition &&
-                        !validateVersionCompatibility(osCondition, currentOsName, currentOsVersion)
-                    ) {
-                        return false;
-                    }
-
-                    if (
-                        environment === 'web' &&
-                        browserCondition &&
-                        !validateVersionCompatibility(
-                            browserCondition,
-                            currentBrowserName,
-                            currentBrowserVersion,
-                        )
-                    ) {
-                        return false;
-                    }
-
-                    if (
-                        settingsCondition &&
-                        !validateSettingsCompatibility(settingsCondition, settings)
-                    ) {
-                        return false;
-                    }
-
-                    if (
-                        transportCondition &&
-                        !validateTransportCompatibility(transportCondition, transport)
-                    ) {
-                        return false;
-                    }
-
-                    if (deviceCondition && !validateDeviceCompatibility(deviceCondition, device)) {
-                        return false;
-                    }
-
-                    return true;
-                }),
+                action.conditions.some(condition => validateConditions(condition, options)),
         )
         .map(action => action.message);
+};
+
+export const getValidExperimentIds = (config: MessageSystem | null, options: Options): string[] => {
+    if (!config?.experiments) {
+        return [];
+    }
+
+    return config.experiments
+        .filter(
+            experiment =>
+                !experiment.conditions.length ||
+                experiment.conditions.some(condition => validateConditions(condition, options)),
+        )
+        .map(experiment => experiment?.experiment?.id);
+};
+
+/**
+ * Attempts to return the message content for the exact language code. If not found,
+ * it falls back to the base language (e.g., 'en' from 'en-US'). If neither is available,
+ * it defaults to 'en'.
+ */
+export const resolveMessageContent = (localizedMessages: Localization, language: string) => {
+    if (localizedMessages[language]) {
+        return localizedMessages[language];
+    }
+
+    const fallbackLanguage = language.split('-')[0];
+
+    return (
+        (fallbackLanguage ? localizedMessages[fallbackLanguage] : undefined) ?? localizedMessages.en
+    );
+};
+
+export const toMessageSystemOptions = <T extends string>(
+    values: readonly T[],
+): ReadonlyArray<{ label: string; value: T }> =>
+    values.map(value => ({
+        value,
+        label: value.replace(/^./, char => char.toUpperCase()),
+    }));
+
+/** Recursively collects all string leaf values from arrays/objects. */
+export const collectStringsDeep = (value: unknown): string[] => {
+    if (typeof value === 'string') return [value];
+    if (Array.isArray(value)) return value.flatMap(collectStringsDeep);
+    if (value && typeof value === 'object') {
+        return Object.values(value as Record<string, unknown>).flatMap(collectStringsDeep);
+    }
+
+    return [];
+};
+
+/** Format a string or string[] into a single string joined by `separator` (default: ", "). */
+export const toCommaSeparated = (value: string | string[], separator = ', '): string =>
+    Array.isArray(value) ? value.join(separator) : value;
+
+const defaultLocalization = {
+    en: '',
+    cs: '',
+    es: '',
+    de: '',
+    fr: '',
+    pt: '',
+} as const satisfies Localization;
+
+type ExtraByCategory = {
+    modal: { modal: { title: Localization; image: string } };
+    context: { context: { domain: string } };
+    feature: { feature: Array<{ domain: string; flag: boolean }> };
+    banner: Record<never, never>;
+};
+
+const EXTRA_BY_CATEGORY = {
+    modal: {
+        modal: {
+            title: defaultLocalization,
+            image: '',
+        },
+    },
+    context: {
+        context: {
+            domain: '',
+        },
+    },
+    feature: {
+        feature: [
+            {
+                domain: '',
+                flag: true,
+            },
+        ],
+    },
+    banner: {},
+} as const satisfies Record<Category, ExtraByCategory[Category]>;
+
+export const getDefaultActionByCategory = (category: Category): Action => {
+    const baseMessage = {
+        id: crypto.randomUUID(),
+        priority: 100,
+        dismissible: true,
+        variant: 'info' as const,
+        category,
+        content: defaultLocalization,
+    };
+
+    return {
+        message: {
+            ...baseMessage,
+            ...EXTRA_BY_CATEGORY[category],
+        },
+        conditions: [{}],
+    };
+};
+
+export const getDefaultExperiment = (): Experiments => ({
+    experiment: {
+        id: crypto.randomUUID(),
+        groups: [
+            {
+                variant: 'A',
+                percentage: 50,
+            },
+            {
+                variant: 'B',
+                percentage: 50,
+            },
+        ],
+    },
+    conditions: [{}],
+});
+
+export const getDefaultConditionValue = (key: keyof Condition): Condition[keyof Condition] => {
+    switch (key) {
+        case 'duration': {
+            const now = new Date();
+            const from = new Date(now.setHours(0, 0, 0, 0)).toISOString();
+            const to = new Date(now.setFullYear(now.getFullYear() + 1)).toISOString();
+
+            return { from, to };
+        }
+
+        case 'environment':
+            return { desktop: '*', mobile: '*', web: '*' };
+
+        case 'os':
+            return {
+                macos: '*',
+                linux: '*',
+                windows: '*',
+                android: '*',
+                ios: '*',
+                chromeos: '*',
+            };
+
+        case 'browser':
+            return { firefox: '*', chrome: '*', chromium: '*' };
+
+        case 'transport':
+            return { bridge: '*', webusbplugin: '*' };
+
+        case 'settings':
+            return [{ tor: false }];
+
+        case 'devices':
+            return [
+                {
+                    model: 'T3W1',
+                    firmwareRevision: '*',
+                    firmware: '*',
+                    bootloader: '*',
+                    variant: '*',
+                    vendor: '*',
+                    thpProperties: {
+                        internalModel: 'T3W1',
+                        modelVariant: 2,
+                        protocolVersionMajor: 2,
+                        protocolVersionMinor: 0,
+                        pairingMethods: ['CodeEntry'],
+                    },
+                },
+            ];
+
+        case 'countryCodes':
+            return ['CZ'];
+
+        default:
+            return exhaustive(key);
+    }
 };

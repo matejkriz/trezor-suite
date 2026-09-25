@@ -1,85 +1,111 @@
-import { useMemo, useState, ReactNode } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 
-import {
-    CryptoIcon,
-    CryptoIconName,
-    FlagIcon,
-    FlagIconName,
-    isCryptoIconType,
-    isFlagIconType,
-} from '@suite-common/icons';
+import { Translation } from '@suite-native/intl';
 
-import { BottomSheet } from '../Sheet/BottomSheet';
-import { SelectItemValue, SelectItem } from './SelectItem';
+import { Box } from '../Box';
+import { Button } from '../Button/Button';
+import { ScreenFooterGradient } from '../ScreenFooterGradient';
+import { BottomSheetModal } from '../Sheet/BottomSheetModal';
+import { useBottomSheetModal } from '../Sheet/hooks/useBottomSheetModal';
+import { VStack } from '../Stack';
+import { SelectItem, type SelectItemValue } from './SelectItem';
 import { SelectTrigger } from './SelectTrigger';
 
 export type SelectItemType<TItemValue extends SelectItemValue> = {
     value: TItemValue;
     label: string;
+    icon?: ReactNode;
+    badge?: ReactNode;
 };
 
-export type SelectItemExtendedType<TItemValue extends SelectItemValue> =
-    SelectItemType<TItemValue> & {
-        iconName?: FlagIconName | CryptoIconName;
-    };
-
-type SelectProps<TItemValue extends SelectItemValue> = {
-    items: SelectItemExtendedType<TItemValue>[];
-    selectValue: SelectItemValue;
+export type SelectProps<TItemValue extends SelectItemValue> = {
+    title: ReactNode;
+    items: SelectItemType<TItemValue>[];
+    value: TItemValue;
     onSelectItem: (value: TItemValue) => void;
-    valueLabel?: string;
-    selectLabel: string;
+    isConfirmable?: boolean;
+    isLabelShown?: boolean;
+    testID?: string;
 };
 
 export const Select = <TItemValue extends SelectItemValue>({
+    title,
     items,
-    selectLabel,
-    selectValue,
-    valueLabel,
+    value,
     onSelectItem,
+    isConfirmable = false,
+    isLabelShown = false,
+    testID,
 }: SelectProps<TItemValue>) => {
-    const [isOpen, setIsOpen] = useState<boolean>(false);
+    const { bottomSheetRef, openModal, closeModal } = useBottomSheetModal();
 
-    const selectedItem = useMemo(
-        () => items.find(item => item.value === selectValue),
-        [selectValue, items],
+    const selectTriggerItem = useMemo(
+        () => items.find(item => item.value === value),
+        [items, value],
     );
-    const handleSelectItem = (itemValue: TItemValue) => {
-        onSelectItem(itemValue);
-        setIsOpen(false);
+
+    const [selectedItemValue, setSelectedItemValue] = useState(value);
+    const [isConfirmButtonVisible, setIsConfirmButtonVisible] = useState(false);
+
+    const openBottomSheet = () => {
+        setSelectedItemValue(value);
+        setIsConfirmButtonVisible(false);
+        openModal();
     };
 
-    const getIcon = (iconName?: CryptoIconName | FlagIconName, isSelectItem = false): ReactNode => {
-        if (!iconName) return null;
-        if (isCryptoIconType(iconName)) {
-            return <CryptoIcon size={isSelectItem ? 'small' : 'extraSmall'} symbol={iconName} />;
-        }
-        if (isFlagIconType(iconName)) {
-            return <FlagIcon size={isSelectItem ? 'small' : 'extraSmall'} name={iconName} />;
+    const confirmSelection = (itemValue: TItemValue) => {
+        onSelectItem(itemValue);
+        closeModal();
+    };
+
+    const handleSelectItem = (itemValue: TItemValue) => {
+        if (isConfirmable) {
+            setSelectedItemValue(itemValue);
+            setIsConfirmButtonVisible(itemValue !== value);
+        } else {
+            confirmSelection(itemValue);
         }
     };
 
     return (
         <>
-            <BottomSheet isVisible={isOpen} onClose={setIsOpen} title={selectLabel}>
-                {items.map(({ value, label, iconName }, index) => (
-                    <SelectItem
-                        key={value}
-                        label={label}
-                        value={value}
-                        icon={getIcon(iconName, true)}
-                        isSelected={value === selectedItem?.value}
-                        isLastChild={index === items.length - 1}
-                        onSelect={() => handleSelectItem(value)}
-                    />
-                ))}
-            </BottomSheet>
+            <BottomSheetModal
+                ref={bottomSheetRef}
+                title={title}
+                footer={
+                    isConfirmButtonVisible && (
+                        <>
+                            <ScreenFooterGradient />
+                            <Box marginHorizontal="sp16" marginBottom="sp16">
+                                <Button onPress={() => confirmSelection(selectedItemValue)}>
+                                    <Translation id="generic.buttons.confirm" />
+                                </Button>
+                            </Box>
+                        </>
+                    )
+                }
+                isCloseDisplayed
+            >
+                <VStack spacing="sp12">
+                    {items.map(({ value: itemValue, label, icon, badge }) => (
+                        <SelectItem
+                            key={itemValue}
+                            label={label}
+                            value={itemValue}
+                            isSelected={itemValue === selectedItemValue}
+                            onSelect={() => handleSelectItem(itemValue)}
+                            icon={icon}
+                            badge={badge}
+                        />
+                    ))}
+                </VStack>
+            </BottomSheetModal>
             <SelectTrigger
-                icon={getIcon(selectedItem?.iconName)}
-                value={selectedItem?.label ?? null}
-                label={selectLabel}
-                valueLabel={valueLabel}
-                handlePress={() => setIsOpen(true)}
+                label={isLabelShown && title}
+                value={selectTriggerItem?.label ?? null}
+                icon={selectTriggerItem?.icon}
+                handlePress={openBottomSheet}
+                testID={testID}
             />
         </>
     );

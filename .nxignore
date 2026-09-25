@@ -94,36 +94,6 @@ _.hprof
 \*.keystore
 !debug.keystore
 
-# fastlane
-
-#
-
-# It is recommended to not store the screenshots in the git repo. Instead, use fastlane to re-generate the
-
-# screenshots whenever they are needed.
-
-# For more information about the recommended setup visit:
-
-# https://docs.fastlane.tools/best-practices/source-control/
-
-**/android/fastlane/report.xml
-**/android/fastlane/Preview.html
-**/android/fastlane/screenshots
-**/android/fastlane/test_output
-**/ios/fastlane/report.xml
-**/ios/fastlane/Preview.html
-**/ios/fastlane/screenshots
-**/ios/fastlane/test_output
-**/fastlane/report.xml
-**/fastlane/Preview.html
-**/fastlane/screenshots
-**/fastlane/test_output
-
-_.cer
-_.certSigningRequest
-_.p12
-_.mobileprovision
-
 # scan temporary files
 
 \*\*/android/fastlane/test_output
@@ -170,11 +140,11 @@ _.mobileprovision
 !.yarn/sdks
 !.yarn/versions
 
-# @trezor/suite-data
+# @suite/app-assets
 
-packages/suite-data/files/browser-detection
-packages/suite-data/files/guide
-packages/suite-data/files/translations/master.json
+suite/app-assets/files/browser-detection
+suite/app-assets/files/guide
+suite/app-assets/files/translations/master.json
 
 # @trezor/connect-explorer
 
@@ -184,8 +154,9 @@ packages/connect-explorer/build-webextension
 
 packages/connect-explorer-theme/style.css
 
-# cypress download folder
-
-packages/suite-web/e2e/downloads
-
 .github
+
+# Symlinks committed to repo, prettier can't handle them (that's ok; it will format the orig files anyway)
+docs/symlink/**
+CLAUDE.md
+

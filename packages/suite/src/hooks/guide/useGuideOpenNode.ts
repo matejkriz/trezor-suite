@@ -1,15 +1,18 @@
-import { analytics, EventType } from '@trezor/suite-analytics';
+import { events, injectDesktopAnalytics } from '@suite/analytics';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
 
-import { useDispatch, useSelector } from 'src/hooks/suite';
 import { openNode } from 'src/actions/suite/guideActions';
-import { getNodeById } from 'src/utils/suite/guide';
 import { useGuide } from 'src/hooks/guide';
+import { useSelector } from 'src/hooks/suite';
+import { selectGuideIndexNode } from 'src/selectors/suite/guideSelectors';
+import { getNodeById } from 'src/utils/suite/guide';
 
 export const useGuideOpenNode = () => {
+    const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
     const { isGuideOpen, openGuide } = useGuide();
 
-    const indexNode = useSelector(state => state.guide.indexNode);
-    const dispatch = useDispatch();
+    const indexNode = useSelector(selectGuideIndexNode);
 
     const openNodeById = (id: string) => {
         if (!indexNode) {
@@ -31,7 +34,7 @@ export const useGuideOpenNode = () => {
         }
 
         analytics.report({
-            type: EventType.GuideTooltipLinkNavigation,
+            type: events.guideTooltipLinkNavigationEvent.name,
             payload: {
                 id: node.id,
             },

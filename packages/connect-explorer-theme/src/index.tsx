@@ -1,29 +1,29 @@
 import type { ReactElement, ReactNode } from 'react';
 import { useMemo } from 'react';
 
+import cn from 'clsx';
 import { useRouter } from 'next/router';
 import type { NextraThemeLayoutProps, PageOpts } from 'nextra';
 import 'focus-visible';
-import cn from 'clsx';
 import { useFSRoute, useMounted } from 'nextra/hooks';
 import { MDXProvider } from 'nextra/mdx';
 import './polyfill';
 import type { PageTheme } from 'nextra/normalize-pages';
-import { normalizePages } from 'nextra/normalize-pages';
 import { createGlobalStyle } from 'styled-components';
 
-import { ElevationContext } from '@trezor/components';
-import { Elevation, mapElevationToBackground } from '@trezor/theme';
-
 import { Banner, Breadcrumb, Head, NavLinks, Navbar, Sidebar, SkipNavContent } from './components';
-import { DEFAULT_LOCALE, PartialDocsThemeConfig } from './constants';
-import { ActiveAnchorProvider, ConfigProvider, useConfig } from './contexts';
+import { DEFAULT_LOCALE } from './constants';
+import { ActiveAnchorProvider } from './contexts/active-anchor';
+import { ConfigProvider } from './contexts/config';
+import { useConfig } from './contexts/useConfig';
 import { getComponents } from './mdx-components';
-import { renderComponent } from './utils';
+import { type PartialDocsThemeConfig } from './schema';
+import { patchedNormalizePages } from './utils/patch-normalize-pages';
+import { renderComponent } from './utils/render';
 
-const GlobalStyle = createGlobalStyle<{ $elevation: Elevation }>`
-    body {
-        background: ${mapElevationToBackground}
+const GlobalStyle = createGlobalStyle`
+    body, .bg-page {
+        background: ${({ theme }) => theme.surfaceFillPage}
     }
 `;
 interface BodyProps {
@@ -84,7 +84,7 @@ const Body = ({
                     'nextra-content nx-min-h-[calc(100vh-var(--nextra-navbar-height))] nx-pl-[max(env(safe-area-inset-left),1.5rem)] nx-pr-[max(env(safe-area-inset-right),1.5rem)]',
                 )}
             >
-                {body}
+                {body as ReactNode}
             </article>
         );
     }
@@ -99,7 +99,7 @@ const Body = ({
         >
             <main className="nx-w-full nx-min-w-0 nx-max-w-6xl nx-px-6 nx-pt-4 md:nx-px-12">
                 {breadcrumb}
-                {body}
+                {body as ReactNode}
             </main>
         </article>
     );
@@ -129,7 +129,7 @@ const InnerLayout = ({
         directories,
     } = useMemo(
         () =>
-            normalizePages({
+            patchedNormalizePages({
                 list: pageMap,
                 locale,
                 defaultLocale,
@@ -137,6 +137,13 @@ const InnerLayout = ({
             }),
         [pageMap, locale, defaultLocale, fsPath],
     );
+
+    // Nextra derives the document title from the filename and title-cases it at build time
+    // (e.g. `selectAccount` → `SelectAccount`), which is independent of the sidebar titles fixed
+    // by `patchedNormalizePages`. Method names must stay in their original casing, so for method
+    // pages reuse the already-corrected title from `activePath`.
+    const documentTitle =
+        activePath[0]?.route === '/methods' ? activePath[activePath.length - 1]?.title : undefined;
 
     const themeContext = { ...activeThemeContext, ...frontMatter };
     const hideSidebar =
@@ -172,7 +179,7 @@ const InnerLayout = ({
                     __html: `document.documentElement.setAttribute('dir','${direction}')`,
                 }}
             />
-            <Head />
+            <Head title={documentTitle} />
             <Banner />
             {themeContext.navbar && (
                 <Navbar flatDirectories={flatDirectories} items={topLevelNavbarItems} />
@@ -214,6 +221,7 @@ const InnerLayout = ({
                     >
                         <MDXProvider
                             components={getComponents({
+                                frontMatter,
                                 isRawLayout: themeContext.layout === 'raw',
                                 components: config.components,
                             })}
@@ -230,14 +238,10 @@ const InnerLayout = ({
 
 // eslint-disable-next-line import/no-default-export
 export default function Layout({ children, ...context }: NextraThemeLayoutProps): ReactElement {
-    const baseElevation = 0;
-
     return (
         <ConfigProvider value={context}>
-            <GlobalStyle $elevation={baseElevation} />
-            <ElevationContext baseElevation={baseElevation}>
-                <InnerLayout {...context.pageOpts}>{children}</InnerLayout>
-            </ElevationContext>
+            <GlobalStyle />
+            <InnerLayout {...context.pageOpts}>{children}</InnerLayout>
         </ConfigProvider>
     );
 }

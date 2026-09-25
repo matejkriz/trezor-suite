@@ -1,35 +1,60 @@
-import styled from 'styled-components';
+import { useIntl } from 'react-intl';
 
-import { H2, variables } from '@trezor/components';
-import { Translation } from 'src/components/suite/Translation';
-import { DeviceConfirmImage } from 'src/components/suite';
-import { TrezorDevice } from 'src/types/suite';
-import { DevicePromptModal, DevicePromptModalProps } from './DevicePromptModal';
+import { Translation, type TranslationKey, messages } from '@suite/intl';
+import { type TrezorDevice } from '@suite-common/suite-types';
+import { getDeviceInternalModel } from '@suite-common/suite-utils';
+import { Column, H2, Modal } from '@trezor/components';
+import TrezorConnect from '@trezor/connect';
+import { getDeviceColorVariant } from '@trezor/device-utils';
+import { ConfirmOnDevicePill } from '@trezor/product-components';
 
-const StyledDevicePromptModal = styled(DevicePromptModal)`
-    width: 360px;
-`;
+import { ConnectModalBackdrop } from 'src/components/suite/ConnectModalBackdrop';
+import { DeviceConfirmImage } from 'src/components/suite/DeviceConfirmImage';
 
-const StyledDeviceConfirmImage = styled(DeviceConfirmImage)`
-    margin-top: -30px;
-`;
-
-const StyledH1 = styled(H2)`
-    margin-top: 12px;
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-    text-align: center;
-`;
-
-interface ConfirmActionProps extends DevicePromptModalProps {
+interface ConfirmActionProps {
+    cancelable?: boolean;
     device: TrezorDevice;
+    title?: TranslationKey;
+    onCancel?: () => void;
+    enableBackdropClick?: boolean;
 }
 
-export const ConfirmActionModal = ({ device, ...rest }: ConfirmActionProps) => (
-    <StyledDevicePromptModal data-test="@suite/modal/confirm-action-on-device" {...rest}>
-        <StyledDeviceConfirmImage device={device} />
+export const ConfirmActionModal = ({
+    title,
+    device,
+    onCancel,
+    cancelable = true,
+    enableBackdropClick = true,
+}: ConfirmActionProps) => {
+    const intl = useIntl();
+    const handleCancel = () => {
+        if (!cancelable) {
+            return;
+        }
+        TrezorConnect.cancel({ reason: intl.formatMessage(messages.TR_CANCELLED) });
+        onCancel?.();
+    };
 
-        <StyledH1>
-            <Translation id="TR_CONFIRM_ACTION_ON_YOUR" values={{ deviceLabel: device.label }} />
-        </StyledH1>
-    </StyledDevicePromptModal>
-);
+    return (
+        <ConnectModalBackdrop
+            onClick={enableBackdropClick ? onCancel : undefined}
+            data-testid="@suite/modal/confirm-action-on-device"
+            canSwitchDevice
+        >
+            <ConfirmOnDevicePill
+                title={<Translation id="TR_CONFIRM_ON_TREZOR" />}
+                deviceModelInternal={getDeviceInternalModel(device)}
+                deviceUnitColor={getDeviceColorVariant(device)}
+                onCancel={cancelable ? handleCancel : undefined}
+            />
+            <Modal.ModalBase width={400}>
+                <Column alignItems="center" gap={16}>
+                    <DeviceConfirmImage device={device} />
+                    <H2 align="center" margin={{ left: 16, right: 16, bottom: 16 }}>
+                        <Translation id={title ?? 'TR_CONFIRM_ACTION_ON_YOUR'} />
+                    </H2>
+                </Column>
+            </Modal.ModalBase>
+        </ConnectModalBackdrop>
+    );
+};

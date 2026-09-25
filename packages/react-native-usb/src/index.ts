@@ -1,20 +1,23 @@
-/* eslint-disable no-console */
-import { NativeModulesProxy, EventEmitter, Subscription } from 'expo-modules-core';
+import { type EventSubscription } from 'expo-modules-core';
 
+import { type NativeDevice, type OnConnectEvent, type WebUSBDevice } from './ReactNativeUsb.types';
 import { ReactNativeUsbModule } from './ReactNativeUsbModule';
-import { NativeDevice, OnConnectEvent, WebUSBDevice } from './ReactNativeUsb.types';
 
 const DEBUG_LOGS = false;
 
 const debugLog = (...args: any[]) => {
     if (DEBUG_LOGS) {
+        // eslint-disable-next-line no-console
         console.log(...args);
     }
 };
 
-const emitter = new EventEmitter(ReactNativeUsbModule ?? NativeModulesProxy.ReactNativeUsb);
+export const setPriorityMode = (isInPriorityMode: boolean) =>
+    ReactNativeUsbModule.setPriorityMode(isInPriorityMode);
 
 const open = (deviceName: string) => ReactNativeUsbModule.open(deviceName);
+
+const reset = (deviceName: string) => ReactNativeUsbModule.reset(deviceName);
 
 const close = (deviceName: string) => ReactNativeUsbModule.close(deviceName);
 
@@ -24,9 +27,6 @@ const claimInterface = (deviceName: string, interfaceNumber: number) =>
 const releaseInterface = (deviceName: string, interfaceNumber: number) =>
     ReactNativeUsbModule.releaseInterface(deviceName, interfaceNumber);
 
-const selectConfiguration = (deviceName: string, configurationValue: number) =>
-    ReactNativeUsbModule.selectConfiguration(deviceName, configurationValue);
-
 const transferIn = async (deviceName: string, endpointNumber: number, length: number) => {
     const perf = performance.now();
     const data = await ReactNativeUsbModule.transferIn(deviceName, endpointNumber, length)
@@ -34,11 +34,11 @@ const transferIn = async (deviceName: string, endpointNumber: number, length: nu
             debugLog('JS: USB read error: ', error);
             throw error;
         })
-        .then((result: number[]) => {
-            debugLog('JS: Native USB read result:', JSON.stringify(result));
+        .then(result => {
+            debugLog('JS: Native USB read result length:', result.length);
 
             return {
-                data: new Uint8Array(result),
+                data: result,
                 status: 'ok',
             };
         });
@@ -54,7 +54,12 @@ const transferOut = async (
 ) => {
     try {
         const perf = performance.now();
-        await ReactNativeUsbModule.transferOut(deviceName, endpointNumber, data.toString());
+        // Ensure we pass a Uint8Array directly to native code (maps to kotlin.ByteArray)
+        const uint8Data =
+            data instanceof Uint8Array
+                ? data
+                : new Uint8Array(ArrayBuffer.isView(data) ? data.buffer : data);
+        await ReactNativeUsbModule.transferOut(deviceName, endpointNumber, uint8Data);
         debugLog('JS: USB write time', performance.now() - perf);
 
         return { status: 'ok' };
@@ -72,10 +77,10 @@ const createNoop = (methodName: string) => async () => {
 const createWebUSBDevice = (device: NativeDevice): WebUSBDevice => ({
     ...device,
     open: () => open(device.deviceName),
+    reset: () => reset(device.deviceName),
     close: () => close(device.deviceName),
     forget: createNoop('forget'),
-    selectConfiguration: (configurationValue: number) =>
-        selectConfiguration(device.deviceName, configurationValue),
+    selectConfiguration: createNoop('selectConfiguration'),
     claimInterface: (interfaceNumber: number) => claimInterface(device.deviceName, interfaceNumber),
     releaseInterface: (interfaceNumber: number) =>
         releaseInterface(device.deviceName, interfaceNumber),
@@ -89,14 +94,11 @@ const createWebUSBDevice = (device: NativeDevice): WebUSBDevice => ({
         transferOut(device.deviceName, endpointNumber, data),
     isochronousTransferIn: createNoop('isochronousTransferIn'),
     isochronousTransferOut: createNoop('isochronousTransferOut'),
-    reset: createNoop('reset'),
 
     // TODO: Implement these properties, very low priority we are not using them anywhere
     usbVersionMajor: 2,
     usbVersionMinor: 0,
     usbVersionSubminor: 0,
-    deviceVersionMajor: 1,
-    deviceVersionMinor: 0,
     deviceVersionSubminor: 0,
     configurations: [],
 });
@@ -105,53 +107,51 @@ const createWebUSBDevice = (device: NativeDevice): WebUSBDevice => ({
 // and not send onConnect event if device is already connected.
 const connectedDevices = new Map<string, WebUSBDevice>();
 
-export function onDeviceConnected(listener: (event: OnConnectEvent) => void): Subscription {
-    return emitter.addListener<NativeDevice>('onDeviceConnect', event => {
-        if (!event) {
-            console.error('JS: USB onDeviceConnect: event is null');
-            // just for debugging purposes now
-            alert('JS: USB onDeviceConnect: event is null');
+const blankEvent = {
+    bubbles: false,
+    cancelBubble: false,
+    cancelable: false,
+} as Event;
+
+export function onDeviceConnected(listener: (event: OnConnectEvent) => void): EventSubscription {
+    return ReactNativeUsbModule.addListener('onDeviceConnect', (device: NativeDevice | null) => {
+        if (!device) {
+            debugLog('JS: USB onDeviceConnect: device is null');
+            console.error('JS: USB onDeviceConnect: device is null');
+            alert('JS: USB onDeviceConnect: device is null');
 
             return;
         }
 
-        if (connectedDevices.has(event.deviceName)) {
+        if (connectedDevices.has(device.deviceName)) {
+            console.warn('JS: USB onDeviceConnect: device already connected');
             debugLog('JS: USB onDeviceConnect: device already connected');
 
             return;
         }
 
-        const eventPayload = {
-            device: createWebUSBDevice(event as NativeDevice),
-        };
+        const webUSBDevice = createWebUSBDevice(device);
+        connectedDevices.set(device.deviceName, webUSBDevice);
 
-        debugLog('JS: USB onDeviceConnect', eventPayload);
-
-        connectedDevices.set(event.deviceName, eventPayload.device);
-
-        return listener(eventPayload as any);
+        const event = { device: webUSBDevice, ...blankEvent } as OnConnectEvent;
+        listener(event);
     });
 }
 
-export function onDeviceDisconnect(listener: (event: OnConnectEvent) => void): Subscription {
-    return emitter.addListener<NativeDevice>('onDeviceDisconnect', event => {
-        if (!event) {
-            console.error('JS: USB onDeviceConnect: event is null');
-            // just for debugging purposes now
-            alert('JS: USB onDeviceConnect: event is null');
+export function onDeviceDisconnect(listener: (event: OnConnectEvent) => void): EventSubscription {
+    return ReactNativeUsbModule.addListener('onDeviceDisconnect', (device: NativeDevice | null) => {
+        if (!device) {
+            debugLog('JS: USB onDeviceDisconnect: device is null');
+            console.error('JS: USB onDeviceDisconnect: device is null');
+            alert('JS: USB onDeviceDisconnect: device is null');
 
             return;
         }
 
-        const eventPayload = {
-            device: createWebUSBDevice(event as NativeDevice),
-        };
-
-        debugLog('JS: USB onDeviceDisconnect', eventPayload);
-
-        connectedDevices.delete(event.deviceName);
-
-        return listener(eventPayload as any);
+        const webUSBDevice = createWebUSBDevice(device);
+        connectedDevices.delete(device.deviceName);
+        const event = { device: webUSBDevice, ...blankEvent } as OnConnectEvent;
+        listener(event);
     });
 }
 
@@ -162,13 +162,30 @@ export async function getDevices(): Promise<any> {
 }
 
 export class WebUSB {
+    private _onConnectSubscription?: EventSubscription;
+    private _onDisconnectSubscription?: EventSubscription;
+
     public getDevices = getDevices;
 
-    set onconnect(listener: (event: OnConnectEvent) => void) {
-        onDeviceConnected(listener);
+    // `onconnect`/`ondisconnect` mirror the WebUSB `USB` event-handler IDL attributes
+    // (https://wicg.github.io/webusb/#dom-usb-onconnect). They are declared as `EventHandler`,
+    // which the HTML spec defines as a *nullable* attribute holding a single handler: assigning
+    // a new value replaces the previous handler, and assigning `null` detaches it
+    // (https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-attributes —
+    // "If the new value is null, then deactivate the event handler").
+    //
+    // `onDeviceConnected`/`onDeviceDisconnect` each register a fresh native subscription via
+    // `ReactNativeUsbModule.addListener`, so we must remove the previous one on every
+    // (re)assignment. Without this, repeated assignment leaks native listeners, and a `null`
+    // assignment (used by transport-common's `UsbApi.dispose()`) would otherwise register a
+    // handler that crashes when it fires.
+    set onconnect(listener: ((event: OnConnectEvent) => void) | null) {
+        this._onConnectSubscription?.remove();
+        this._onConnectSubscription = listener ? onDeviceConnected(listener) : undefined;
     }
-    set ondisconnect(listener: (event: OnConnectEvent) => void) {
-        onDeviceDisconnect(listener);
+    set ondisconnect(listener: ((event: OnConnectEvent) => void) | null) {
+        this._onDisconnectSubscription?.remove();
+        this._onDisconnectSubscription = listener ? onDeviceDisconnect(listener) : undefined;
     }
 
     // TODO: implement these commented out properties, because they are part of WebUSB specs, but very low priority we are not using them anywhere

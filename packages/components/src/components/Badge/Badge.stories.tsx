@@ -1,14 +1,41 @@
-import { Meta, StoryObj } from '@storybook/react';
-import { Badge as BadgeComponent, BadgeProps } from './Badge';
+import { type Meta, type StoryObj } from '@storybook/react';
 
-const meta: Meta = {
-    title: 'Misc/Badge',
+import { Badge as BadgeComponent, allowedBadgeFrameProps } from './Badge';
+import { badgeIntents, badgeSizes } from './types';
+import { getFramePropsStory } from '../../utils/frameProps';
+
+const meta: Meta<typeof BadgeComponent> = {
+    title: 'Badge',
     component: BadgeComponent,
-} as Meta;
+};
 export default meta;
 
-export const Badge: StoryObj<BadgeProps> = {
+export const Badge: StoryObj<typeof meta> = {
     args: {
-        children: 'Badge label',
+        children: 'Placeholder',
+        intent: 'brand',
+        size: 'small',
+        isAnimated: false,
+        ...getFramePropsStory(allowedBadgeFrameProps).args,
+    },
+    argTypes: {
+        intent: {
+            control: {
+                type: 'select',
+            },
+            options: badgeIntents,
+        },
+        size: {
+            control: {
+                type: 'select',
+            },
+            options: badgeSizes,
+        },
+        isAnimated: {
+            control: {
+                type: 'boolean',
+            },
+        },
+        ...getFramePropsStory(allowedBadgeFrameProps).argTypes,
     },
 };

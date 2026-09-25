@@ -1,143 +1,99 @@
-import { useState } from 'react';
-import { Pressable, PressableProps } from 'react-native';
-import Animated from 'react-native-reanimated';
+import { type ReactNode, useState } from 'react';
+import { type PressableProps } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
-import { MergeExclusive } from 'type-fest';
+import { type AnimatedIconColor, Icon, type IconName } from '@suite-native/icons';
+import { type NativeStyleObject, prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
+import { type Color, nativeSpacings } from '@trezor/theme';
 
-import { Color, TypographyStyle, nativeSpacings } from '@trezor/theme';
-import { NativeStyleObject, prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-import { Icon, IconColor, IconName, IconSize } from '@suite-common/icons';
-
-import { Text } from '../Text';
-import { useButtonPressAnimatedStyle } from './useButtonPressAnimatedStyle';
-import { TestProps } from '../types';
+import { Loader } from '../Loader';
+import { AnimatedPressable } from '../Pressable';
 import { HStack } from '../Stack';
+import { Text } from '../Text';
+import { type TestProps } from '../types';
+import { type ButtonColorProps, type ButtonSize } from './types';
+import { useButtonPressAnimatedStyle } from './useButtonPressAnimatedStyle';
+import {
+    buttonGapMap,
+    buttonSizeToDimensionsMap,
+    buttonToIconSizeMap,
+    buttonToTextSizeMap,
+    getButtonColors,
+} from './utils';
 
-export type ButtonSize = 'small' | 'medium' | 'large';
-export type ButtonColorScheme =
-    | 'primary'
-    | 'secondary'
-    | 'tertiaryElevation0'
-    | 'tertiaryElevation1'
-    | 'dangerElevation0'
-    | 'dangerElevation1';
+export {
+    BUTTON_INTENTS,
+    BUTTON_PRIORITIES,
+    BUTTON_SIZES,
+    type ButtonColorProps,
+    type ButtonIntent,
+    type ButtonPriority,
+    type ButtonSize,
+} from './types';
+export {
+    buttonToIconSizeMap,
+    buttonToTextSizeMap,
+    getButtonColors,
+    iconButtonToIconSizeMap,
+} from './utils';
+
+export type ButtonAccessory = IconName;
 
 export type ButtonProps = Omit<PressableProps, 'style' | 'onPressIn' | 'onPressOut'> & {
-    children: string;
-    colorScheme?: ButtonColorScheme;
+    children: ReactNode;
     size?: ButtonSize;
     style?: NativeStyleObject;
     isDisabled?: boolean;
-} & MergeExclusive<{ iconLeft?: IconName }, { iconRight?: IconName }> &
+    isLoading?: boolean;
+    flex?: number;
+    isFullWidth?: boolean;
+    iconLeft?: IconName;
+    iconRight?: IconName;
+    shouldWrapChildrenInText?: boolean;
+} & ButtonColorProps &
     TestProps;
 
 type ButtonIconProps = {
     iconName: IconName;
-    color: IconColor;
-    buttonSize: ButtonSize;
+    color?: AnimatedIconColor;
+    size?: ButtonSize;
 };
 
-type ButtonColorSchemeColors = {
-    backgroundColor: Color;
-    onPressColor: Color;
-    textColor: Color;
-    disabledTextColor: Color;
+type ButtonAccessoryViewProps = {
+    element: ButtonAccessory;
+    iconColor?: AnimatedIconColor;
+    iconSize?: ButtonSize;
 };
 
 export type ButtonStyleProps = {
     size: ButtonSize;
     backgroundColor: Color;
-    isDisabled: boolean;
-    hasTitle?: boolean;
+    isFullWidth: boolean;
+    flex?: number;
 };
 
-export const buttonSchemeToColorsMap = {
-    primary: {
-        backgroundColor: 'backgroundPrimaryDefault',
-        onPressColor: 'backgroundPrimaryPressed',
-        textColor: 'textOnPrimary',
-        disabledTextColor: 'textDisabled',
-    },
-    secondary: {
-        backgroundColor: 'backgroundSecondaryDefault',
-        onPressColor: 'backgroundSecondaryPressed',
-        textColor: 'textOnSecondary',
-        disabledTextColor: 'textDisabled',
-    },
-    tertiaryElevation0: {
-        backgroundColor: 'backgroundTertiaryDefaultOnElevation0',
-        onPressColor: 'backgroundTertiaryPressedOnElevation0',
+export type ButtonTextStyleProps = {
+    buttonSize: ButtonSize;
+};
 
-        textColor: 'textOnTertiary',
-        disabledTextColor: 'textDisabled',
-    },
-    tertiaryElevation1: {
-        backgroundColor: 'backgroundTertiaryDefaultOnElevation1',
-        onPressColor: 'backgroundTertiaryPressedOnElevation1',
-
-        textColor: 'textOnTertiary',
-        disabledTextColor: 'textDisabled',
-    },
-    dangerElevation0: {
-        backgroundColor: 'backgroundAlertRedSubtleOnElevation0',
-        onPressColor: 'backgroundAlertRedSubtleOnElevation0',
-        textColor: 'textAlertRed',
-        disabledTextColor: 'textDisabled',
-    },
-    dangerElevation1: {
-        backgroundColor: 'backgroundAlertRedSubtleOnElevation1',
-        onPressColor: 'backgroundAlertRedSubtleOnElevation1',
-        textColor: 'textAlertRed',
-        disabledTextColor: 'textDisabled',
-    },
-} as const satisfies Record<ButtonColorScheme, ButtonColorSchemeColors>;
-
-const sizeToDimensionsMap = {
-    small: {
-        minHeight: 40,
-        paddingVertical: 10,
-        paddingHorizontal: nativeSpacings.medium,
-    },
-    medium: {
-        minHeight: 48,
-        paddingVertical: 12,
-        paddingHorizontal: 20,
-    },
-    large: {
-        minHeight: 56,
-        paddingVertical: nativeSpacings.medium,
-        paddingHorizontal: nativeSpacings.large,
-    },
-} as const satisfies Record<ButtonSize, NativeStyleObject>;
-
-export const buttonToTextSizeMap = {
-    small: 'hint',
-    medium: 'body',
-    large: 'body',
-} as const satisfies Record<ButtonSize, TypographyStyle>;
-
-const buttonToIconSizeMap = {
-    small: 'medium',
-    medium: 'mediumLarge',
-    large: 'large',
-} as const satisfies Record<ButtonSize, IconSize>;
+const LOADER_FADE_IN_DURATION = 500;
 
 export const buttonStyle = prepareNativeStyle<ButtonStyleProps>(
-    (utils, { size, backgroundColor, isDisabled }) => {
-        const sizeDimensions = sizeToDimensionsMap[size];
+    (utils, { size, backgroundColor, flex, isFullWidth }) => {
+        const sizeDimensions = buttonSizeToDimensionsMap[size];
 
         return {
+            flex,
             flexDirection: 'row',
             justifyContent: 'center',
             alignItems: 'center',
-            borderRadius: utils.borders.radii.round,
             backgroundColor: utils.colors[backgroundColor],
             ...sizeDimensions,
             extend: [
                 {
-                    condition: isDisabled,
+                    condition: isFullWidth,
                     style: {
-                        backgroundColor: utils.colors.backgroundNeutralDisabled,
+                        width: '100%',
                     },
                 },
             ],
@@ -145,28 +101,58 @@ export const buttonStyle = prepareNativeStyle<ButtonStyleProps>(
     },
 );
 
-export const ButtonIcon = ({ iconName, color, buttonSize }: ButtonIconProps) => (
-    <Icon name={iconName} color={color} size={buttonToIconSizeMap[buttonSize]} />
+const buttonTextStyle = prepareNativeStyle<ButtonTextStyleProps>((utils, { buttonSize }) => ({
+    ...utils.typography[buttonToTextSizeMap[buttonSize]],
+    flexShrink: 1,
+    paddingHorizontal: nativeSpacings.sp4,
+}));
+
+export const ButtonIcon = ({
+    iconName,
+    color = 'contentPrimary',
+    size = 'large',
+}: ButtonIconProps) => (
+    <Icon.Animated name={iconName} color={color} size={buttonToIconSizeMap[size]} />
 );
 
+export const ButtonAccessoryView = ({
+    element,
+    iconColor = 'contentPrimary',
+    iconSize = 'medium',
+}: ButtonAccessoryViewProps) => <ButtonIcon iconName={element} color={iconColor} size={iconSize} />;
+
 export const Button = ({
+    children,
+    disabled: isNativeDisabled,
+    flex,
     iconLeft,
     iconRight,
-    style,
-    children,
-    colorScheme = 'primary',
-    size = 'medium',
+    intent = 'brand',
     isDisabled = false,
+    isFullWidth = false,
+    isInverse = false,
+    isLoading = false,
+    priority = 'primary',
+    size = 'large',
+    style,
+    testID,
+    shouldWrapChildrenInText = true,
     ...pressableProps
 }: ButtonProps) => {
     const [isPressed, setIsPressed] = useState(false);
     const { applyStyle } = useNativeStyles();
-    const { backgroundColor, onPressColor, textColor, disabledTextColor } =
-        buttonSchemeToColorsMap[colorScheme];
+    const hasDisabledState = isDisabled || !!isNativeDisabled;
+    const hasDisabledVisualState = hasDisabledState || isLoading;
+    const { backgroundColor, onPressColor, contentColor } = getButtonColors({
+        intent,
+        priority,
+        isInverse,
+        isDisabled: hasDisabledVisualState,
+    });
 
     const animatedPressStyle = useButtonPressAnimatedStyle(
         isPressed,
-        isDisabled,
+        hasDisabledVisualState,
         backgroundColor,
         onPressColor,
     );
@@ -174,45 +160,65 @@ export const Button = ({
     const handlePressIn = () => setIsPressed(true);
     const handlePressOut = () => setIsPressed(false);
 
-    const iconName = iconLeft || iconRight;
-    const icon = iconName ? (
-        <ButtonIcon
-            iconName={iconName}
-            color={isDisabled ? disabledTextColor : textColor}
-            buttonSize={size}
-        />
-    ) : null;
-
     return (
-        <Pressable
-            disabled={isDisabled}
+        <AnimatedPressable
+            disabled={hasDisabledVisualState}
             onPressIn={handlePressIn}
             onPressOut={handlePressOut}
+            style={[
+                animatedPressStyle,
+                applyStyle(buttonStyle, {
+                    size,
+                    backgroundColor,
+                    flex,
+                    isFullWidth,
+                }),
+                style,
+            ]}
+            testID={testID}
             {...pressableProps}
         >
-            <Animated.View
-                style={[
-                    animatedPressStyle,
-                    applyStyle(buttonStyle, {
-                        size,
-                        backgroundColor,
-                        isDisabled,
-                    }),
-                    style,
-                ]}
-            >
-                <HStack alignItems="center">
-                    {iconLeft && icon}
+            <HStack alignItems="center" justifyContent="center" spacing={buttonGapMap[size]}>
+                {isLoading && (
+                    <Animated.View
+                        entering={FadeIn.duration(LOADER_FADE_IN_DURATION)}
+                        testID={testID ? `${testID}/loading` : undefined}
+                    >
+                        <Loader color={contentColor} />
+                    </Animated.View>
+                )}
+                {!isLoading && !!iconLeft && (
+                    <ButtonAccessoryView
+                        element={iconLeft}
+                        iconColor={contentColor}
+                        iconSize={size}
+                    />
+                )}
+
+                {shouldWrapChildrenInText ? (
                     <Text
+                        color={contentColor}
+                        numberOfLines={1}
+                        style={applyStyle(buttonTextStyle, {
+                            buttonSize: size,
+                        })}
+                        testID={testID ? `${testID}/text` : undefined}
                         textAlign="center"
                         variant={buttonToTextSizeMap[size]}
-                        color={isDisabled ? disabledTextColor : textColor}
                     >
                         {children}
                     </Text>
-                    {iconRight && icon}
-                </HStack>
-            </Animated.View>
-        </Pressable>
+                ) : (
+                    children
+                )}
+                {!isLoading && !!iconRight && (
+                    <ButtonAccessoryView
+                        element={iconRight}
+                        iconColor={contentColor}
+                        iconSize={size}
+                    />
+                )}
+            </HStack>
+        </AnimatedPressable>
     );
 };

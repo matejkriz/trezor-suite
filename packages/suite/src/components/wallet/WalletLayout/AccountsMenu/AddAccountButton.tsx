@@ -1,50 +1,37 @@
-import { Translation } from 'src/components/suite';
-import { TrezorDevice } from 'src/types/suite';
-import { useDiscovery, useDispatch } from 'src/hooks/suite';
-import { openModal } from 'src/actions/suite/modalActions';
+import { useState } from 'react';
 
-import { Tooltip, ButtonProps, IconButton, Button } from '@trezor/components';
-import { DiscoveryStatus } from '@suite-common/wallet-constants';
+import { Translation } from '@suite/intl';
+import { openModal } from '@suite/modal';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { Box, Icon, Row, ShortcutBadge, TOOLTIP_DELAY_NORMAL, Tooltip } from '@trezor/components';
+import { PlusIcon } from '@trezor/icons';
+
+import { useDiscovery } from 'src/hooks/suite';
+import { type TrezorDevice } from 'src/types/suite';
 
 const getExplanationMessage = (device: TrezorDevice | undefined, discoveryIsRunning: boolean) => {
-    let message;
     if (device && !device.connected) {
-        message = <Translation id="TR_TO_ADD_NEW_ACCOUNT_PLEASE_CONNECT" />;
+        return <Translation id="TR_TO_ADD_NEW_ACCOUNT_PLEASE_CONNECT" />;
     } else if (discoveryIsRunning) {
-        message = <Translation id="TR_TO_ADD_NEW_ACCOUNT_WAIT_FOR_DISCOVERY" />;
+        return <Translation id="TR_TO_ADD_NEW_ACCOUNT_WAIT_FOR_DISCOVERY" />;
     }
-
-    return message;
 };
 
-interface AddAccountButtonProps extends Omit<ButtonProps, 'children'> {
+type AddAccountButtonProps = {
     device: TrezorDevice | undefined;
-    closeMenu?: () => void;
-    isDisabled?: boolean;
-    isFullWidth?: boolean;
-}
+};
 
-export const AddAccountButton = ({
-    device,
-    isDisabled,
-    closeMenu,
-    isFullWidth,
-    ...rest
-}: AddAccountButtonProps) => {
-    const { discovery } = useDiscovery();
-    const dispatch = useDispatch();
+export const AddAccountButton = ({ device }: AddAccountButtonProps) => {
+    const { isDiscoveryRunning } = useDiscovery();
+    const [isHovered, setIsHovered] = useState(false);
 
-    const discoveryIsRunning = discovery ? discovery.status <= DiscoveryStatus.STOPPING : false;
+    const { dispatch } = useServices(injectDispatch);
 
     // TODO: add more cases when adding account is not possible
-    const addAccountDisabled =
-        discoveryIsRunning ||
-        !device ||
-        !device.connected ||
-        device.authConfirm ||
-        device.authFailed;
-
-    const tooltipMessage = getExplanationMessage(device, discoveryIsRunning);
+    const addAccountDisabled = isDiscoveryRunning || !device?.connected;
+    const tooltipMessage = getExplanationMessage(device, isDiscoveryRunning);
+    const dataTestId = '@account-menu/add-account';
 
     const handleOnClick = () => {
         if (!device) {
@@ -57,46 +44,42 @@ export const AddAccountButton = ({
                 device,
             }),
         );
-        if (closeMenu) closeMenu();
     };
 
-    const ButtonComponent = isFullWidth ? (
-        <Button
-            onClick={device ? handleOnClick : undefined}
-            icon="PLUS"
-            isDisabled={addAccountDisabled || isDisabled}
-            size="small"
-            variant="tertiary"
-            isFullWidth
-            {...rest}
+    const ButtonComponent = (
+        <Tooltip
+            isActive={!tooltipMessage}
+            content={
+                <Row gap={12}>
+                    <Translation id="TR_ADD_ACCOUNT" />
+                    <ShortcutBadge shortcut={['ALT', 'KEY_A']} />
+                </Row>
+            }
         >
-            <Translation id="TR_SIDEBAR_ADD_COIN" />
-        </Button>
-    ) : (
-        <IconButton
-            onClick={device ? handleOnClick : undefined}
-            icon="PLUS"
-            isDisabled={addAccountDisabled || isDisabled}
-            size="small"
-            variant="tertiary"
-            {...rest}
-            label={!tooltipMessage && <Translation id="TR_ADD_ACCOUNT" />}
-        />
+            <Box onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
+                <Icon
+                    onClick={device ? handleOnClick : undefined}
+                    as={PlusIcon}
+                    size={16}
+                    isDisabled={addAccountDisabled}
+                    intent="neutral"
+                    priority={isHovered ? 'primary' : 'secondary'}
+                    data-testid={dataTestId}
+                />
+            </Box>
+        </Tooltip>
     );
 
-    if (tooltipMessage) {
-        return (
-            <Tooltip
-                isFullWidth={isFullWidth}
-                maxWidth={200}
-                content={tooltipMessage}
-                placement="bottom"
-                cursor="not-allowed"
-            >
-                {ButtonComponent}
-            </Tooltip>
-        );
-    }
-
-    return ButtonComponent;
+    return (
+        <Tooltip
+            isActive={!!tooltipMessage}
+            tooltipMaxWidth={200}
+            content={tooltipMessage}
+            placement="bottom"
+            cursor="not-allowed"
+            delayShow={TOOLTIP_DELAY_NORMAL}
+        >
+            {ButtonComponent}
+        </Tooltip>
+    );
 };

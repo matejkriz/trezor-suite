@@ -1,26 +1,25 @@
-import WebSocket from 'ws';
-
-import { CustomError } from '@trezor/blockchain-link-types/src/constants/errors';
+import { CustomError } from '@trezor/blockchain-link-types';
 import type {
-    BlockNotification,
-    MempoolTransactionNotification,
-    AddressNotification,
-    Send,
-    FiatRatesNotification,
-    FilterRequestParams,
-} from '@trezor/blockchain-link-types/src/blockbook';
-import type {
-    GetFiatRatesForTimestamps,
-    GetFiatRatesTickersList,
-    GetCurrentFiatRates,
-} from '@trezor/blockchain-link-types/src/messages';
-import type {
-    AccountInfoParams,
-    EstimateFeeParams,
     AccountBalanceHistoryParams,
-} from '@trezor/blockchain-link-types/src/params';
+    AccountInfoParams,
+    BlockbookAddressNotification as AddressNotification,
+    BlockbookBlockNotification as BlockNotification,
+    EstimateFeeParams,
+    BlockbookFiatRatesNotification as FiatRatesNotification,
+    BlockbookFilterRequestParams as FilterRequestParams,
+    BlockbookMempoolTransactionNotification as MempoolTransactionNotification,
+    MessageTypes,
+    RpcCallParams,
+    BlockbookSend as Send,
+} from '@trezor/blockchain-link-types';
+import { type GetContractInfo } from '@trezor/blockchain-link-types/src/messages';
+import { getSuiteVersion } from '@trezor/env-utils';
 
 import { BaseWebsocket } from '../baseWebsocket';
+
+type GetCurrentFiatRates = MessageTypes.GetCurrentFiatRates;
+type GetFiatRatesForTimestamps = MessageTypes.GetFiatRatesForTimestamps;
+type GetFiatRatesTickersList = MessageTypes.GetFiatRatesTickersList;
 
 interface BlockbookEvents {
     block: BlockNotification;
@@ -46,13 +45,11 @@ export class BlockbookAPI extends BaseWebsocket<BlockbookEvents> {
             url += suffix;
         }
 
-        // initialize connection,
-        // options are not used in web builds (see ./src/utils/ws)
-        return new WebSocket(url, {
+        return this.initWebsocket({
+            url,
             agent: this.options.agent,
             headers: {
-                Origin: 'https://node.trezor.io',
-                'User-Agent': 'Trezor Suite',
+                'User-Agent': `Trezor Suite ${getSuiteVersion()}`,
                 ...this.options.headers,
             },
         });
@@ -72,8 +69,11 @@ export class BlockbookAPI extends BaseWebsocket<BlockbookEvents> {
         return this.send('getBlockHash', { height: block });
     }
 
-    getBlock(block: number | string) {
-        return this.send('getBlock', { id: `${block}` });
+    getBlock(
+        block: number | string,
+        { page, pageSize }: { page?: number; pageSize?: number } = {},
+    ) {
+        return this.send('getBlock', { id: `${block}`, page, pageSize });
     }
 
     getBlockFilter(blockHash: string, filterParams?: FilterRequestParams) {
@@ -117,12 +117,20 @@ export class BlockbookAPI extends BaseWebsocket<BlockbookEvents> {
         return this.send('getTransaction', { txid });
     }
 
-    pushTransaction(hex: string) {
-        return this.send('sendTransaction', { hex });
+    pushTransaction(hex: string, disableAlternativeRPC?: boolean) {
+        return this.send('sendTransaction', { hex, disableAlternativeRPC });
     }
 
     estimateFee(payload: EstimateFeeParams) {
         return this.send('estimateFee', payload);
+    }
+
+    rpcCall(payload: RpcCallParams) {
+        return this.send('rpcCall', payload);
+    }
+
+    getContractInfo(payload: GetContractInfo['payload']) {
+        return this.send('getContractInfo', payload);
     }
 
     getCurrentFiatRates(payload: GetCurrentFiatRates['payload']) {
@@ -143,9 +151,11 @@ export class BlockbookAPI extends BaseWebsocket<BlockbookEvents> {
 
     subscribeAddresses(addresses: string[]) {
         this.removeSubscription('notification');
-        this.addSubscription('notification', result => this.emit('notification', result));
 
-        return this.send('subscribeAddresses', { addresses });
+        return this.sendMessage(
+            { method: 'subscribeAddresses', params: { addresses } },
+            { onIdCreated: id => this.addSubscription('notification', id) },
+        );
     }
 
     unsubscribeAddresses() {
@@ -156,9 +166,11 @@ export class BlockbookAPI extends BaseWebsocket<BlockbookEvents> {
 
     subscribeBlock() {
         this.removeSubscription('block');
-        this.addSubscription('block', result => this.emit('block', result));
 
-        return this.send('subscribeNewBlock');
+        return this.sendMessage(
+            { method: 'subscribeNewBlock' },
+            { onIdCreated: id => this.addSubscription('block', id) },
+        );
     }
 
     unsubscribeBlock() {
@@ -169,9 +181,11 @@ export class BlockbookAPI extends BaseWebsocket<BlockbookEvents> {
 
     subscribeFiatRates(currency?: string) {
         this.removeSubscription('fiatRates');
-        this.addSubscription('fiatRates', result => this.emit('fiatRates', result));
 
-        return this.send('subscribeFiatRates', { currency });
+        return this.sendMessage(
+            { method: 'subscribeFiatRates', params: { currency } },
+            { onIdCreated: id => this.addSubscription('fiatRates', id) },
+        );
     }
 
     unsubscribeFiatRates() {
@@ -182,9 +196,11 @@ export class BlockbookAPI extends BaseWebsocket<BlockbookEvents> {
 
     subscribeMempool() {
         this.removeSubscription('mempool');
-        this.addSubscription('mempool', result => this.emit('mempool', result));
 
-        return this.send('subscribeNewTransaction');
+        return this.sendMessage(
+            { method: 'subscribeNewTransaction' },
+            { onIdCreated: id => this.addSubscription('mempool', id) },
+        );
     }
 
     unsubscribeMempool() {

@@ -1,16 +1,22 @@
-import { useController } from 'react-hook-form';
 import { useContext } from 'react';
+import { useController } from 'react-hook-form';
 
-import { FieldName } from '../types';
+import { G } from '@mobily/ts-belt';
+
 import { FormContext } from '../Form';
+import { type FieldName } from '../types';
 
 interface UseFieldArgs {
     name: FieldName;
-    label: string;
     defaultValue?: unknown;
+    valueTransformer?: (value: string) => string;
 }
 
-export const useField = ({ name, label, defaultValue }: UseFieldArgs) => {
+export const useField = ({
+    name,
+    defaultValue,
+    valueTransformer = value => value,
+}: UseFieldArgs) => {
     // TODO: once react-hook-form is updated to 7+ we can use the `errors` from `fieldState` on useController
     const { control } = useContext(FormContext);
 
@@ -20,21 +26,28 @@ export const useField = ({ name, label, defaultValue }: UseFieldArgs) => {
 
     const {
         field: { onBlur, onChange, value },
-        fieldState: { error },
+        fieldState: { error, isDirty, isTouched },
     } = useController({
         name,
         control,
         defaultValue,
     });
 
-    // TODO: proper error message resolution using intl
-    const errorMessage = error?.message?.replace(name, label);
+    // Inspired by https://react-hook-form.com/advanced-usage#TransformandParse.
+    // Allows to parse/transform the value before it's set to the input.
+    const transformedValue = G.isString(value) ? valueTransformer(value) : '';
+
+    const errorMessage = error?.message;
+    const errorType = error?.type;
     const hasError = !!error;
 
     return {
         errorMessage,
+        errorType,
         hasError,
-        value,
+        isDirty,
+        isTouched,
+        value: transformedValue,
         onBlur,
         onChange,
     };

@@ -1,17 +1,16 @@
 {
     "extends": "../../tsconfig.base.json",
-    "compilerOptions": { "outDir": "libDev" },
+    "compilerOptions": {
+        "outDir": "libDev",
+        "types": ["jest", "node", "w3c-web-usb"]
+    },
     "references": [
-        { "path": "../blockchain-link" },
-        { "path": "../blockchain-link-types" },
-        { "path": "../connect-analytics" },
         { "path": "../connect-common" },
-        { "path": "../protobuf" },
-        { "path": "../protocol" },
-        { "path": "../schema-utils" },
+        { "path": "../connect-core" },
         { "path": "../transport" },
-        { "path": "../utils" },
-        { "path": "../utxo-lib" },
-        { "path": "../trezor-user-env-link" }
+        { "path": "../transport-common" },
+        { "path": "../transport-web" },
+        { "path": "../eslint" },
+        { "path": "../requirements" }
     ]
 }

@@ -1,73 +1,56 @@
-import { UserContextPayload } from '@suite-common/suite-types';
-import { notificationsActions } from '@suite-common/toast-notifications';
-import TrezorConnect, { Success, Unsuccessful } from '@trezor/connect';
-import { selectDevice } from '@suite-common/wallet-core';
-import { getDerivationType } from '@suite-common/wallet-utils';
+import { type Dispatch, type UnknownAction } from '@reduxjs/toolkit';
+import { type ThunkDispatch } from 'redux-thunk';
 
-import { onCancel, openModal, preserve } from 'src/actions/suite/modalActions';
-import { GetState, Dispatch } from 'src/types/suite';
+import { type SelectedAccountRootState, selectSelectedAccount } from '@suite/account';
+import { closeModal, openModal, preserveModal } from '@suite/modal';
+import { type DeviceRootState, selectSelectedDevice } from '@suite-common/device';
+import { type UserContextPayload } from '@suite-common/suite-types';
+import { notificationsActions } from '@suite-common/toast-notifications';
+import { showXpubOnDevice } from '@suite-common/wallet-core';
 
 export const openXpubModal =
     (params?: Pick<Extract<UserContextPayload, { type: 'xpub' }>, 'isConfirmed'>) =>
-    (dispatch: Dispatch) => {
+    (dispatch: Dispatch<UnknownAction>) => {
         dispatch(openModal({ type: 'xpub', ...params }));
     };
 
-export const showXpub = () => async (dispatch: Dispatch, getState: GetState) => {
-    const device = selectDevice(getState());
-    const { account } = getState().wallet.selectedAccount;
+export type ShowXpubThunkState = DeviceRootState & SelectedAccountRootState;
 
-    if (!device || !account) return;
+export const showXpubThunk =
+    () =>
+    async (
+        dispatch: ThunkDispatch<ShowXpubThunkState, unknown, UnknownAction>,
+        getState: () => ShowXpubThunkState,
+    ) => {
+        const device = selectSelectedDevice(getState());
+        const account = selectSelectedAccount(getState());
 
-    // Show warning when device is not connected.
-    if (!device.connected || !device.available) {
-        dispatch(openModal({ type: 'unverified-xpub' }));
+        if (!device || !account) return;
 
-        return;
-    }
+        // Show warning when device is not connected.
+        if (!device.connected || !device.available) {
+            dispatch(openModal({ type: 'unverified-xpub' }));
 
-    // Prevent flickering screen when modal changes.
-    dispatch(preserve());
+            return;
+        }
 
-    const params = {
-        device,
-        path: account.path,
-        useEmptyPassphrase: device.useEmptyPassphrase,
-        showOnTrezor: true,
-        derivationType: getDerivationType(account.accountType),
+        // Prevent flickering screen when modal changes.
+        dispatch(preserveModal());
+
+        const response = await showXpubOnDevice(device, account);
+
+        if (response.success) {
+            // Show second part of the "confirm XPUB" modal.
+            dispatch(openXpubModal({ isConfirmed: true }));
+        } else {
+            dispatch(closeModal());
+            // Special case: closing no-backup warning modal should not show a toast.
+            if (response.error.code === 'Method_PermissionsNotGranted') return;
+            dispatch(
+                notificationsActions.addToast({
+                    type: 'verify-xpub-error',
+                    error: response.error.message,
+                }),
+            );
+        }
     };
-
-    let response: Success<unknown> | Unsuccessful;
-
-    switch (account.networkType) {
-        case 'bitcoin':
-            response = await TrezorConnect.getPublicKey(params);
-            break;
-        case 'cardano':
-            response = await TrezorConnect.cardanoGetPublicKey(params);
-            break;
-        case 'solana':
-            response = await TrezorConnect.solanaGetPublicKey(params);
-            break;
-        default:
-            response = {
-                success: false,
-                payload: { error: 'Method for getPublicKey not defined', code: undefined },
-            };
-    }
-
-    if (response.success) {
-        // Show second part of the "confirm XPUB" modal.
-        dispatch(openXpubModal({ isConfirmed: true }));
-    } else {
-        dispatch(onCancel());
-        // Special case: closing no-backup warning modal should not show a toast.
-        if (response.payload.code === 'Method_PermissionsNotGranted') return;
-        dispatch(
-            notificationsActions.addToast({
-                type: 'verify-xpub-error',
-                error: response.payload.error,
-            }),
-        );
-    }
-};

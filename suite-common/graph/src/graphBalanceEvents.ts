@@ -1,21 +1,28 @@
 import { A, pipe } from '@mobily/ts-belt';
 import { fromUnixTime, getUnixTime } from 'date-fns';
 
-import { NetworkSymbol, getNetworkType } from '@suite-common/wallet-config';
+import { type Dispatch } from '@suite-common/redux-utils';
+import type { NetworkSymbol } from '@suite-common/wallet-config';
+import { fetchTransactionsFromNowUntilTimestampThunk } from '@suite-common/wallet-core';
+import type { AccountKey, Timestamp, TokenAddress } from '@suite-common/wallet-types';
+import { type AccountBalanceHistory as AccountMovementHistory } from '@trezor/blockchain-link';
 import TrezorConnect from '@trezor/connect';
-import { AccountBalanceHistory as AccountMovementHistory } from '@trezor/blockchain-link';
-import {
-    AccountBalanceHistory,
-    TransactionCacheEngine,
-} from '@suite-common/transaction-cache-engine';
+import { asCoinSymbol } from '@trezor/connect-common';
 
-import { BalanceMovementEvent, GroupedBalanceMovementEvent, AccountItem } from './types';
+import { getAccountHistoryMovementFromTransactions } from './balanceHistoryUtils';
+import { isIgnoredBalanceHistoryCoin, isLocalBalanceHistoryCoin } from './constants';
+import {
+    type AccountHistoryMovementItem,
+    type AccountItem,
+    type BalanceMovementEvent,
+    type GroupedBalanceMovementEvent,
+} from './types';
 
 /**
  * Calculates received and sent values of each balance movement point.
  */
 export const formatBalanceMovementEventsAmounts = (
-    balanceMovements: Array<AccountMovementHistory | AccountBalanceHistory>,
+    balanceMovements: Array<AccountMovementHistory | AccountHistoryMovementItem>,
 ): readonly BalanceMovementEvent[] =>
     A.map(balanceMovements, balanceMovement => {
         const sentTotal = Number(balanceMovement.sent);
@@ -31,7 +38,7 @@ export const formatBalanceMovementEventsAmounts = (
                 sent: Math.abs(sentTotal - sentToSelf),
                 received: Math.abs(receivedTotal - sentToSelf),
             },
-        } as BalanceMovementEvent;
+        };
     });
 
 /**
@@ -48,7 +55,8 @@ export const groupBalanceMovementEvents = (
     balanceMovements.forEach(balanceMovement => {
         if (
             A.isEmpty(currentGroup) ||
-            balanceMovement.date - currentGroup[currentGroup.length - 1].date < groupingThreshold
+            balanceMovement.date - (currentGroup[currentGroup.length - 1]?.date ?? 0) <
+                groupingThreshold
         ) {
             currentGroup.push(balanceMovement);
 
@@ -66,7 +74,17 @@ export const groupBalanceMovementEvents = (
 /**
  * Reduces each balance movements group to a single balance movement point.
  */
-export const mergeGroups = (groups: BalanceMovementEvent[][], networkSymbol: NetworkSymbol) =>
+export const mergeGroups = ({
+    groups,
+    symbol,
+    tokenAddress,
+    accountKey,
+}: {
+    groups: BalanceMovementEvent[][];
+    symbol: NetworkSymbol;
+    accountKey: AccountKey;
+    tokenAddress?: TokenAddress;
+}) =>
     A.map(groups, group => {
         const averageTimestamp =
             group.reduce((sum, nextBalanceObject) => sum + nextBalanceObject.date, 0) /
@@ -94,10 +112,12 @@ export const mergeGroups = (groups: BalanceMovementEvent[][], networkSymbol: Net
                     sent: 0,
                     sentTransactionsCount: 0,
                     receivedTransactionsCount: 0,
-                    networkSymbol,
+                    symbol,
+                    tokenAddress,
+                    accountKey,
                 },
             ),
-        } as GroupedBalanceMovementEvent;
+        };
     });
 
 /**  Relative number that ensure that there is no more than 30 points in each graph.  */
@@ -107,35 +127,55 @@ export const getAccountMovementEvents = async ({
     account,
     startOfTimeFrameDate,
     endOfTimeFrameDate,
+    dispatch,
 }: {
     account: AccountItem;
     startOfTimeFrameDate: Date | null;
     endOfTimeFrameDate: Date;
+    dispatch: Dispatch;
 }) => {
-    const { coin, descriptor } = account;
+    const { symbol, identity, descriptor, tokensFilter, accountKey } = account;
+    const tokenAddress = tokensFilter?.[0]; // This is only for graph on detail screen where we have always only one token
 
     const getBalanceHistory = async () => {
-        if (getNetworkType(coin) === 'ripple') {
-            return TransactionCacheEngine.getAccountBalanceHistory({
-                coin,
-                descriptor,
+        if (isIgnoredBalanceHistoryCoin(symbol)) {
+            return [];
+        }
+        if (isLocalBalanceHistoryCoin(symbol)) {
+            const allTransactions = await dispatch(
+                fetchTransactionsFromNowUntilTimestampThunk({
+                    accountKey: account.accountKey,
+                    timestamp: startOfTimeFrameDate
+                        ? (getUnixTime(startOfTimeFrameDate) as Timestamp)
+                        : null,
+                }),
+            ).unwrap();
+
+            const movements = getAccountHistoryMovementFromTransactions({
+                transactions: allTransactions,
+                symbol,
             });
+
+            if (tokenAddress) {
+                return movements.tokens[tokenAddress] ?? [];
+            }
+
+            return movements.main;
         }
         const connectBalanceHistory = await TrezorConnect.blockchainGetAccountBalanceHistory({
-            coin,
+            coin: asCoinSymbol(symbol),
+            identity,
             descriptor,
             from: startOfTimeFrameDate ? getUnixTime(startOfTimeFrameDate) : undefined,
             to: getUnixTime(endOfTimeFrameDate),
             groupBy: 1,
             // we don't need currencies at all here, this will just reduce transferred data size
-            // TODO: doesn't work at all, fix it in connect or blockchain-link?
-            // issue: https://github.com/trezor/trezor-suite/issues/8888
             currencies: ['usd'],
         });
 
         if (!connectBalanceHistory?.success) {
             throw new Error(
-                `Get account balance movement error: ${connectBalanceHistory.payload.error}`,
+                `Get account balance movement error: ${connectBalanceHistory.error.message}`,
             );
         }
 
@@ -144,16 +184,24 @@ export const getAccountMovementEvents = async ({
 
     const accountHistoryMovements = await getBalanceHistory();
 
+    if (accountHistoryMovements.length === 0) {
+        return [];
+    }
+
     /** Determines relative maximum distance of adjacent balance movements to be grouped together. */
     const GROUPING_THRESHOLD =
         (endOfTimeFrameDate.getTime() -
-            (startOfTimeFrameDate?.getTime() ?? accountHistoryMovements[0].time * 1000)) /
+            (startOfTimeFrameDate?.getTime() ?? (accountHistoryMovements[0]?.time ?? 0) * 1000)) /
         GROUPING_DIVISOR;
 
     return pipe(
         accountHistoryMovements,
         formatBalanceMovementEventsAmounts,
+        A.filter(
+            balanceMovement =>
+                balanceMovement.payload.sent !== 0 || balanceMovement.payload.received !== 0,
+        ),
         formattedBalances => groupBalanceMovementEvents(formattedBalances, GROUPING_THRESHOLD),
-        group => mergeGroups(group, coin),
+        groups => mergeGroups({ groups, symbol, tokenAddress, accountKey }),
     ) as GroupedBalanceMovementEvent[];
 };

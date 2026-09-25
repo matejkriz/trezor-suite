@@ -1,16 +1,21 @@
-import { useState } from 'react';
-import { LayoutChangeEvent } from 'react-native';
+import { useEffect } from 'react';
 
-import { typographyStylesBase } from '@trezor/theme';
-import { mergeNativeStyleObjects, prepareNativeStyle, useNativeStyles } from '@trezor/styles';
+import { useDiscreetMode } from '@suite-common/discreet-mode';
+import {
+    mergeNativeStyleObjects,
+    prepareNativeStyle,
+    useNativeStyles,
+} from '@trezor/styles-native';
+import { nativeTypography } from '@trezor/theme';
 
-import { Text, TextProps } from '../Text';
 import { Box } from '../Box';
+import { Text, type TextProps } from '../Text';
 import { DiscreetCanvas } from './DiscreetCanvas';
-import { useDiscreetMode } from './useDiscreetMode';
+import { preloadDiscreetFont } from './useDiscreetFont';
 
 export type DiscreetTextProps = TextProps & {
     children?: string | null;
+    isForcedDiscreetMode?: boolean;
 };
 
 const textStyle = prepareNativeStyle((_, { isDiscreetMode }) => ({
@@ -19,49 +24,50 @@ const textStyle = prepareNativeStyle((_, { isDiscreetMode }) => ({
 
 export const DiscreetText = ({
     children = '',
-    color = 'textDefault',
-    variant = 'body',
+    color = 'contentPrimary',
+    variant = 'body-md',
     ellipsizeMode,
     adjustsFontSizeToFit,
     style = {},
+    isForcedDiscreetMode,
     ...restTextProps
 }: DiscreetTextProps) => {
     const { applyStyle } = useNativeStyles();
     const { isDiscreetMode } = useDiscreetMode();
-    const [width, setWidth] = useState(0);
-    const [height, setHeight] = useState(0);
 
-    const handleLayout = ({ nativeEvent }: LayoutChangeEvent) => {
-        setWidth(nativeEvent.layout.width);
-        setHeight(nativeEvent.layout.height);
-    };
+    // Warm the Skia typeface cache up front so the first discreet-mode toggle
+    // paints the blurred canvas immediately instead of flashing blank.
+    useEffect(() => {
+        preloadDiscreetFont();
+    }, []);
 
-    const { fontSize } = typographyStylesBase[variant];
+    const { fontSize, lineHeight } = nativeTypography[variant];
     if (!children) return null;
+    const showAsDiscreet = isDiscreetMode || !!isForcedDiscreetMode;
 
     return (
         <Box>
-            {isDiscreetMode && (
+            {showAsDiscreet && (
                 <DiscreetCanvas
-                    width={width}
-                    height={height}
                     fontSize={fontSize}
+                    lineHeight={lineHeight}
                     text={children}
                     color={color}
                 />
             )}
 
-            {/* Plain Text needs to be always rendered so it shares its width with DiscreetCanvas. */}
+            {/* Plain Text always sizes the parent that the DiscreetCanvas fills. */}
             {/* If the DiscreetMode is on, it is hidden with opacity set to zero. */}
-            <Box onLayout={handleLayout}>
+            <Box>
                 <Text
+                    testID={showAsDiscreet ? 'discreet-text' : 'plain-text'}
                     variant={variant}
                     color={color}
                     ellipsizeMode={ellipsizeMode}
                     adjustsFontSizeToFit={adjustsFontSizeToFit}
                     style={mergeNativeStyleObjects([
                         style,
-                        applyStyle(textStyle, { isDiscreetMode }),
+                        applyStyle(textStyle, { isDiscreetMode: showAsDiscreet }),
                     ])}
                     {...restTextProps}
                 >

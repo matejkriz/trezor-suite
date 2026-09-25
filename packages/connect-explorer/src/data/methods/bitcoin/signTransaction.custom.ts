@@ -1,13 +1,10 @@
 import { select } from './common';
 
 const name = 'signTransaction';
-const docs = 'methods/signTransaction.md';
 
 export default [
     {
-        url: '/method/signTransaction-custom',
         name,
-        docs,
         submitButton: 'Sign transaction',
         fields: [
             {
@@ -48,8 +45,8 @@ export default [
             },
             {
                 name: 'versionGroupId',
-                label: 'Version group id',
                 type: 'number',
+                defaultValue: '',
                 value: '',
             },
             {
@@ -60,8 +57,8 @@ export default [
             },
             {
                 name: 'branchId',
-                label: 'Branch id',
                 type: 'number',
+                defaultValue: '',
                 value: '',
             },
             {
@@ -71,16 +68,25 @@ export default [
             },
             {
                 name: 'push',
-                label: 'Push transaction',
                 type: 'checkbox',
                 defaultValue: false,
                 value: false,
             },
             {
                 name: 'chunkify',
-                label: 'Display recipient address in chunks of 4 characters',
                 type: 'checkbox',
                 value: false,
+            },
+            {
+                name: 'amountUnit',
+                type: 'select',
+                value: 'BITCOIN',
+                data: [
+                    { value: 0, label: 'BITCOIN (0)' },
+                    { value: 1, label: 'MILLIBITCOIN (1)' },
+                    { value: 2, label: 'MICROBITCOIN (2)' },
+                    { value: 3, label: 'SATOSHI (3)' },
+                ],
             },
         ],
     },

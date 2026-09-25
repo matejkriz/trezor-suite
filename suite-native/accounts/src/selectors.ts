@@ -1,78 +1,462 @@
-import { A, D, pipe } from '@mobily/ts-belt';
-import { memoizeWithArgs } from 'proxy-memoize';
+import { A, pipe } from '@mobily/ts-belt';
 
+import { getFirstFreshAddress } from '@suite-common/address';
 import {
-    AccountsRootState,
-    DeviceRootState,
-    selectAccounts,
-    selectDeviceAccountsByNetworkSymbol,
-    selectDeviceAccounts,
-    FiatRatesRootState,
+    type DeviceRootState,
+    selectDeviceStaticSessionId,
+    selectIsPortfolioTrackerDevice,
+} from '@suite-common/device';
+import { type NetworksRootState, selectSupportedNetworkSymbols } from '@suite-common/networks';
+import {
+    createWeakMapSelector,
+    returnStableArrayIfEmpty,
+    weakMapMemoize,
+} from '@suite-common/redux-utils';
+import {
+    type SuiteSyncDataRootState,
+    selectAccountsWithSuiteSyncLabel,
+    selectSuiteSyncAccountLabel,
+} from '@suite-common/suite-sync';
+import {
+    type SimpleTokenStructure,
+    type TokenDefinitionsRootState,
+    getSimpleCoinDefinitionsByNetwork,
+    isTokenDefinitionKnown,
+    selectTokenDefinitions,
+} from '@suite-common/token-definitions';
+import { type NetworkSymbol } from '@suite-common/wallet-config';
+import {
+    type AccountsRootState,
+    type FiatRatesRootState,
+    type TransactionsRootState,
+    type WalletSettingsRootState,
+    isCardanoStakingActive,
+    selectAccountByKey,
+    selectAccountDefiTokensCount,
+    selectBaseCurrency,
+    selectCurrentFiatRates,
+    selectIsAccountUtxoBased,
+    selectPendingAccountAddresses,
+    selectVisibleDeviceAccounts,
 } from '@suite-common/wallet-core';
-import { TokenInfoBranded } from '@suite-common/wallet-types';
-import { selectEthereumAccountsTokensWithFiatRates } from '@suite-native/ethereum-tokens';
-import { SettingsSliceRootState } from '@suite-native/module-settings';
-import { NetworkSymbol, networks } from '@suite-common/wallet-config';
+import {
+    type Account,
+    type AccountDescriptor,
+    type AccountKey,
+    type RatesByKey,
+    type TokenAddress,
+    type TokenInfoBranded,
+    areBaseCurrencyAmountsEqual,
+    asBaseCurrencyAmount,
+    createAccountKey,
+} from '@suite-common/wallet-types';
+import {
+    BASE_CURRENCY_ZERO,
+    getAccountFiatBalance,
+    getAccountTotalStakingBalance,
+    getFiatRateKey,
+    isAccountFailed,
+    isErc4626,
+    isStakingSymbol,
+    sortTokensByName,
+    toFiatCurrency,
+} from '@suite-common/wallet-utils';
+import { type CombinedLabelingState, selectIsLabellingAllowed } from '@suite-native/labeling';
+import { isNetworkWithTokens, selectAccountTokenInfo } from '@suite-native/tokens';
+import { type StaticSessionId } from '@trezor/connect';
+import { parseStaticSessionId } from '@trezor/device-utils';
 
-import { GroupedAccounts } from './types';
+import { type AccountListSection } from './types';
 import {
     filterAccountsByLabelAndNetworkNames,
-    groupAccountsByNetworkAccountType,
+    filterAccountsByNetworkSymbols,
+    filterSendAvailableAccounts,
     sortAccountsByNetworksAndAccountTypes,
 } from './utils';
 
-export const selectFilteredDeviceAccountsGroupedByNetworkAccountType = memoizeWithArgs(
-    (
-        state: AccountsRootState & FiatRatesRootState & SettingsSliceRootState & DeviceRootState,
-        filterValue: string,
-    ) => {
-        const accounts = selectDeviceAccounts(state);
+export type NativeAccountsRootState = AccountsRootState &
+    FiatRatesRootState &
+    WalletSettingsRootState &
+    DeviceRootState &
+    SuiteSyncDataRootState &
+    TokenDefinitionsRootState &
+    TransactionsRootState;
 
-        return pipe(
-            accounts,
-            sortAccountsByNetworksAndAccountTypes,
-            A.map(account => ({
-                ...account,
-                // Select only tokens with fiat rates To apply filter only one those tokens later.
-                tokens: selectEthereumAccountsTokensWithFiatRates(
-                    state,
-                    account.key,
-                ) as TokenInfoBranded[],
-            })),
-            accountsWithFiatRatedTokens =>
-                filterAccountsByLabelAndNetworkNames(accountsWithFiatRatedTokens, filterValue),
-            groupAccountsByNetworkAccountType,
-        ) as GroupedAccounts;
-    },
-    // This selector is used only in one search component, so cache size equal to 1 is enough.
-    { size: 1 },
-);
+const createNetworkMemoizedSelector = createWeakMapSelector.withTypes<
+    NativeAccountsRootState & NetworksRootState
+>();
 
-export const selectDeviceNetworkAccountsGroupedByAccountType = memoizeWithArgs(
-    (state: AccountsRootState & DeviceRootState, networkSymbol: NetworkSymbol) =>
-        pipe(
-            selectDeviceAccountsByNetworkSymbol(state, networkSymbol),
-            sortAccountsByNetworksAndAccountTypes,
-            groupAccountsByNetworkAccountType,
-        ) as GroupedAccounts,
-    { size: D.keys(networks).length },
-);
+const createMemoizedSelector = createWeakMapSelector.withTypes<NativeAccountsRootState>();
 
-export const selectIsAccountAlreadyDiscovered = (
-    state: AccountsRootState,
-    {
-        networkSymbol,
-        path,
-        deviceState,
-    }: { networkSymbol: NetworkSymbol; path: string; deviceState: string },
-) =>
-    pipe(
+const selectVisibleAccountsWithSuiteSyncLabel = (state: NativeAccountsRootState) =>
+    selectAccountsWithSuiteSyncLabel(
         state,
-        selectAccounts,
-        A.any(
-            account =>
-                account.symbol === networkSymbol &&
-                account.path === path &&
-                account.deviceState === deviceState,
-        ),
+        selectVisibleDeviceAccounts(state),
+        selectDeviceStaticSessionId(state),
     );
+
+export const selectAccountLabel = (
+    state: CombinedLabelingState,
+    deviceStaticSessionId: StaticSessionId,
+    accountDescriptor: AccountDescriptor,
+    networkSymbol: NetworkSymbol,
+) => {
+    const isLabellingAllowed = selectIsLabellingAllowed(state);
+
+    const { walletDescriptor } = parseStaticSessionId(deviceStaticSessionId);
+
+    const syncedLabel = selectSuiteSyncAccountLabel(
+        state,
+        walletDescriptor,
+        accountDescriptor,
+        networkSymbol,
+    );
+
+    if (isLabellingAllowed && syncedLabel) {
+        return syncedLabel;
+    }
+
+    // Fallback to legacy account.label (mobile only, portfolio tracker)
+
+    const accountKey = createAccountKey({
+        accountDescriptor,
+        networkSymbol,
+        deviceStaticSessionId,
+    });
+
+    const account = selectAccountByKey(state, accountKey);
+
+    return account?.accountLabel ?? null;
+};
+
+// TODO: It searches for filterValue even in tokens without fiat rates.
+// These are currently hidden in UI, but they should be made accessible in some way.
+const selectFilteredDeviceAccounts = createNetworkMemoizedSelector(
+    [
+        selectVisibleAccountsWithSuiteSyncLabel,
+        selectSupportedNetworkSymbols,
+        (_state: NativeAccountsRootState, filterValue: string) => filterValue,
+        (_state: NativeAccountsRootState, _filterValue: string, isSendFlow: boolean = false) =>
+            isSendFlow,
+    ],
+    (accounts, supportedNetworks, filterValue, isSendFlow) => {
+        const sortedAccounts = sortAccountsByNetworksAndAccountTypes(accounts, supportedNetworks);
+        const sendFilteredAccounts = isSendFlow
+            ? filterSendAvailableAccounts(sortedAccounts)
+            : sortedAccounts;
+
+        return filterAccountsByLabelAndNetworkNames(sendFilteredAccounts, filterValue);
+    },
+);
+
+const createStableArray = weakMapMemoize(<T>(...items: T[]) => items);
+
+export type FilteredDeviceAccountListRow = {
+    accountKey: AccountKey;
+    isFirst: boolean;
+    isLast: boolean;
+};
+
+const isSameAccountGroup = (
+    firstAccount: Account | undefined,
+    secondAccount: Account | undefined,
+) =>
+    firstAccount?.symbol === secondAccount?.symbol &&
+    firstAccount?.accountType === secondAccount?.accountType;
+
+const createFilteredDeviceAccountListRow = weakMapMemoize(
+    (accountKey: AccountKey, isFirst: boolean, isLast: boolean): FilteredDeviceAccountListRow => ({
+        accountKey,
+        isFirst,
+        isLast,
+    }),
+);
+
+export const selectFilteredDeviceAccountListRows = createNetworkMemoizedSelector(
+    [
+        selectFilteredDeviceAccounts,
+        (
+            _state: NativeAccountsRootState,
+            _filterValue: string,
+            _isSendFlow: boolean = false,
+            networkSymbols: NetworkSymbol[],
+        ) => networkSymbols,
+    ],
+    (accounts, networkSymbols) => {
+        const filteredAccounts = filterAccountsByNetworkSymbols(accounts, networkSymbols);
+
+        return returnStableArrayIfEmpty(
+            createStableArray(
+                ...filteredAccounts.map((account, index) =>
+                    createFilteredDeviceAccountListRow(
+                        account.key,
+                        !isSameAccountGroup(filteredAccounts[index - 1], account),
+                        !isSameAccountGroup(account, filteredAccounts[index + 1]),
+                    ),
+                ),
+            ),
+        );
+    },
+);
+
+export type NetworkFilterOption = {
+    symbol: NetworkSymbol;
+    accountCount: number;
+};
+
+const createNetworkFilterOption = weakMapMemoize(
+    (symbol: NetworkSymbol, accountCount: number): NetworkFilterOption => ({
+        symbol,
+        accountCount,
+    }),
+);
+
+export const selectNetworkFilterOptions = createNetworkMemoizedSelector(
+    [
+        selectVisibleAccountsWithSuiteSyncLabel,
+        selectSupportedNetworkSymbols,
+        (_state: NativeAccountsRootState, isSendFlow: boolean = false) => isSendFlow,
+    ],
+    (accounts, supportedNetworks, isSendFlow) => {
+        const sortedAccounts = sortAccountsByNetworksAndAccountTypes(accounts, supportedNetworks);
+        const filteredAccounts = isSendFlow
+            ? filterSendAvailableAccounts(sortedAccounts)
+            : sortedAccounts;
+
+        const accountCounts = new Map<NetworkSymbol, number>();
+
+        for (const account of filteredAccounts) {
+            accountCounts.set(account.symbol, (accountCounts.get(account.symbol) ?? 0) + 1);
+        }
+
+        return returnStableArrayIfEmpty(
+            createStableArray(
+                ...Array.from(accountCounts, ([symbol, accountCount]) =>
+                    createNetworkFilterOption(symbol, accountCount),
+                ),
+            ),
+        );
+    },
+);
+
+export const selectIsAccountsListNetworkFilterVisible = createNetworkMemoizedSelector(
+    [selectNetworkFilterOptions],
+    networkFilterOptions => networkFilterOptions.length > 1,
+);
+
+export const selectAccountFiatBalance = createMemoizedSelector(
+    [
+        selectCurrentFiatRates,
+        selectAccountByKey,
+        selectBaseCurrency,
+        (_, _accountKey: AccountKey, shouldIncludeStaking?: boolean) =>
+            shouldIncludeStaking ?? true,
+        (
+            _,
+            _accountKey: AccountKey,
+            _shouldIncludeStaking?: boolean,
+            shouldIncludeTokens?: boolean,
+        ) => shouldIncludeTokens ?? true,
+    ],
+    (fiatRates, account, localCurrency, shouldIncludeStaking, shouldIncludeTokens) => {
+        if (!account) {
+            return BASE_CURRENCY_ZERO;
+        }
+
+        const totalBalance = getAccountFiatBalance({
+            account,
+            rates: fiatRates,
+            baseCurrencyCode: localCurrency,
+            shouldIncludeStaking,
+            shouldIncludeTokens,
+        });
+
+        return totalBalance ? asBaseCurrencyAmount(totalBalance) : BASE_CURRENCY_ZERO;
+    },
+    {
+        memoizeOptions: {
+            // Accounts and fiat rates churn on every sync; keep the previous BigNumber reference
+            // when the amount is unchanged so useSelector consumers don't rerender.
+            resultEqualityCheck: areBaseCurrencyAmountsEqual,
+        },
+    },
+);
+
+export const selectAccountTokenFiatBalance = createMemoizedSelector(
+    [selectCurrentFiatRates, selectBaseCurrency, selectAccountByKey, selectAccountTokenInfo],
+    (fiatRates, localCurrency, account, tokenInfo) => {
+        if (!account || !fiatRates || !tokenInfo) return BASE_CURRENCY_ZERO;
+        const { contract, balance } = tokenInfo;
+        const fiatRateKey = getFiatRateKey(account.symbol, localCurrency, contract);
+        const rate = fiatRates[fiatRateKey]?.rate;
+
+        if (!rate || !balance) return BASE_CURRENCY_ZERO;
+
+        return toFiatCurrency({ amount: balance, rate }) ?? BASE_CURRENCY_ZERO;
+    },
+    {
+        memoizeOptions: {
+            // Accounts and fiat rates churn on every sync; keep the previous BigNumber reference
+            // when the amount is unchanged so useSelector consumers don't rerender.
+            resultEqualityCheck: areBaseCurrencyAmountsEqual,
+        },
+    },
+);
+
+export const getAccountListSections = (
+    account: Account,
+    tokenDefinitions: SimpleTokenStructure | undefined,
+    groupZeroBalance = false,
+    hiddenContracts: string[] = [],
+    shownContracts: string[] = [],
+    fiatRates?: RatesByKey,
+    localCurrency?: ReturnType<typeof selectBaseCurrency>,
+) => {
+    const sections: AccountListSection[] = [];
+    const isNetworkSupportingTokens = isNetworkWithTokens(account.symbol);
+
+    const hiddenSet = new Set(hiddenContracts.map(c => c.toLowerCase()));
+    const shownSet = new Set(shownContracts.map(c => c.toLowerCase()));
+    const tokens =
+        account.networkType === 'stellar'
+            ? (account.tokens ?? []).filter(token => !hiddenSet.has(token.contract.toLowerCase()))
+            : (account.tokens ?? [])
+                  .filter(
+                      token =>
+                          isTokenDefinitionKnown(
+                              tokenDefinitions,
+                              account.symbol,
+                              token.contract,
+                          ) || shownSet.has(token.contract.toLowerCase()),
+                  )
+                  .filter(token => !hiddenSet.has(token.contract.toLowerCase()));
+
+    const tokensWithBalance = tokens.filter(token => parseFloat(token?.balance ?? '0') > 0);
+
+    const zeroBalanceTokens: TokenInfoBranded[] = groupZeroBalance
+        ? (tokens
+              .filter(token => parseFloat(token?.balance ?? '0') === 0)
+              .filter(token => !isErc4626(token)) as TokenInfoBranded[])
+        : [];
+
+    const hasAnyKnownTokens =
+        isNetworkSupportingTokens && !!(tokensWithBalance.length + zeroBalanceTokens.length);
+
+    const stakingBalance = getAccountTotalStakingBalance(account) ?? '0';
+
+    const hasStakingBalance = stakingBalance !== '0' || isCardanoStakingActive(account);
+    const hasStaking = isStakingSymbol(account.symbol) && hasStakingBalance;
+
+    sections.push({
+        type: 'account',
+        account,
+        isLast: !hasAnyKnownTokens && !hasStaking,
+        isFirst: true,
+        hasAnyKnownTokens,
+    });
+
+    if (hasStaking) {
+        sections.push({
+            type: 'staking',
+            account,
+            stakingCryptoBalance: stakingBalance,
+            isLast: !hasAnyKnownTokens,
+        });
+    }
+
+    if (hasAnyKnownTokens) {
+        const getTokenFiatValue = (token: { contract: string; balance?: string }): number => {
+            if (!fiatRates || !localCurrency) return 0;
+            const fiatRateKey = getFiatRateKey(
+                account.symbol,
+                localCurrency,
+                token.contract as TokenAddress,
+            );
+            const rate = fiatRates[fiatRateKey]?.rate;
+            if (!rate || !token.balance) return 0;
+
+            return toFiatCurrency({ amount: token.balance, rate })?.toNumber() ?? 0;
+        };
+
+        const tokensToShow = tokensWithBalance
+            .filter(token => !isErc4626(token))
+            .sort((a, b) => getTokenFiatValue(b) - getTokenFiatValue(a));
+        tokensToShow.forEach((token, index) => {
+            sections.push({
+                type: 'token',
+                account,
+                token: token as TokenInfoBranded,
+                isLast: index === tokensToShow.length - 1 && zeroBalanceTokens.length === 0,
+            });
+        });
+
+        if (zeroBalanceTokens.length > 0) {
+            sections.push({
+                type: 'zeroBalance',
+                account,
+                tokens: [...zeroBalanceTokens].sort(sortTokensByName),
+            });
+        }
+    }
+
+    return sections;
+};
+
+const EMPTY_ARRAY: AccountListSection[] = [];
+
+export const selectAccountListSectionsWithZeroBalanceGroup = createMemoizedSelector(
+    [selectAccountByKey, selectTokenDefinitions, selectCurrentFiatRates, selectBaseCurrency],
+    (account, tokenDefinitions, fiatRates, localCurrency) => {
+        if (!account) return EMPTY_ARRAY;
+
+        const networkTokenDefinitions = getSimpleCoinDefinitionsByNetwork(
+            tokenDefinitions,
+            account.symbol,
+        );
+        const coinDefs = tokenDefinitions[account.symbol]?.coin;
+
+        return getAccountListSections(
+            account,
+            networkTokenDefinitions,
+            true,
+            coinDefs?.hide ?? [],
+            coinDefs?.show ?? [],
+            fiatRates,
+            localCurrency,
+        );
+    },
+);
+
+export const selectActiveAndDefiTokensCount = createMemoizedSelector(
+    [selectAccountListSectionsWithZeroBalanceGroup, selectAccountDefiTokensCount],
+    (sections, defiCount) => sections.filter(item => item.type === 'token').length + defiCount,
+);
+
+export const selectFreshAccountAddress = createMemoizedSelector(
+    [selectAccountByKey, selectPendingAccountAddresses, selectIsAccountUtxoBased],
+    (account, pendingAddresses, isAccountUtxoBased) =>
+        account ? getFirstFreshAddress(account, [], pendingAddresses, isAccountUtxoBased) : null,
+);
+
+export const selectIsAccountDiscoveryFailed = createMemoizedSelector(
+    [selectAccountByKey],
+    account => !!account && isAccountFailed(account),
+);
+
+export const selectHasDeviceAnyFailedAccountForNetworkSymbol = createMemoizedSelector(
+    [
+        selectVisibleDeviceAccounts,
+        (_state: NativeAccountsRootState, networkSymbol: NetworkSymbol) => networkSymbol,
+    ],
+    (accounts, networkSymbol) =>
+        accounts.some(account => account.symbol === networkSymbol && isAccountFailed(account)),
+);
+
+export const selectHasDeviceAnySendAvailableAccount = createMemoizedSelector(
+    [selectIsPortfolioTrackerDevice, selectVisibleDeviceAccounts],
+    (isPortfolioTrackerDevice, accounts) => {
+        if (isPortfolioTrackerDevice) return false;
+
+        return pipe(accounts, filterSendAvailableAccounts, A.isNotEmpty);
+    },
+);

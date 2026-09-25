@@ -1,24 +1,22 @@
 import styled from 'styled-components';
-import { variables } from '@trezor/components';
-import { TranslationKey } from '@suite-common/intl-types';
-import { Translation } from 'src/components/suite/Translation';
+
+import { Translation, type TranslationKey } from '@suite/intl';
+import { typography } from '@trezor/theme';
 
 const StyledBalanceContainer = styled.div`
     padding: 0 24px;
 `;
 
-const Heading = styled.p<{ $color?: string }>`
+const Heading = styled.p`
     margin-bottom: 4px;
-    color: ${({ theme, color }) => color || theme.TYPE_LIGHT_GREY};
-    font-weight: ${variables.FONT_WEIGHT.DEMI_BOLD};
-    font-size: ${variables.FONT_SIZE.TINY};
+    color: ${({ theme, color }) => color || theme.contentSecondary};
+    ${typography['body-xs']}
 `;
 
 const SubHeading = styled.p`
     max-width: 480px;
     margin-top: 6px;
-    font-weight: ${variables.FONT_WEIGHT.DEMI_BOLD};
-    font-size: ${variables.FONT_SIZE.H3};
+    ${typography['headline-sm']}
 `;
 
 export interface CoinjoinBalanceErrorProps {

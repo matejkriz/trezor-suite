@@ -1,7 +1,10 @@
+import { type BaseCurrencyAmount } from '@suite-common/wallet-types';
+
 export interface AssetFiatBalance {
-    fiatBalance: string;
+    fiatBalance: BaseCurrencyAmount | null;
     symbol: string;
 }
+
 export interface AssetFiatBalanceWithPercentage extends AssetFiatBalance {
     fiatPercentage: number;
     fiatPercentageOffset: number;

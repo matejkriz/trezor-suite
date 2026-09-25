@@ -1,8 +1,8 @@
 import { createAction } from '@reduxjs/toolkit';
 
-import { NetworkSymbol } from '@suite-common/wallet-config';
-import type { CustomBackend, NetworksFees } from '@suite-common/wallet-types';
-import type { Timeout } from '@trezor/type-utils';
+import { type NetworkSymbol } from '@suite-common/wallet-config';
+import type { CustomBackend } from '@suite-common/wallet-types';
+import type { TimerId } from '@trezor/type-utils';
 
 export const BLOCKCHAIN_MODULE_PREFIX = '@common/wallet-core/blockchain';
 
@@ -13,23 +13,15 @@ const connected = createAction(
     }),
 );
 
-const updateFee = createAction(
-    `${BLOCKCHAIN_MODULE_PREFIX}/updateFee`,
-    (payload: Partial<NetworksFees>) => ({
-        payload,
-    }),
-);
-
 const synced = createAction(
     `${BLOCKCHAIN_MODULE_PREFIX}/synced`,
-    (payload: { symbol: NetworkSymbol; timeout?: Timeout }) => ({
+    (payload: { symbol: NetworkSymbol; timeout?: TimerId }) => ({
         payload,
     }),
 );
 
 export type SetBackendPayload =
-    | CustomBackend
-    | { coin: NetworkSymbol; type: 'default'; urls?: unknown };
+    CustomBackend | { symbol: NetworkSymbol; type: 'default'; urls?: unknown };
 const setBackend = createAction(
     `${BLOCKCHAIN_MODULE_PREFIX}/setBackend`,
     (payload: SetBackendPayload) => ({
@@ -37,9 +29,14 @@ const setBackend = createAction(
     }),
 );
 
+const setBackendGapLimit = createAction(
+    `${BLOCKCHAIN_MODULE_PREFIX}/setBackendGapLimit`,
+    (payload: { symbol: NetworkSymbol; gapLimit: number | undefined }) => ({ payload }),
+);
+
 export const blockchainActions = {
     setBackend,
+    setBackendGapLimit,
     connected,
-    updateFee,
     synced,
 };

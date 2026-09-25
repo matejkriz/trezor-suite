@@ -1,343 +1,250 @@
-import { ReactNode } from 'react';
-import styled, { css } from 'styled-components';
 import * as semver from 'semver';
 
-import { pickByDeviceModel, getFirmwareVersion } from '@trezor/device-utils';
+import { useDevice } from '@suite/device';
+import { useFirmwareDesktopUpdate } from '@suite/firmware-upgrade';
+import { Translation, type TranslationKey } from '@suite/intl';
+import { selectSelectedDeviceLabelOrName } from '@suite-common/device';
+import { type TrezorDevice } from '@suite-common/suite-types';
+import { Column, H2, Modal, Paragraph, Row, StepList } from '@trezor/components';
+import { type Device } from '@trezor/connect';
+import { DeviceModelInternal, getFirmwareVersion } from '@trezor/device-utils';
 import {
-    H2,
-    Button,
-    ConfirmOnDevice,
-    variables,
+    ConfirmOnDevicePill,
     DeviceAnimation,
-    AnimationDeviceType,
-} from '@trezor/components';
-import { DeviceModelInternal } from '@trezor/connect';
-import { Modal, Translation, WebUsbButton } from 'src/components/suite';
+    type DeviceAnimationProps,
+} from '@trezor/product-components';
+import { usePreviousDefined } from '@trezor/react-utils';
+
+import { WebUsbButton } from 'src/components/suite';
 import { DeviceConfirmImage } from 'src/components/suite/DeviceConfirmImage';
-import { useDevice, useFirmware } from 'src/hooks/suite';
-import {
-    useRebootRequest,
-    RebootRequestedMode,
-    RebootPhase,
-    RebootMethod,
-} from 'src/hooks/firmware/useRebootRequest';
-import type { TrezorDevice } from 'src/types/suite';
-import { AbortButton } from 'src/components/suite/modals/AbortButton';
-
-const StyledModal = styled(Modal)`
-    width: 580px;
-
-    ${Modal.Body} {
-        padding: 38px 22px 6px;
-    }
-`;
-
-const Wrapper = styled.div`
-    display: flex;
-    align-items: center;
-    justify-content: space-around;
-
-    ${variables.SCREEN_QUERY.MOBILE} {
-        flex-direction: column;
-    }
-`;
-
-const Content = styled.div`
-    display: flex;
-    flex-direction: column;
-    padding: 10px 14px;
-    margin-left: 24px;
-`;
-
-const BulletPointWrapper = styled.div`
-    display: flex;
-    align-items: center;
-
-    & + & {
-        margin-top: 24px;
-    }
-`;
-
-const BulletPointNumber = styled.div<{ $active?: boolean }>`
-    display: flex;
-    flex: 0 0 auto;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    justify-content: center;
-    align-items: center;
-    margin-right: 14px;
-    font-size: ${variables.FONT_SIZE.SMALL};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    background: ${({ theme }) => theme.BG_GREY};
-    font-variant-numeric: tabular-nums;
-
-    ${({ $active, theme }) =>
-        $active &&
-        css`
-            color: ${theme.TYPE_GREEN};
-            background: ${theme.BG_LIGHT_GREEN};
-        `}
-`;
-
-const BulletPointText = styled.span<{ $active?: boolean }>`
-    font-size: ${variables.FONT_SIZE.NORMAL};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-    color: ${({ theme, $active }) => ($active ? theme.TYPE_GREEN : theme.TYPE_LIGHT_GREY)};
-    text-align: left;
-`;
-
-const CenteredPointText = styled(BulletPointText)`
-    text-align: center;
-`;
-
-const StyledDeviceAnimation = styled(DeviceAnimation)`
-    flex: 0 0 220px;
-    width: 220px;
-    height: 220px;
-
-    ${variables.SCREEN_QUERY.MOBILE} {
-        align-self: center;
-    }
-`;
-
-const StyledConfirmImage = styled(DeviceConfirmImage)`
-    flex: 0 0 200px;
-    width: 200px;
-    height: 200px;
-`;
-
-const Heading = styled(H2)`
-    margin-bottom: 16px;
-    font-weight: ${variables.FONT_WEIGHT.DEMI_BOLD};
-`;
-
-const StyledWebUsbButton = styled(WebUsbButton)`
-    margin-top: 24px;
-`;
-
-const StyledAbortButton = styled(AbortButton)`
-    position: absolute;
-    top: 12px;
-    right: 12px;
-`;
-
-const HeadingText = ({
-    requestedMode,
-    phase,
-    method,
-}: {
-    requestedMode: RebootRequestedMode;
-    phase: RebootPhase;
-    method: RebootMethod;
-}) => {
-    if (requestedMode === 'bootloader') {
-        if (phase === 'done') {
-            return <Translation id="TR_RECONNECT_IN_BOOTLOADER_SUCCESS" />;
-        }
-
-        return method === 'automatic' ? (
-            <Translation id="TR_REBOOT_INTO_BOOTLOADER" />
-        ) : (
-            <Translation id="TR_RECONNECT_IN_BOOTLOADER" />
-        );
-    }
-
-    return phase === 'done' ? (
-        <Translation id="TR_RECONNECT_IN_NORMAL_SUCCESS" />
-    ) : (
-        <Translation id="TR_RECONNECT_IN_NORMAL" />
-    );
-};
-
-const ReconnectLabel = ({
-    requestedMode,
-    device,
-}: {
-    requestedMode: RebootRequestedMode;
-    device?: TrezorDevice;
-}) => {
-    const deviceFwVersion = getFirmwareVersion(device);
-    const deviceModelInternal = device?.features?.internal_model;
-
-    if (requestedMode === 'bootloader') {
-        const switchToBootloaderModeMessage = pickByDeviceModel(deviceModelInternal, {
-            default: 'TR_SWITCH_TO_BOOTLOADER_HOLD_LEFT_BUTTON',
-            [DeviceModelInternal.T1B1]:
-                semver.valid(deviceFwVersion) && semver.satisfies(deviceFwVersion, '<1.8.0')
-                    ? 'TR_SWITCH_TO_BOOTLOADER_HOLD_BOTH_BUTTONS'
-                    : 'TR_SWITCH_TO_BOOTLOADER_HOLD_LEFT_BUTTON',
-            [DeviceModelInternal.T2T1]: 'TR_SWITCH_TO_BOOTLOADER_SWIPE_YOUR_FINGERS',
-        } as const);
-
-        return <Translation id={switchToBootloaderModeMessage} />;
-    }
-
-    const switchToNormalModeMessage = pickByDeviceModel(deviceModelInternal, {
-        default: 'FIRMWARE_CONNECT_IN_NORMAL_MODEL_NO_BUTTON',
-        [DeviceModelInternal.T2B1]: 'FIRMWARE_CONNECT_IN_NORMAL_MODEL_NO_TOUCH',
-    } as const);
-
-    return <Translation id={switchToNormalModeMessage} />;
-};
-
-interface ReconnectStepProps {
-    order?: number;
-    active: boolean;
-    children: ReactNode;
-    dataTest: string;
-}
-
-const ReconnectStep = ({ order, active, dataTest, children }: ReconnectStepProps) => (
-    <BulletPointWrapper>
-        {order && <BulletPointNumber $active={active}>{order}</BulletPointNumber>}
-
-        <BulletPointText $active={active} data-test={active ? dataTest : undefined}>
-            {children}
-        </BulletPointText>
-    </BulletPointWrapper>
-);
+import { useSelector } from 'src/hooks/suite';
+import { selectHasTransportOfType } from 'src/selectors/suite/suiteSelectors';
 
 const RebootDeviceGraphics = ({
     device,
-    method,
-    requestedMode,
+    isManualRebootRequired,
 }: {
-    device?: TrezorDevice;
-    method: RebootMethod;
-    requestedMode: RebootRequestedMode;
+    device?: Device | TrezorDevice;
+    isManualRebootRequired: boolean;
 }) => {
-    if (method === 'automatic') {
-        return device ? <StyledConfirmImage device={device} /> : null;
+    if (!isManualRebootRequired) {
+        return device ? <DeviceConfirmImage device={device} /> : null;
     }
 
     const deviceModelInternal = device?.features?.internal_model;
 
-    // T1B1 bootloader before firmware version 1.8.0 can only be invoked by holding both buttons
-    const deviceFwVersion = device?.features ? getFirmwareVersion(device) : '';
-    let type: AnimationDeviceType = requestedMode === 'bootloader' ? 'BOOTLOADER' : 'NORMAL';
-    if (
-        type === 'BOOTLOADER' &&
-        deviceModelInternal === DeviceModelInternal.T1B1 &&
-        semver.valid(deviceFwVersion) &&
-        semver.satisfies(deviceFwVersion, '<1.8.0')
-    ) {
-        type = 'BOOTLOADER_TWO_BUTTONS';
-    }
+    const getModelForBootloader = () => {
+        switch (deviceModelInternal) {
+            case DeviceModelInternal.T1B1:
+                return DeviceModelInternal.T1B1;
+            case DeviceModelInternal.T2T1:
+                return DeviceModelInternal.T2T1;
+            default:
+                return DeviceModelInternal.T3B1;
+        }
+    };
+
+    const getRebootType = () => {
+        // Used during intermediary update on T1B1.
+        if (device?.mode === 'bootloader') {
+            return { type: 'RECONNECT', deviceModelInternal: DeviceModelInternal.T1B1 };
+        }
+        // T1B1 bootloader before firmware version 1.8.0 can only be invoked by holding both buttons.
+        const deviceFwVersion = device?.features ? getFirmwareVersion(device) : '';
+        if (
+            deviceModelInternal === DeviceModelInternal.T1B1 &&
+            semver.valid(deviceFwVersion) &&
+            semver.satisfies(deviceFwVersion, '<1.8.0')
+        ) {
+            return {
+                type: 'BOOTLOADER_TWO_BUTTONS',
+                deviceModelInternal: DeviceModelInternal.T1B1,
+            };
+        }
+
+        return { type: 'BOOTLOADER', deviceModelInternal: getModelForBootloader() };
+    };
+
+    const deviceAnimationProps = getRebootType();
 
     return (
-        <StyledDeviceAnimation
-            type={type}
-            height="220px"
-            width="220px"
+        <DeviceAnimation
+            {...(deviceAnimationProps as DeviceAnimationProps)}
+            height={220}
+            width={220}
             shape="ROUNDED"
-            deviceModelInternal={deviceModelInternal}
             loop
         />
     );
 };
 
 interface ReconnectDevicePromptProps {
-    expectedDevice?: TrezorDevice;
-    requestedMode: RebootRequestedMode;
-    onSuccess?: () => void;
     onClose?: () => void;
+    onSuccess: () => void;
 }
 
-export const ReconnectDevicePrompt = ({
-    expectedDevice,
-    requestedMode,
-    onSuccess,
-    onClose,
-}: ReconnectDevicePromptProps) => {
+export const ReconnectDevicePrompt = ({ onClose, onSuccess }: ReconnectDevicePromptProps) => {
+    const deviceLabel = useSelector(selectSelectedDeviceLabelOrName);
+    const isWebUsbTransport = useSelector(selectHasTransportOfType('WebUsbTransport'));
+    const {
+        showManualReconnectPrompt,
+        status,
+        reconnectEvent,
+        buttonEvent,
+        deviceIsWaitingForConfirmationToInitiateConnection,
+        pinRequested,
+    } = useFirmwareDesktopUpdate();
     const { device } = useDevice();
-    const { isWebUSB } = useFirmware();
-    const { rebootPhase, rebootMethod } = useRebootRequest(device, requestedMode);
 
-    const isRebootAutomatic = rebootMethod === 'automatic';
-    const isAnimationVisible = requestedMode === 'bootloader' && rebootPhase !== 'done';
-    const deviceModelInternal = device?.features?.internal_model;
+    const eventDevice = usePreviousDefined(buttonEvent?.device || device);
+
+    const isManualRebootRequired =
+        // Automatic reboot isn't supported:
+        showManualReconnectPrompt ||
+        // Automatic reboot cancelled or device disconnected:
+        status === 'error';
+
+    const getRebootPhase = () => {
+        if (device?.mode === 'bootloader' && buttonEvent && isManualRebootRequired) {
+            return 'done';
+        }
+        const rebootToBootloaderNotSupported = reconnectEvent && !reconnectEvent.disconnected;
+        const rebootToBootloaderCancelled = device?.connected && device?.mode !== 'bootloader';
+
+        return rebootToBootloaderNotSupported || rebootToBootloaderCancelled
+            ? 'waiting-for-reboot'
+            : 'disconnected';
+    };
+
+    const rebootPhase = getRebootPhase();
+    const isRebootDone = rebootPhase === 'done';
+    const isAbortable =
+        onClose !== undefined && isManualRebootRequired && rebootPhase == 'waiting-for-reboot';
+    const showWebUsbButton = rebootPhase === 'disconnected' && isWebUsbTransport;
+    const toNormal = reconnectEvent?.target === 'normal' && reconnectEvent.method === 'manual';
+    const showConfirmOnDevice =
+        (!isManualRebootRequired && !isRebootDone) ||
+        deviceIsWaitingForConfirmationToInitiateConnection ||
+        pinRequested;
+
+    const getHeading = () => {
+        if (isRebootDone) {
+            return 'TR_RECONNECT_IN_BOOTLOADER_SUCCESS';
+        }
+
+        if (toNormal) {
+            return 'TR_RECONNECT_IN_NORMAL';
+        }
+
+        return isManualRebootRequired ? 'TR_RECONNECT_IN_BOOTLOADER' : 'TR_REBOOT_INTO_BOOTLOADER';
+    };
+
+    const getSecondStep = () => {
+        if (toNormal) {
+            return 'FIRMWARE_CONNECT_IN_NORMAL_MODEL_NO_BUTTON';
+        }
+
+        // internal_model cannot be read from features while in bootloader mode.
+        const deviceModelFromEvent =
+            eventDevice?.features?.internal_model || DeviceModelInternal.UNKNOWN;
+        const deviceFwVersion = getFirmwareVersion(eventDevice);
+        const switchToBootloaderMap: Record<DeviceModelInternal, TranslationKey> = {
+            // just to have something, I assume new models will have touch screen
+            [DeviceModelInternal.UNKNOWN]: 'TR_SWITCH_TO_BOOTLOADER_SWIPE_YOUR_FINGERS',
+
+            [DeviceModelInternal.T1B1]:
+                semver.valid(deviceFwVersion) && semver.satisfies(deviceFwVersion, '<1.8.0')
+                    ? 'TR_SWITCH_TO_BOOTLOADER_HOLD_BOTH_BUTTONS'
+                    : 'TR_SWITCH_TO_BOOTLOADER_HOLD_LEFT_BUTTON',
+            [DeviceModelInternal.T2T1]: 'TR_SWITCH_TO_BOOTLOADER_SWIPE_YOUR_FINGERS',
+            [DeviceModelInternal.T2B1]: 'TR_SWITCH_TO_BOOTLOADER_HOLD_LEFT_BUTTON',
+            [DeviceModelInternal.T3B1]: 'TR_SWITCH_TO_BOOTLOADER_HOLD_LEFT_BUTTON',
+            [DeviceModelInternal.T3T1]: 'TR_SWITCH_TO_BOOTLOADER_SWIPE_YOUR_FINGERS',
+            [DeviceModelInternal.T3W1]: 'TR_SWITCH_TO_BOOTLOADER_SWIPE_YOUR_FINGERS',
+        };
+
+        return switchToBootloaderMap[deviceModelFromEvent];
+    };
 
     return (
-        <StyledModal
-            modalPrompt={
-                isRebootAutomatic && (
-                    <ConfirmOnDevice
-                        title={<Translation id="TR_CONFIRM_ON_TREZOR" />}
-                        deviceModelInternal={deviceModelInternal}
-                        deviceUnitColor={device?.features?.unit_color}
-                        isConfirmed={rebootPhase !== 'wait-for-confirm'}
-                    />
-                )
-            }
-        >
-            {onClose && rebootPhase === 'initial' && <StyledAbortButton onAbort={onClose} />}
-
-            <Wrapper data-test={`@firmware/reconnect-device/${requestedMode}`}>
-                {isAnimationVisible && (
-                    <RebootDeviceGraphics
-                        device={expectedDevice}
-                        method={rebootMethod}
-                        requestedMode={requestedMode}
-                    />
-                )}
-
-                <Content>
-                    <Heading>
-                        <HeadingText
-                            requestedMode={requestedMode}
-                            phase={rebootPhase}
-                            method={rebootMethod}
+        <Modal.Backdrop onClick={isAbortable ? onClose : undefined}>
+            {showConfirmOnDevice && (
+                <ConfirmOnDevicePill
+                    title={<Translation id="TR_CONFIRM_ON_TREZOR" />}
+                    deviceModelInternal={eventDevice?.features?.internal_model}
+                    deviceUnitColor={eventDevice?.features?.unit_color}
+                    isConfirmed={
+                        !buttonEvent &&
+                        !deviceIsWaitingForConfirmationToInitiateConnection &&
+                        !pinRequested
+                    }
+                />
+            )}
+            <Modal.ModalBase
+                onCancel={isAbortable ? onClose : undefined}
+                data-testid="@firmware/reconnect-device"
+                width={400}
+                bottomContent={
+                    isRebootDone && (
+                        <Modal.Button onClick={onSuccess} data-testid="@firmware/install-button">
+                            <Translation id="TR_INSTALL" />
+                        </Modal.Button>
+                    )
+                }
+            >
+                {!isRebootDone && (
+                    <Column margin={{ bottom: 16 }} alignItems="center">
+                        <RebootDeviceGraphics
+                            device={eventDevice}
+                            isManualRebootRequired={isManualRebootRequired}
                         />
-                    </Heading>
+                    </Column>
+                )}
+                <H2 align="center">
+                    <Translation id={getHeading()} />
+                </H2>
+                {!isRebootDone && (
+                    <Column gap={20}>
+                        {isManualRebootRequired ? (
+                            <StepList
+                                isOrdered
+                                margin={{ top: 16 }}
+                                gap={24}
+                                titleGap={2}
+                                bulletGap={16}
+                            >
+                                {/* First step asks for disconnecting a device */}
+                                <StepList.Item
+                                    title={<Translation id="TR_DISCONNECT_YOUR_DEVICE" />}
+                                    data-testid="@firmware/disconnect-message"
+                                    state={rebootPhase === 'disconnected' ? 'done' : 'default'}
+                                />
 
-                    {rebootPhase !== 'done' ? (
-                        <>
-                            {isRebootAutomatic ? (
-                                <CenteredPointText>
-                                    <Translation
-                                        id="TR_CONFIRM_ACTION_ON_YOUR"
-                                        values={{ deviceLabel: expectedDevice?.label }}
-                                    />
-                                </CenteredPointText>
-                            ) : (
-                                <>
-                                    {/* First step asks for disconnecting a device */}
-                                    <ReconnectStep
-                                        order={1}
-                                        active={rebootPhase !== 'disconnected'}
-                                        dataTest="@firmware/disconnect-message"
-                                    >
-                                        <Translation id="TR_DISCONNECT_YOUR_DEVICE" />
-                                    </ReconnectStep>
-
-                                    {/* Second step reconnect in normal mode or bootloader */}
-                                    <ReconnectStep
-                                        order={2}
-                                        active={rebootPhase === 'disconnected'}
-                                        dataTest={`@firmware/connect-in-${requestedMode}-message`}
-                                    >
-                                        <ReconnectLabel
-                                            requestedMode={requestedMode}
-                                            device={expectedDevice}
-                                        />
-                                    </ReconnectStep>
-                                </>
-                            )}
-                            {rebootPhase === 'disconnected' && isWebUSB && <StyledWebUsbButton />}
-                        </>
-                    ) : (
-                        <>
-                            {requestedMode === 'bootloader' && (
-                                <Button onClick={onSuccess} data-test="@firmware/install-button">
-                                    <Translation id="TR_INSTALL" />
-                                </Button>
-                            )}
-                        </>
-                    )}
-                </Content>
-            </Wrapper>
-        </StyledModal>
+                                {/* Second step reconnect in bootloader */}
+                                <StepList.Item
+                                    title={<Translation id={getSecondStep()} />}
+                                    data-testid="@firmware/connect-in-bootloader-message"
+                                    state={rebootPhase === 'disconnected' ? 'default' : 'pending'}
+                                />
+                            </StepList>
+                        ) : (
+                            <Paragraph
+                                typographyStyle="body-sm"
+                                intent="neutral"
+                                priority="secondary"
+                                align="center"
+                                margin={{ top: 8 }}
+                            >
+                                <Translation
+                                    id="TR_CONFIRM_ACTION_ON_YOUR"
+                                    values={{ deviceLabel }}
+                                />
+                            </Paragraph>
+                        )}
+                        <Row justifyContent="center">{showWebUsbButton && <WebUsbButton />}</Row>
+                    </Column>
+                )}
+            </Modal.ModalBase>
+        </Modal.Backdrop>
     );
 };

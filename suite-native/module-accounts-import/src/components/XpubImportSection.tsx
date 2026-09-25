@@ -1,13 +1,13 @@
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
+import { type NetworkSymbol, type NetworkType, getNetworkType } from '@suite-common/wallet-config';
 import { Box, Button } from '@suite-native/atoms';
-import { networks, NetworkSymbol } from '@suite-common/wallet-config';
+import { Translation, type TxKeyPath } from '@suite-native/intl';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
 
 import { QrWithLaser } from './QRWithLaser';
-import { networkTypeToTitleMap } from '../screens/ScanQRCodeModalScreen';
 
 type XpubImportSectionProps = {
     onRequestCamera: () => void;
-    networkSymbol: NetworkSymbol;
+    symbol: NetworkSymbol;
 };
 
 const iconWrapperStyle = prepareNativeStyle(_ => ({
@@ -18,19 +18,29 @@ const importSectionWrapperStyle = prepareNativeStyle(_ => ({
     width: '100%',
 }));
 
-export const XpubImportSection = ({ onRequestCamera, networkSymbol }: XpubImportSectionProps) => {
+export const networkTypeToTitleTxKeyMap: Record<NetworkType, TxKeyPath> = {
+    bitcoin: 'moduleAccountImport.xpubScanScreen.scanButton.xpub',
+    cardano: 'moduleAccountImport.xpubScanScreen.scanButton.xpub',
+    ethereum: 'moduleAccountImport.xpubScanScreen.scanButton.address',
+    ripple: 'moduleAccountImport.xpubScanScreen.scanButton.address',
+    solana: 'moduleAccountImport.xpubScanScreen.scanButton.address',
+    stellar: 'moduleAccountImport.xpubScanScreen.scanButton.address',
+    tron: 'moduleAccountImport.xpubScanScreen.scanButton.address',
+};
+
+export const XpubImportSection = ({ onRequestCamera, symbol }: XpubImportSectionProps) => {
     const { applyStyle } = useNativeStyles();
 
-    const { networkType } = networks[networkSymbol];
-    const buttonTitle = networkTypeToTitleMap[networkType];
+    const networkType = getNetworkType(symbol);
+    const buttonTitleTxKey = networkTypeToTitleTxKeyMap[networkType];
 
     return (
         <Box style={applyStyle(importSectionWrapperStyle)}>
             <Box justifyContent="center" alignItems="center" style={applyStyle(iconWrapperStyle)}>
                 <QrWithLaser />
             </Box>
-            <Button size="large" onPress={onRequestCamera}>
-                {buttonTitle}
+            <Button onPress={onRequestCamera}>
+                <Translation id={buttonTitleTxKey} />
             </Button>
         </Box>
     );

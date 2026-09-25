@@ -1,32 +1,16 @@
 # @suite-common/icons
 
-This package contains fully-fledged icon components using the Skia engine. There are three groups of icons in the package:
+Icons for the native (mobile) app. General icon SVG sources live in `@trezor/icons` (`packages/icons/assets`).
 
--   [icons](./assets/icons) - icons used to depict the universal concepts used commonly throughout a UI
--   [cryptoIcons](./assets/cryptoIcons) - a collection of icons representing main network coins (btc, eth, etc.)
--   [tokenIcons](./assets/cryptoIcons) - a collection of icons representing tokens (erc20, dai, link, usdt, etc.)
--   [flags](./assets/flags) - a collection of icons representing [country flags](https://github.com/HatScripts/circle-flags/tree/gh-pages/flags)
+## How to add or update an icon
 
-Icon components are ready to use only with React Native app now, but it is planned to be used by the web in the future as well.
+1. Export the icon as SVG from Figma and rename it to camelCase (`Warning Circle.svg` → `warningCircle.svg`), place it in `@trezor/icons/assets`.
+2. Run `yarn generate-icons` from repo root
 
-Components and their definitions are split out into two separate files:
+## In case some icons are not rendering correctly in icon font
 
-`Component.tsx` is picked up by Metro bundler for both Android and iOS platforms.
-
-`Component.web.tsx` is picked up by the Webpack bundler for the web.
-
-## How to add or update icon
-
-1. Export icon as SVG from Figma (no other types than SVG are allowed).
-2. Rename icon to follow camel case convention (`Warning Circle.svg` => `warningCircle.svg`).
-3. Copy icon to the correct folder based on its context (crypto icon to [cryptoIcons](./assets/cryptoIcons), etc.)
-4. Run `yarn generate-icons` - this will do some necessary changes in SVG structure like removing dimensions and some optimization using [SVGO library](https://github.com/svg/svgo). It will also regenerate `src/icons.ts` file.
-5. You can use your newly added icon 🎉. Pay attention that file name without extension is what you need to put into Icon `name` prop:
-
-```tsx
-<Icon name="warningCircle" />
-```
-
-```tsx
-<CryptoIcon symbol="btc" />
-```
+1. Copy a whole path from the SVG file of the problematic icon.
+2. Open `https://yqnn.github.io/svg-path-editor/` and paste the path there.
+3. Select the problematic segment in the _Commands_ section and fix it by running _Reverse Subpath_.
+4. Check the _Minify output_ checkbox and copy&paste the fixed path back into the SVG file.
+5. Regenerate icons with `yarn generate-icons`.

@@ -1,55 +1,41 @@
-import { desktopApi } from '@trezor/suite-desktop-api';
-import {
-    ActionButton,
-    ActionColumn,
-    SectionItem,
-    TextColumn,
-    Translation,
-} from 'src/components/suite';
-import { removeDatabase } from 'src/actions/suite/storageActions';
-import { goto } from 'src/actions/suite/routerActions';
-import { useDispatch } from 'src/hooks/suite';
-import { useAnchor } from 'src/hooks/suite/useAnchor';
-import { SettingsAnchor } from 'src/constants/suite/anchors';
-import { reloadApp } from 'src/utils/suite/reload';
+import { Translation } from '@suite/intl';
+import { Anchor, SettingsAnchor } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { ActionButton, ActionColumn, SectionItem, TextColumn } from '@trezor/product-components';
+
+import { resetSuiteAppThunk } from 'src/actions/suite/suiteThunks';
 
 export const ClearStorage = () => {
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
 
-    const { anchorRef, shouldHighlight } = useAnchor(SettingsAnchor.ClearStorage);
-
-    const hanldeClick = async () => {
-        localStorage.clear();
-        dispatch(removeDatabase());
-        if (desktopApi.available) {
-            // Reset the desktop-specific store.
-            desktopApi.clearStore();
-        } else {
-            // redirect to / and reload the web
-            await dispatch(goto('suite-index'));
-        }
-        reloadApp();
+    const handleClick = async () => {
+        await dispatch(resetSuiteAppThunk());
     };
 
     return (
-        <SectionItem
-            data-test="@settings/storage"
-            ref={anchorRef}
-            shouldHighlight={shouldHighlight}
-        >
-            <TextColumn
-                title={<Translation id="TR_SUITE_STORAGE" />}
-                description={<Translation id="TR_CLEAR_STORAGE_DESCRIPTION" />}
-            />
-            <ActionColumn>
-                <ActionButton
-                    onClick={hanldeClick}
-                    variant="secondary"
-                    data-test="@settings/reset-app-button"
+        <Anchor anchorId={SettingsAnchor.ClearStorage}>
+            {({ anchorId, anchorRef, shouldHighlight }) => (
+                <SectionItem
+                    data-testid={anchorId}
+                    ref={anchorRef}
+                    shouldHighlight={shouldHighlight}
                 >
-                    <Translation id="TR_CLEAR_STORAGE" />
-                </ActionButton>
-            </ActionColumn>
-        </SectionItem>
+                    <TextColumn
+                        title={<Translation id="TR_SUITE_STORAGE" />}
+                        description={<Translation id="TR_CLEAR_STORAGE_DESCRIPTION" />}
+                    />
+                    <ActionColumn>
+                        <ActionButton
+                            onClick={handleClick}
+                            intent="warning"
+                            data-testid="@settings/reset-app-button"
+                        >
+                            <Translation id="TR_CLEAR_STORAGE" />
+                        </ActionButton>
+                    </ActionColumn>
+                </SectionItem>
+            )}
+        </Anchor>
     );
 };

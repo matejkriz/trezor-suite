@@ -1,21 +1,21 @@
 import { TypedEmitter } from '@trezor/utils';
 
-import { Status } from './Status';
 import { Account } from './Account';
 import { CoinjoinPrison } from './CoinjoinPrison';
 import { CoinjoinRound } from './CoinjoinRound';
-import { getNetwork } from '../utils/settingsUtils';
-import { redacted } from '../utils/redacted';
-import { analyzeTransactions, AnalyzeTransactionsResult } from './analyzeTransactions';
+import { Status } from './Status';
+import { type AnalyzeTransactionsResult, analyzeTransactions } from './analyzeTransactions';
 import type {
-    CoinjoinClientSettings,
-    RegisterAccountParams,
-    CoinjoinStatusEvent,
-    CoinjoinResponseEvent,
     CoinjoinClientEvents,
-    Logger,
+    CoinjoinClientSettings,
+    CoinjoinResponseEvent,
+    CoinjoinStatusEvent,
     LogLevel,
+    Logger,
+    RegisterAccountParams,
 } from '../types';
+import { redacted } from '../utils/redacted';
+import { getCoinjoinNetwork } from '../utils/settingsUtils';
 
 export class CoinjoinClient extends TypedEmitter<CoinjoinClientEvents> {
     readonly settings: CoinjoinClientSettings;
@@ -31,7 +31,7 @@ export class CoinjoinClient extends TypedEmitter<CoinjoinClientEvents> {
         super();
         this.settings = Object.freeze(settings);
         this.logger = this.getLogger();
-        this.network = getNetwork(settings.network);
+        this.network = getCoinjoinNetwork(settings.network);
         this.abortController = new AbortController();
 
         this.status = new Status(settings);
@@ -176,7 +176,8 @@ export class CoinjoinClient extends TypedEmitter<CoinjoinClientEvents> {
     private async onStatusUpdate({
         changed,
         rounds,
-    }: Pick<CoinjoinStatusEvent, 'changed' | 'rounds'>) {
+        prevStatusTimestamp,
+    }: Pick<CoinjoinStatusEvent, 'changed' | 'rounds' | 'prevStatusTimestamp'>) {
         // try to release inputs from prison
         this.prison.release(rounds.map(r => r.Id));
 
@@ -187,7 +188,7 @@ export class CoinjoinClient extends TypedEmitter<CoinjoinClientEvents> {
                 if (currentRound) {
                     // try to finish/interrupt current running process on changed round (if any)
                     // and update fresh data from Status
-                    return currentRound.onPhaseChange(round);
+                    return currentRound.onPhaseChange(round, prevStatusTimestamp);
                 }
 
                 return [];
@@ -208,6 +209,7 @@ export class CoinjoinClient extends TypedEmitter<CoinjoinClientEvents> {
                     coordinatorName: this.settings.coordinatorName,
                     coordinatorUrl: this.settings.coordinatorUrl,
                     middlewareUrl: this.settings.middlewareUrl,
+                    affiliationId: this.settings.affiliationId,
                     logger: this.logger,
                     setSessionPhase: sessionPhase => this.setSessionPhase(sessionPhase),
                 },
@@ -277,10 +279,6 @@ export class CoinjoinClient extends TypedEmitter<CoinjoinClientEvents> {
             warn: emit('warn'),
             error: emit('error'),
         };
-    }
-
-    getRounds() {
-        return this.rounds.map(round => round.toSerialized());
     }
 
     getRoundsInCriticalPhase() {

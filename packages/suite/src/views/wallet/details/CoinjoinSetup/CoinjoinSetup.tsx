@@ -1,22 +1,21 @@
-import { useDispatch } from 'react-redux';
 import { AnimatePresence, motion } from 'framer-motion';
 import styled from 'styled-components';
 
-import { Translation } from 'src/components/suite';
-import { useSelector } from 'src/hooks/suite/useSelector';
-import { Card, Radio, motionAnimation, motionEasing, Warning } from '@trezor/components';
-import { coinjoinAccountUpdateSetupOption } from 'src/actions/wallet/coinjoinAccountActions';
+import { coinjoinAccountUpdateSetupOption, selectCoinjoinAccountByKey } from '@suite/coinjoin';
+import { Translation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { type AccountKey } from '@suite-common/wallet-types';
+import { Banner, Card, Radio, motionAnimation, motionEasing } from '@trezor/components';
+
+import { useSelector } from 'src/hooks/suite';
+
 import { AnonymityLevelSetup } from './AnonymityLevelSetup';
 import { MaxMiningFeeSetup } from './MaxMiningFeeSetup';
 import { SkipRoundsSetup } from './SkipRoundsSetup';
-import { selectCoinjoinAccountByKey } from 'src/reducers/wallet/coinjoinReducer';
 
 const SetupContainer = styled.div`
-    padding: 18px;
-`;
-
-const StyledCard = styled(Card)`
-    padding: 8px;
+    padding: 20px;
 `;
 
 const SetupOptions = styled.div`
@@ -26,7 +25,7 @@ const SetupOptions = styled.div`
 `;
 
 const CustomSetup = styled.div`
-    border-top: 1px solid ${({ theme }) => theme.STROKE_GREY};
+    border-top: 1px solid ${({ theme }) => theme.surfaceBorderRaised};
     display: flex;
     flex-direction: column;
     gap: 32px;
@@ -35,13 +34,13 @@ const CustomSetup = styled.div`
 `;
 
 interface CoinjoinSetupProps {
-    accountKey: string;
+    accountKey: AccountKey;
 }
 
 export const CoinjoinSetup = ({ accountKey }: CoinjoinSetupProps) => {
     const coinjoinAccount = useSelector(state => selectCoinjoinAccountByKey(state, accountKey));
 
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
 
     if (!coinjoinAccount) {
         return null;
@@ -58,24 +57,25 @@ export const CoinjoinSetup = ({ accountKey }: CoinjoinSetupProps) => {
     const setCustomSetup = () => handleSetupOptionChange(false);
 
     return (
-        <StyledCard>
+        <Card>
             {hasSession && (
-                <Warning variant="info">
-                    <Translation id="TR_DISABLED_ANONYMITY_CHANGE_MESSAGE" />
-                </Warning>
+                <Banner
+                    intent="info"
+                    description={<Translation id="TR_DISABLED_ANONYMITY_CHANGE_MESSAGE" />}
+                />
             )}
             <SetupContainer>
                 <SetupOptions>
                     <Radio
                         isChecked={!coinjoinAccount.setup}
-                        onClick={setRecommendedSetup}
+                        onChange={setRecommendedSetup}
                         isDisabled={hasSession}
                     >
                         <Translation id="TR_RECOMMENDED" />
                     </Radio>
                     <Radio
                         isChecked={!!coinjoinAccount.setup}
-                        onClick={setCustomSetup}
+                        onChange={setCustomSetup}
                         isDisabled={hasSession}
                     >
                         <Translation id="TR_CUSTOM" />
@@ -105,6 +105,6 @@ export const CoinjoinSetup = ({ accountKey }: CoinjoinSetupProps) => {
                     )}
                 </AnimatePresence>
             </SetupContainer>
-        </StyledCard>
+        </Card>
     );
 };

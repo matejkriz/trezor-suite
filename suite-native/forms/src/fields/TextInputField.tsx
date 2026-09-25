@@ -1,45 +1,82 @@
 import { forwardRef } from 'react';
 
-import { TextInput } from 'react-native/types';
-
-import { Input, InputWrapper, InputProps, InputWrapperProps } from '@suite-native/atoms';
+import {
+    Input,
+    type InputLabelVariantProps,
+    type InputProps,
+    type InputType,
+    InputWrapper,
+    type InputWrapperProps,
+} from '@suite-native/atoms';
 
 import { useField } from '../hooks/useField';
-import { FieldName } from '../types';
+import { type FieldName } from '../types';
 
 type AllowedTextInputFieldProps = Omit<
     Partial<InputProps>,
-    keyof ReturnType<typeof useField> | 'defaultValue'
+    keyof ReturnType<typeof useField> | 'defaultValue' | 'label' | 'placeholder' | 'labelType'
 >;
 type AllowedInputWrapperProps = Pick<InputWrapperProps, 'hint'>;
-export interface FieldProps extends AllowedTextInputFieldProps, AllowedInputWrapperProps {
-    name: FieldName;
-    label: string;
-    onBlur?: () => void;
-    defaultValue?: string;
-}
 
-export const TextInputField = forwardRef<TextInput, FieldProps>(
-    ({ name, label, hint, onBlur, defaultValue = '', ...otherProps }, ref) => {
-        const field = useField({ name, label, defaultValue });
+export type FieldProps = AllowedTextInputFieldProps &
+    AllowedInputWrapperProps &
+    InputLabelVariantProps & {
+        name: FieldName;
+        onBlur?: () => void;
+        defaultValue?: string;
+        valueTransformer?: (value: string) => string;
+    };
+
+export const TextInputField = forwardRef<InputType, FieldProps>(
+    (
+        {
+            name,
+            hint,
+            label,
+            readOnly,
+            placeholder,
+            onBlur,
+            valueTransformer,
+            onChangeText,
+            defaultValue = '',
+            labelType = 'innerLabel',
+            ...otherProps
+        },
+        ref,
+    ) => {
+        const field = useField({
+            name,
+            defaultValue,
+            valueTransformer,
+        });
         const { errorMessage, onBlur: hookFormOnBlur, onChange, value, hasError } = field;
 
         const handleOnBlur = () => {
             hookFormOnBlur();
-            if (onBlur) {
-                onBlur();
-            }
+            onBlur?.();
         };
 
+        const handleOnChange = (text: string) => {
+            onChange(text);
+            onChangeText?.(text);
+        };
+
+        const innerLabelOrPlaceholderProps =
+            labelType === 'innerLabel' ? { labelType, label } : { labelType, placeholder };
+        const wrapperLabel = labelType === 'outsideLabel' ? label : undefined;
+
         return (
-            <InputWrapper error={errorMessage} hint={hint}>
+            <InputWrapper error={errorMessage} hint={hint} label={wrapperLabel}>
                 <Input
                     {...otherProps}
+                    {...innerLabelOrPlaceholderProps}
+                    // Forces a native layout reset of multiline read-only inputs after form is cleared.
+                    key={readOnly && !value ? 'read-only-empty' : null}
                     onBlur={handleOnBlur}
-                    onChangeText={onChange}
+                    onChangeText={handleOnChange}
                     value={value}
+                    readOnly={readOnly}
                     hasError={hasError}
-                    label={label}
                     ref={ref}
                 />
             </InputWrapper>

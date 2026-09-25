@@ -1,0 +1,74 @@
+import { Param } from '../../components/Param';
+
+# Common parameters
+
+Every call requires an `Object` with a combination of common and method-specified fields.
+All common parameters are optional.
+
+<Param name="device" type="Object" required={false} />
+
+<div style={{ marginLeft: 30 }}>
+    <Param name="path" type="string" required={true}>
+        call to a direct device. Useful when working with multiple connected devices. This value is
+        emitted by [`TrezorConnectEvent`](./events)
+    </Param>
+    <Param name="state" type="string" required={false}>
+        sets expected state. This value is emitted by [`TrezorConnectEvent`](./events)
+    </Param>
+    <Param name="instance" type="number" required={false}>
+        sets an instance of device. Useful when working with one device and multiple passphrases.
+        This value is emitted by [`TrezorConnectEvent`](./events)
+    </Param>
+</div>
+
+<Param name="useEmptyPassphrase" type="boolean" required={false}>
+    metmethod will not ask for a passphrase. Default is set to `false`
+</Param>
+
+<Param name="keepSession" type="boolean" required={false}>
+   Advanced feature. After method return a response device session will NOT! be released. Session should be released after all calls are performed by calling any method with `keepSession` set to false or `undefined`. Useful when you need to do multiple different calls to TrezorConnect API without releasing. Example sequence loop for 10 account should look like:
+   
+    - `TrezorConnect.getPublicKey({ device: { path: "web01"}, keepSession: true, ...otherParams })` for first account,
+    - `Trezor.getAddress({ device: { path: "web01"}, ...otherParams })` for the same account,
+    - looking up for balance in external blockchain
+    - loop iteration
+    - after last iteration call `TrezorConnect.getFeatures({ device: { path: "web01"}, keepSession: false, ...otherParams })`
+
+</Param>
+
+<Param name="override" type="boolean" required={false}>
+    Interrupt previous call, if any.
+</Param>
+
+## Application-level setup
+
+In addition to the per-call common parameters above, applications declare which networks they use up-front, as part of `TrezorConnect.init`. Each entry names a network by its coin shortcut — see [Supported coins](./coins):
+
+```ts
+TrezorConnect.init({
+    manifest: { email: '...', appUrl: '...' },
+    enabledNetworks: [{ coin: 'btc' }, { coin: 'eth' }, { coin: 'ada' }],
+});
+```
+
+Today the only network this affects is Cardano: including `'ada'` makes the device session capable of Cardano-aware operations, by setting `derive_cardano: true` on the next `Initialize` (applies to both THP and pre-THP sessions). The device then derives the Cardano root key alongside the BIP-39 seed, which makes `Initialize` slower — only declare `'ada'` if your app actually uses Cardano.
+
+The declared set is applied **additively** — your declaration widens the enabled networks, it never replaces them.
+
+> **Note:** `enabledNetworks` is honored only by the in-process `@trezor/connect` package (code that embeds the Core directly, e.g. Trezor Suite itself). The thin packages — `@trezor/connect-web` (popup / desktop), `@trezor/connect-webextension`, and `@trezor/connect-mobile` (deeplink) — do **not** forward `enabledNetworks` to the host Core; on those, Cardano availability follows the host (Trezor Suite) wallet's own enabled coins.
+
+Cardano derivation is driven **solely** by this declaration — there is no per-call escape hatch (the former `useCardanoDerivation` common param has been removed). Declare `'ada'` in `init` before invoking any Cardano-bound call — whether a `cardano*` method (`cardanoGetAddress`, `cardanoSignTransaction`, …) or a non-`cardano*` method targeting a Cardano coin (e.g. `getAccountInfo({ coin: 'ada', path: ... })`). A call made while `'ada'` is not enabled produces a non-Cardano session, which the device then rejects (`Cardano derivation is not enabled for this session`).
+
+### Runtime mutation
+
+To change the set at runtime, pass `enabledNetworks` to `updateConnectSettings`:
+
+```ts
+TrezorConnect.updateConnectSettings({
+    enabledNetworks: [{ coin: 'btc' }, { coin: 'eth' }, { coin: 'ada' }],
+});
+```
+
+This is internal plumbing for in-process Core hosts — code that embeds `@trezor/connect` directly and owns the Core (Trezor Suite itself, or a consumer of the `@trezor/connect` package). It applies the set additively (e.g. when the user toggles a coin); the flow is one-way, and the current set is readable from `getSettings().enabledNetworks`.
+
+On the thin-client transports (popup / desktop / webextension / deeplink) the Core lives in the host, so neither `init` nor `updateConnectSettings` forwards `enabledNetworks` from the caller — Cardano availability there follows the host's own enabled coins (see the note above).

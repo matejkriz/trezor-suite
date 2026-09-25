@@ -1,0 +1,163 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import { connectPopupActions } from '@suite-common/connect-popup';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { CORE_CALL, CORE_CALL_CANCEL, POPUP } from '@trezor/connect';
+
+import {
+    type ConnectPopupLink,
+    type ConnectPopupMessage,
+    type ConnectPopupOutgoingMessage,
+    useConnectPopup,
+} from './useConnectPopup';
+
+const webChannel = {
+    here: '@trezor/connect-popup',
+    peer: '@trezor/connect-web',
+};
+
+export const useConnectPopupWeb = () => {
+    const { dispatch } = useServices(injectDispatch);
+    const [incomingMessages, setIncomingMessages] = useState<ConnectPopupMessage[]>([]);
+    // Start with '*' because we don't know the opener's origin yet.
+    // Protocol messages sent before the first incoming message (e.g.
+    // POPUP.CORE_LOADED, channel-handshake-confirm) contain no sensitive
+    // data, so '*' is safe.  Once we receive a message from the caller,
+    // originRef is narrowed to the actual event.origin — all subsequent
+    // messages (including those carrying addresses / signatures) will be
+    // scoped to that origin.
+    const originRef = useRef<string>('*');
+    const initialUrl = useRef<string>(window.location.href.split('?')[1] ?? '');
+    const [broadcast, setBroadcast] = useState<BroadcastChannel | null>(null);
+
+    /**
+     * Send a message back to the caller (opener window or same window).
+     *
+     * Uses `originRef.current` as the target origin so that responses are only
+     * delivered to the window that initiated the connect call. This prevents a
+     * malicious opener from a different origin from intercepting sensitive data
+     * such as addresses or signatures.
+     */
+
+    const popupLink = useMemo<ConnectPopupLink | null>(() => {
+        if (!broadcast) return null;
+
+        return {
+            sendMessage: (message: ConnectPopupOutgoingMessage) => {
+                message.channel = webChannel;
+                broadcast.postMessage(message);
+            },
+            get origin() {
+                return originRef.current;
+            },
+        };
+    }, [broadcast]);
+
+    const consumeMessages = useCallback(() => {
+        setIncomingMessages(prev => prev.slice(1));
+    }, []);
+
+    useConnectPopup(popupLink, incomingMessages, consumeMessages);
+
+    // Listen for incoming window messages and normalize them.
+    useEffect(() => {
+        const urlParams = new URLSearchParams(initialUrl.current);
+        const requestId = urlParams.get('connect-popup-req');
+        const requestErr = urlParams.get('connect-popup-err');
+
+        if (!requestId && !requestErr) {
+            // no id in URL, unable to establish communication channel
+            return;
+        }
+
+        if (requestErr) {
+            dispatch(
+                connectPopupActions.setError({
+                    code: 'Handshake_Error',
+                    message: requestErr,
+                }),
+            );
+
+            return;
+        }
+
+        let broadcastChannel: BroadcastChannel | undefined;
+        try {
+            broadcastChannel = new BroadcastChannel(`@trezor/connect-popup/${requestId}`);
+            setBroadcast(broadcastChannel);
+        } catch {
+            dispatch(
+                connectPopupActions.setError({
+                    code: 'Popup_ConnectionMissing',
+                    message: 'BroadcastChannel is not supported in this browser',
+                }),
+            );
+
+            return;
+        }
+
+        const handshakeTimeout = setTimeout(() => {
+            // eslint-disable-next-line @typescript-eslint/no-use-before-define
+            broadcastChannel.removeEventListener('message', onMessage);
+            broadcastChannel.close();
+            setBroadcast(null);
+            dispatch(
+                connectPopupActions.setError({
+                    code: 'Handshake_Error',
+                    message: 'handshake-timeout',
+                }),
+            );
+        }, 3000);
+
+        const onMessage = (event: MessageEvent) => {
+            const { data } = event;
+            if (!data?.type) return;
+
+            if (data.type === 'channel-handshake-request') {
+                // another popup with the same channel peer is trying to handshake.
+                // close current instance and proceed in new window.
+                if (data.channel.peer === '@trezor/connect-bootstrap-popup') {
+                    window.close();
+
+                    return;
+                }
+
+                if (data.channel.peer === webChannel.here) {
+                    clearTimeout(handshakeTimeout);
+                    // Remember the actual caller origin (sent by the bootstrap).
+                    originRef.current = data.origin;
+                }
+            }
+
+            if (
+                data.type === 'channel-handshake-request' ||
+                data.type === POPUP.HANDSHAKE ||
+                data.type === POPUP.CLOSED ||
+                data.type === CORE_CALL_CANCEL ||
+                data.type === CORE_CALL
+            ) {
+                const message: ConnectPopupMessage = data;
+                setIncomingMessages(prev => [...prev, message]);
+            }
+        };
+
+        broadcastChannel.addEventListener('message', onMessage);
+
+        // TODO: replace this with broadcastChannel ping-pong
+        const onBeforeUnload = () => {
+            broadcastChannel.postMessage({
+                type: POPUP.CLOSED,
+                channel: webChannel,
+            });
+        };
+        window.addEventListener('beforeunload', onBeforeUnload);
+
+        return () => {
+            clearTimeout(handshakeTimeout);
+            broadcastChannel.removeEventListener('message', onMessage);
+            broadcastChannel.close();
+            window.removeEventListener('beforeunload', onBeforeUnload);
+        };
+    }, [dispatch]);
+};

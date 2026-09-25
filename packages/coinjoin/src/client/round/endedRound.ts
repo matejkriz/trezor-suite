@@ -1,7 +1,7 @@
-import { enumUtils, getRandomNumberInRange } from '@trezor/utils';
+import { enumUtils, getWeakRandomNumberInRange } from '@trezor/utils';
 
-import type { CoinjoinRound, CoinjoinRoundOptions } from '../CoinjoinRound';
 import { EndRoundState, WabiSabiProtocolErrorCode } from '../../enums';
+import type { CoinjoinRoundOptions, CoinjoinRoundShape } from '../../types/round';
 import { getBroadcastedTxDetails } from '../../utils/roundUtils';
 
 /**
@@ -13,7 +13,7 @@ import { getBroadcastedTxDetails } from '../../utils/roundUtils';
  * - catch transaction broadcasted
  */
 
-export const ended = (round: CoinjoinRound, { logger, network }: CoinjoinRoundOptions) => {
+export const ended = (round: CoinjoinRoundShape, { logger, network }: CoinjoinRoundOptions) => {
     const { id, endRoundState, inputs, addresses, prison } = round;
     const endRoundKey = enumUtils.getKeyByValue(EndRoundState, round.endRoundState);
     logger.info(`Ending round ~~${round.id}~~. End state: ${endRoundKey}`);
@@ -56,7 +56,7 @@ export const ended = (round: CoinjoinRound, { logger, network }: CoinjoinRoundOp
         // repeated input-registration will tell if they are really banned,
         // make sure that addresses registered in round are recycled (reset Infinity sentence)
         const minute = 60 * 1000;
-        const sentenceEnd = getRandomNumberInRange(5 * minute, 10 * minute);
+        const sentenceEnd = getWeakRandomNumberInRange(5 * minute, 10 * minute);
         [...inputs, ...addresses].forEach(vinvout =>
             prison.detain(vinvout, {
                 sentenceEnd,

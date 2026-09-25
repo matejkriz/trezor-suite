@@ -1,0 +1,29 @@
+import { TestCategory, TestPriority, TestStream } from '@trezor/e2e-utils';
+
+import { test } from '../../../support/fixtures';
+import { createTestAnnotation } from '../../../support/reporters/annotations';
+
+test.describe.skip('Device language', { tag: ['@group=manual'] }, () => {
+    test(
+        'Device language firmware upgrade',
+        {
+            annotation: createTestAnnotation({
+                testCase:
+                    'Verifies that a user can upgrade device firmware when device translation is installed.',
+                prerequisites: [
+                    'Seeded Trezor device with transactions (eg. with "all" seed)',
+                    'Connected Trezor Suite',
+                ],
+                steps: [
+                    'Navigate to "Settings/Device"',
+                    'In "Firmware/Language" section select different language than English and different than currently installed in device.',
+                    'Perform firmware upgrade',
+                ],
+                category: TestCategory.Firmware,
+                priority: TestPriority.High,
+                stream: TestStream.Firmware,
+            }),
+        },
+        async () => {},
+    );
+});

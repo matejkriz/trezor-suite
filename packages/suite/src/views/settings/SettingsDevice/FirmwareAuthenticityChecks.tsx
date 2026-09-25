@@ -1,0 +1,76 @@
+import { LearnMoreButton } from '@suite/external-links';
+import { Translation } from '@suite/intl';
+import { openModal } from '@suite/modal';
+import {
+    selectAreDeviceMetaChecksEnabled,
+    selectIsFirmwareHashCheckEnabled,
+    selectIsFirmwareRevisionCheckEnabled,
+} from '@suite/settings';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { ActionButton, ActionColumn, SectionItem, TextColumn } from '@trezor/product-components';
+import { HELP_CENTER_FIRMWARE_REVISION_CHECK } from '@trezor/urls';
+
+import { toggleFirmwareAuthenticityChecks } from 'src/actions/suite/suiteActions';
+import { useSelector } from 'src/hooks/suite';
+
+export const FirmwareAuthenticityChecks = () => {
+    const { dispatch } = useServices(injectDispatch);
+    const isFirmwareHashCheckEnabled = useSelector(selectIsFirmwareHashCheckEnabled);
+    const isFirmwareRevisionCheckEnabled = useSelector(selectIsFirmwareRevisionCheckEnabled);
+    const areDeviceMetaChecksEnabled = useSelector(selectAreDeviceMetaChecksEnabled);
+
+    // Checks can gradually be turned off in debug settings.
+    // In case any one of the checks is turned off, the toggle shall be considered off, inviting the user to turn back it on.
+    const areAllFirmwareChecksEnabled =
+        isFirmwareHashCheckEnabled && isFirmwareRevisionCheckEnabled && areDeviceMetaChecksEnabled;
+
+    const handleClick = () => {
+        if (areAllFirmwareChecksEnabled) {
+            dispatch(openModal({ type: 'firmware-authenticity-checks-opt-out' }));
+        } else {
+            dispatch(toggleFirmwareAuthenticityChecks(true));
+        }
+    };
+
+    return (
+        <SectionItem>
+            <TextColumn
+                title={
+                    <Translation
+                        id={
+                            areAllFirmwareChecksEnabled
+                                ? 'TR_DEVICE_FIRMWARE_REVISION_CHECK_TITLE'
+                                : 'TR_DEVICE_FIRMWARE_REVISION_CHECK_TITLE_DISABLED'
+                        }
+                    />
+                }
+                description={
+                    <Translation
+                        id={
+                            areAllFirmwareChecksEnabled
+                                ? 'TR_DEVICE_FIRMWARE_REVISION_CHECK_DESCRIPTION'
+                                : 'TR_DEVICE_FIRMWARE_REVISION_CHECK_DESCRIPTION_DISABLED'
+                        }
+                    />
+                }
+                bottomContent={<LearnMoreButton url={HELP_CENTER_FIRMWARE_REVISION_CHECK} />}
+            />
+            <ActionColumn>
+                <ActionButton
+                    onClick={handleClick}
+                    intent={areAllFirmwareChecksEnabled ? 'critical' : 'brand'}
+                    data-testid="@settings/device/open-firmware-revision-check-modal-button"
+                >
+                    <Translation
+                        id={
+                            areAllFirmwareChecksEnabled
+                                ? 'TR_DEVICE_FIRMWARE_REVISION_CHECK_BUTTON'
+                                : 'TR_DEVICE_FIRMWARE_REVISION_CHECK_BUTTON_DISABLED'
+                        }
+                    />
+                </ActionButton>
+            </ActionColumn>
+        </SectionItem>
+    );
+};

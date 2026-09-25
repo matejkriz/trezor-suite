@@ -1,15 +1,31 @@
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
+import {
+    type NativeStyleObject,
+    mergeNativeStyleObjects,
+    prepareNativeStyle,
+    useNativeStyles,
+} from '@trezor/styles-native';
+import { isNotNullOrUndefined } from '@trezor/utils';
 
-import { Box, BoxProps } from './Box';
+import { Box, type BoxProps } from './Box';
+
+export type DividerProps = Omit<BoxProps, 'style'> & {
+    style?: NativeStyleObject;
+};
 
 const dividerStyle = prepareNativeStyle(utils => ({
     borderBottomWidth: utils.borders.widths.small,
-    borderBottomColor: utils.colors.borderFocus,
+    borderBottomColor: utils.colors.borderNeutral,
     flex: 1,
 }));
 
-export const Divider = ({ ...props }: BoxProps) => {
+export const Divider = ({ style, ...props }: DividerProps) => {
     const { applyStyle } = useNativeStyles();
 
-    return <Box style={applyStyle(dividerStyle)} {...props} />;
+    const defaultStyle = applyStyle(dividerStyle);
+
+    const mergedStyle = isNotNullOrUndefined(style)
+        ? mergeNativeStyleObjects([defaultStyle, style])
+        : defaultStyle;
+
+    return <Box style={mergedStyle} {...props} />;
 };

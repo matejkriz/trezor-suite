@@ -1,30 +1,91 @@
-import { TranslationKey } from '@suite-common/intl-types';
-import { DesktopAppUpdateState, PROTOCOL_SCHEME } from '@suite-common/suite-constants';
-import { TrezorDevice } from '@suite-common/suite-types';
-import { NetworkSymbol } from '@suite-common/wallet-config';
-import { DEVICE } from '@trezor/connect';
+import { type CSSProperties } from 'react';
+
+import { type DesktopAppUpdateState } from '@suite-common/suite-constants';
+import { type TrezorDevice } from '@suite-common/suite-types';
+import { type NetworkSymbol } from '@suite-common/wallet-config';
+import { type FormStateTradingExchange } from '@suite-common/wallet-types';
+import { type DEVICE, type TokenInfo } from '@trezor/connect';
+import type { Protocol } from '@trezor/network-module-suite-common-types';
+
+export type UnknownTranslationKey = string;
 
 export type NotificationId = number;
 
 export interface NotificationOptions {
     seen?: boolean;
-    resolved?: boolean;
     autoClose?: number | false;
+    style?: CSSProperties;
 }
 
 type TransactionNotificationPayload = {
-    formattedAmount: string;
+    /** The amount in main units, unformatted: the notification is rendered, not the string. */
+    amount: string;
     device?: TrezorDevice;
     descriptor: string;
     symbol: NetworkSymbol;
     txid: string;
 };
+
+type BaseTransactionNotificationPayload = Omit<TransactionNotificationPayload, 'amount'>;
+
 type SentTransactionNotification = {
     type: 'tx-sent';
+    token?: TokenInfo;
 } & TransactionNotificationPayload;
+
+type RawSentTransactionNotification = {
+    type: 'raw-tx-sent';
+} & BaseTransactionNotificationPayload;
+
+type RevokeTransactionNotification = {
+    type: 'tx-revoked';
+    token: TokenInfo;
+} & TransactionNotificationPayload;
+
+type ApproveTransactionNotification = {
+    type: 'tx-approved';
+    token: TokenInfo;
+    isInfiniteApproval: boolean;
+} & TransactionNotificationPayload;
+
+type ExchangeTransactionNotification = {
+    type: 'tx-exchange';
+    metadata: FormStateTradingExchange;
+} & TransactionNotificationPayload;
+
+export type WrapTransactionAsset = {
+    symbol: NetworkSymbol;
+    displaySymbol: string;
+    contractAddress?: string;
+    amount: string;
+};
+
+type WrapTransactionMetadata = {
+    send: WrapTransactionAsset;
+    receive: WrapTransactionAsset;
+};
+
+// Set when the wrap/unwrap is a step of a yield deposit/withdraw rather than the standalone page,
+// which report their analytics on `yield/deposit` / `yield/withdraw` instead.
+type YieldFlowStepFlag = {
+    isYieldFlowStep?: boolean;
+};
+
+type WrapTransactionNotification = {
+    type: 'tx-wrap';
+    metadata: WrapTransactionMetadata;
+} & YieldFlowStepFlag &
+    TransactionNotificationPayload;
+
+type UnwrapTransactionNotification = {
+    type: 'tx-unwrap';
+    metadata: WrapTransactionMetadata;
+} & YieldFlowStepFlag &
+    TransactionNotificationPayload;
 
 type ReceivedTransactionNotification = {
     type: 'tx-received' | 'tx-confirmed';
+    token?: Pick<TokenInfo, 'contract' | 'name' | 'symbol' | 'decimals'>;
 } & TransactionNotificationPayload;
 
 type StakedTransactionNotification = {
@@ -39,7 +100,48 @@ type ClaimedTransactionNotification = {
     type: 'tx-claimed';
 } & TransactionNotificationPayload;
 
-export type ToastPayload = (
+type YieldDepositTransactionNotification = {
+    type: 'tx-yield-deposit';
+} & BaseTransactionNotificationPayload;
+
+type YieldWithdrawTransactionNotification = {
+    type: 'tx-yield-withdraw';
+} & BaseTransactionNotificationPayload;
+
+type YieldClaimTransactionNotification = {
+    type: 'tx-yield-claim';
+} & BaseTransactionNotificationPayload;
+
+type AccountAddedNotification = {
+    type: 'account-added';
+    networkName: string;
+};
+
+type AccountsDiscoveredNotification = {
+    type: 'accounts-discovered';
+    count: number;
+    networkName: string;
+};
+
+export type ErrorToastPayload = {
+    type:
+        | 'error'
+        | 'discovery-error'
+        | 'verify-address-error'
+        | 'verify-xpub-error'
+        | 'sign-message-error'
+        | 'verify-message-error'
+        | 'sign-tx-error'
+        | 'metadata-auth-error'
+        | 'metadata-not-found-error'
+        | 'metadata-unexpected-error'
+        | 'device-authenticity-error'
+        | 'cardano-delegate-error'
+        | 'cardano-withdrawal-error';
+    error: string;
+};
+
+export type ToastPayload<TranslationKey extends UnknownTranslationKey = UnknownTranslationKey> = (
     | {
           type: 'acquire-error';
           error: string;
@@ -56,53 +158,56 @@ export type ToastPayload = (
               | 'wipe-code-changed'
               | 'wipe-code-removed'
               | 'device-wiped'
+              | 'device-forgotten'
               | 'backup-success'
               | 'backup-failed'
               | 'sign-message-success'
               | 'verify-message-success'
-              | 'firmware-check-authenticity-success'
-              | 'device-authenticity-success';
+              | 'verify-message-cancelled'
+              | 'device-authenticity-success'
+              | 'clear-storage'
+              | 'add-token-success'
+              | 'activate-token-success'
+              | 'deactivate-token-success'
+              | 'auto-updater-no-new'
+              | 'auto-eject-settings'
+              | 'qr-incorrect-address'
+              | 'copy-to-clipboard'
+              | 'tor-is-slow'
+              | 'coinjoin-interrupted'
+              | 'firmware-language-changed'
+              | 'firmware-language-fetch-error'
+              | 'estimated-fee-error'
+              | 'not-enough-funds-error'
+              | 'could-not-parse-csv'
+              | 'thp-credentials-reset'
+              | 'sign-transaction-timeout'
+              | 'suite-sync-keys-error'
+              | 'suite-sync-enabled'
+              | 'bip-329-labels-imported';
+      }
+    | {
+          type: 'legacy-labeling-migration-success';
+          added: number;
+          skipped: number;
       }
     | SentTransactionNotification
+    | ApproveTransactionNotification
+    | RevokeTransactionNotification
+    | ExchangeTransactionNotification
+    | WrapTransactionNotification
+    | UnwrapTransactionNotification
+    | RawSentTransactionNotification
+    | ErrorToastPayload
     | {
-          type: 'raw-tx-sent';
-          txid: string;
-      }
-    | {
-          type: 'copy-to-clipboard';
-      }
-    | {
-          type: 'clear-storage';
-      }
-    | {
-          type: 'bridge-dev-restart';
-          devMode: boolean;
-      }
-    | {
-          type: 'add-token-success';
-      }
-    | {
-          type:
-              | 'error'
-              | 'auth-failed'
-              | 'discovery-error'
-              | 'verify-address-error'
-              | 'verify-xpub-error'
-              | 'sign-message-error'
-              | 'verify-message-error'
-              | 'sign-tx-error'
-              | 'metadata-auth-error'
-              | 'metadata-not-found-error'
-              | 'metadata-unexpected-error'
-              | 'device-authenticity-error';
-          error: string;
+          type: 'trading-error';
+          errorCode: string;
+          values?: Record<string, string | number | boolean | undefined>;
+          message?: string;
       }
     | {
           type: 'auto-updater-error';
           state: DesktopAppUpdateState;
-      }
-    | {
-          type: 'auto-updater-no-new';
       }
     | {
           type: 'auto-updater-new-version-first-run';
@@ -116,67 +221,58 @@ export type ToastPayload = (
           coin: string;
       }
     | {
-          type: 'qr-incorrect-address';
+          type: 'qr-unknown-scheme-protocol';
+          scheme: string;
+          error: string;
       }
     | {
           type: 'coin-scheme-protocol';
-          scheme: PROTOCOL_SCHEME;
+          scheme: Protocol;
           address: string;
-          amount?: number;
+          amount?: string;
       }
     | {
-          type: 'cardano-delegate-error';
-          error: string;
-      }
-    | {
-          type: 'cardano-withdrawal-error';
-          error: string;
-      }
-    | {
-          type: 'savings-kyc-failed';
-      }
-    | {
-          type: 'savings-kyc-success';
+          type: 'suite-sync-keys-error';
       }
     | {
           type: 'tor-toggle-error';
           error: TranslationKey;
       }
     | {
-          type: 'tor-is-slow';
-      }
-    | {
-          type: 'coinjoin-interrupted';
+          type: 'firmware-authenticity-check-error';
+          translationKey: TranslationKey;
       }
     | {
           type: 'successful-claim';
-          symbol: string;
-      }
-    | {
-          type: 'firmware-language-changed';
-      }
-    | {
-          type: 'firmware-language-fetch-error';
+          symbol: NetworkSymbol;
       }
     | StakedTransactionNotification
     | UnstakedTransactionNotification
     | ClaimedTransactionNotification
+    | YieldDepositTransactionNotification
+    | YieldWithdrawTransactionNotification
+    | YieldClaimTransactionNotification
+    | AccountAddedNotification
+    | AccountsDiscoveredNotification
+    | {
+          type: 'cannot-open-bluetooth-settings-error';
+      }
+    | {
+          type: 'connect-popup-success';
+          appName: string;
+      }
 ) &
     NotificationOptions;
 
+export const AUTH_DEVICE = 'auth-device';
 export type NotificationEventPayload = (
     | {
-          // only temporary, must be same as AUTH_DEVICE value in packages/suite/src/actions/suite/constants/suiteConstants.ts
-          // once that will be migrated to @suite-common, this should be replaced directly by suiteActions.authDevice.type
-          // this should not break type safety, if someone will change value of AUTH_DEVICE, it will throw error in place
-          // where action is used and you will need to change it also here
-          type: '@suite/device/authDevice';
+          type: typeof AUTH_DEVICE;
       }
     | ReceivedTransactionNotification
     | {
           type: typeof DEVICE.CONNECT | typeof DEVICE.CONNECT_UNACQUIRED;
           device: TrezorDevice;
-          needAttention?: boolean;
       }
 ) &
     NotificationOptions;
@@ -188,22 +284,38 @@ export interface CommonNotificationPayload {
     error?: string;
 }
 
-export type ToastNotification = { context: 'toast' } & CommonNotificationPayload & ToastPayload;
-export type EventNotification = { context: 'event' } & CommonNotificationPayload &
+export type ToastNotification<
+    TranslationKey extends UnknownTranslationKey = UnknownTranslationKey,
+> = {
+    context: 'toast';
+} & CommonNotificationPayload &
+    ToastPayload<TranslationKey>;
+type EventNotification = { context: 'event' } & CommonNotificationPayload &
     NotificationEventPayload;
 
-export type NotificationEntry = ToastNotification | EventNotification;
+export type NotificationEntry<TranslationKey extends string = UnknownTranslationKey> =
+    ToastNotification<TranslationKey> | EventNotification;
 
-export type NotificationsState = NotificationEntry[];
-
-export type NotificationsRootState = {
-    notifications: NotificationsState;
+export type AddNotificationAction<TranslationKey extends string = UnknownTranslationKey> = {
+    payload: NotificationEntry<TranslationKey>;
 };
 
-export type TransactionNotification = (
-    | SentTransactionNotification
-    | ReceivedTransactionNotification
-) &
-    CommonNotificationPayload;
+export type NotificationsState<TranslationKey extends string = UnknownTranslationKey> =
+    NotificationEntry<TranslationKey>[];
 
-export type TransactionNotificationType = TransactionNotification['type'];
+export type NotificationsRootState<TranslationKey extends string = UnknownTranslationKey> = {
+    notifications: NotificationsState<TranslationKey>;
+};
+
+export type TransactionNotification = Extract<
+    NotificationEntry,
+    { type: TransactionNotificationType }
+>;
+
+// Derived from the payload union so every new `tx-*` notification is forced through
+// the `satisfies Record<TransactionNotificationType, ...>` maps in consumers.
+// Must stay in sync with the runtime check in `isTransactionNotification`.
+export type TransactionNotificationType = Extract<
+    NotificationEntry['type'],
+    `tx-${string}` | 'raw-tx-sent'
+>;

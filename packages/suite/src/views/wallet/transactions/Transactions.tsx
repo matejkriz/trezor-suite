@@ -1,46 +1,47 @@
-import { ReactNode } from 'react';
+import { type ReactNode } from 'react';
 
-import { WalletLayout, CoinjoinAccountDiscoveryProgress } from 'src/components/wallet';
+import { selectFullSelectedAccount } from '@suite/account';
+import {
+    selectAccountTransactionsWithNulls,
+    selectIsLoadingAccountTransactions,
+} from '@suite-common/wallet-core';
+import { Column } from '@trezor/components';
+
+import { CoinjoinAccountDiscoveryProgress, WalletLayout } from 'src/components/wallet';
+import { SolanaLimitedHistoryBanner } from 'src/components/wallet/WalletLayout/AccountBanners/SolanaLimitedHistoryBanner';
 import { useSelector } from 'src/hooks/suite';
-import { AppState } from 'src/types/suite';
-import { selectAccountTransactions, selectIsLoadingTransactions } from '@suite-common/wallet-core';
-import { NoTransactions } from './components/NoTransactions';
-import { AccountEmpty } from './components/AccountEmpty';
-import { TransactionList } from './TransactionList/TransactionList';
-import { TransactionSummary } from './components/TransactionSummary';
+import { type AppState } from 'src/types/suite';
+import { isNetworkWithGraphFeature } from 'src/utils/wallet/graph';
+
 import { CoinjoinExplanation } from './CoinjoinExplanation/CoinjoinExplanation';
 import { CoinjoinSummary } from './CoinjoinSummary/CoinjoinSummary';
 import { TradeBox } from './TradeBox/TradeBox';
-import styled from 'styled-components';
-import { spacingsPx } from '@trezor/theme';
-
-const AccountLayout = styled(WalletLayout)`
-    display: flex;
-    flex-direction: column;
-    gap: ${spacingsPx.xxl};
-`;
+import { WalletTransactionList } from './TransactionList/WalletTransactionList';
+import { AccountEmpty } from './components/AccountEmpty';
+import { AccountOverviewBalance } from './components/AccountOverviewBalance';
+import { NoTransactions } from './components/NoTransactions';
+import { TransactionSummary } from './components/TransactionSummary';
+import { TronResources } from './components/TronResources';
+import { CardanoNewProviderCard } from '../staking/components/AdaStakingDashboard/CardanoNewProviderCard';
 
 interface LayoutProps {
     selectedAccount: AppState['wallet']['selectedAccount'];
     children?: ReactNode;
-    showEmptyHeaderPlaceholder?: boolean;
 }
 
-const Layout = ({ selectedAccount, showEmptyHeaderPlaceholder = false, children }: LayoutProps) => (
-    <AccountLayout
-        title="TR_NAV_TRANSACTIONS"
-        account={selectedAccount}
-        showEmptyHeaderPlaceholder={showEmptyHeaderPlaceholder}
-    >
+const Layout = ({ selectedAccount, children }: LayoutProps) => (
+    <WalletLayout title="TR_NAV_TRANSACTIONS" account={selectedAccount}>
         {children}
-    </AccountLayout>
+    </WalletLayout>
 );
 
 export const Transactions = () => {
-    const transactionsIsLoading = useSelector(selectIsLoadingTransactions);
-    const selectedAccount = useSelector(state => state.wallet.selectedAccount);
+    const selectedAccount = useSelector(selectFullSelectedAccount);
+    const transactionsIsLoading = useSelector(state =>
+        selectIsLoadingAccountTransactions(state, selectedAccount.account?.key || null),
+    );
     const accountTransactions = useSelector(state =>
-        selectAccountTransactions(state, selectedAccount.account?.key || ''),
+        selectAccountTransactionsWithNulls(state, selectedAccount.account?.key || null),
     );
 
     if (selectedAccount.status !== 'loaded') {
@@ -48,6 +49,8 @@ export const Transactions = () => {
     }
 
     const { account } = selectedAccount;
+
+    const isGraphSupported = isNetworkWithGraphFeature(account.symbol, account.backendType);
 
     if (account.backendType === 'coinjoin') {
         const isLoading = account.status === 'out-of-sync' && !!account.syncing;
@@ -64,12 +67,7 @@ export const Transactions = () => {
                         {isEmpty ? (
                             <CoinjoinExplanation />
                         ) : (
-                            <TransactionList
-                                account={account}
-                                transactions={accountTransactions}
-                                symbol={account.symbol}
-                                isLoading={transactionsIsLoading}
-                            />
+                            <WalletTransactionList account={account} symbol={account.symbol} />
                         )}
                     </>
                 )}
@@ -78,35 +76,49 @@ export const Transactions = () => {
     }
 
     if (accountTransactions.length > 0 || transactionsIsLoading) {
-        const networksWithoutTxSummary = ['ripple', 'solana'];
-
         return (
             <Layout selectedAccount={selectedAccount}>
-                {!networksWithoutTxSummary.includes(account.networkType) && (
-                    <TransactionSummary account={account} />
+                <CardanoNewProviderCard account={account} />
+                <TronResources account={account} />
+                {isGraphSupported ? (
+                    <>
+                        <Column gap={20}>
+                            <AccountOverviewBalance selectedAccount={selectedAccount} />
+                            <TransactionSummary account={account} />
+                        </Column>
+                        <TradeBox account={account} />
+                    </>
+                ) : (
+                    <Column gap={20}>
+                        <AccountOverviewBalance selectedAccount={selectedAccount} />
+                        <TradeBox account={account} />
+                    </Column>
                 )}
-                <TradeBox account={account} />
-                <TransactionList
-                    account={account}
-                    transactions={accountTransactions}
-                    symbol={account.symbol}
-                    isLoading={transactionsIsLoading}
-                />
+                <SolanaLimitedHistoryBanner account={account} />
+                <WalletTransactionList account={account} symbol={account.symbol} />
             </Layout>
         );
     }
 
     if (account.empty) {
         return (
-            <Layout selectedAccount={selectedAccount} showEmptyHeaderPlaceholder>
-                <AccountEmpty account={selectedAccount.account} />
+            <Layout selectedAccount={selectedAccount}>
+                <Column gap={20}>
+                    <AccountOverviewBalance selectedAccount={selectedAccount} />
+                    <AccountEmpty account={selectedAccount.account} />
+                </Column>
+                <TradeBox account={account} />
             </Layout>
         );
     }
 
     return (
-        <Layout selectedAccount={selectedAccount} showEmptyHeaderPlaceholder>
-            <NoTransactions account={account} />
+        <Layout selectedAccount={selectedAccount}>
+            <Column gap={20}>
+                <AccountOverviewBalance selectedAccount={selectedAccount} />
+                <NoTransactions account={account} />
+            </Column>
+            <TradeBox account={account} />
         </Layout>
     );
 };

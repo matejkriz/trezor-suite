@@ -1,47 +1,58 @@
-import { useState } from 'react';
+import { useMemo } from 'react';
 
-import { useNavigation } from '@react-navigation/native';
-
+import { isStakingSymbol } from '@suite-common/wallet-utils';
+import { AccountsListWithFilter, type OnSelectAccount } from '@suite-native/accounts';
 import { DeviceManagerScreenHeader } from '@suite-native/device-manager';
+import { AccountsRediscoveryNeededWarning } from '@suite-native/discovery';
+import { Translation } from '@suite-native/intl';
 import {
-    RootStackParamList,
+    type AccountsStackParamList,
+    type AccountsStackRoutes,
+    type RootStackParamList,
     RootStackRoutes,
     Screen,
-    StackNavigationProps,
+    type StackToStackCompositeScreenProps,
 } from '@suite-native/navigation';
-import { AccountsList, SearchableAccountsListScreenHeader } from '@suite-native/accounts';
-import { AccountKey, TokenAddress } from '@suite-common/wallet-types';
+import { isNetworkWithTokens } from '@suite-native/tokens';
 
-export const AccountsScreen = () => {
-    const navigation =
-        useNavigation<StackNavigationProps<RootStackParamList, RootStackRoutes.AccountDetail>>();
+type ScreenNavigationProps = StackToStackCompositeScreenProps<
+    AccountsStackParamList,
+    AccountsStackRoutes.Accounts,
+    RootStackParamList
+>;
 
-    const [accountsFilterValue, setAccountsFilterValue] = useState<string>('');
+export const AccountsScreen = ({ navigation, route }: ScreenNavigationProps) => {
+    const networksFilter = useMemo(
+        () => route.params?.networksFilter ?? [],
+        [route.params?.networksFilter],
+    );
 
-    const handleSelectAccount = (accountKey: AccountKey, tokenContract?: TokenAddress) => {
+    const handleSelectAccount: OnSelectAccount = ({ account }) => {
+        const { key: accountKey, symbol } = account;
+
+        if (isNetworkWithTokens(symbol) || isStakingSymbol(symbol)) {
+            navigation.navigate(RootStackRoutes.AccountAssets, { accountKey });
+
+            return;
+        }
         navigation.navigate(RootStackRoutes.AccountDetail, {
             accountKey,
-            tokenContract,
             closeActionType: 'back',
         });
     };
 
-    const handleFilterChange = (value: string) => {
-        setAccountsFilterValue(value);
-    };
-
     return (
-        <Screen
-            screenHeader={<DeviceManagerScreenHeader />}
-            subheader={
-                <SearchableAccountsListScreenHeader
-                    title="My assets"
-                    onSearchInputChange={handleFilterChange}
-                    flowType="accounts"
-                />
-            }
-        >
-            <AccountsList onSelectAccount={handleSelectAccount} filterValue={accountsFilterValue} />
+        // noBottomPadding: SearchableAccountsListHeader owns the top spacing to accommodate filter badge overflow.
+        <Screen header={<DeviceManagerScreenHeader noBottomPadding />} isScrollable={false}>
+            <AccountsListWithFilter
+                title={<Translation id="moduleAccountManagement.accountsScreen.accountsTitle" />}
+                onSelectAccount={handleSelectAccount}
+                flowType="accounts"
+                networksFilter={networksFilter}
+                isScrollDividerEnabled
+            >
+                <AccountsRediscoveryNeededWarning />
+            </AccountsListWithFilter>
         </Screen>
     );
 };

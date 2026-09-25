@@ -1,15 +1,17 @@
-import { Dimensions } from 'react-native';
 import React from 'react';
+import { Dimensions } from 'react-native';
 
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
 
 import { Box } from '../Box';
 import { BoxSkeleton } from './BoxSkeleton';
 import { VStack } from '../Stack';
 
-const skeletonContainer = prepareNativeStyle(_ => ({
+const skeletonContainer = prepareNativeStyle(utils => ({
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingVertical: utils.spacings.sp12,
+    paddingHorizontal: utils.spacings.sp16,
 }));
 
 const MAIN_ITEM_HEIGHT = 48;
@@ -30,16 +32,16 @@ export const ListItemSkeleton = () => {
         <Box style={applyStyle(skeletonContainer)}>
             <BoxSkeleton width={MAIN_ITEM_WIDTH} height={MAIN_ITEM_HEIGHT} />
 
-            <VStack spacing="small" alignItems="flex-end">
+            <VStack spacing="sp8" alignItems="flex-end">
                 <BoxSkeleton
                     width={TOP_SUB_ITEM_WIDTH}
                     height={SUBITEM_HEIGHT}
-                    borderRadius={borders.radii.extraSmall}
+                    borderRadius={borders.radii.r4}
                 />
                 <BoxSkeleton
                     width={BOTTOM_SUB_ITEM_WIDTH}
                     height={SUBITEM_HEIGHT}
-                    borderRadius={borders.radii.extraSmall}
+                    borderRadius={borders.radii.r4}
                 />
             </VStack>
         </Box>

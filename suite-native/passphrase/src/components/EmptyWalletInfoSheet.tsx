@@ -1,0 +1,98 @@
+import React, { forwardRef } from 'react';
+
+import { type BottomSheetModalMethods } from '@gorhom/bottom-sheet/lib/typescript/types';
+import { useNavigation } from '@react-navigation/native';
+
+import {
+    BannerInline,
+    BottomSheetModal,
+    Box,
+    Button,
+    IconList,
+    IconListTextItem,
+    TitleHeader,
+    VStack,
+} from '@suite-native/atoms';
+import { Translation } from '@suite-native/intl';
+import {
+    type PassphraseStackParamList,
+    PassphraseStackRoutes,
+    type RootStackParamList,
+    type StackToStackCompositeNavigationProps,
+} from '@suite-native/navigation';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
+
+const bottomSheetStyle = prepareNativeStyle(utils => ({
+    gap: utils.spacings.sp24,
+    paddingTop: utils.spacings.sp8,
+}));
+
+const bottomSheetBottomStyle = prepareNativeStyle(utils => ({
+    alignItems: 'center',
+    gap: utils.spacings.sp24,
+    padding: 0,
+}));
+
+const buttonWrapperStyle = prepareNativeStyle(() => ({
+    width: '100%',
+}));
+
+type NavigationProp = StackToStackCompositeNavigationProps<
+    PassphraseStackParamList,
+    PassphraseStackRoutes.PassphraseEmptyWallet,
+    RootStackParamList
+>;
+
+type EmptyWalletInfoSheetProps = {
+    onCloseModal: () => void;
+};
+
+export const EmptyWalletInfoSheet = forwardRef<BottomSheetModalMethods, EmptyWalletInfoSheetProps>(
+    ({ onCloseModal }, ref) => {
+        const navigation = useNavigation<NavigationProp>();
+
+        const { applyStyle } = useNativeStyles();
+
+        const handleOpenEmptyWallet = () => {
+            navigation.navigate(PassphraseStackRoutes.PassphraseVerifyEmptyWallet);
+            onCloseModal();
+        };
+
+        return (
+            <BottomSheetModal style={applyStyle(bottomSheetStyle)} ref={ref}>
+                <TitleHeader
+                    textAlign="left"
+                    title={
+                        <Translation id="modulePassphrase.emptyPassphraseWallet.confirmEmptyWalletSheet.title" />
+                    }
+                />
+                <Box padding="sp8">
+                    <IconList iconSize={36} textVariant="body-md">
+                        <IconListTextItem icon="pencilSimpleLine">
+                            <Translation id="modulePassphrase.emptyPassphraseWallet.confirmEmptyWalletSheet.list.backup" />
+                        </IconListTextItem>
+                        <IconListTextItem icon="copy">
+                            <Translation id="modulePassphrase.emptyPassphraseWallet.confirmEmptyWalletSheet.list.store" />
+                        </IconListTextItem>
+                        <IconListTextItem icon="eyeSlash">
+                            <Translation id="modulePassphrase.emptyPassphraseWallet.confirmEmptyWalletSheet.list.neverShare" />
+                        </IconListTextItem>
+                    </IconList>
+                </Box>
+                <VStack style={applyStyle(bottomSheetBottomStyle)}>
+                    <BannerInline
+                        intent="warning"
+                        title={
+                            <Translation id="modulePassphrase.emptyPassphraseWallet.confirmEmptyWalletSheet.alertTitle" />
+                        }
+                    />
+                    <Box style={applyStyle(buttonWrapperStyle)}>
+                        <Button onPress={handleOpenEmptyWallet}>
+                            <Translation id="generic.buttons.gotIt" />
+                        </Button>
+                    </Box>
+                </VStack>
+            </BottomSheetModal>
+        );
+    },
+);

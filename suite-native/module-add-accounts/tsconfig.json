@@ -1,12 +1,16 @@
 {
     "extends": "../../tsconfig.base.json",
-    "compilerOptions": {
-        "noImplicitAny": false,
-        "outDir": "libDev"
-    },
+    "compilerOptions": { "outDir": "libDev" },
     "references": [
         {
-            "path": "../../suite-common/suite-types"
+            "path": "../../suite-common/analytics"
+        },
+        {
+            "path": "../../suite-common/dependency-injection"
+        },
+        { "path": "../../suite-common/device" },
+        {
+            "path": "../../suite-common/redux-utils"
         },
         {
             "path": "../../suite-common/wallet-config"
@@ -18,13 +22,22 @@
             "path": "../../suite-common/wallet-types"
         },
         { "path": "../accounts" },
-        { "path": "../alerts" },
+        { "path": "../add-coin-account" },
+        { "path": "../analytics" },
         { "path": "../atoms" },
+        { "path": "../coin-enabling" },
         { "path": "../discovery" },
+        { "path": "../icons" },
         { "path": "../intl" },
         { "path": "../link" },
         { "path": "../navigation" },
-        { "path": "../../packages/styles" },
-        { "path": "../../packages/theme" }
+        { "path": "../passphrase" },
+        { "path": "../search" },
+        {
+            "path": "../../packages/styles-native"
+        },
+        { "path": "../../packages/urls" },
+        { "path": "../../packages/utils" },
+        { "path": "../../packages/requirements" }
     ]
 }

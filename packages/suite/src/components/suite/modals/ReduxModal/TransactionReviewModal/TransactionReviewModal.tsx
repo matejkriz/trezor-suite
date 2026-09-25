@@ -1,36 +1,160 @@
-import { UserContextPayload } from '@suite-common/suite-types';
-import { selectStake } from '@suite-common/wallet-core';
-import { cancelSignTx as cancelSignStakingTx } from 'src/actions/wallet/stakeActions';
-import { TransactionReviewModalContent } from './TransactionReviewModalContent';
-import { useDispatch, useSelector } from 'src/hooks/suite';
+import { selectFullSelectedAccount } from '@suite/account';
+import { gotoThunk } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import {
+    cancelSignSendFormTransactionThunk,
+    selectPrecomposedSendForm,
+    selectSend,
+    selectStake,
+    selectStakePrecomposedForm,
+    selectTronStakeTxReview,
+    selectYieldTxReview,
+    sendFormActions,
+    stakeActions,
+} from '@suite-common/wallet-core';
+import { type FormState, type PrecomposedTransactionFinal } from '@suite-common/wallet-types';
 
-import { cancelSignSendFormTransactionThunk } from 'src/actions/wallet/send/sendFormThunks';
+import {
+    removeSendFormDraftThunk,
+    signAndPushSendFormTransactionThunk,
+} from 'src/actions/wallet/send/sendFormThunks';
+import { cancelSignYieldTxThunk } from 'src/actions/wallet/stablecoin-yield';
+import {
+    cancelSignTxThunk as cancelSignStakingTx,
+    signTransactionThunk,
+} from 'src/actions/wallet/stakeActions';
+import { cancelSignTronFreezeTxThunk } from 'src/actions/wallet/tron-stake/cancelSignTronFreezeTx';
+import { useSelector } from 'src/hooks/suite';
+
+import { TransactionReviewModalBody } from './TransactionReviewModalBody';
+import { TransactionReviewModalExchange } from './TransactionReviewModalExchange';
+import { type TransactionReviewModalProps } from './TransactionReviewModalProps';
+import { TransactionReviewModalSell } from './TransactionReviewModalSell';
+import { type TxInfoState } from './utils';
 
 // This modal is opened either in Device (button request) or User (push tx) context
 // contexts are distinguished by `type` prop
-type TransactionReviewModalProps =
-    | Extract<UserContextPayload, { type: 'review-transaction' }>
-    | { type: 'sign-transaction'; decision?: undefined };
-
-export const TransactionReviewModal = ({ decision }: TransactionReviewModalProps) => {
-    const send = useSelector(state => state.wallet.send);
+export const TransactionReviewModal = ({ type, decision }: TransactionReviewModalProps) => {
+    const send = useSelector(selectSend);
     const stake = useSelector(selectStake);
-    const dispatch = useDispatch();
+    const yieldTxReview = useSelector(selectYieldTxReview);
+    const tronStakeTxReview = useSelector(selectTronStakeTxReview);
+    const sendPrecomposedForm = useSelector(selectPrecomposedSendForm);
+    const stakePrecomposedForm = useSelector(selectStakePrecomposedForm);
+    const selectedAccount = useSelector(selectFullSelectedAccount);
+    const { dispatch } = useServices(injectDispatch);
 
-    const isSend = Boolean(send?.precomposedTx);
-    // Only one state should be available when the modal is open
-    const txInfoState = isSend ? send : stake;
+    const getReviewSource = (): {
+        txInfoState: TxInfoState;
+        precomposedForm: FormState | undefined;
+        cancelSignTx: () => void;
+    } => {
+        if (tronStakeTxReview.precomposedTx) {
+            return {
+                txInfoState: tronStakeTxReview,
+                precomposedForm: tronStakeTxReview.precomposedForm,
+                cancelSignTx: () => dispatch(cancelSignTronFreezeTxThunk()),
+            };
+        }
+        if (yieldTxReview.precomposedTx) {
+            return {
+                txInfoState: yieldTxReview,
+                precomposedForm: yieldTxReview.precomposedForm,
+                cancelSignTx: () => dispatch(cancelSignYieldTxThunk()),
+            };
+        }
+        if (send?.precomposedTx) {
+            return {
+                txInfoState: send,
+                precomposedForm: sendPrecomposedForm,
+                cancelSignTx: () => dispatch(cancelSignSendFormTransactionThunk()),
+            };
+        }
 
-    const handleCancelSignTx = () => {
-        if (isSend) dispatch(cancelSignSendFormTransactionThunk());
-        else dispatch(cancelSignStakingTx());
+        return {
+            txInfoState: stake,
+            precomposedForm: stakePrecomposedForm,
+            cancelSignTx: () => dispatch(cancelSignStakingTx()),
+        };
     };
 
+    const { txInfoState, precomposedForm, cancelSignTx } = getReviewSource();
+
+    const isRbfConfirmedError = type === 'review-transaction-rbf-previous-transaction-mined-error';
+    const isExchange = precomposedForm?.trading?.activeSection === 'exchange';
+    const isSell = precomposedForm?.trading?.activeSection === 'sell';
+
+    const handleSignAndPushSendTx = async () => {
+        try {
+            const result = await dispatch(
+                signAndPushSendFormTransactionThunk({
+                    formState: send.precomposedForm!,
+                    precomposedTransaction: send.precomposedTx!,
+                    selectedAccount: selectedAccount.account,
+                }),
+            ).unwrap();
+
+            if (result?.success) {
+                dispatch(removeSendFormDraftThunk());
+                dispatch(gotoThunk({ routeName: 'wallet-index', preserveParams: true }));
+            }
+        } catch {
+            // Error state is handled by signAndPushSendFormTransactionThunk.
+        }
+    };
+
+    const handleStakeTx = async () => {
+        dispatch(stakeActions.dispose());
+        await dispatch(
+            signTransactionThunk(
+                stake.precomposedForm!,
+                stake.precomposedTx as PrecomposedTransactionFinal,
+            ),
+        );
+    };
+
+    const handleTryAgainSignTx = async () => {
+        if (send.precomposedForm && send.precomposedTx) {
+            dispatch(sendFormActions.clearSignedTransactionData());
+            await handleSignAndPushSendTx();
+        } else if (stake.precomposedForm && stake.precomposedTx) {
+            await handleStakeTx();
+        }
+    };
+
+    if (isExchange) {
+        return (
+            <TransactionReviewModalExchange
+                decision={decision}
+                txInfoState={txInfoState}
+                cancelSignTx={cancelSignTx}
+                isRbfConfirmedError={isRbfConfirmedError}
+                precomposedForm={precomposedForm}
+            />
+        );
+    }
+
+    if (isSell) {
+        return (
+            <TransactionReviewModalSell
+                decision={decision}
+                txInfoState={txInfoState}
+                cancelSignTx={cancelSignTx}
+                isRbfConfirmedError={isRbfConfirmedError}
+                precomposedForm={precomposedForm}
+            />
+        );
+    }
+
     return (
-        <TransactionReviewModalContent
+        <TransactionReviewModalBody
             decision={decision}
             txInfoState={txInfoState}
-            cancelSignTx={handleCancelSignTx}
+            tryAgainSignTx={handleTryAgainSignTx}
+            cancelSignTx={cancelSignTx}
+            isRbfConfirmedError={isRbfConfirmedError}
+            precomposedForm={precomposedForm}
         />
     );
 };

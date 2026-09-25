@@ -1,18 +1,31 @@
+import { differenceInMonths, fromUnixTime, getUnixTime, isWithinInterval } from 'date-fns';
+
 import { getFiatRatesForTimestamps } from '@suite-common/fiat-services';
 import { resetTime } from '@suite-common/suite-utils';
-import { networks, type NetworkSymbol } from '@suite-common/wallet-config';
-import { Account } from '@suite-common/wallet-types';
+import {
+    type BackendType,
+    type NetworkSymbol,
+    getNetwork,
+    getNetworkFeatures,
+} from '@suite-common/wallet-config';
+import { type Account } from '@suite-common/wallet-types';
 import { formatNetworkAmount } from '@suite-common/wallet-utils';
-import BigNumber from 'bignumber.js';
-import { differenceInMonths } from 'date-fns';
+import type { BaseCurrencyCode } from '@trezor/blockchain-link-types';
+import type { BlockchainAccountBalanceHistory, StaticSessionId } from '@trezor/connect';
+import { BigNumber, arrayToDictionary } from '@trezor/utils';
 
-import { CommonAggregatedHistory, GraphData, GraphRange, GraphScale } from 'src/types/wallet/graph';
+import { type GraphState } from 'src/reducers/wallet/graphReducer';
+import {
+    type AccountHistoryWithBalance,
+    type CommonAggregatedHistory,
+    type GraphData,
+    type GraphRange,
+} from 'src/types/wallet/graph';
 
-import type { BlockchainAccountBalanceHistory } from '@trezor/connect';
-import { FiatCurrencyCode } from '@suite-common/suite-config';
-import { ObjectType, TypeName, sumFiatValueMapInPlace } from './utilsShared';
+import { type FiatValueMap, type GraphDataPoint, type TypeName } from './types';
+import { sumFiatValueMapInPlace } from './utilsShared';
 
-export const deviceGraphDataFilterFn = (d: GraphData, deviceState: string | undefined) => {
+export const deviceGraphDataFilterFn = (d: GraphData, deviceState: StaticSessionId | undefined) => {
     if (!deviceState) return false;
 
     return d.account.deviceState === deviceState;
@@ -21,10 +34,10 @@ export const deviceGraphDataFilterFn = (d: GraphData, deviceState: string | unde
 export const ensureHistoryRates = async (
     symbol: NetworkSymbol,
     data: BlockchainAccountBalanceHistory[],
-    fiatCurrency: FiatCurrencyCode,
+    baseCurrencyCode: BaseCurrencyCode,
     isElectrumBackend: boolean,
 ): Promise<BlockchainAccountBalanceHistory[]> => {
-    if (!networks[symbol].coingeckoId) return data;
+    if (!getNetwork(symbol).coingeckoId) return data;
 
     const missingRates = data
         .filter(({ rates }) => !Object.keys(rates || {}).length)
@@ -33,7 +46,7 @@ export const ensureHistoryRates = async (
     const rateDictionary = await getFiatRatesForTimestamps(
         { symbol },
         missingRates,
-        fiatCurrency,
+        baseCurrencyCode,
         isElectrumBackend,
     )
         .then(res => (res?.tickers || []).map(({ ts, rates }) => [ts, rates]))
@@ -50,6 +63,18 @@ export const accountGraphDataFilterFn = (d: GraphData, account: Account) =>
     d.account.descriptor === account.descriptor &&
     d.account.symbol === account.symbol &&
     d.account.deviceState === account.deviceState;
+
+/**
+ * Does given network has backend type with support for retrieving transactions history, e.g. for showing graph?
+ */
+export function isNetworkWithGraphFeature(symbol: NetworkSymbol, backendType?: BackendType) {
+    const hasGraphFeature = getNetworkFeatures(symbol).includes('graph');
+    if (!hasGraphFeature) {
+        return false;
+    }
+
+    return backendType !== 'evm-rpc';
+}
 
 export const enhanceBlockchainAccountHistory = (
     data: BlockchainAccountBalanceHistory[],
@@ -82,22 +107,32 @@ export const enhanceBlockchainAccountHistory = (
     return enhancedResponse;
 };
 
+export const mergeAccountBalanceHistory = (
+    cached: AccountHistoryWithBalance[],
+    fresh: AccountHistoryWithBalance[],
+) => {
+    const pointsByTime = arrayToDictionary([...cached, ...fresh], point => point.time);
+
+    return Object.values(pointsByTime).sort((a, b) => a.time - b.time);
+};
+
 /**
  * Return array with 2 items, minimum non-zero value and maximum value calculated from sent, received and balance fields
  */
-export const getMinMaxValueFromData = <TType extends TypeName>(
-    data: ObjectType<TType>[],
+export const getMinMaxValueFromData = <TType extends TypeName, TValue extends BigNumber>(
+    data: GraphDataPoint<TType>[],
     _type: TType,
-    extractSentValue: (sourceData: ObjectType<TType>) => string | undefined,
-    extractReceivedValue: (sourceData: ObjectType<TType>) => string | undefined,
-    extractBalanceValue: (sourceData: ObjectType<TType>) => string | undefined,
-): [number, number] => {
+    extractSentValue: (sourceData: GraphDataPoint<TType>) => TValue | undefined,
+    extractReceivedValue: (sourceData: GraphDataPoint<TType>) => TValue | undefined,
+    extractBalanceValue: (sourceData: GraphDataPoint<TType>) => TValue | undefined,
+): [TValue, TValue] => {
     if (!data || data.length === 0) {
-        return [0, 0];
+        return [new BigNumber(0) as TValue, new BigNumber(0) as TValue];
     }
-    let maxSent = new BigNumber(extractSentValue(data[0]) || 0);
-    let maxReceived = new BigNumber(extractReceivedValue(data[0]) || 0);
-    let maxBalance = new BigNumber(extractBalanceValue(data[0]) || 0);
+    const firstPoint = data[0];
+    let maxSent = new BigNumber(firstPoint ? extractSentValue(firstPoint) || 0 : 0);
+    let maxReceived = new BigNumber(firstPoint ? extractReceivedValue(firstPoint) || 0 : 0);
+    let maxBalance = new BigNumber(firstPoint ? extractBalanceValue(firstPoint) || 0 : 0);
 
     let minSent: BigNumber | undefined;
     let minReceived: BigNumber | undefined;
@@ -134,55 +169,30 @@ export const getMinMaxValueFromData = <TType extends TypeName>(
         }
     });
 
-    const maxValue = Math.max(maxSent.toNumber(), maxReceived.toNumber(), maxBalance.toNumber());
+    const maxValue = BigNumber.max(maxSent, maxReceived, maxBalance);
 
     const minsToCompare = [minSent, minReceived, minBalance]
-        .filter(m => !!m)
-        .map(m => m!.toNumber());
-    const minValue = Math.min(...minsToCompare);
+        .filter((m): m is TValue => !!m)
+        .map(m => m.toNumber());
+    const minValue = BigNumber.min(...minsToCompare);
 
-    return [minValue, maxValue];
+    return [minValue as TValue, maxValue as TValue];
 };
 
-export const sumFiatValueMap = (
-    valueMap: { [k: string]: string | undefined },
-    obj: { [k: string]: string | undefined },
-) => {
+export const sumFiatValueMap = (valueMap: FiatValueMap, obj: FiatValueMap): FiatValueMap => {
     const newMap = { ...valueMap };
     sumFiatValueMapInPlace(newMap, obj);
 
     return newMap;
 };
 
-const calcMinYDomain = (minMaxValues: [number, number]) => {
-    // Used in calculating domain interval for Y axis with log scale
-    // We could simply use minimum coin value (eg 0.00000001) as our minimum, but that would results in
-    // Y axis with values/labels 0.00000001, 0.0000001, 0.000001, 0.0001...
-    // So instead we calculate what smallest value we need to show without any value being of of the range.
-    // Maybe we could instead just calculate our own set of ticks
-    const [minDataValue] = minMaxValues;
-    const decimals = minDataValue.toString().split('.')[1]?.length;
-    const min = decimals && decimals > 0 ? 1 / 10 ** decimals : 0.00000001;
-
-    return min;
-    // return 0.00000001;
-};
-
 export const calcYDomain = (
-    type: 'fiat' | 'crypto',
-    scale: GraphScale,
     minMaxValues: [number, number],
     lastBalance?: string,
 ): [number, number] => {
     const [, maxDataValue] = minMaxValues;
-    const maxValueMultiplier = scale === 'linear' ? 1.2 : 10;
-
-    let minValue: number;
-    if (scale === 'linear') {
-        minValue = 0;
-    } else {
-        minValue = type === 'fiat' ? 0.01 : calcMinYDomain(minMaxValues);
-    }
+    const maxValueMultiplier = 1.2;
+    const minValue = 0;
 
     if (maxDataValue > 0) {
         return [minValue, maxDataValue * maxValueMultiplier];
@@ -190,7 +200,7 @@ export const calcYDomain = (
 
     // no txs, but there could be non zero balance we still need to show
     const lastBalanceBn = lastBalance ? new BigNumber(lastBalance) : null;
-    if (lastBalanceBn && lastBalanceBn.gt(0)) {
+    if (lastBalanceBn?.gt(0)) {
         return [minValue, lastBalanceBn.toNumber() * 1.2];
     }
 
@@ -207,8 +217,11 @@ export const calcXDomain = (
     data: { time: number }[],
     range: GraphRange,
 ): [number, number] => {
-    const start = ticks[0];
-    const lastTick = ticks[ticks.length - 1];
+    // falling back to the unix epoch would render an axis around 1970,
+    // so when there are no ticks yet we center the interval around now instead
+    const now = getUnixTime(new Date());
+    const start = ticks[0] ?? now;
+    const lastTick = ticks[ticks.length - 1] ?? now;
     const lastData = data[data.length - 1];
     // if the last data point is after last tick/label use datapoint's timestamp to mark the end of the interval
     const end = lastData && lastTick < lastData.time ? lastData.time : lastTick;
@@ -232,7 +245,7 @@ export const calcXDomain = (
                 xPadding = 3600 * 24 * 14; // 14 days
             }
             break;
-        default: // 12 hours
+        case 'week':
             xPadding = 3600 * 12;
             break;
     }
@@ -299,7 +312,7 @@ export const calcFakeGraphDataForTimestamps = (
             if (
                 ts > firstDataPoint.time &&
                 ts < lastDataPoint.time &&
-                !data.find(d => d.time === ts)
+                !data.some(d => d.time === ts)
             ) {
                 const closest = data.findIndex(d => d.time >= ts);
                 balanceData.push({
@@ -335,4 +348,45 @@ export const calcFakeGraphDataForTimestamps = (
     const sortedData = balanceData.sort((a, b) => Number(a.time) - Number(b.time));
 
     return sortedData;
+};
+
+type GetGraphDataForIntervalProps = {
+    account?: Account;
+    deviceState?: StaticSessionId;
+    graph: GraphState;
+};
+
+export const getGraphDataForInterval = ({
+    account,
+    deviceState,
+    graph,
+}: GetGraphDataForIntervalProps) => {
+    const { selectedRange } = graph;
+
+    const data: GraphData[] = [];
+    graph.data.forEach(accountGraph => {
+        const accountFilter = account ? accountGraphDataFilterFn(accountGraph, account) : true;
+        const deviceFilter = deviceState
+            ? deviceGraphDataFilterFn(accountGraph, deviceState)
+            : true;
+
+        if (accountFilter && deviceFilter) {
+            if (selectedRange.startDate && selectedRange.endDate) {
+                data.push({
+                    ...accountGraph,
+                    data:
+                        accountGraph.data?.filter(d =>
+                            isWithinInterval(fromUnixTime(d.time), {
+                                start: selectedRange.startDate,
+                                end: selectedRange.endDate,
+                            }),
+                        ) ?? [],
+                });
+            } else {
+                data.push(accountGraph);
+            }
+        }
+    });
+
+    return data;
 };

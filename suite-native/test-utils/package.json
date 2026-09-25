@@ -6,17 +6,27 @@
     "sideEffects": false,
     "main": "src/index",
     "scripts": {
-        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "type-check": "yarn g:tsc --build"
+        "depcheck": "yarn g:depcheck",
+        "type-check": "yarn g:tsc --build",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'"
     },
     "dependencies": {
-        "@testing-library/react-native": "^11.0.0",
-        "@trezor/styles": "workspace:*",
+        "@gorhom/bottom-sheet": "5.2.9",
+        "@react-navigation/native": "7.1.31",
+        "@suite-common/dependency-injection": "workspace:*",
+        "@suite-common/formatters": "workspace:*",
+        "@suite-common/react-query": "workspace:*",
+        "@suite-native/intl": "workspace:*",
+        "@testing-library/react-native": "14.0.1",
+        "@trezor/styles-native": "workspace:*",
         "@trezor/theme": "workspace:*",
-        "react": "18.2.0",
-        "react-native-gesture-handler": "2.15.0",
-        "react-native-reanimated": "3.7.0-nightly-20240101-9d365ae7b",
-        "react-native-safe-area-context": "4.9.0",
-        "react-redux": "8.0.7"
+        "react": "19.2.3",
+        "react-native": "0.86.0",
+        "react-native-keyboard-controller": "1.21.9",
+        "react-native-permissions": "5.4.4",
+        "react-native-reanimated": "4.5.0",
+        "react-native-safe-area-context": "~5.7.0",
+        "react-native-worklets": "0.10.0",
+        "test-renderer": "1.2.0"
     }
 }

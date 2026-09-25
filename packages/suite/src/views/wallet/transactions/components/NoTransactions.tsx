@@ -1,27 +1,38 @@
-import { Button } from '@trezor/components';
-import { AccountExceptionLayout } from 'src/components/wallet';
-import { Translation, TrezorLink } from 'src/components/suite';
-import { Account } from 'src/types/wallet';
-import { getNetwork } from '@suite-common/wallet-utils';
+import { useExternalLink } from '@suite/external-links';
+import { Translation } from '@suite/intl';
+import { type Explorer } from '@suite-common/wallet-config';
+import { getExplorerUrl } from '@suite-common/wallet-config/src/getExplorerUrls';
+import { selectExplorer } from '@suite-common/wallet-core';
+import { isUtxoBased } from '@suite-common/wallet-utils';
+import { CloudIcon } from '@trezor/icons';
 
+import { AccountExceptionLayout } from 'src/components/wallet';
+import { useSelector } from 'src/hooks/suite';
+import { type Account } from 'src/types/wallet';
 interface NoTransactionsProps {
     account: Account;
 }
 
 export const NoTransactions = ({ account }: NoTransactionsProps) => {
-    const network = getNetwork(account.symbol)!;
-    const explorerUrl = `${network.explorer.account}${account.descriptor}${network.explorer.queryString}`;
+    const explorer = useSelector(state => selectExplorer(state, account.symbol)) as Explorer;
+    const explorerUrl = `${getExplorerUrl(explorer, 'address')}${account.descriptor}${explorer.queryString ?? ''}`;
+    const href = useExternalLink(explorerUrl);
 
     return (
         <AccountExceptionLayout
             title={<Translation id="TR_TRANSACTIONS_NOT_AVAILABLE" />}
-            image="CLOUDY"
-            actionComponent={
-                <Button variant="primary" icon="EXTERNAL_LINK" iconAlignment="right">
-                    <TrezorLink variant="nostyle" href={explorerUrl}>
-                        <Translation id="TR_SHOW_DETAILS_IN_BLOCK_EXPLORER" />
-                    </TrezorLink>
-                </Button>
+            icon={CloudIcon}
+            iconVariant="info"
+            actions={
+                !isUtxoBased(account)
+                    ? [
+                          {
+                              key: '1',
+                              href,
+                              children: <Translation id="TR_SHOW_DETAILS_IN_BLOCK_EXPLORER" />,
+                          },
+                      ]
+                    : undefined
             }
         />
     );

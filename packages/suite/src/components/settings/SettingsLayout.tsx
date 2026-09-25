@@ -1,25 +1,33 @@
-import { ReactNode, useMemo } from 'react';
-import { useDiscovery, useDispatch, useLayout, useSelector } from 'src/hooks/suite';
-import { SettingsLoading } from 'src/views/settings/SettingsLoader';
+import { type ReactNode, useMemo } from 'react';
+
+import { AnimatePresence, motion } from 'framer-motion';
+
+import { selectIsDebugModeActive } from '@suite/debug';
+import { Translation } from '@suite/intl';
+import { gotoThunk } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { Box, Column, motionEasing } from '@trezor/components';
+
 import {
+    type NavigationItem,
     PageHeader,
-    NavigationItem,
     SubpageNavigation,
 } from 'src/components/suite/layouts/SuiteLayout';
-import { goto } from 'src/actions/suite/routerActions';
-import { selectIsDebugModeActive } from 'src/reducers/suite/suiteReducer';
-import { Translation } from 'src/components/suite';
+import { useDiscovery, useLayout, useSelector } from 'src/hooks/suite';
+import { AccountHeaderProvider } from 'src/support/suite/AccountHeaderProvider';
+import { SettingsLoading } from 'src/views/settings/SettingsLoader';
 
 type SettingsLayoutProps = {
     title?: string;
     children?: ReactNode;
-    ['data-test']?: string;
+    ['data-testid']?: string;
 };
 
 const SettingsHeader = () => {
     const isDebugModeActive = useSelector(selectIsDebugModeActive);
 
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
 
     const settingsSubpages = useMemo<Array<NavigationItem>>(
         () => [
@@ -27,52 +35,83 @@ const SettingsHeader = () => {
                 id: 'settings-index',
                 title: <Translation id="TR_GENERAL" />,
                 position: 'primary',
-                'data-test': '@settings/menu/general',
-                callback: () => dispatch(goto('settings-index', { preserveParams: true })),
+                'data-testid': '@settings/menu/general',
+                callback: () =>
+                    dispatch(gotoThunk({ routeName: 'settings-index', preserveParams: true })),
             },
             {
                 id: 'settings-device',
                 title: <Translation id="TR_DEVICE" />,
                 position: 'primary',
-                'data-test': '@settings/menu/device',
-                callback: () => dispatch(goto('settings-device', { preserveParams: true })),
+                'data-testid': '@settings/menu/device',
+                callback: () =>
+                    dispatch(gotoThunk({ routeName: 'settings-device', preserveParams: true })),
             },
             {
                 id: 'settings-coins',
                 title: <Translation id="TR_COINS" />,
                 position: 'primary',
-                'data-test': '@settings/menu/wallet',
-                callback: () => dispatch(goto('settings-coins', { preserveParams: true })),
+                'data-testid': '@settings/menu/wallet',
+                callback: () =>
+                    dispatch(gotoThunk({ routeName: 'settings-coins', preserveParams: true })),
+            },
+            {
+                id: 'settings-connected-apps',
+                title: <Translation id="TR_CONNECTED_APPS" />,
+                position: 'primary',
+                'data-testid': '@settings/menu/connected-apps',
+                callback: () =>
+                    dispatch(
+                        gotoThunk({ routeName: 'settings-connected-apps', preserveParams: true }),
+                    ),
             },
             {
                 id: 'settings-debug',
                 title: <Translation id="TR_DEBUG_SETTINGS" />,
                 position: 'primary',
                 isHidden: !isDebugModeActive,
-                'data-test': '@settings/menu/debug',
-                callback: () => dispatch(goto('settings-debug', { preserveParams: true })),
+                'data-testid': '@settings/menu/debug',
+                callback: () =>
+                    dispatch(gotoThunk({ routeName: 'settings-debug', preserveParams: true })),
             },
         ],
         [dispatch, isDebugModeActive],
     );
 
     return (
-        <>
+        <AccountHeaderProvider>
             <PageHeader />
-            <SubpageNavigation items={settingsSubpages} />
-        </>
+            <SubpageNavigation data-testid="@settings/menu" items={settingsSubpages} />
+        </AccountHeaderProvider>
     );
 };
 
-export const SettingsLayout = ({ title, children, 'data-test': dataTest }: SettingsLayoutProps) => {
-    useLayout(title || 'Settings', SettingsHeader);
+export const SettingsLayout = ({
+    title,
+    children,
+    'data-testid': dataTest,
+}: SettingsLayoutProps) => {
+    useLayout(title || 'Settings', <SettingsHeader />);
 
     const { isDiscoveryRunning } = useDiscovery();
 
     return (
-        <div data-test={dataTest}>
-            <SettingsLoading isPresent={isDiscoveryRunning} />
-            <>{children}</>
+        <div data-testid={dataTest}>
+            <AnimatePresence>
+                {isDiscoveryRunning && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.3, ease: motionEasing.transition }}
+                    >
+                        <Box padding={{ bottom: 32 }}>
+                            <SettingsLoading />
+                        </Box>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+            <Column gap={48}>{children}</Column>
         </div>
     );
 };

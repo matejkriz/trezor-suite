@@ -1,9 +1,59 @@
 export default [
     {
         blockchain: {
+            name: 'Custom EVM RPC',
+            worker: 'js/evm-rpc-worker.js',
+            server: ['https://base.llamarpc.com'],
+            debug: true,
+        },
+        data: {
+            address: '0x9eA3721B5Bf3b64b4418c38B603154d2D597FAE3', // all ETH#1
+            accountInfoOptions: {
+                page: 0,
+                pageSize: 25,
+                contractFilter: undefined,
+            },
+            estimateFeeOptions: {
+                blocks: [1, 2, 10],
+            },
+            txid: '',
+            tx: '',
+            subscribe: '0x2a0c0dbecc7e4d658f48e01e3fa353f44050c208', // Poloniex: https://www.walletexplorer.com/wallet/Poloniex.com
+        },
+    },
+    {
+        blockchain: {
+            name: 'HyperEVM',
+            worker: 'js/blockbook-worker.js',
+            server: ['https://hype.trezor.io'],
+            debug: true,
+        },
+        data: {
+            address: '',
+            accountInfoOptions: {
+                page: 1,
+                pageSize: 25,
+                contractFilter: undefined,
+            },
+            estimateFeeOptions: {
+                blocks: [1, 2, 10],
+            },
+            txid: '',
+            tx: '',
+            subscribe: '',
+        },
+    },
+    {
+        blockchain: {
             name: 'Ripple',
             worker: 'js/ripple-worker.js',
-            server: ['wss://s1.ripple.com', 'wss://s-east.ripple.com', 'wss://s-west.ripple.com'],
+            server: [
+                'wss://xrp1.trezor.io',
+                'wss://xrp2.trezor.io',
+                'wss://xrplcluster.com',
+                'wss://xrpl.ws',
+                'wss://s2.ripple.com',
+            ],
             debug: true,
         },
         data: {
@@ -31,10 +81,49 @@ export default [
     },
     {
         blockchain: {
+            name: 'Stellar',
+            worker: 'js/stellar-worker.js',
+            server: ['https://horizon.stellar.org'],
+            debug: true,
+        },
+        data: {
+            address: 'GBSXTBPFJOJ64NSYRFE2F6P6TPMMSD45KQZH5TEWIBEAHICY6IZVGCET',
+            accountInfoOptions: {
+                pageSize: 25,
+            },
+            estimateFeeOptions: {
+                blocks: [1, 2, 10],
+            },
+            txid: '',
+            tx: '',
+            subscribe: 'GBSXTBPFJOJ64NSYRFE2F6P6TPMMSD45KQZH5TEWIBEAHICY6IZVGCET',
+        },
+    },
+    {
+        blockchain: {
+            name: 'Stellar Testnet',
+            worker: 'js/stellar-worker.js',
+            server: ['https://horizon-testnet.stellar.org'],
+            debug: true,
+        },
+        data: {
+            address: 'GBSXTBPFJOJ64NSYRFE2F6P6TPMMSD45KQZH5TEWIBEAHICY6IZVGCET',
+            accountInfoOptions: {
+                pageSize: 25,
+            },
+            estimateFeeOptions: {
+                blocks: [1, 2, 10],
+            },
+            txid: '',
+            tx: '',
+            subscribe: 'GBSXTBPFJOJ64NSYRFE2F6P6TPMMSD45KQZH5TEWIBEAHICY6IZVGCET',
+        },
+    },
+    {
+        blockchain: {
             name: 'Ripple Testnet',
             worker: 'js/ripple-worker.js',
-            server: ['wss://s.altnet.rippletest.net'],
-            // server: ['wss://s.devnet.rippletest.net'],
+            server: ['wss://txrp1.trezor.io'],
             debug: true,
         },
         data: {
@@ -59,7 +148,7 @@ export default [
         blockchain: {
             name: 'Ethereum',
             worker: 'js/blockbook-worker.js',
-            server: ['https://eth1.trezor.io', 'https://eth2.trezor.io'],
+            server: ['https://eth.trezor.io'],
             debug: true,
         },
         data: {
@@ -89,9 +178,163 @@ export default [
     },
     {
         blockchain: {
+            name: 'Tron',
+            worker: 'js/blockbook-worker.js',
+            server: ['https://tron.trezor.io'],
+            debug: true,
+        },
+        data: {
+            address: '',
+            accountInfoOptions: {
+                page: 0,
+                pageSize: 25,
+                contractFilter: undefined,
+            },
+            estimateFeeOptions: {
+                blocks: [1],
+            },
+            txid: '',
+            tx: '',
+            subscribe: '',
+        },
+    },
+    {
+        blockchain: {
+            name: 'BNB Smart Chain',
+            worker: 'js/blockbook-worker.js',
+            server: ['https://bsc.trezor.io'],
+            debug: true,
+        },
+        data: {
+            address: '',
+            accountInfoOptions: {
+                page: 1,
+                pageSize: 25,
+                contractFilter: undefined,
+            },
+            estimateFeeOptions: {
+                blocks: [1, 2, 10],
+            },
+            txid: '',
+            tx: '',
+            subscribe: '',
+        },
+    },
+    {
+        blockchain: {
+            name: 'Arbitrum One',
+            worker: 'js/blockbook-worker.js',
+            server: ['https://arb.trezor.io'],
+            debug: true,
+        },
+        data: {
+            address: '',
+            accountInfoOptions: {
+                page: 1,
+                pageSize: 25,
+                contractFilter: undefined,
+            },
+            estimateFeeOptions: {
+                blocks: [1, 2, 10],
+            },
+            txid: '',
+            tx: '',
+            subscribe: '',
+        },
+    },
+    {
+        blockchain: {
+            name: 'Robinhood Chain',
+            worker: 'js/blockbook-worker.js',
+            server: ['https://rhc.trezor.io'],
+            debug: true,
+        },
+        data: {
+            address: '',
+            accountInfoOptions: {
+                page: 1,
+                pageSize: 25,
+                contractFilter: undefined,
+            },
+            estimateFeeOptions: {
+                blocks: [1, 2, 10],
+            },
+            txid: '',
+            tx: '',
+            subscribe: '',
+        },
+    },
+    {
+        blockchain: {
+            name: 'Base',
+            worker: 'js/blockbook-worker.js',
+            server: ['https://base.trezor.io'],
+            debug: true,
+        },
+        data: {
+            address: '',
+            accountInfoOptions: {
+                page: 1,
+                pageSize: 25,
+                contractFilter: undefined,
+            },
+            estimateFeeOptions: {
+                blocks: [1, 2, 10],
+            },
+            txid: '',
+            tx: '',
+            subscribe: '',
+        },
+    },
+    {
+        blockchain: {
+            name: 'Optimism',
+            worker: 'js/blockbook-worker.js',
+            server: ['https://op.trezor.io'],
+            debug: true,
+        },
+        data: {
+            address: '',
+            accountInfoOptions: {
+                page: 1,
+                pageSize: 25,
+                contractFilter: undefined,
+            },
+            estimateFeeOptions: {
+                blocks: [1, 2, 10],
+            },
+            txid: '',
+            tx: '',
+            subscribe: '',
+        },
+    },
+    {
+        blockchain: {
+            name: 'Avalanche C-Chain',
+            worker: 'js/blockbook-worker.js',
+            server: ['https://avax.trezor.io'],
+            debug: true,
+        },
+        data: {
+            address: '',
+            accountInfoOptions: {
+                page: 1,
+                pageSize: 25,
+                contractFilter: undefined,
+            },
+            estimateFeeOptions: {
+                blocks: [1],
+            },
+            txid: '',
+            tx: '',
+            subscribe: '',
+        },
+    },
+    {
+        blockchain: {
             name: 'Ethereum Classic',
             worker: 'js/blockbook-worker.js',
-            server: ['https://etc1.trezor.io', 'https://etc2.trezor.io'],
+            server: ['https://etc.trezor.io'],
             debug: true,
         },
         data: {
@@ -113,13 +356,7 @@ export default [
         blockchain: {
             name: 'Bitcoin',
             worker: 'js/blockbook-worker.js',
-            server: [
-                'https://btc1.trezor.io',
-                'https://btc2.trezor.io',
-                'https://btc3.trezor.io',
-                'https://btc4.trezor.io',
-                'https://btc5.trezor.io',
-            ],
+            server: ['https://btc.trezor.io'],
             debug: true,
         },
         data: {
@@ -141,7 +378,7 @@ export default [
         blockchain: {
             name: 'Bitcoin Testnet',
             worker: 'js/blockbook-worker.js',
-            server: ['https://tbtc1.trezor.io', 'https://tbtc2.trezor.io'],
+            server: ['https://tbtc.trezor.io'],
             debug: true,
         },
         data: {
@@ -173,15 +410,33 @@ export default [
     },
     {
         blockchain: {
+            name: 'Bitcoin Testnet 4',
+            worker: 'js/blockbook-worker.js',
+            server: ['https://tbtc4.trezor.io'],
+            debug: true,
+        },
+        data: {
+            address:
+                'vpub5YX1yJFY8E236pH3iNvCpThsXLxoQoC4nwraaS5h4TZwaSp1Gg9SQoxCsrumxjh7nZRQQkNfH29TEDeMvAZVmD3rpmsDnFc5Sj4JgJG6m4b', // all-all bech32 1
+            accountInfoOptions: {
+                page: 0,
+                pageSize: 25,
+                contractFilter: undefined,
+            },
+            estimateFeeOptions: {
+                blocks: [1, 2, 10],
+            },
+            txid: '',
+            tx: '',
+            subscribe: 'tb1qlj64u6fqutr0xue85kl55fx0gt4m4urun25p7q', // https://bitcoinfaucet.uo1.net/
+        },
+        selected: true,
+    },
+    {
+        blockchain: {
             name: 'Bitcoin Cash',
             worker: 'js/blockbook-worker.js',
-            server: [
-                'https://bch1.trezor.io',
-                'https://bch2.trezor.io',
-                'https://bch3.trezor.io',
-                'https://bch4.trezor.io',
-                'https://bch5.trezor.io',
-            ],
+            server: ['https://bch.trezor.io'],
             debug: true,
         },
         data: {
@@ -277,13 +532,7 @@ export default [
         blockchain: {
             name: 'Doge',
             worker: 'js/blockbook-worker.js',
-            server: [
-                'https://doge1.trezor.io',
-                'https://doge2.trezor.io',
-                'https://doge3.trezor.io',
-                'https://doge4.trezor.io',
-                'https://doge5.trezor.io',
-            ],
+            server: ['https://doge.trezor.io'],
             debug: true,
         },
         data: {
@@ -304,13 +553,7 @@ export default [
         blockchain: {
             name: 'Litecoin',
             worker: 'js/blockbook-worker.js',
-            server: [
-                'https://ltc1.trezor.io',
-                'https://ltc2.trezor.io',
-                'https://ltc3.trezor.io',
-                'https://ltc4.trezor.io',
-                'https://ltc5.trezor.io',
-            ],
+            server: ['https://ltc.trezor.io'],
             debug: true,
         },
         data: {
@@ -379,13 +622,7 @@ export default [
         blockchain: {
             name: 'ZCash',
             worker: 'js/blockbook-worker.js',
-            server: [
-                'https://zec1.trezor.io',
-                'https://zec2.trezor.io',
-                'https://zec3.trezor.io',
-                'https://zec4.trezor.io',
-                'https://zec5.trezor.io',
-            ],
+            server: ['https://zec.trezor.io'],
             debug: true,
         },
         data: {
@@ -406,8 +643,7 @@ export default [
         blockchain: {
             name: 'Cardano Mainnet',
             worker: 'js/blockfrost-worker.js',
-            server: ['wss://trezor-cardano-mainnet.blockfrost.io'],
-            // server: ['ws://localhost:3005'],
+            server: ['wss://ada.trezor.io'],
             debug: true,
         },
         data: {
@@ -430,7 +666,7 @@ export default [
         blockchain: {
             name: 'Cardano Preview Testnet',
             worker: 'js/blockfrost-worker.js',
-            server: ['wss://trezor-cardano-preview.blockfrost.io'],
+            server: ['wss://tada1.trezor.io'],
             debug: true,
         },
         data: {
@@ -454,7 +690,7 @@ export default [
             name: 'Solana Mainnet',
             // we do not use path to worker build here because its not used, we use it just to match this config to actual implementation of the worker
             worker: 'solana',
-            server: ['https://solana1.trezor.io'],
+            server: ['https://sol.trezor.io'],
             debug: true,
         },
         data: {
@@ -481,7 +717,7 @@ export default [
             name: 'Solana Devnet',
             // we do not use path to worker build here because its not used, we use it just to match this config to actual implementation of the worker
             worker: 'solana',
-            server: ['https://solana-dev.trezor.io'],
+            server: ['https://dsol1.trezor.io'],
             debug: true,
         },
         data: {
@@ -507,7 +743,7 @@ export default [
         blockchain: {
             name: 'Polygon PoS',
             worker: 'js/blockbook-worker.js',
-            server: ['https://matic1.trezor.io', 'https://matic2.trezor.io'],
+            server: ['https://pol.trezor.io'],
             debug: true,
         },
         data: {

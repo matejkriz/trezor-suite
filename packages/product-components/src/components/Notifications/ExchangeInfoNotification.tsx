@@ -1,0 +1,44 @@
+import { type ReactNode } from 'react';
+
+import { Column, Icon, Row, Text } from '@trezor/components';
+import { ArrowRightIcon } from '@trezor/icons';
+
+import { ExchangeAmountWithSymbol } from './ExchangeAmountWithSymbol';
+import { ExchangeAssetWithFallback } from './ExchangeAssetWithFallback';
+import { type ExchangeInfoAmountSide, type ExchangeInfoAsset } from './notificationsTypes';
+
+export type { ExchangeInfoAmountSide, ExchangeInfoAsset } from './notificationsTypes';
+
+export type ExchangeInfoNotificationProps = {
+    message: ReactNode;
+    send: ExchangeInfoAsset;
+    receive: ExchangeInfoAsset;
+    renderAmount?: (amount: ReactNode, side: ExchangeInfoAmountSide) => ReactNode;
+    'data-testid'?: string;
+};
+
+export const ExchangeInfoNotification = ({
+    message,
+    send,
+    receive,
+    renderAmount,
+    'data-testid': dataTestId,
+}: ExchangeInfoNotificationProps) => {
+    const sendAmount = renderAmount ? renderAmount(send.amount, 'send') : send.amount;
+    const receiveAmount = renderAmount ? renderAmount(receive.amount, 'receive') : receive.amount;
+
+    return (
+        <Column gap={4}>
+            <Text typographyStyle="body-md-strong" data-testid={`${dataTestId}/message`}>
+                {message}
+            </Text>
+            <Row gap={8} alignItems="center">
+                <ExchangeAssetWithFallback asset={send} />
+                <ExchangeAmountWithSymbol amount={sendAmount} asset={send} />
+                <Icon as={ArrowRightIcon} size={20} />
+                <ExchangeAssetWithFallback asset={receive} />
+                <ExchangeAmountWithSymbol amount={receiveAmount} asset={receive} />
+            </Row>
+        </Column>
+    );
+};

@@ -13,16 +13,15 @@
     },
     "include": [".", "**/*.json"],
     "references": [
-        { "path": "../../suite-common/icons" },
+        { "path": "../../suite-common/flags" },
         {
-            "path": "../../suite-common/validators"
+            "path": "../../suite-common/illustrations"
         },
-        { "path": "../connect" },
-        { "path": "../dom-utils" },
         { "path": "../env-utils" },
-        { "path": "../react-utils" },
-        { "path": "../styles" },
+        { "path": "../icons" },
         { "path": "../theme" },
-        { "path": "../utils" }
+        { "path": "../type-utils" },
+        { "path": "../utils" },
+        { "path": "../eslint" }
     ]
 }

@@ -1,41 +1,65 @@
-import type { Transaction } from '@trezor/blockchain-link-types';
+import type { ServerInfo, Transaction } from '@trezor/blockchain-link-types';
+import { RIPPLE_DECIMALS, getUnixTimestamp } from '@trezor/network-ripple/constants';
+import type { AccountTxTransaction, ServerInfoResponse } from '@trezor/network-ripple/types';
 
-// export const transformServerInfo = (payload: GetServerInfoResponse) => {
-export const transformServerInfo = (payload: any) => ({
+export const transformServerInfo = (payload: ServerInfoResponse): Omit<ServerInfo, 'url'> => ({
     name: 'Ripple',
     shortcut: 'xrp',
+    network: 'xrp',
     testnet: false,
-    version: payload.buildVersion,
-    decimals: 6,
-    blockHeight: payload.validatedLedger.ledgerVersion,
-    blockHash: payload.validatedLedger.hash,
+    version: payload.result.info.build_version,
+    decimals: RIPPLE_DECIMALS,
+    blockHeight: payload.result.info.validated_ledger?.seq ?? 0,
+    blockHash: payload.result.info.validated_ledger?.hash ?? '',
 });
 
-// https://bitcoin.stackexchange.com/questions/23061/ripple-ledger-time-format/23065#23065
-const BLOCKTIME_OFFSET = 946684800;
+export const transformTransaction = (
+    hash: string | undefined,
+    tx_json: NonNullable<AccountTxTransaction['tx_json']>,
+    meta: AccountTxTransaction['meta'] | undefined,
+    descriptor?: string,
+): Transaction => {
+    let txType: Transaction['type'] = 'unknown';
+    let addresses: string[] = [];
+    let amount: string | undefined;
+    let destinationTag: number | undefined;
 
-export const transformTransaction = (tx: any, descriptor?: string): Transaction => {
-    const blockTime =
-        typeof tx.date === 'number' && tx.date > 0 ? tx.date + BLOCKTIME_OFFSET : tx.date;
-    const type =
-        tx.TransactionType !== 'Payment' || !descriptor
-            ? 'unknown'
-            : (tx.Account === descriptor && 'sent') || 'recv';
-    const addresses = [tx.Destination];
-    const amount = tx.Amount;
-    const fee = tx.Fee;
+    if (tx_json.TransactionType === 'Payment') {
+        // https://xrpl.org/docs/references/protocol/transactions/types/payment
+        // DeliverMax is a valid field on Payment response
+        const deliverMax = (tx_json as { DeliverMax?: string }).DeliverMax ?? undefined;
+        const isTokenTransaction = typeof deliverMax !== 'string';
 
-    // TODO: https://github.com/ripple/ripple-lib/blob/develop/docs/index.md#transaction-types
+        amount = !isTokenTransaction ? deliverMax : undefined;
+
+        // https://xrpl.org/docs/references/protocol/transactions/transaction-results
+        // Success - tes - (Not an error) The transaction succeeded. This result only final in a validated ledger.
+        if (
+            meta != null &&
+            typeof meta !== 'string' &&
+            !meta.TransactionResult?.startsWith('tes')
+        ) {
+            txType = 'failed';
+        } else if (!descriptor || isTokenTransaction) {
+            txType = 'unknown';
+        } else {
+            txType = tx_json.Account === descriptor ? 'sent' : 'recv';
+        }
+
+        addresses = [tx_json.Destination];
+        destinationTag = tx_json.DestinationTag;
+    }
+
     return {
-        type,
-        txid: tx.hash,
-        amount,
-        fee,
-        blockTime,
-        blockHeight: tx.ledger_index,
-        blockHash: tx.hash,
+        type: txType,
+        txid: hash ?? '',
+        amount: amount ?? '0',
+        fee: tx_json.Fee ?? '0',
+        blockTime: getUnixTimestamp(tx_json.date),
+        blockHeight: tx_json.ledger_index,
+        blockHash: hash ?? '',
         targets:
-            type === 'unknown'
+            txType === 'unknown'
                 ? []
                 : [
                       {
@@ -54,6 +78,9 @@ export const transformTransaction = (tx: any, descriptor?: string): Transaction 
             size: 0,
             totalInput: '0',
             totalOutput: '0',
+        },
+        rippleSpecific: {
+            destinationTag,
         },
     };
 };

@@ -1,36 +1,34 @@
-import { css, DefaultTheme } from 'styled-components';
+import { css } from 'styled-components';
 
-type InputColorOptions = {
-    checked?: boolean;
-    disabled?: boolean;
-};
+import { type CSSColor } from '@trezor/theme';
+import { clamp } from '@trezor/utils';
 
-type LabelColorOptions = {
-    disabled?: boolean;
-    alert?: boolean;
-};
+export const focusStyleTransition = 'outline 0.1s ease-out';
 
-export const getInputColor = (theme: DefaultTheme, { checked, disabled }: InputColorOptions) => {
-    if (!checked) {
-        return theme.backgroundNeutralDisabled;
-    }
-
-    return disabled ? theme.backgroundPrimarySubtleOnElevation0 : theme.backgroundPrimaryDefault;
-};
-
-export const getLabelColor = (theme: DefaultTheme, { alert, disabled }: LabelColorOptions) => {
-    if (alert) {
-        return theme.borderAlertRed;
-    }
-
-    return disabled ? theme.textDisabled : theme.textDefault;
-};
-
-export const focusStyleTransition = 'box-shadow 0.1s ease-out, border-color 0.1s ease-out';
-
-export const getFocusShadowStyle = (selector = '&:focus-visible') => css`
-    ${selector} {
-        border-color: ${({ theme }) => theme.backgroundAlertBlueBold};
-        box-shadow: ${({ theme }) => theme.boxShadowFocused};
-    }
+export const commonFocusStyles = css`
+    outline: 4px solid ${({ theme }) => theme.elementBorderFocusRing};
+    outline-offset: 2px;
 `;
+
+export const addAlphaToHex = (hex: CSSColor, percent: number): CSSColor => {
+    const cleanHex = hex.replace(/^#/, '');
+    const clampedPercent = clamp(percent, 0, 1);
+
+    const normalizedHex =
+        cleanHex.length === 3 || cleanHex.length === 4
+            ? cleanHex
+                  .split('')
+                  .map(c => c + c)
+                  .join('')
+            : cleanHex;
+
+    const rgbHex = normalizedHex.slice(0, 6);
+    const existingAlphaHex = normalizedHex.length === 8 ? normalizedHex.slice(6, 8) : 'FF';
+    const baseAlpha = parseInt(existingAlphaHex, 16);
+    const newAlphaHex = Math.round(baseAlpha * clampedPercent)
+        .toString(16)
+        .padStart(2, '0')
+        .toUpperCase();
+
+    return `#${rgbHex}${newAlphaHex}`;
+};

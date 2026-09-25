@@ -1,20 +1,36 @@
-import { borders } from '@trezor/theme';
-import styled, { CSSProperties, css } from 'styled-components';
+import styled, { css } from 'styled-components';
 
-export type Shape = 'CIRCLE' | 'ROUNDED' | 'ROUNDED-SMALL';
+import { type FrameProps, type FramePropsKeys, withFrameProps } from '../../utils/frameProps';
+import { type TransientProps } from '../../utils/transientProps';
 
-export const AnimationWrapper = styled.div<{
-    height?: CSSProperties['height'];
-    width?: CSSProperties['width'];
-    shape?: Shape;
-}>`
+export const allowedAnimationPrimitivesFrameProps = [
+    'margin',
+    'maxWidth',
+    'maxHeight',
+    'width',
+    'height',
+] as const satisfies FramePropsKeys[];
+export type AllowedAnimationPrimitiveFrameProps = Pick<
+    FrameProps,
+    (typeof allowedAnimationPrimitivesFrameProps)[number]
+>;
+
+export const shapes = ['CIRCLE', 'ROUNDED', 'ROUNDED-SMALL'] as const;
+export type Shape = (typeof shapes)[number];
+
+export const AnimationWrapper = styled.div.attrs<{ 'data-component'?: string }>(props => ({
+    'data-component': props['data-component'] ?? 'AnimationWrapper',
+}))<
+    TransientProps<AllowedAnimationPrimitiveFrameProps> & {
+        shape?: Shape;
+    }
+>`
     overflow: hidden;
     display: flex;
     justify-content: center;
     align-items: center;
 
-    width: ${({ width }) => width};
-    height: ${({ height }) => height};
+    ${withFrameProps}
 
     ${({ shape }) =>
         shape === 'CIRCLE' &&
@@ -24,11 +40,11 @@ export const AnimationWrapper = styled.div<{
     ${({ shape }) =>
         shape === 'ROUNDED' &&
         css`
-            border-radius: 30px;
+            border-radius: 32px;
         `};
     ${({ shape }) =>
         shape === 'ROUNDED-SMALL' &&
         css`
-            border-radius: ${borders.radii.xs};
+            border-radius: 4px;
         `};
 `;

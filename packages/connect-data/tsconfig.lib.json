@@ -1,0 +1,10 @@
+{
+    "extends": "../../tsconfig.lib.json",
+    "include": ["./src", "./files"],
+    "compilerOptions": {
+        "outDir": "./lib",
+        "rootDir": "./src",
+        "types": ["node", "chrome", "jest"]
+    },
+    "references": [{ "path": "../requirements" }]
+}

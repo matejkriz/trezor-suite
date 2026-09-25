@@ -1,0 +1,9 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "outDir": "./libDev",
+        "types": ["node", "chrome", "jest"]
+    },
+    "include": [".", "./files/**/*.json"],
+    "references": [{ "path": "../requirements" }]
+}

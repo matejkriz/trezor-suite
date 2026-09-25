@@ -1,38 +1,44 @@
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+
 import { deviceAccessMutex } from './DeviceAccessMutex';
 import { DEVICE_ACCESS_ERROR } from './constants';
-import { DeviceAccessResponse } from './types';
+import { type DeviceAccessResponse } from './types';
 
 /**
  * Puts the callback to the end of the queue and waits for its turn to execute.
  */
-export const requestDeviceAccess = async <TParams extends unknown[], TReturnType>(
-    deviceCallback: (...args: TParams) => TReturnType,
-    ...callbackParams: TParams
+export const requestDeviceAccess = async <TReturnType>(
+    deviceCallback: () => TReturnType,
+    isPrioritized?: boolean,
 ): DeviceAccessResponse<TReturnType> => {
-    const wasLockSuccessful = await deviceAccessMutex.lock();
+    const wasLockSuccessful = await (isPrioritized
+        ? deviceAccessMutex.prioritizedLock()
+        : deviceAccessMutex.lock());
     if (!wasLockSuccessful) return DEVICE_ACCESS_ERROR;
 
-    const response = await deviceCallback(...callbackParams);
-    deviceAccessMutex.unlock();
+    const keepAwakeTag = crypto.randomUUID();
 
-    return { success: true, payload: response };
+    try {
+        activateKeepAwakeAsync(keepAwakeTag); // Prevents screen from sleeping while app interacts with device.
+        const response = await deviceCallback();
+        deviceAccessMutex.unlock();
+
+        return { success: true, payload: response };
+    } catch (error) {
+        deviceAccessMutex.unlock();
+
+        return { success: false, error };
+    } finally {
+        deactivateKeepAwake(keepAwakeTag);
+    }
 };
 
 /**
  * Puts the callback to the beginning of the queue to execute the callback with priority.
  */
-export const requestPrioritizedDeviceAccess = async <TParams extends unknown[], TReturnType>(
-    deviceCallback: (...args: TParams) => TReturnType,
-    ...callbackParams: TParams
-): DeviceAccessResponse<TReturnType> => {
-    const wasLockSuccessful = await deviceAccessMutex.prioritizedLock();
-    if (!wasLockSuccessful) return DEVICE_ACCESS_ERROR;
-
-    const response = await deviceCallback(...callbackParams);
-    deviceAccessMutex.unlock();
-
-    return { success: true, payload: response };
-};
+export const requestPrioritizedDeviceAccess = <TReturnType>(
+    deviceCallback: () => TReturnType,
+): DeviceAccessResponse<TReturnType> => requestDeviceAccess(deviceCallback, true);
 
 export const clearAndUnlockDeviceAccessQueue = () => {
     deviceAccessMutex.clearQueue();

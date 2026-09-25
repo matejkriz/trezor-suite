@@ -1,41 +1,25 @@
-import { useEffect } from 'react';
-import styled from 'styled-components';
-import { TooltipProps } from 'recharts';
+import { type JSX, useEffect } from 'react';
 
-import { variables } from '@trezor/components';
+import { type TooltipProps } from 'recharts';
+import styled, { ThemeProvider } from 'styled-components';
 
-import { Translation, FormattedDate } from 'src/components/suite';
-import { CommonAggregatedHistory, GraphRange } from 'src/types/wallet/graph';
+import { Translation } from '@suite/intl';
+import { Row, Text, intermediaryTheme } from '@trezor/components';
+
+import { FormattedDate } from 'src/components/suite/FormattedDate';
+import { type CommonAggregatedHistory, type GraphRange } from 'src/types/wallet/graph';
 
 // Used for triggering custom Tooltip alignment
 const OFFSET_LIMIT_HORIZONTAL = 125;
 
-// When the Tooltip gets triggered near to the horizontal boundaries, it might overflow outside of the screen
-// These positioning functions are used to align it properly from each side
-const calculateXPosition = (x: number, offset = 0) => `calc(${x}px - ${x / 2}px + ${offset}px)`;
-const calculateXPositionRight = (x: number, offset = 0) => `calc(${x}px + 25% + ${offset}px)`;
+// The Tooltip is centered above the hovered point, but ancestors of the chart clip horizontal
+// overflow (the app content is a scroll container), so the box is clamped to the chart's left
+// edge and only the arrow keeps following the cursor
+const getTooltipXPosition = (x: number, width: number): string =>
+    x >= width - OFFSET_LIMIT_HORIZONTAL ? `calc(${x}px + 25%)` : `max(0px, calc(${x}px - 50%))`;
 
-// Tooltip should be centered and above the chart bars but should not overflow horizontally thanks to the positioning functions
-const getTooltipXPosition = (x: number, width: number): string => {
-    if (x <= OFFSET_LIMIT_HORIZONTAL) {
-        return calculateXPosition(x, -30);
-    }
-
-    if (x >= width - OFFSET_LIMIT_HORIZONTAL) {
-        return calculateXPositionRight(x);
-    }
-
-    return `calc(${x}px - 50%)`;
-};
-
-// Align the triangle arrow in a similar manner
-const getTooltipArrowXPosition = (x: number, width: number): string => {
-    if (x <= OFFSET_LIMIT_HORIZONTAL) {
-        return `left: ${calculateXPosition(x, -30)};`;
-    }
-
-    return x >= width - OFFSET_LIMIT_HORIZONTAL ? `left: calc(75% + 1px);` : `left: 50%;`;
-};
+const getTooltipArrowXPosition = (x: number, width: number): string =>
+    x >= width - OFFSET_LIMIT_HORIZONTAL ? `left: calc(75% + 1px);` : `left: min(${x}px, 50%);`;
 
 interface WrapperProps {
     $positionX: number;
@@ -45,11 +29,12 @@ interface WrapperProps {
 const CustomTooltipWrapper = styled.div<WrapperProps>`
     display: flex;
     flex-direction: column;
-    color: ${({ theme }) => theme.TYPE_WHITE};
-    background: ${({ theme }) => theme.BG_TOOLTIP};
+    color: ${({ theme }) => theme.contentPrimary};
+    background: ${({ theme }) => theme.surfaceFillModelessNeutralDark};
+    outline: 1px solid ${({ theme }) => theme.surfaceBorderModelessNeutralDark};
     padding: 8px 6px;
     border-radius: 4px;
-    box-shadow: 0 3px 14px 0 ${({ theme }) => theme.BOX_SHADOW_BLACK_15};
+    box-shadow: ${({ theme }) => theme.surfaceShadowModeless};
     font-variant-numeric: tabular-nums;
     ${({ $positionX, $boxWidth }) =>
         $positionX >= $boxWidth - OFFSET_LIMIT_HORIZONTAL && `position: absolute; right: 0;`}
@@ -62,13 +47,14 @@ const CustomTooltipWrapper = styled.div<WrapperProps>`
         content: '';
         top: 100%;
         ${({ $positionX, $boxWidth }) => getTooltipArrowXPosition($positionX, $boxWidth)}
-        margin-left: ${({ $positionX }) =>
-            $positionX <= OFFSET_LIMIT_HORIZONTAL ? `50px` : `-10px`};
+        margin-left: -10px;
         width: 0;
         height: 0;
+        /* stylelint-disable trezor/dimension-token-values -- These borders construct the tooltip arrow. */
         border-left: 10px solid transparent;
         border-right: 10px solid transparent;
-        border-top: 10px solid ${({ theme }) => theme.BG_TOOLTIP};
+        border-top: 10px solid ${({ theme }) => theme.surfaceFillModelessNeutralDark};
+        /* stylelint-enable trezor/dimension-token-values */
     }
 `;
 
@@ -77,23 +63,15 @@ const Col = styled.div`
     flex-direction: column;
 `;
 
-const Row = styled.div<{ $noBottomMargin?: boolean }>`
-    display: flex;
-    white-space: nowrap;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 8px;
-    margin-bottom: ${({ $noBottomMargin }) => ($noBottomMargin ? '0px' : '4px')};
-`;
+const Title = ({ children }: { children: React.ReactNode }) => (
+    <Text typographyStyle="body-md" margin={{ right: 20 }}>
+        {children}
+    </Text>
+);
 
-const Title = styled.span`
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-    margin-right: 20px;
-`;
-
-const Value = styled.span`
-    font-weight: ${variables.FONT_WEIGHT.DEMI_BOLD};
-`;
+const Value = ({ children }: { children: React.ReactNode }) => (
+    <Text typographyStyle="body-md-strong">{children}</Text>
+);
 
 const ColsWrapper = styled.div`
     display: flex;
@@ -105,19 +83,13 @@ const HighlightedArea = styled(Col)`
 `;
 
 const HighlightedAreaLeft = styled(HighlightedArea)`
-    border-top-left-radius: 5px;
-    border-bottom-left-radius: 5px;
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
 `;
 
 const HighlightedAreaRight = styled(HighlightedArea)`
-    border-top-right-radius: 5px;
-    border-bottom-right-radius: 5px;
-`;
-
-const Sign = styled.span<{ $color: string }>`
-    color: ${({ $color }) => $color};
-    width: 1ch;
-    margin-right: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
 `;
 
 const formatDate = (date: Date, dateFormat: 'day' | 'month') => {
@@ -145,77 +117,104 @@ export const GraphTooltipBase = (props: GraphTooltipBaseProps) => {
 
         props.onShow(
             props.extendedDataForInterval.findIndex(
-                item => item.time === props.payload?.[0].payload.time,
+                item => item.time === props.payload?.[0]?.payload.time,
             ),
         );
     }, [props]);
 
-    if (!props.active || !props.payload) {
+    const firstEntry = props.payload?.[0];
+
+    if (!props.active || !props.payload || !firstEntry) {
         return null;
     }
 
-    const date = new Date(props.payload[0].payload.time * 1000);
+    const date = new Date(firstEntry.payload.time * 1000);
     const dateFormat =
         props.selectedRange?.label === 'year' || props.selectedRange?.label === 'all'
             ? 'month'
             : 'day';
 
     return (
-        <CustomTooltipWrapper
-            $positionX={props.coordinate!.x!}
-            $boxWidth={props.viewBox!.width!}
-            data-test="@dashboard/customtooltip"
-        >
-            <Row>
-                <Title>{date && formatDate(date, dateFormat)}</Title>
-            </Row>
+        <ThemeProvider theme={{ variant: 'dark', ...intermediaryTheme.dark }}>
+            <CustomTooltipWrapper
+                $positionX={props.coordinate!.x!}
+                $boxWidth={props.viewBox!.width!}
+                data-testid="@dashboard/customtooltip"
+            >
+                <Row margin={{ bottom: 4, left: 8, right: 8 }}>
+                    <Title>{date && formatDate(date, dateFormat)}</Title>
+                </Row>
 
-            <ColsWrapper>
-                <Col>
-                    {props.balance && (
-                        <Row>
-                            <Title>
-                                <Translation id="TR_BALANCE" />
-                            </Title>
-                        </Row>
-                    )}
+                <ColsWrapper>
+                    <Col>
+                        {props.balance && (
+                            <Row
+                                margin={{
+                                    bottom: 4,
+                                    left: 8,
+                                    right: 8,
+                                }}
+                            >
+                                <Title>
+                                    <Translation id="TR_BALANCE" />
+                                </Title>
+                            </Row>
+                        )}
 
-                    <HighlightedAreaLeft>
-                        <Row>
-                            <Title>
-                                <Translation id="TR_RECEIVED" />
-                            </Title>
-                        </Row>
+                        <HighlightedAreaLeft>
+                            <Row
+                                margin={{
+                                    bottom: 4,
+                                    left: 8,
+                                    right: 8,
+                                }}
+                            >
+                                <Title>
+                                    <Translation id="TR_RECEIVED" />
+                                </Title>
+                            </Row>
 
-                        <Row $noBottomMargin>
-                            <Title>
-                                <Translation id="TR_SENT" />
-                            </Title>
-                        </Row>
-                    </HighlightedAreaLeft>
-                </Col>
+                            <Row margin={{ left: 8, right: 8 }}>
+                                <Title>
+                                    <Translation id="TR_SENT" />
+                                </Title>
+                            </Row>
+                        </HighlightedAreaLeft>
+                    </Col>
 
-                <Col>
-                    {props.balance && (
-                        <Row>
-                            <Value>
-                                <Sign $color="transparent">+</Sign>
-                                {props.balance}
-                            </Value>
-                        </Row>
-                    )}
+                    <Col>
+                        {props.balance && (
+                            <Row
+                                margin={{
+                                    bottom: 4,
+                                    left: 8,
+                                    right: 8,
+                                }}
+                            >
+                                <Value>
+                                    <Row margin={{ left: 8, right: 8 }}>{props.balance}</Row>
+                                </Value>
+                            </Row>
+                        )}
 
-                    <HighlightedAreaRight>
-                        <Row>
-                            <Value>{props.receivedAmount}</Value>
-                        </Row>
+                        <HighlightedAreaRight>
+                            <Row
+                                margin={{
+                                    bottom: 4,
+                                    left: 8,
+                                    right: 8,
+                                }}
+                            >
+                                <Value>{props.receivedAmount}</Value>
+                            </Row>
 
-                        <Row $noBottomMargin>
-                            <Value>{props.sentAmount}</Value>
-                        </Row>
-                    </HighlightedAreaRight>
-                </Col>
-            </ColsWrapper>
-        </CustomTooltipWrapper>
+                            <Row margin={{ left: 8, right: 8 }}>
+                                <Value>{props.sentAmount}</Value>
+                            </Row>
+                        </HighlightedAreaRight>
+                    </Col>
+                </ColsWrapper>
+            </CustomTooltipWrapper>
+        </ThemeProvider>
     );
 };

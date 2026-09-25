@@ -1,64 +1,76 @@
-import styled from 'styled-components';
-
+import { events, injectDesktopAnalytics } from '@suite/analytics';
+import { setConnectionMode, toggleConnectionModal } from '@suite/device';
+import { Translation } from '@suite/intl';
+import { bluetoothActions, selectAdapterStatus } from '@suite-common/bluetooth';
+import { useServices } from '@suite-common/dependency-injection';
+import { selectDevices } from '@suite-common/device';
+import { injectDispatch } from '@suite-common/redux-utils';
 import * as deviceUtils from '@suite-common/suite-utils';
-import { selectDevice, selectDevices } from '@suite-common/wallet-core';
+import { Button, Column } from '@trezor/components';
+import { TrezorDevicesIcon } from '@trezor/icons';
 
-import { Translation } from 'src/components/suite/Translation';
-import { Modal, WebUsbButton } from 'src/components/suite';
-import { isWebUsb } from 'src/utils/suite/transport';
-import { getBackgroundRoute } from 'src/utils/suite/router';
-import { ForegroundAppProps } from 'src/types/suite';
 import { useSelector } from 'src/hooks/suite';
+import { type ForegroundAppProps } from 'src/types/suite';
 
 import { DeviceItem } from './DeviceItem/DeviceItem';
+import { SwitchDeviceModal } from './SwitchDeviceModal';
 
-const DeviceItemsWrapper = styled.div`
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    flex: 1;
-`;
-
-export const SwitchDevice = ({ cancelable, onCancel }: ForegroundAppProps) => {
-    const selectedDevice = useSelector(selectDevice);
+export const SwitchDeviceContent = ({ cancelable, onCancel }: ForegroundAppProps) => {
+    const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
+    const bluetoothAdapterStatus = useSelector(selectAdapterStatus);
     const devices = useSelector(selectDevices);
-    const transport = useSelector(state => state.suite.transport);
 
-    const isWebUsbTransport = isWebUsb(transport);
-
-    // exclude selectedDevice from list, because other devices could have a higher priority
+    // exclude selectedDevice from list, because other devices could have a higher priority,
     // and we want to have selectedDevice on top
-    const sortedDevices = deviceUtils
-        .getFirstDeviceInstance(devices)
-        .filter(d => !deviceUtils.isSelectedDevice(selectedDevice, d));
+    const sortedDevices = deviceUtils.getFirstDeviceInstance(devices, {
+        sortingFn: deviceUtils.sortDevicesForDeviceList,
+    });
 
-    // append selectedDevice at top of the list
-    if (selectedDevice) {
-        sortedDevices.unshift(selectedDevice);
-    }
+    const openDeviceConnectionModal = () => {
+        dispatch(toggleConnectionModal());
 
-    const backgroundRoute = getBackgroundRoute();
+        if (bluetoothAdapterStatus === 'enabled') {
+            dispatch(bluetoothActions.enableAutoConnect());
+            dispatch(setConnectionMode('bluetooth'));
+        }
+
+        analytics.report({
+            type: events.deviceConnectionConnectButtonEvent.name,
+            payload: {
+                option: 'dropdown',
+            },
+        });
+
+        onCancel();
+    };
 
     return (
-        <Modal
-            isCancelable={cancelable}
-            onCancel={onCancel}
-            heading={<Translation id="TR_CHOOSE_WALLET" />}
-            headerComponent={
-                isWebUsbTransport ? <WebUsbButton variant="tertiary" size="small" /> : undefined
-            }
-        >
-            <DeviceItemsWrapper>
-                {sortedDevices.map(device => (
-                    <DeviceItem
-                        key={`${device.id}-${device.instance}`}
-                        device={device}
-                        instances={deviceUtils.getDeviceInstances(device, devices)}
-                        backgroundRoute={backgroundRoute}
-                        onCancel={onCancel}
-                    />
-                ))}
-            </DeviceItemsWrapper>
-        </Modal>
+        <Column gap={12}>
+            {sortedDevices.map(device => (
+                <DeviceItem
+                    key={`${device.path}-${device.id}-${device.instance}`}
+                    device={device}
+                    instances={deviceUtils.getDeviceInstances(device, devices)}
+                    onCancel={cancelable ? onCancel : undefined}
+                />
+            ))}
+            <Button
+                intent="neutral"
+                priority="secondary"
+                iconLeft={TrezorDevicesIcon}
+                isFloating
+                width="100%"
+                size="large"
+                onClick={openDeviceConnectionModal}
+            >
+                <Translation id="TR_CONNECT_DEVICE" />
+            </Button>
+        </Column>
     );
 };
+
+export const SwitchDevice = ({ cancelable, onCancel }: ForegroundAppProps) => (
+    <SwitchDeviceModal isAnimationEnabled onCancel={cancelable ? onCancel : undefined}>
+        <SwitchDeviceContent cancelable={cancelable} onCancel={onCancel} />
+    </SwitchDeviceModal>
+);

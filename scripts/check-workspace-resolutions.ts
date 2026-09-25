@@ -1,6 +1,6 @@
-import fs from 'fs';
-import path from 'path';
 import chalk from 'chalk';
+import fs from 'node:fs';
+import path from 'node:path';
 
 import { getWorkspacesList } from './utils/getWorkspacesList';
 
@@ -13,8 +13,7 @@ import { getWorkspacesList } from './utils/getWorkspacesList';
         {},
     );
 
-    Object.keys(workspaces).forEach(workspaceName => {
-        const workspace = workspaces[workspaceName];
+    Object.entries(workspaces).forEach(([workspaceName, workspace]) => {
         const packageJSON = fs.readFileSync(path.join(workspace.location, 'package.json'), {
             encoding: 'utf-8',
         });
@@ -23,10 +22,11 @@ import { getWorkspacesList } from './utils/getWorkspacesList';
         const listOfWorkspaceDependencies = { ...dependencies, ...devDependencies };
 
         workspace.workspaceDependencies.forEach(workspaceDependency => {
-            const dependencyName = packageNames[workspaceDependency];
-            const dependencyVersion = listOfWorkspaceDependencies[dependencyName];
+            const dependencyName = packageNames[workspaceDependency] ?? workspaceDependency;
+            const dependencyVersion: string | undefined =
+                listOfWorkspaceDependencies[dependencyName];
 
-            if (!dependencyVersion.startsWith('workspace:')) {
+            if (!dependencyVersion?.startsWith('workspace:')) {
                 console.error(
                     chalk.red(
                         `${workspaceName} has a dependency on ${dependencyName} with version ${dependencyVersion}.`,

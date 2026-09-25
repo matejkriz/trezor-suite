@@ -1,0 +1,73 @@
+import { Translation, type TranslationKey } from '@suite/intl';
+import { type NetworkType } from '@suite-common/wallet-config';
+import { type RbfTransactionType } from '@suite-common/wallet-types';
+import { Box, Card, Column, IconCircle, Text, TextButton } from '@trezor/components';
+import { WarningIcon } from '@trezor/icons';
+import {
+    HELP_CENTER_CANCEL_TRANSACTION,
+    HELP_CENTER_REPLACE_BY_FEE_BITCOIN,
+    HELP_CENTER_REPLACE_BY_FEE_ETHEREUM,
+    type Url,
+} from '@trezor/urls';
+
+export type ReplaceByFeeFailedOriginalTxConfirmedProps = {
+    type: RbfTransactionType;
+    networkType: NetworkType;
+};
+
+const titleMap: Record<ReplaceByFeeFailedOriginalTxConfirmedProps['type'], TranslationKey> = {
+    'bump-fee': 'TR_REPLACE_BY_FEE_FAILED_ALREADY_MINED',
+    cancel: 'TR_CANCEL_TX_FAILED_ALREADY_MINED',
+};
+
+const descriptionMap: Record<ReplaceByFeeFailedOriginalTxConfirmedProps['type'], TranslationKey> = {
+    'bump-fee': 'TR_REPLACE_BY_FEE_FAILED_ALREADY_MINED_DESCRIPTION',
+    cancel: 'TR_CANCEL_TX_FAILED_ALREADY_MINED_DESCRIPTION',
+};
+
+const helpLink: Record<
+    NetworkType,
+    Record<ReplaceByFeeFailedOriginalTxConfirmedProps['type'], Url | null> | null
+> = {
+    bitcoin: {
+        'bump-fee': HELP_CENTER_REPLACE_BY_FEE_BITCOIN,
+        cancel: HELP_CENTER_CANCEL_TRANSACTION,
+    },
+    cardano: null,
+    ethereum: {
+        'bump-fee': HELP_CENTER_REPLACE_BY_FEE_ETHEREUM,
+        cancel: null,
+    },
+    ripple: null,
+    solana: null,
+    stellar: null,
+    tron: null,
+};
+
+export const ReplaceByFeeFailedOriginalTxConfirmed = ({
+    type,
+    networkType,
+}: ReplaceByFeeFailedOriginalTxConfirmedProps) => {
+    const link = helpLink[networkType]?.[type];
+
+    return (
+        <Card type="contrast">
+            <Column gap={8}>
+                <Box margin={{ bottom: 16 }}>
+                    <IconCircle icon={WarningIcon} size={112} intent="critical" />
+                </Box>
+
+                <Text typographyStyle="headline-sm">
+                    <Translation id={titleMap[type]} />
+                </Text>
+                <Translation id={descriptionMap[type]} />
+
+                {link && (
+                    <TextButton href={link} size="small" isUnderlined>
+                        <Translation id="TR_LEARN_MORE" />
+                    </TextButton>
+                )}
+            </Column>
+        </Card>
+    );
+};

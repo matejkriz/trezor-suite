@@ -1,146 +1,146 @@
-import { ButtonHTMLAttributes } from 'react';
-import styled, { useTheme } from 'styled-components';
-import { Elevation, borders, spacingsPx, typography } from '@trezor/theme';
-import { Icon, IconType } from '../../assets/Icon/Icon';
-import { Spinner } from '../../loaders/Spinner/Spinner';
+import styled from 'styled-components';
+
+import { ArrowLineUpRightIcon } from '@trezor/icons';
+
 import {
-    ButtonSize,
-    ButtonVariant,
-    getIconColor,
-    getIconSize,
-    getPadding,
-    getVariantStyle,
-    IconAlignment,
-} from '../buttonStyleUtils';
-import { focusStyleTransition, getFocusShadowStyle } from '../../../utils/utils';
-import { useElevation } from '../../ElevationContext/ElevationContext';
+    type FrameProps,
+    type FramePropsKeys,
+    pickAndPrepareFrameProps,
+    withFrameProps,
+} from '../../../utils/frameProps';
+import { type TransientProps } from '../../../utils/transientProps';
+import { Box } from '../../Box/Box';
+import { Row } from '../../Flex/Flex';
+import { Icon, type IconComponent } from '../../Icon/Icon';
+import { ShortcutBadge } from '../../ShortcutBadge/ShortcutBadge';
+import { Spinner } from '../../loaders/Spinner/Spinner';
+import { Text } from '../../typography/Text/Text';
+import {
+    type ButtonIntent,
+    type ButtonPriority,
+    type ButtonSize,
+    type CommonButtonProps,
+} from '../types';
+import {
+    commonButtonStyles,
+    mapPropsToCSS,
+    mapPropsToColorToken,
+    mapSizeToBorderRadius,
+    mapSizeToIconSize,
+    mapSizeToTypographyStyle,
+    pickButtonProps,
+} from '../utils';
+import { mapSizeToGap, mapSizeToPadding } from './utils';
+import { type Keys } from '../../ShortcutBadge/keyboardKeys';
 
-interface ButtonContainerProps {
-    $variant: ButtonVariant;
+export const allowedButtonFrameProps = [
+    'margin',
+    'minWidth',
+    'maxWidth',
+    'width',
+    'flex',
+] as const satisfies FramePropsKeys[];
+export type AllowedButtonFrameProps = Pick<FrameProps, (typeof allowedButtonFrameProps)[number]>;
+
+type ButtonContainerProps = TransientProps<AllowedButtonFrameProps> & {
     $size: ButtonSize;
-    $iconAlignment?: IconAlignment;
-    $hasIcon?: boolean;
-    $isFullWidth?: boolean;
-    $elevation: Elevation;
-}
+    $priority: ButtonPriority;
+    $intent: ButtonIntent;
+    $isInverse: boolean;
+    $isFloating: boolean;
+    disabled: boolean;
+};
 
-export const ButtonContainer = styled.button<ButtonContainerProps>`
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-direction: ${({ $iconAlignment }) => $iconAlignment === 'right' && 'row-reverse'};
-    gap: ${({ $hasIcon }) => $hasIcon && spacingsPx.xs};
-    padding: ${({ $size }) => getPadding($size, true)};
-    width: ${({ $isFullWidth }) => $isFullWidth && '100%'};
-    border-radius: ${borders.radii.full};
-    transition:
-        ${focusStyleTransition},
-        background 0.1s ease-out;
-    outline: none;
-    cursor: pointer;
-    border: 1px solid transparent;
+const Container = styled.button<ButtonContainerProps>`
+    ${commonButtonStyles}
 
-    ${getFocusShadowStyle()}
-    ${({ $variant, $elevation }) => getVariantStyle($variant, $elevation)}
+    border-radius: ${({ $size }) => mapSizeToBorderRadius($size)}px;
 
-    &:disabled {
-        background: ${({ theme }) => theme.BG_GREY};
-        color: ${({ theme }) => theme.textDisabled};
-        pointer-events: none;
-        cursor: default;
-    }
+    ${({ $intent, $priority, disabled, $isInverse, $isFloating, theme }) =>
+        mapPropsToCSS($intent, $priority, disabled, $isInverse, theme, $isFloating)}
+
+    ${withFrameProps}
 `;
 
-interface ContentProps {
-    $size: ButtonSize;
-    $disabled: boolean;
-}
-
-const getTypography = (size: ButtonSize) => {
-    const map: Record<ButtonSize, string> = {
-        large: typography.body,
-        medium: typography.body,
-        small: typography.hint,
-        tiny: typography.hint,
+export type ButtonProps = CommonButtonProps &
+    AllowedButtonFrameProps & {
+        size?: ButtonSize;
+        iconLeft?: IconComponent;
+        iconRight?: IconComponent;
+        children: React.ReactNode;
+        'data-testid'?: string;
+        'data-component'?: string;
+        shortcut?: Keys[];
     };
 
-    return map[size];
-};
-
-const Content = styled.div<ContentProps>`
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-
-    ${({ $size }) => getTypography($size)};
-`;
-
-type SelectedHTMLButtonProps = Pick<
-    ButtonHTMLAttributes<HTMLButtonElement>,
-    'onClick' | 'onMouseOver' | 'onMouseLeave' | 'type' | 'tabIndex'
->;
-
-export interface ButtonProps extends SelectedHTMLButtonProps {
-    variant?: ButtonVariant;
-    size?: ButtonSize;
-    isDisabled?: boolean;
-    isLoading?: boolean;
-    isFullWidth?: boolean;
-    icon?: IconType;
-    iconSize?: number;
-    iconAlignment?: IconAlignment;
-    children: React.ReactNode;
-    title?: string;
-    className?: string;
-    'data-test'?: string;
-}
-
 export const Button = ({
-    variant = 'primary',
-    size = 'medium',
-    isDisabled = false,
-    isLoading = false,
-    isFullWidth = false,
-    icon,
-    iconSize,
-    iconAlignment = 'left',
-    type = 'button',
+    'data-testid': dataTestId,
+    'data-component': dataComponent = 'Button',
     children,
-    ...rest
+    iconLeft,
+    iconRight,
+    shortcut,
+    size = 'medium',
+    isFloating = false,
+    ...props
 }: ButtonProps) => {
-    const theme = useTheme();
-    const { elevation } = useElevation();
+    const frameProps = pickAndPrepareFrameProps(props, allowedButtonFrameProps);
+    const { intent, priority, isInverse, ...buttonProps } = pickButtonProps(props);
+    const colorToken = mapPropsToColorToken(intent, priority, buttonProps.disabled, isInverse);
 
-    const IconComponent = icon ? (
-        <Icon
-            icon={icon}
-            size={iconSize || getIconSize(size)}
-            color={getIconColor(variant, isDisabled, theme)}
-        />
-    ) : null;
-
-    const Loader = <Spinner size={getIconSize(size)} />;
+    const iconProps = {
+        size: mapSizeToIconSize(size),
+        color: colorToken,
+    };
 
     return (
-        <ButtonContainer
-            $variant={variant}
+        <Container
+            data-component={dataComponent}
+            data-testid={dataTestId}
             $size={size}
-            $iconAlignment={iconAlignment}
-            disabled={isDisabled || isLoading}
-            $isFullWidth={isFullWidth}
-            type={type}
-            $hasIcon={!!icon || isLoading}
-            $elevation={elevation}
-            {...rest}
+            $priority={priority}
+            $isInverse={isInverse}
+            $intent={intent}
+            $isFloating={isFloating}
+            {...frameProps}
+            {...buttonProps}
         >
-            {!isLoading && icon && IconComponent}
-            {isLoading && Loader}
-
-            {children && (
-                <Content $size={size} $disabled={isDisabled || isLoading}>
-                    {children}
-                </Content>
-            )}
-        </ButtonContainer>
+            <Row
+                gap={mapSizeToGap(size)}
+                padding={mapSizeToPadding(size)}
+                justifyContent="center"
+                overflow="hidden"
+                width="100%"
+            >
+                {props.isLoading && (
+                    <Spinner
+                        isDisabled={true}
+                        size={mapSizeToIconSize(size)}
+                        data-testid={`${dataTestId}/spinner`}
+                    />
+                )}
+                {iconLeft && !props.isLoading && <Icon as={iconLeft} {...iconProps} />}
+                <Box padding={{ horizontal: 4 }} overflow="hidden">
+                    <Text
+                        as="div"
+                        typographyStyle={mapSizeToTypographyStyle(size)}
+                        color={colorToken}
+                        ellipsisLineCount={1}
+                    >
+                        {children}
+                    </Text>
+                </Box>
+                {(iconRight || buttonProps.target === '_blank') && (
+                    <Icon as={iconRight ?? ArrowLineUpRightIcon} {...iconProps} />
+                )}
+                {!!shortcut?.length && (
+                    <Text as="div" color={colorToken}>
+                        <ShortcutBadge shortcut={shortcut} />
+                    </Text>
+                )}
+            </Row>
+        </Container>
     );
 };
+
+export type { ButtonIntent };

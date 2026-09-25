@@ -1,47 +1,52 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useWatch } from 'react-hook-form';
 import { View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import { FadeIn } from 'react-native-reanimated';
 
 import { useFocusEffect } from '@react-navigation/native';
 
-import { Box, Button, HeaderedCard, TextDivider, VStack } from '@suite-native/atoms';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectAddressValidator } from '@suite-common/networks';
+import {
+    type XpubFormContext,
+    type XpubFormValues,
+    xpubFormValidationSchema,
+} from '@suite-common/validators';
+import { getNetworkType } from '@suite-common/wallet-config';
+import { isAddressBasedNetwork } from '@suite-common/wallet-utils';
+import { SelectableNetworkItem } from '@suite-native/accounts';
+import { type Alert, useAlert } from '@suite-native/alerts';
+import {
+    AnimatedBox,
+    Button,
+    Card,
+    TextDivider,
+    VStack,
+    useBottomSheetModal,
+} from '@suite-native/atoms';
 import { isDevelopOrDebugEnv } from '@suite-native/config';
 import { Form, TextInputField, useForm } from '@suite-native/forms';
+import { Translation, useTranslate } from '@suite-native/intl';
 import {
-    AccountsImportStackParamList,
+    type AccountsImportStackParamList,
     AccountsImportStackRoutes,
     Screen,
-    StackProps,
+    type StackProps,
 } from '@suite-native/navigation';
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-import { getNetworkType } from '@suite-common/wallet-config';
-import { isAddressValid, isAddressBasedNetwork } from '@suite-common/wallet-utils';
-import { Alert, useAlert } from '@suite-native/alerts';
-import { useTranslate } from '@suite-native/intl';
-import {
-    XpubFormContext,
-    xpubFormValidationSchema,
-    XpubFormValues,
-    // TODO: This direct import is needed to avoid importing the `@suite-common/wallet-utils`
-    // to the `connect` packages. Should be revisited soon when fixing the monorepo tree shaking problems.
-} from '@suite-common/validators/src/schemas/xpubSchema';
-import { SelectableNetworkItem } from '@suite-native/accounts';
+import { ScanQRBottomSheet } from '@suite-native/qr-code';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
 
-import { XpubImportSection } from '../components/XpubImportSection';
-import { AccountImportSubHeader } from '../components/AccountImportSubHeader';
+import { AccountImportScreenHeader } from '../components/AccountImportScreenHeader';
 import { DevXpub } from '../components/DevXpub';
 import { XpubHint } from '../components/XpubHint';
 import { XpubHintBottomSheet } from '../components/XpubHintBottomSheet';
+import { XpubImportSection, networkTypeToTitleTxKeyMap } from '../components/XpubImportSection';
 
 const FORM_BUTTON_FADE_IN_DURATION = 200;
 
-// Extra padding needed to make multiline xpub input form visible even with the sticky footer.
-const EXTRA_KEYBOARD_AVOIDING_VIEW_HEIGHT = 350;
-
-const cameraStyle = prepareNativeStyle(utils => ({
+const cameraStyle = prepareNativeStyle(_ => ({
     alignItems: 'center',
     marginTop: 20,
-    marginBottom: utils.spacings.medium,
 }));
 
 const isBtcTestnetXpub = (xpubAddress: string) => {
@@ -50,7 +55,7 @@ const isBtcTestnetXpub = (xpubAddress: string) => {
 
     const btcTestnetPrefixes = ['tpub', 'upub', 'vpub', 'Upub', 'Vpub'];
 
-    return btcTestnetPrefixes.some(prefix => prefix === xpub.slice(0, 4));
+    return btcTestnetPrefixes.includes(xpub.slice(0, 4));
 };
 
 export const XpubScanScreen = ({
@@ -59,19 +64,30 @@ export const XpubScanScreen = ({
 }: StackProps<AccountsImportStackParamList, AccountsImportStackRoutes.XpubScan>) => {
     const { translate } = useTranslate();
     const { applyStyle } = useNativeStyles();
-    const [_, setIsCameraRequested] = useState<boolean>(false);
-    const { showAlert, hideAlert } = useAlert();
+    const [_, setIsCameraRequested] = useState(false);
+    const {
+        bottomSheetRef: xpubHintRef,
+        openModal: openXpubHint,
+        closeModal: closeXpubHint,
+    } = useBottomSheetModal();
+    const {
+        bottomSheetRef: scannerRef,
+        openModal: openScanner,
+        closeModal: closeScanner,
+    } = useBottomSheetModal();
+
+    const { showAlert } = useAlert();
+    const { addressValidator } = useServices(injectAddressValidator);
 
     const { networkSymbol } = route.params;
     const networkType = getNetworkType(networkSymbol);
 
     const form = useForm<XpubFormValues, XpubFormContext>({
         validation: xpubFormValidationSchema,
-        context: { networkSymbol },
+        context: { addressValidator, symbol: networkSymbol },
     });
-    const { handleSubmit, setValue, watch, reset } = form;
-    const watchXpubAddress = watch('xpubAddress');
-    const [isHintSheetVisible, setIsHintSheetVisible] = useState(false);
+    const { handleSubmit, setValue, control } = form;
+    const watchXpubAddress = useWatch({ control, name: 'xpubAddress' });
 
     const isXpubFormFilled = watchXpubAddress?.length > 0;
 
@@ -97,11 +113,12 @@ export const XpubScanScreen = ({
     const goToAccountImportScreen = ({ xpubAddress }: XpubFormValues) => {
         if (networkSymbol === 'btc' && isBtcTestnetXpub(xpubAddress)) {
             showDelayedAlert({
-                title: translate('moduleAccountImport.xpubScanScreen.alert.xpub.title'),
-                description: translate('moduleAccountImport.xpubScanScreen.alert.xpub.description'),
-                icon: 'warningCircle',
-                pictogramVariant: 'red',
-                primaryButtonTitle: translate('moduleAccountImport.xpubScanScreen.confirmButton'),
+                title: <Translation id="moduleAccountImport.xpubScanScreen.alert.xpub.title" />,
+                description: (
+                    <Translation id="moduleAccountImport.xpubScanScreen.alert.xpub.description" />
+                ),
+                pictogramVariant: 'critical',
+                primaryButtonTitle: <Translation id="generic.buttons.gotIt" />,
                 onPressPrimaryButton: () => null,
             });
 
@@ -112,23 +129,22 @@ export const XpubScanScreen = ({
         if (
             xpubAddress &&
             !isAddressBasedNetwork(networkType) &&
-            isAddressValid(xpubAddress, networkSymbol)
+            addressValidator.isAddressValid(xpubAddress, networkSymbol)
         ) {
             showDelayedAlert({
-                title: translate('moduleAccountImport.xpubScanScreen.alert.address.title'),
-                description: translate(
-                    'moduleAccountImport.xpubScanScreen.alert.address.description',
+                title: <Translation id="moduleAccountImport.xpubScanScreen.alert.address.title" />,
+                testID: '@alert-sheet/error/invalidXpub',
+                description: (
+                    <Translation id="moduleAccountImport.xpubScanScreen.alert.address.description" />
                 ),
-                icon: 'warningCircle',
-                pictogramVariant: 'red',
-                primaryButtonTitle: translate('moduleAccountImport.xpubScanScreen.confirmButton'),
+                pictogramVariant: 'critical',
+                primaryButtonTitle: <Translation id="generic.buttons.gotIt" />,
                 onPressPrimaryButton: () => null,
-                secondaryButtonTitle: translate(
-                    'moduleAccountImport.xpubScanScreen.alert.address.hintButton',
+                secondaryButtonTitle: (
+                    <Translation id="moduleAccountImport.xpubScanScreen.alert.address.hintButton" />
                 ),
                 onPressSecondaryButton: () => {
-                    hideAlert();
-                    setIsHintSheetVisible(true);
+                    openXpubHint();
                 },
             });
 
@@ -159,43 +175,32 @@ export const XpubScanScreen = ({
         }
     }, [handleXpubResult, route.params]);
 
-    const handleRequestCamera = () => {
-        reset({
-            xpubAddress: '',
-        });
-        navigation.navigate(AccountsImportStackRoutes.XpubScanModal, {
-            networkSymbol,
-        });
+    const handleBarCodeScanned = (data: string) => {
+        setValue('xpubAddress', data);
+        onXpubFormSubmit();
     };
-
-    const handleOpenHint = () => setIsHintSheetVisible(true);
-    const handleGoBack = () => navigation.goBack();
 
     return (
         <Screen
-            screenHeader={<AccountImportSubHeader />}
-            footer={<XpubHint networkType={networkType} handleOpen={handleOpenHint} />}
-            extraKeyboardAvoidingViewHeight={EXTRA_KEYBOARD_AVOIDING_VIEW_HEIGHT}
+            header={<AccountImportScreenHeader closeActionType="back" />}
+            footer={<XpubHint networkType={networkType} handleOpen={openXpubHint} />}
+            focusedInputBottomOffset={163} // button height with vertical margin + footer height
         >
-            <HeaderedCard
-                title="Coin to sync"
-                buttonTitle="Change"
-                buttonIcon="discover"
-                onButtonPress={handleGoBack}
-            >
+            <Card>
                 <SelectableNetworkItem symbol={networkSymbol} />
-            </HeaderedCard>
-            <Box marginHorizontal="medium">
+            </Card>
+            <VStack spacing="sp16">
                 <View style={applyStyle(cameraStyle)}>
-                    <XpubImportSection
-                        onRequestCamera={handleRequestCamera}
-                        networkSymbol={networkSymbol}
-                    />
+                    <XpubImportSection onRequestCamera={openScanner} symbol={networkSymbol} />
                 </View>
 
-                <TextDivider title="OR" />
+                <TextDivider
+                    title="generic.orSeparator"
+                    lineColor="borderNeutral"
+                    textColor="contentSecondary"
+                />
                 <Form form={form}>
-                    <VStack spacing="medium">
+                    <VStack spacing="sp16">
                         <TextInputField
                             testID="@accounts-import/sync-coins/xpub-input"
                             name="xpubAddress"
@@ -204,26 +209,31 @@ export const XpubScanScreen = ({
                             multiline
                         />
                         {isXpubFormFilled && (
-                            <Animated.View entering={FadeIn.duration(FORM_BUTTON_FADE_IN_DURATION)}>
+                            <AnimatedBox entering={FadeIn.duration(FORM_BUTTON_FADE_IN_DURATION)}>
                                 <Button
                                     testID="@accounts-import/sync-coins/xpub-submit"
                                     onPress={onXpubFormSubmit}
-                                    size="large"
                                 >
-                                    Confirm
+                                    <Translation id="generic.buttons.confirm" />
                                 </Button>
-                            </Animated.View>
+                            </AnimatedBox>
                         )}
                     </VStack>
                 </Form>
                 {isDevelopOrDebugEnv() && (
                     <DevXpub symbol={networkSymbol} onSelect={goToAccountImportScreen} />
                 )}
-            </Box>
+            </VStack>
             <XpubHintBottomSheet
                 networkType={networkType}
-                isVisible={isHintSheetVisible}
-                handleClose={() => setIsHintSheetVisible(false)}
+                ref={xpubHintRef}
+                handleClose={closeXpubHint}
+            />
+            <ScanQRBottomSheet
+                title={<Translation id={networkTypeToTitleTxKeyMap[networkType]} />}
+                onCodeScanned={handleBarCodeScanned}
+                ref={scannerRef}
+                onClose={closeScanner}
             />
         </Screen>
     );

@@ -1,80 +1,144 @@
+import { useEffect, useMemo, useRef } from 'react';
+
+import { motion, useAnimation } from 'framer-motion';
 import styled from 'styled-components';
-import { Account } from '@suite-common/wallet-types';
-import { spacingsPx } from '@trezor/theme';
-import { CoinLogo } from '@trezor/components';
-import {
-    MetadataLabeling,
-    AccountLabel,
-    FormattedCryptoAmount,
-    FiatValue,
-    AmountUnitSwitchWrapper,
-} from 'src/components/suite';
-import { useAccountLabel } from 'src/components/suite/AccountLabel';
-import { useSelector } from 'src/hooks/suite';
-import { selectLabelingDataForSelectedAccount } from 'src/reducers/suite/metadataReducer';
 
-const DetailsContainer = styled.div`
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
+import { AccountTypeBadge, useAccountLabel } from '@suite/account';
+import { useTranslation } from '@suite/intl';
+import { Labeling } from '@suite/labeling';
+import { useDisplayBaseCurrency } from '@suite-common/wallet-core';
+import { type Account } from '@suite-common/wallet-types';
+import { Column, H2, Row, Text, motionEasing } from '@trezor/components';
+import { TokenIcon } from '@trezor/product-components';
+
+import { AmountUnitSwitchWrapper } from 'src/components/suite/AmountUnitSwitchWrapper';
+import { BaseCurrencyValue } from 'src/components/suite/BaseCurrencyValue';
+import { FormattedCryptoAmount } from 'src/components/suite/FormattedCryptoAmount';
+import { useIsContentBelowBreakpoint } from 'src/support/suite/ContentFlex';
+
+const DetailsContainer = styled(motion.div)`
+    -webkit-app-region: no-drag;
+    overflow: hidden;
 `;
 
-const AccountBalance = styled.div`
-    display: flex;
-    align-items: center;
-    gap: ${spacingsPx.sm};
-    color: ${({ theme }) => theme.textSubdued};
-`;
-
-const CryptoBalance = styled.div`
-    display: flex;
-    align-items: center;
-    gap: ${spacingsPx.xxs};
-`;
-
-interface AccountDetailsProps {
+type AccountDetailsProps = {
     selectedAccount: Account;
-}
+    isBalanceShown: boolean;
+};
 
-export const AccountDetails = ({ selectedAccount }: AccountDetailsProps) => {
-    const selectedAccountLabels = useSelector(selectLabelingDataForSelectedAccount);
+export const AccountDetails = ({ selectedAccount, isBalanceShown }: AccountDetailsProps) => {
+    const hasMountedRef = useRef(false);
+    const controls = useAnimation();
+    const { defaultLabel, label } = useAccountLabel({ account: selectedAccount });
 
-    const { defaultAccountLabelString } = useAccountLabel();
+    const isContentBelowBreakpoint = useIsContentBelowBreakpoint();
+    const { translationString } = useTranslation();
 
-    const { symbol, key, path, index, accountType, formattedBalance } = selectedAccount;
+    const { symbol, key, path, accountType, formattedBalance, deviceState, networkType } =
+        selectedAccount;
+    const { shallDisplayBaseCurrency } = useDisplayBaseCurrency(symbol);
 
-    return (
-        <DetailsContainer>
-            <MetadataLabeling
-                defaultVisibleValue={
-                    <AccountLabel
-                        accountLabel={selectedAccountLabels.accountLabel}
-                        accountType={accountType}
-                        symbol={selectedAccount.symbol}
-                        index={index}
-                    />
-                }
+    const getTypographyStyle = () => {
+        if (isBalanceShown) {
+            return 'body-md-strong';
+        } else if (isContentBelowBreakpoint) {
+            return 'headline-sm';
+        }
+
+        return 'headline-md';
+    };
+
+    const accountNameElement = useMemo(
+        () => (
+            <Labeling
+                key={`account-label-${key}`}
                 payload={{
                     type: 'accountLabel',
                     entityKey: key,
                     defaultValue: path,
-                    value: selectedAccountLabels.accountLabel,
                 }}
-                defaultEditableValue={defaultAccountLabelString({ accountType, symbol, index })}
-            />
+                deviceStaticSessionId={deviceState}
+                defaultValue={defaultLabel}
+                rightAddon={
+                    <AccountTypeBadge
+                        accountType={accountType}
+                        path={path}
+                        networkType={networkType}
+                        size={isBalanceShown ? 'small' : 'medium'}
+                    />
+                }
+                gap={8}
+                placeholder={translationString('TR_LABELING_ACCOUNT_LABEL')}
+            >
+                {label}
+            </Labeling>
+        ),
+        [
+            key,
+            path,
+            label,
+            deviceState,
+            defaultLabel,
+            accountType,
+            networkType,
+            isBalanceShown,
+            translationString,
+        ],
+    );
 
-            <AccountBalance>
-                <CryptoBalance>
-                    <CoinLogo size={16} symbol={symbol} />
-                    <AmountUnitSwitchWrapper symbol={symbol}>
-                        <FormattedCryptoAmount value={formattedBalance} symbol={symbol} />
-                    </AmountUnitSwitchWrapper>
-                </CryptoBalance>
+    useEffect(() => {
+        if (!hasMountedRef.current) {
+            hasMountedRef.current = true;
 
-                <span>
-                    ~<FiatValue amount={formattedBalance} symbol={symbol} />
-                </span>
-            </AccountBalance>
+            return;
+        }
+
+        controls.start({
+            y: isBalanceShown ? ['100%', '0%'] : ['-100%', '0%'],
+            opacity: [0, 1],
+            transition: { duration: 0.3, ease: motionEasing.enter },
+        });
+    }, [controls, isBalanceShown]);
+
+    return (
+        <DetailsContainer initial={false} animate={controls}>
+            <Row gap={4} overflow="hidden">
+                <TokenIcon size={40} symbol={symbol} />
+                <Column
+                    overflow="hidden"
+                    // To accommodate the labeling component
+                    padding={8}
+                >
+                    <H2 typographyStyle={getTypographyStyle()}>{accountNameElement}</H2>
+                    {isBalanceShown && (
+                        <Text
+                            intent="neutral"
+                            priority="secondary"
+                            typographyStyle="body-xs"
+                            as="div"
+                        >
+                            <Row gap={4}>
+                                <AmountUnitSwitchWrapper symbol={symbol}>
+                                    <FormattedCryptoAmount
+                                        data-testid="@wallet/account/crypto-balance"
+                                        value={formattedBalance}
+                                        symbol={symbol}
+                                    />
+                                </AmountUnitSwitchWrapper>
+                                {shallDisplayBaseCurrency && (
+                                    <span data-testid="@wallet/account/fiat-amount">
+                                        <BaseCurrencyValue
+                                            amount={formattedBalance}
+                                            symbol={symbol}
+                                            showApproximationIndicator
+                                        />
+                                    </span>
+                                )}
+                            </Row>
+                        </Text>
+                    )}
+                </Column>
+            </Row>
         </DetailsContainer>
     );
 };

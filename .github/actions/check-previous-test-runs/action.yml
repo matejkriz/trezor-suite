@@ -1,0 +1,97 @@
+name: "Check Previous Runs"
+description: "Check if a previous run of a job was successful to skip tests"
+inputs:
+  github_token:
+    description: "GitHub token for accessing the API"
+    required: true
+  pr_branch:
+    description: "The branch of the pull request"
+    required: true
+  pr_created:
+    description: "The ISO 8601 timestamp when the PR was created"
+    required: true
+  repo:
+    description: "The repository name"
+    required: true
+  workflow_name:
+    description: "The workflow name to filter runs"
+    required: true
+  run_attempt:
+    description: "The run attempt number"
+    required: true
+outputs:
+  skip_tests:
+    description: "Indicates whether tests should be skipped"
+    value: ${{ steps.check-previous-runs.outputs.skip_tests }}
+runs:
+  using: "composite"
+  steps:
+    - name: Check Previous Test Runs
+      id: check-previous-runs
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+      shell: bash
+      run: |
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          echo "Manually triggered workflow. Running all tests."
+          echo "skip_tests=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        PR_BRANCH="${{ inputs.pr_branch }}"
+        PR_CREATED_TIMESTAMP="${{ inputs.pr_created }}"
+        REPO="${{ inputs.repo }}"
+        WORKFLOW_NAME="${{ inputs.workflow_name }}"
+        RUN_ATTEMPT="${{ inputs.run_attempt }}"
+
+        if [ "${RUN_ATTEMPT}" -gt 1 ]; then
+          echo "Manually triggered re-run."
+          echo "skip_tests=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        # Fetch workflow ID
+        WORKFLOW_ID=$(gh workflow list \
+          --repo "$REPO" \
+          --json id,name \
+          --limit 100 \
+          --jq ".[] | select(.name == \"${WORKFLOW_NAME}\") | .id")
+
+        # Fetch previous PR runs
+        PREVIOUS_RUN_RESPONSE=$(curl -s -H "Authorization: Bearer ${GH_TOKEN}" \
+          "https://api.github.com/repos/$REPO/actions/workflows/${WORKFLOW_ID}/runs?event=pull_request&branch=${PR_BRANCH}&created=%3E%3D${PR_CREATED_TIMESTAMP}&status=completed&per_page=1")
+        PREVIOUS_RUN_CONCLUSION=$(echo "$PREVIOUS_RUN_RESPONSE" | jq -r '.workflow_runs[0].conclusion // ""')  
+
+        if [ -z "${PREVIOUS_RUN_CONCLUSION}" ] || [ "${PREVIOUS_RUN_CONCLUSION}" != "success" ]; then
+          echo "No previous runs found or previous run was not successful. Running all tests as usual"
+          echo "skip_tests=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        SUCCESSFUL_JOB_URL=$(echo "$PREVIOUS_RUN_RESPONSE" | jq -r '.workflow_runs[0].html_url')
+        echo "Previous successful job found: ${SUCCESSFUL_JOB_URL} - no need to run tests again"
+        echo "skip_tests=true" >> $GITHUB_OUTPUT
+
+    - name: Find skipped tests comment
+      if: ${{ steps.check-previous-runs.outputs.skip_tests == 'true' }}
+      uses: peter-evans/find-comment@b30e6a3c0ed37e7c023ccd3f1db5c6c0b0c23aad # v4
+      id: find-comment
+      with:
+        token: ${{ inputs.github_token }}
+        issue-number: ${{ github.event.pull_request.number }}
+        comment-author: "trezor-bot[bot]"
+        body-includes: ✅ Previously successful run of **${{ inputs.workflow_name }}**
+
+    - name: Post skipped tests comment
+      if: ${{ steps.check-previous-runs.outputs.skip_tests == 'true' }}
+      uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5
+      with:
+        comment-id: ${{ steps.find-comment.outputs.comment-id }}
+        token: ${{ inputs.github_token }}
+        issue-number: ${{ github.event.pull_request.number }}
+        body: |
+          ✅ Previously successful run of **${{ inputs.workflow_name }}** workflow has been found.
+          ⏭️ Skipping tests for this run.
+          💡 If you are unsure about your latest changes, please rerun the workflow manually. (Use the Re-run all jobs option)
+        edit-mode: replace

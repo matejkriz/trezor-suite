@@ -1,0 +1,208 @@
+import { type CryptoId } from 'invity-api';
+
+import { type TradingTransaction, cryptoIdToNetwork, toTokenCryptoId } from '@suite-common/trading';
+import { type NetworkSymbol, getNetwork } from '@suite-common/wallet-config';
+import type { Account } from '@suite-common/wallet-types';
+import {
+    findAccountsByAddress,
+    findAccountsByDescriptor,
+    findAccountsByNetwork,
+    getContractAddressForNetworkSymbol,
+} from '@suite-common/wallet-utils';
+import { type OnUpgradeFunc } from '@trezor/suite-storage';
+
+import { type SuiteDBSchema } from 'src/storage/definitions';
+import { type DBWalletAccountTransactionCompatible } from 'src/storage/migrations';
+
+import { updateAll } from '../utils';
+
+const findAccountForBuyTrade = (
+    accounts: Account[],
+    descriptor: string,
+    symbol: NetworkSymbol,
+): Account | undefined => {
+    const account = findAccountsByDescriptor(
+        descriptor,
+        findAccountsByNetwork(symbol, accounts),
+    ).at(0);
+
+    if (account) {
+        return account;
+    }
+
+    return undefined;
+};
+
+const findAccountForTrade = (
+    accounts: Account[],
+    address: string | undefined,
+    cryptoId: CryptoId | undefined,
+): Account | undefined => {
+    if (!address || !cryptoId) {
+        return undefined;
+    }
+
+    const network = cryptoIdToNetwork(cryptoId);
+    if (!network) {
+        return undefined;
+    }
+
+    const account = findAccountsByAddress(network.symbol, address, accounts).at(0);
+
+    if (account) {
+        return account;
+    }
+
+    return accounts.find(account => {
+        const cryptoIds = [
+            ...(account.tokens?.flatMap(token =>
+                toTokenCryptoId(
+                    account.symbol,
+                    getContractAddressForNetworkSymbol(account.symbol, token.contract),
+                ),
+            ) ?? []),
+            getNetwork(account.symbol).tradeCryptoId,
+        ].filter(Boolean) as CryptoId[];
+
+        return account.descriptor === address && cryptoIds.includes(cryptoId);
+    });
+};
+
+export const migrateToV56: OnUpgradeFunc<SuiteDBSchema> = async (
+    db,
+    oldVersion,
+    _newVersion,
+    transaction,
+) => {
+    const oldStoreName = 'coinmarketTrades';
+    const newStoreName = 'tradingTrades';
+
+    // 1. Migration coinmarketTrades to tradingTrades
+    // @ts-expect-error - old type
+    if (db.objectStoreNames.contains(oldStoreName) && !db.objectStoreNames.contains(newStoreName)) {
+        // @ts-expect-error - old type
+        const trades = transaction.objectStore(oldStoreName);
+        let tradesCursor = await trades.openCursor();
+
+        const newTradesStore = db.createObjectStore(newStoreName, { keyPath: trades.keyPath });
+
+        while (tradesCursor) {
+            const trade = tradesCursor.value as TradingTransaction;
+
+            await tradesCursor.delete();
+            await newTradesStore.add(trade);
+
+            tradesCursor = await tradesCursor.continue();
+        }
+
+        // @ts-expect-error - old type
+        db.deleteObjectStore(oldStoreName);
+    }
+
+    // 2. Update trading trades to have only key of account and delete account property
+    const accountsStoreOld = transaction.objectStore('accounts');
+    const accounts = await accountsStoreOld.getAll();
+
+    await updateAll(transaction, 'tradingTrades', trade => {
+        if (trade.tradeType === 'buy') {
+            if (trade.receiveAccountKey === undefined) {
+                trade.receiveAccountKey = findAccountForTrade(
+                    accounts,
+                    trade.data.receiveAddress,
+                    trade.data.receiveCurrency,
+                )?.key;
+            }
+
+            if (!trade.selectedAccountKey) {
+                trade.selectedAccountKey = findAccountForBuyTrade(
+                    accounts,
+                    // @ts-expect-error - account deprecated property
+                    trade.account.descriptor,
+                    // @ts-expect-error - account deprecated property
+                    trade.account.symbol,
+                )?.key;
+            }
+
+            return trade;
+        }
+
+        if (trade.tradeType === 'sell' && trade.sendAccountKey === undefined) {
+            trade.sendAccountKey = findAccountForTrade(
+                accounts,
+                // account may be incorrect because it may not be current, but the default
+                // @ts-expect-error - account deprecated property
+                trade.account.descriptor,
+                trade.data.cryptoCurrency,
+            )?.key;
+
+            return trade;
+        }
+
+        if (trade.tradeType === 'exchange') {
+            if (trade.sendAccountKey === undefined) {
+                trade.sendAccountKey = findAccountForTrade(
+                    accounts,
+                    // @ts-expect-error - account deprecated property
+                    trade.account.descriptor,
+                    trade.data.send,
+                )?.key;
+            }
+
+            if (trade.receiveAccountKey === undefined) {
+                trade.receiveAccountKey = findAccountForTrade(
+                    accounts,
+                    trade.data.receiveAddress,
+                    trade.data.receive,
+                )?.key;
+            }
+
+            return trade;
+        }
+
+        // @ts-expect-error - account deprecated property
+        delete trade.account;
+
+        return trade;
+    });
+
+    // 3. Remove form drafts
+    transaction.objectStore('formDrafts').clear();
+
+    // 4. add explorer object store, if it does not exist
+    if (!db.objectStoreNames.contains('explorer')) {
+        db.createObjectStore('explorer');
+    }
+
+    // 5. add thp and bluetooth object stores
+    if (!db.objectStoreNames.contains('thp')) {
+        db.createObjectStore('thp');
+    }
+    if (!db.objectStoreNames.contains('bluetooth')) {
+        db.createObjectStore('bluetooth');
+    }
+
+    // 6. refetch solana txs
+    const accountsToUpdate = ['sol', 'dsol'];
+
+    // refetch also evm txs for version 52+
+    if (oldVersion >= 52) {
+        accountsToUpdate.push(...['eth', 'pol', 'bsc', 'base', 'arb', 'op', 'thod', 'tsep']);
+    }
+
+    await updateAll<'txs', DBWalletAccountTransactionCompatible>(transaction, 'txs', tx => {
+        if (accountsToUpdate.includes(tx.tx.symbol)) {
+            return null;
+        }
+
+        return tx;
+    });
+
+    // force to fetch solana network transactions again
+    await updateAll(transaction, 'accounts', account => {
+        if (accountsToUpdate.includes(account.symbol)) {
+            account.history = { total: 0, unconfirmed: 0, tokens: 0 };
+
+            return account;
+        }
+    });
+};

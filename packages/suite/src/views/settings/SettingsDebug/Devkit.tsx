@@ -1,11 +1,13 @@
-import { firmwareActions, selectUseDevkit } from '@suite-common/wallet-core';
+import { useServices } from '@suite-common/dependency-injection';
+import { firmwareActions, selectUseDevkit } from '@suite-common/firmware';
+import { injectDispatch } from '@suite-common/redux-utils';
 import { Switch } from '@trezor/components';
+import { ActionColumn, SectionItem, TextColumn } from '@trezor/product-components';
 
-import { ActionColumn, SectionItem, TextColumn } from 'src/components/suite';
-import { useSelector, useDispatch } from 'src/hooks/suite';
+import { useSelector } from 'src/hooks/suite';
 
 export const Devkit = () => {
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
     const useDevkit = useSelector(selectUseDevkit);
 
     const onChangeRegularCheck = () => {
@@ -13,7 +15,7 @@ export const Devkit = () => {
     };
 
     return (
-        <SectionItem data-test="@settings/debug/firmware-devkit/switch">
+        <SectionItem data-testid="@settings/debug/firmware-devkit/switch">
             <TextColumn
                 title="Devkit"
                 description="Offer devkit versions of firmware binaries. Never install regular firmware on devkit and vice versa! Use this only if you know what you are doing."

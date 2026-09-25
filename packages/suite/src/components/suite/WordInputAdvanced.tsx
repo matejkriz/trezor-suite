@@ -1,44 +1,40 @@
-import { useEffect, useCallback } from 'react';
-import styled from 'styled-components';
+import { useCallback, useEffect } from 'react';
+
+import { useExternalLink } from '@suite/external-links';
+import { Translation } from '@suite/intl';
+import { selectModalRequestId } from '@suite/modal';
+import {
+    Banner,
+    Button,
+    Card,
+    Column,
+    Grid,
+    IconButton,
+    KEYBOARD_CODE,
+    Paragraph,
+} from '@trezor/components';
+import TrezorConnect, { UI_RESPONSE } from '@trezor/connect';
+import { CaretLeftIcon, DotOutlineFilledIcon, QuestionIcon } from '@trezor/icons';
 import { HELP_CENTER_ADVANCED_RECOVERY_URL } from '@trezor/urls';
-import { Button, PinButton, KEYBOARD_CODE } from '@trezor/components';
-import { Translation, TrezorLink, DeviceMatrixExplanation } from 'src/components/suite';
-import { createTimeoutPromise } from '@trezor/utils';
-import TrezorConnect, { DeviceModelInternal, UI } from '@trezor/connect';
+import { resolveAfter } from '@trezor/utils';
 
-const Wrapper = styled.div`
-    display: flex;
-    height: 100%;
-    justify-content: center;
-`;
+import { useSelector } from 'src/hooks/suite';
 
-const MatrixWrapper = styled.div`
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 270px;
-    height: 100%;
-`;
-
-const Row = styled.div`
-    display: flex;
-    width: 100%;
-    justify-content: space-evenly;
-`;
-
-const Backspace = styled(Button)`
-    margin: 8px;
-`;
-
-interface WordInputAdvancedProps {
+type WordInputAdvancedProps = {
     count: 6 | 9;
-}
+};
 
 export const WordInputAdvanced = ({ count }: WordInputAdvancedProps) => {
-    const onSubmit = useCallback(async (value: string) => {
-        await createTimeoutPromise(600);
-        TrezorConnect.uiResponse({ type: UI.RECEIVE_WORD, payload: value });
-    }, []);
+    const learnMoreUrl = useExternalLink(HELP_CENTER_ADVANCED_RECOVERY_URL);
+    const requestId = useSelector(selectModalRequestId);
+
+    const onSubmit = useCallback(
+        async (value: string) => {
+            await resolveAfter(600);
+            TrezorConnect.uiResponse({ type: UI_RESPONSE.RECEIVE_WORD, payload: value, requestId });
+        },
+        [requestId],
+    );
 
     const backspace = useCallback(() => {
         onSubmit(String.fromCharCode(8));
@@ -46,6 +42,10 @@ export const WordInputAdvanced = ({ count }: WordInputAdvancedProps) => {
 
     useEffect(() => {
         const keyboardHandler = (event: KeyboardEvent) => {
+            if (count === 6) {
+                return;
+            }
+
             event.preventDefault();
 
             if (event.code === KEYBOARD_CODE.BACK_SPACE) {
@@ -102,77 +102,57 @@ export const WordInputAdvanced = ({ count }: WordInputAdvancedProps) => {
     }, [backspace, count, onSubmit]);
 
     return (
-        <Wrapper>
-            <DeviceMatrixExplanation
-                items={[
-                    {
-                        key: '1',
-                        title: <Translation id="TR_RECOVERY_MATRIX_DISPLAYED_ON_TREZOR" />,
-                        deviceModelInternal: DeviceModelInternal.T1B1,
-                    },
-                    {
-                        key: '2',
-                        title: (
-                            <TrezorLink
-                                variant="underline"
-                                href={HELP_CENTER_ADVANCED_RECOVERY_URL}
-                            >
-                                <Translation id="TR_LEARN_ADVANCED_RECOVERY" />
-                            </TrezorLink>
-                        ),
-                        icon: 'INFO',
-                    },
-                ]}
+        <Column gap={16} maxWidth={380}>
+            <Banner
+                intent="info"
+                icon={QuestionIcon}
+                rightContent={
+                    <Banner.Button href={learnMoreUrl} size="small">
+                        <Translation id="TR_LEARN_MORE" />
+                    </Banner.Button>
+                }
+                description={
+                    <Paragraph typographyStyle="body-xs">
+                        <Translation id="TR_ADVANCED_RECOVERY_NOT_SURE" />
+                    </Paragraph>
+                }
             />
-            <MatrixWrapper>
-                {count === 9 && (
-                    <>
-                        <Row>
-                            <PinButton data-value="7" onClick={() => onSubmit('7')} />
-                            <PinButton data-value="8" onClick={() => onSubmit('8')} />
-                            <PinButton data-value="9" onClick={() => onSubmit('9')} />
-                        </Row>
-                        <Row>
-                            <PinButton data-value="4" onClick={() => onSubmit('4')} />
-                            <PinButton data-value="5" onClick={() => onSubmit('5')} />
-                            <PinButton data-value="6" onClick={() => onSubmit('6')} />
-                        </Row>
-                        <Row>
-                            <PinButton
-                                data-value="1"
-                                onClick={() => onSubmit('1')}
-                                data-test="@recovery/word-input-advanced/1"
+            <Card paddingType="none">
+                <Column gap={40} padding={16} alignItems="center">
+                    <Grid columns={count === 9 ? 3 : 2} gap={20}>
+                        {(count === 9
+                            ? // prettier-ignore
+                              [7, 8, 9,
+                               4, 5, 6,
+                               1, 2, 3]
+                            : // prettier-ignore
+                              [7, 9,
+                               4, 6,
+                               1, 3]
+                        ).map(num => (
+                            <IconButton
+                                key={num}
+                                onClick={() => onSubmit(String(num))}
+                                data-testid={`@recovery/word-input-advanced/${num}`}
+                                icon={DotOutlineFilledIcon}
+                                intent="neutral"
+                                priority="secondary"
+                                size="large"
+                                tooltip={{ isActive: false }}
                             />
-                            <PinButton data-value="2" onClick={() => onSubmit('2')} />
-                            <PinButton data-value="3" onClick={() => onSubmit('3')} />
-                        </Row>
-                    </>
-                )}
-
-                {count === 6 && (
-                    <>
-                        <Row>
-                            <PinButton data-value="8" onClick={() => onSubmit('7')} />
-                            <PinButton data-value="9" onClick={() => onSubmit('9')} />
-                        </Row>
-                        <Row>
-                            <PinButton data-value="5" onClick={() => onSubmit('4')} />
-                            <PinButton data-value="6" onClick={() => onSubmit('6')} />
-                        </Row>
-                        <Row>
-                            <PinButton
-                                data-value="2"
-                                onClick={() => onSubmit('1')}
-                                data-test="@recovery/word-input-advanced/1"
-                            />
-                            <PinButton data-value="3" onClick={() => onSubmit('3')} />
-                        </Row>
-                    </>
-                )}
-                <Backspace variant="tertiary" onClick={backspace} icon="ARROW_LEFT">
-                    <Translation id="TR_BACKSPACE" />
-                </Backspace>
-            </MatrixWrapper>
-        </Wrapper>
+                        ))}
+                    </Grid>
+                    <Button
+                        intent="neutral"
+                        priority="secondary"
+                        onClick={backspace}
+                        size="small"
+                        iconLeft={CaretLeftIcon}
+                    >
+                        <Translation id="TR_BACKSPACE" />
+                    </Button>
+                </Column>
+            </Card>
+        </Column>
     );
 };

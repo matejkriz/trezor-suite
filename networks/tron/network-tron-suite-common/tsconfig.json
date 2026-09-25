@@ -1,0 +1,13 @@
+{
+    "extends": "../../../tsconfig.base.json",
+    "compilerOptions": { "outDir": "libDev" },
+    "references": [
+        {
+            "path": "../../../packages/device-utils"
+        },
+        {
+            "path": "../../network-module/network-module-suite-common-types"
+        },
+        { "path": "../network-tron" }
+    ]
+}

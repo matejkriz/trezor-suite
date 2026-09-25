@@ -1,106 +1,205 @@
-import styled, { css } from 'styled-components';
-import { IconName } from '@suite-common/icons';
-import { Icon } from '@suite-common/icons/src/webComponents';
-import { ExtendedMessageDescriptor, TranslationKey } from '@suite-common/intl-types';
-import { Elevation, borders, mapElevationToBackground, spacingsPx } from '@trezor/theme';
-import { getFocusShadowStyle } from '@trezor/components/src/utils/utils';
-import { Translation } from 'src/components/suite/Translation';
-import { Route } from '@suite-common/suite-types';
-import { useDispatch, useSelector } from 'src/hooks/suite';
-import { goto } from 'src/actions/suite/routerActions';
-import { MouseEvent } from 'react';
-import { selectRouteName } from 'src/reducers/suite/routerReducer';
-import { useElevation } from '@trezor/components';
+import { type MouseEvent } from 'react';
 
-export const NavigationItemBase = styled.div.attrs(() => ({
-    tabIndex: 0,
-}))`
+import styled, { css } from 'styled-components';
+
+import { type ExtendedMessageDescriptor, Translation, type TranslationKey } from '@suite/intl';
+import { type Route, gotoThunk, selectRouteName } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import {
+    Badge,
+    Icon,
+    type IconComponent,
+    Paragraph,
+    Row,
+    ShortcutBadge,
+    type ShortcutBadgeProps,
+    StatusBadge,
+    TOOLTIP_DELAY_LONG,
+    TOOLTIP_DELAY_SHORT,
+    Tooltip,
+} from '@trezor/components';
+import { commonFocusStyles } from '@trezor/components/src/utils/utils';
+
+import { useSelector } from 'src/hooks/suite';
+import { useResponsiveContext } from 'src/support/suite/ResponsiveContext';
+
+const Container = styled.button<{ $isActive?: boolean }>`
+    flex: 1;
     display: flex;
     align-items: center;
-    gap: ${spacingsPx.md};
-    padding: ${spacingsPx.xs};
-    border-radius: ${borders.radii.sm};
-    color: ${({ theme }) => theme.textSubdued};
-    transition:
-        color 0.15s,
-        background 0.15s;
+    gap: 16px;
+    padding: 8px;
+    border-radius: 12px;
+    transition: 0.2s ease-in-out;
     cursor: pointer;
+    border: 0;
+    background: none;
+    -webkit-app-region: no-drag;
 
-    border: 1px solid transparent;
-    ${getFocusShadowStyle()}
+    &:focus-visible {
+        ${commonFocusStyles}
+    }
+
+    &:hover {
+        background: ${({ theme }) => theme.elementFillGhostHovered};
+    }
+
+    ${({ $isActive, theme }) =>
+        $isActive &&
+        css`
+            background: ${theme.elementFillElevated} !important;
+            box-shadow: ${theme.elementShadowElevated};
+        `}
 `;
 
-const Container = styled(NavigationItemBase)<{ $elevation: Elevation; $isActive?: boolean }>`
-    ${({ theme, $isActive }) =>
-        $isActive
-            ? css<{ $elevation: Elevation }>`
-                  background-color: ${mapElevationToBackground};
-                  box-shadow: ${theme.boxShadowBase};
-                  color: ${theme.textDefault};
-
-                  path {
-                      stroke: ${theme.iconDefault};
-                  }
-              `
-            : css`
-                  &:hover {
-                      color: ${theme.textDefault};
-
-                      path {
-                          stroke: ${theme.iconDefault};
-                      }
-                  }
-              `}
-`;
-
-export interface NavigationItemProps {
+export type NavigationItemProps = {
     nameId: TranslationKey;
-    icon: IconName;
+    icon: IconComponent;
+    expanded?: boolean;
     routes?: Route['name'][];
     goToRoute?: Route['name'];
     preserveParams?: boolean;
     isActive?: boolean;
-    dataTest?: string;
-    className?: string;
+    hasIndicator?: boolean;
+    hasNewContentIndicator?: boolean;
+    isNewContentIndicatorAnimated?: boolean;
+    'data-testid'?: string;
     values?: ExtendedMessageDescriptor['values'];
-}
+    onClick?: () => void;
+    shortcut?: ShortcutBadgeProps['shortcut'];
+};
 
-export const NavigationItem = ({
+type TitleProps = {
+    nameId: TranslationKey;
+    values?: ExtendedMessageDescriptor['values'];
+};
+
+const Title = ({ nameId, values }: TitleProps) => <Translation id={nameId} values={values} />;
+
+const NavItem = ({
     nameId,
     icon,
+    expanded,
     routes,
     goToRoute,
     isActive,
-    dataTest,
-    className,
+    hasIndicator,
+    hasNewContentIndicator,
+    isNewContentIndicatorAnimated,
+    'data-testid': dataTest,
     values,
     preserveParams,
+    onClick,
+    shortcut,
 }: NavigationItemProps) => {
     const activeRoute = useSelector(selectRouteName);
-    const { elevation } = useElevation();
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
 
     const handleClick = (e: MouseEvent) => {
         e.stopPropagation();
 
+        onClick?.();
+
         if (goToRoute !== undefined) {
-            dispatch(goto(goToRoute, preserveParams === true ? { preserveParams } : undefined));
+            dispatch(
+                gotoThunk({
+                    routeName: goToRoute,
+                    ...(preserveParams === true ? { preserveParams } : undefined),
+                }),
+            );
         }
     };
 
     const isActiveRoute = routes?.some(route => route === activeRoute);
+    const isItemActive = isActive || isActiveRoute;
+
+    const isTooltipActive = expanded ? shortcut !== undefined : true;
+    const isNewContentBadgeShown = expanded === true && hasNewContentIndicator === true;
+    const isNewContentDotShown =
+        expanded !== true && hasNewContentIndicator === true && hasIndicator !== true;
+    const isIconIndicatorShown = hasIndicator === true || isNewContentDotShown;
+    const iconIndicatorIntent = hasIndicator === true ? 'critical' : 'accentViolet';
+    const navigationItemTestId = dataTest || `@suite/menu/${goToRoute}`;
 
     return (
-        <Container
-            $isActive={isActive || isActiveRoute}
-            onClick={handleClick}
-            data-test={dataTest! !== undefined ? dataTest : `@suite/menu/${goToRoute}`}
-            className={className}
-            tabIndex={0}
-            $elevation={elevation}
+        <Tooltip
+            cursor="pointer"
+            flex="1"
+            content={
+                shortcut ? (
+                    <Row gap={12}>
+                        <Title nameId={nameId} values={values} />
+                        <ShortcutBadge shortcut={shortcut} />
+                    </Row>
+                ) : (
+                    <Title nameId={nameId} values={values} />
+                )
+            }
+            isActive={isTooltipActive}
+            delayShow={expanded ? TOOLTIP_DELAY_LONG : TOOLTIP_DELAY_SHORT}
+            placement="right"
         >
-            <Icon name={icon} size="large" color="iconSubdued" />
-            <Translation id={nameId} values={values} />
-        </Container>
+            <Container
+                $isActive={isItemActive}
+                onClick={handleClick}
+                data-testid={navigationItemTestId}
+                type="button"
+            >
+                <StatusBadge
+                    isShown={isIconIndicatorShown}
+                    isAnimated={
+                        hasIndicator === true
+                            ? isIconIndicatorShown
+                            : isNewContentDotShown && isNewContentIndicatorAnimated
+                    }
+                    intent={iconIndicatorIntent}
+                    offset={{ x: -6, y: 5 }}
+                >
+                    <Icon
+                        as={icon}
+                        size={24}
+                        intent="neutral"
+                        priority={isItemActive ? 'primary' : 'secondary'}
+                        pointerEvents="none"
+                    />
+                </StatusBadge>
+                {expanded && (
+                    <Row
+                        flex="1"
+                        minWidth={0}
+                        gap={8}
+                        justifyContent="space-between"
+                        alignItems="center"
+                    >
+                        <Paragraph
+                            typographyStyle="body-md"
+                            intent="neutral"
+                            priority={isItemActive ? 'primary' : 'secondary'}
+                            minWidth={0}
+                            overflowWrap="anywhere"
+                        >
+                            <Translation id={nameId} values={values} />
+                        </Paragraph>
+                        {isNewContentBadgeShown && (
+                            <Badge
+                                size="medium"
+                                intent="accentViolet"
+                                isAnimated={isNewContentIndicatorAnimated}
+                                data-testid={`${navigationItemTestId}/new-content-indicator`}
+                            >
+                                <Translation id="TR_NEW" />
+                            </Badge>
+                        )}
+                    </Row>
+                )}
+            </Container>
+        </Tooltip>
     );
+};
+
+export const NavigationItem = (props: NavigationItemProps) => {
+    const { isSidebarCollapsed } = useResponsiveContext();
+
+    return <NavItem expanded={!isSidebarCollapsed} {...props} />;
 };

@@ -6,23 +6,25 @@
     "sideEffects": false,
     "main": "src/index",
     "scripts": {
-        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
+        "depcheck": "yarn g:depcheck",
         "type-check": "yarn g:tsc --build",
-        "generate-icons": "yarn g:tsx generateIcons.js"
-    },
-    "dependencies": {
-        "@shopify/react-native-skia": "0.1.234",
-        "@suite-common/wallet-config": "workspace:*",
-        "@suite-common/wallet-types": "workspace:*",
-        "@trezor/styles": "workspace:*",
-        "@trezor/theme": "workspace:*",
-        "react": "18.2.0",
-        "react-native": "0.73.2",
-        "react-native-reanimated": "3.7.0-nightly-20240101-9d365ae7b",
-        "react-svg": "^16.1.33",
-        "styled-components": "^6.1.8"
+        "generate-icons": "yarn g:tsx generateIcons.mjs && yarn g:tsx generateIconFont.ts",
+        "generate-icon-font": "yarn g:tsx generateIconFont.ts",
+        "download-crypto-icons": "yarn g:tsx ./scripts/downloadCryptoIcons.ts",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
+        "test:unit": "yarn g:jest"
     },
     "devDependencies": {
-        "svgo": "3.2.0"
+        "@suite-common/wallet-config": "workspace:^",
+        "@trezor/network-ethereum-suite-common": "workspace:*",
+        "chalk": "^6.0.0",
+        "fantasticon": "4.1.0",
+        "prettier": "^3.9.6",
+        "sharp": "^0.34.2",
+        "svgo": "^4.0.1"
+    },
+    "dependencies": {
+        "@suite-common/http-client": "workspace:^",
+        "zod": "4.3.6"
     }
 }

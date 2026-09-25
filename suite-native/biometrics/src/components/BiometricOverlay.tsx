@@ -1,18 +1,20 @@
-import { Platform, StyleSheet, TouchableOpacity } from 'react-native';
+import { StyleSheet } from 'react-native';
 
-import { Box, Text } from '@suite-native/atoms';
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-import { Icon } from '@suite-common/icons';
-import { useTranslate, TxKeyPath } from '@suite-native/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { Box, PressableOpacity, Text } from '@suite-native/atoms';
+import { Icon, iconSizes } from '@suite-native/icons';
+import { Translation } from '@suite-native/intl';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
 
-import { BiometricsIcons } from './BiometricsIcons';
-import { useBiometricsSettings } from '../useBiometricsSettings';
+import { BiometricsIcon } from './BiometricsIcon';
+import { authenticateUserThunk } from '../biometricsThunks';
 
 const overlayWrapperStyle = prepareNativeStyle(utils => ({
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: utils.colors.backgroundTertiaryDefaultOnElevation0,
+    backgroundColor: utils.colors.surfaceFillPage,
 }));
 
 const bottomWrapperStyle = prepareNativeStyle(utils => ({
@@ -21,61 +23,37 @@ const bottomWrapperStyle = prepareNativeStyle(utils => ({
     marginHorizontal: 'auto',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: utils.spacings.extraSmall,
+    gap: utils.spacings.sp4,
 }));
-
-const getBiometricsTranslationKey = ({
-    isFacialEnabled,
-    isFingerprintEnabled,
-}: {
-    isFacialEnabled: boolean;
-    isFingerprintEnabled: boolean;
-}): TxKeyPath => {
-    if (Platform.OS === 'ios') {
-        return isFacialEnabled ? 'biometrics.ios.faceId' : 'biometrics.ios.touchId';
-    }
-
-    if (Platform.OS === 'android') {
-        if (isFingerprintEnabled && isFacialEnabled) return 'biometrics.android.combined';
-
-        if (isFingerprintEnabled) return 'biometrics.android.fingerprint';
-
-        if (isFacialEnabled) {
-            return 'biometrics.android.facial';
-        }
-    }
-
-    return 'biometrics.unknown';
-};
 
 type BiometricOverlayProps = {
     isBiometricsAuthButtonVisible: boolean;
-    onBiometricAuthPress: () => void;
 };
 
-export const BiometricOverlay = ({
-    isBiometricsAuthButtonVisible,
-    onBiometricAuthPress,
-}: BiometricOverlayProps) => {
+export const BiometricOverlay = ({ isBiometricsAuthButtonVisible }: BiometricOverlayProps) => {
     const { applyStyle } = useNativeStyles();
-    const { translate } = useTranslate();
-    const { isFacialEnabled, isFingerprintEnabled } = useBiometricsSettings();
 
-    const titleTransKey = getBiometricsTranslationKey({ isFacialEnabled, isFingerprintEnabled });
+    const { dispatch } = useServices(injectDispatch);
+
+    const triggerManualAuthentication = () => {
+        dispatch(authenticateUserThunk());
+    };
 
     return (
         <>
             <Box style={applyStyle(overlayWrapperStyle)}>
-                <Icon name="trezor" size="extraLarge" color="iconDefault" />
+                <Icon name="trezorLogo" size="extraLarge" color="contentPrimary" />
             </Box>
             {isBiometricsAuthButtonVisible && (
-                <TouchableOpacity
-                    onPress={onBiometricAuthPress}
+                <PressableOpacity
+                    onPress={triggerManualAuthentication}
                     style={applyStyle(bottomWrapperStyle)}
                 >
-                    <BiometricsIcons iconSize={32} showShadow />
-                    <Text color="textPrimaryDefault">{translate(titleTransKey)}</Text>
-                </TouchableOpacity>
+                    <BiometricsIcon iconSize={iconSizes.extraLarge} showShadow />
+                    <Text color="contentBrand">
+                        <Translation id="biometrics.biometricsButton" />
+                    </Text>
+                </PressableOpacity>
             )}
         </>
     );

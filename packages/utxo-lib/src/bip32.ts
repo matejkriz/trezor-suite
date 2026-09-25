@@ -2,35 +2,48 @@
 // differences:
 // - add missing `compressed` field on BIP32Interface
 // - changed order of `fromPrivateKeyLocal/fromPublicKeyLocal` (eslint no-use-before-define)
-// - `identifier` method is using different hashing for Decred.
-// - `fromBase58` and `toBase58` methods are using additional "network" param in bs58check.encode/decode (Decred support).
 
-import ecc from 'tiny-secp256k1';
-import wif from 'wif';
-import { typeforce } from './types/typeforce';
+import * as wif from 'wif';
+
 import * as bs58check from './bs58check';
 import * as crypto from './crypto';
-import { bitcoin as BITCOIN, isNetworkType } from './networks';
+import { bitcoin as BITCOIN } from './networks';
 import type { Network } from './networks';
+import * as ecc from './noble-compatibility';
+import {
+    BufferNSchema,
+    BufferSchema,
+    Type,
+    UInt32,
+    UInt8,
+    assertType,
+    checkType,
+} from './types/validation';
 
-const UINT256_TYPE = typeforce.BufferN(32);
-const NETWORK_TYPE = typeforce.compile({
-    wif: typeforce.UInt8,
-    bip32: {
-        public: typeforce.UInt32,
-        private: typeforce.UInt32,
+const UINT256_TYPE = BufferNSchema(32);
+const NETWORK_TYPE = Type.Object(
+    {
+        wif: UInt8,
+        bip32: Type.Object(
+            {
+                public: UInt32,
+                private: UInt32,
+            },
+            { additionalProperties: true },
+        ),
     },
-});
+    { additionalProperties: true },
+);
 
 const HIGHEST_BIT = 0x80000000;
 const UINT31_MAX = 2 ** 31 - 1;
 
-function BIP32Path(value: string): boolean {
-    return typeforce.String(value) && value.match(/^(m\/)?(\d+'?\/)*\d+'?$/) !== null;
+function isBIP32Path(value: string): boolean {
+    return typeof value === 'string' && value.match(/^(m\/)?(\d+'?\/)*\d+'?$/) !== null;
 }
 
-function UInt31(value: number): boolean {
-    return typeforce.UInt32(value) && value <= UINT31_MAX;
+function isUInt31(value: number): boolean {
+    return checkType(UInt32, value) && value <= UINT31_MAX;
 }
 
 function fromPrivateKeyLocal(
@@ -41,13 +54,10 @@ function fromPrivateKeyLocal(
     index?: number,
     parentFingerprint?: number,
 ): BIP32Interface {
-    typeforce(
-        {
-            privateKey: UINT256_TYPE,
-            chainCode: UINT256_TYPE,
-        },
-        { privateKey, chainCode },
-    );
+    assertType(Type.Object({ privateKey: UINT256_TYPE, chainCode: UINT256_TYPE }), {
+        privateKey,
+        chainCode,
+    });
     network = network || BITCOIN;
 
     if (!ecc.isPrivate(privateKey)) throw new TypeError('Private key not in range [1, n)');
@@ -64,13 +74,10 @@ function fromPublicKeyLocal(
     index?: number,
     parentFingerprint?: number,
 ): BIP32Interface {
-    typeforce(
-        {
-            publicKey: typeforce.BufferN(33),
-            chainCode: UINT256_TYPE,
-        },
-        { publicKey, chainCode },
-    );
+    assertType(Type.Object({ publicKey: BufferNSchema(33), chainCode: UINT256_TYPE }), {
+        publicKey,
+        chainCode,
+    });
     network = network || BITCOIN;
 
     // verify the X coordinate is a point on the curve
@@ -114,7 +121,7 @@ class BIP32 implements BIP32Interface {
         private __INDEX = 0,
         private __PARENT_FINGERPRINT = 0x00000000,
     ) {
-        typeforce(NETWORK_TYPE, network);
+        assertType(NETWORK_TYPE, network);
         this.lowR = false;
     }
 
@@ -131,9 +138,9 @@ class BIP32 implements BIP32Interface {
     }
 
     get publicKey(): Buffer {
-        if (this.__Q === undefined) this.__Q = ecc.pointFromScalar(this.__D, true);
+        if (this.__Q === undefined) this.__Q = ecc.pointFromScalar(this.__D!, true);
 
-        return this.__Q!;
+        return this.__Q;
     }
 
     get privateKey(): Buffer | undefined {
@@ -141,8 +148,6 @@ class BIP32 implements BIP32Interface {
     }
 
     get identifier(): Buffer {
-        if (isNetworkType('decred', this.network)) return crypto.hash160blake256(this.publicKey);
-
         return crypto.hash160(this.publicKey);
     }
 
@@ -204,18 +209,22 @@ class BIP32 implements BIP32Interface {
             this.publicKey.copy(buffer, 45);
         }
 
-        return bs58check.encode(buffer, network);
+        return bs58check.encode(buffer);
     }
 
     toWIF(): string {
         if (!this.privateKey) throw new TypeError('Missing private key');
 
-        return wif.encode(this.network.wif, this.privateKey, true);
+        return wif.encode({
+            version: this.network.wif,
+            privateKey: this.privateKey,
+            compressed: true,
+        });
     }
 
     // https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#child-key-derivation-ckd-functions
     derive(index: number): BIP32Interface {
-        typeforce(typeforce.UInt32, index);
+        assertType(UInt32, index);
 
         const isHardened = index >= HIGHEST_BIT;
         const data = Buffer.allocUnsafe(37);
@@ -249,7 +258,7 @@ class BIP32 implements BIP32Interface {
         let hd: BIP32Interface;
         if (!this.isNeutered()) {
             // ki = parse256(IL) + kpar (mod n)
-            const ki = ecc.privateAdd(this.privateKey, IL);
+            const ki = ecc.privateAdd(this.privateKey!, IL);
 
             // In case ki == 0, proceed with the next value for i
             if (ki == null) return this.derive(index + 1);
@@ -286,14 +295,14 @@ class BIP32 implements BIP32Interface {
     }
 
     deriveHardened(index: number): BIP32Interface {
-        typeforce(UInt31, index);
+        if (!isUInt31(index)) throw new TypeError('Expected UInt31');
 
         // Only derives hardened private keys by default
         return this.derive(index + HIGHEST_BIT);
     }
 
     derivePath(path: string): BIP32Interface {
-        typeforce(BIP32Path, path);
+        if (!isBIP32Path(path)) throw new TypeError('Expected BIP32Path, got');
 
         let splitPath = path.split('/');
         if (splitPath[0] === 'm') {
@@ -304,7 +313,7 @@ class BIP32 implements BIP32Interface {
 
         return splitPath.reduce((prevHd, indexStr) => {
             let index;
-            if (indexStr.slice(-1) === `'`) {
+            if (indexStr.endsWith(`'`)) {
                 index = parseInt(indexStr.slice(0, -1), 10);
 
                 return prevHd.deriveHardened(index);
@@ -326,7 +335,7 @@ class BIP32 implements BIP32Interface {
         let counter = 0;
         // if first try is lowR, skip the loop
         // for second try and on, add extra entropy counting up
-        while (sig[0] > 0x7f) {
+        while ((sig[0] as number) > 0x7f) {
             counter++;
             extraData.writeUIntLE(counter, 0, 6);
             sig = ecc.signWithEntropy(hash, this.privateKey, extraData);
@@ -341,11 +350,7 @@ class BIP32 implements BIP32Interface {
 }
 
 export function fromBase58(inString: string, network?: Network): BIP32Interface {
-    const buffer = Buffer.from(
-        isNetworkType('decred', network)
-            ? bs58check.decodeBlake256Key(inString)
-            : bs58check.decode(inString, network),
-    );
+    const buffer = Buffer.from(bs58check.decode(inString));
     if (buffer.length !== 78) throw new TypeError('Invalid buffer length');
     network = network || BITCOIN;
 
@@ -406,7 +411,7 @@ export function fromPublicKey(
 }
 
 export function fromSeed(seed: Buffer, network?: Network): BIP32Interface {
-    typeforce(typeforce.Buffer, seed);
+    assertType(BufferSchema, seed);
     if (seed.length < 16) throw new TypeError('Seed should be at least 128 bits');
     if (seed.length > 64) throw new TypeError('Seed should be at most 512 bits');
     network = network || BITCOIN;

@@ -5,9 +5,11 @@
     "author": "Satoshilabs s.r.o <info@satoshilabs.com>",
     "license": "MIT",
     "scripts": {
-        "start": "node index.js"
+        "start": "tsx  ./src/index.ts",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'"
     },
     "dependencies": {
-        "@trezor/connect": "workspace:*"
+        "@trezor/connect": "workspace:*",
+        "tsx": "^4.21.0"
     }
 }

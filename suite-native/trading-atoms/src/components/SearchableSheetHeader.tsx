@@ -1,0 +1,99 @@
+import { type ReactNode, useCallback, useState } from 'react';
+import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+
+import { BottomSheetGrabber, VStack } from '@suite-native/atoms';
+import { type IconName } from '@suite-native/icons';
+import { useTranslate } from '@suite-native/intl';
+import { type NativeStyleObject, prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
+
+import { BottomSheetSearchInputWithCancel } from './BottomSheetSearchInputWithCancel';
+import { SheetHeaderTitle } from './SheetHeaderTitle';
+
+export type SearchableSheetHeaderProps = {
+    onClose: () => void;
+    title: ReactNode;
+    rightButtonIcon?: IconName;
+    rightButtonA11yLabel?: string;
+    onFilterFocusChange?: (isFilterActive: boolean) => void;
+    children?: ReactNode;
+    style?: NativeStyleObject;
+    onFilterChange?: (value: string) => void;
+    filterValue?: string;
+    searchInputPlaceholder?: string;
+    searchInputTestId?: string;
+    autoCorrect?: boolean;
+};
+
+export const SEARCHABLE_SHEET_HEADER_DEFAULT_HEIGHT = 160 as const;
+export const FOCUS_ANIMATION_DURATION = 300 as const;
+
+const noOp = () => {};
+
+const wrapperStyle = prepareNativeStyle(({ spacings }) => ({
+    padding: spacings.sp16,
+    gap: spacings.sp16,
+}));
+
+export const SearchableSheetHeader = ({
+    onClose,
+    title,
+    children,
+    onFilterFocusChange = noOp,
+    style,
+    rightButtonIcon = 'x',
+    rightButtonA11yLabel,
+    onFilterChange = noOp,
+    filterValue,
+    searchInputTestId,
+    searchInputPlaceholder,
+    autoCorrect,
+}: SearchableSheetHeaderProps) => {
+    const { applyStyle } = useNativeStyles();
+    const { translate } = useTranslate();
+
+    const [isFilterActive, setIsFilterActive] = useState(false);
+
+    const changeFilterFocus = useCallback(
+        (newValue: boolean) => {
+            setIsFilterActive(newValue);
+            onFilterFocusChange(newValue);
+        },
+        [onFilterFocusChange],
+    );
+
+    return (
+        <VStack style={[applyStyle(wrapperStyle), style]}>
+            <BottomSheetGrabber />
+            <Animated.View layout={LinearTransition.duration(FOCUS_ANIMATION_DURATION)}>
+                {!isFilterActive && (
+                    <Animated.View
+                        entering={FadeIn.duration(FOCUS_ANIMATION_DURATION)}
+                        exiting={FadeOut.duration(FOCUS_ANIMATION_DURATION)}
+                    >
+                        <SheetHeaderTitle
+                            rightButtonIcon={rightButtonIcon}
+                            onRightButtonPress={onClose}
+                            rightButtonA11yLabel={
+                                rightButtonA11yLabel ?? translate('generic.buttons.close')
+                            }
+                        >
+                            {title}
+                        </SheetHeaderTitle>
+                    </Animated.View>
+                )}
+            </Animated.View>
+            <Animated.View layout={LinearTransition.duration(FOCUS_ANIMATION_DURATION)}>
+                <BottomSheetSearchInputWithCancel
+                    onChange={onFilterChange}
+                    onFocus={() => changeFilterFocus(true)}
+                    onBlur={() => changeFilterFocus(false)}
+                    value={filterValue}
+                    placeholder={searchInputPlaceholder}
+                    testId={searchInputTestId}
+                    autoCorrect={autoCorrect}
+                />
+            </Animated.View>
+            {children}
+        </VStack>
+    );
+};

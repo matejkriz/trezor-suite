@@ -5,160 +5,235 @@
     "repository": "https://github.com/trezor/trezor-suite.git",
     "license": "SEE LICENSE IN LICENSE.md",
     "engines": {
-        "node": "18",
+        "node": "24",
         "yarn": ">=4"
     },
     "workspaces": {
         "packages": [
+            "networks/*/*",
             "packages/*",
             "packages/connect-examples/*",
             "suite-native/*",
             "suite-common/*",
+            "suite/*",
             "scripts"
         ]
     },
     "scripts": {
         "_______ Hooks _______": "Yarn hooks.",
-        "postinstall": "yarn run patch-package",
+        "postinstall": "husky",
         "_______ Library Scripts #####": "Some libraries have their own build scripts.",
         "build:libs": "yarn nx run-many --skip-nx-cache --target=build:lib",
-        "suite:build:web": "yarn workspace @trezor/suite-web build",
+        "build:essential": "yarn message-system-sign-config & yarn workspace @suite/app-assets build:lib & yarn workspace @trezor/transport-bridge build:lib",
+        "suite:build:web": "yarn workspace @suite/web-app build",
+        "suite:build:web:preview": "yarn workspace @suite/web-app build:preview",
         "_______ Start Scripts _______": "Here are standalone scripts for running individual applications for development.",
-        "suite:dev": "yarn workspace @trezor/suite-web dev",
-        "suite:dev:desktop": "yarn workspace @trezor/suite-desktop dev",
+        "suite:dev": "yarn workspace @suite/web-app dev",
+        "suite:dev:vite": "yarn workspace @suite/web-app dev:vite",
+        "suite:dev:desktop": "yarn workspace @suite/desktop-app dev",
+        "analytics:docs-dev": "node scripts/analytics-docs-dev.mjs",
         "native:start": "yarn workspace @suite-native/app start",
-        "_______ Testing _______": "Testing, linting, type checking...",
-        "type-check": "yarn nx run-many --target=type-check",
-        "type-check:force": "rimraf -rf -- **/libDev && yarn type-check",
-        "test:unit": "yarn nx run-many --target=test:unit",
-        "lint:js": "eslint . --cache --cache-strategy content --ignore-path .gitignore",
-        "lint:styles": "yarn nx run-many --target=lint:styles",
+        "connect:explorer": "yarn workspace @trezor/connect-explorer dev",
+        "connect:cli": "yarn workspace @trezor/connect-cli cli",
+        "_______ Code validation _______": "Static code analysis (incl. autofixes), like formatting, testing, linting, type checking...",
+        "type-check": "yarn nx affected --target=type-check",
+        "type-check:all": "yarn nx run-many --target=type-check",
+        "test:unit": "yarn nx affected --target=test:unit",
+        "test:unit:suite": "yarn nx affected --target=test:unit --exclude='@suite-native/*'",
+        "test:unit:native": "yarn nx affected --target=test:unit --exclude='@trezor/*,@suite/*,@suite-common/*,@suite-native/module-trading,@suite-native/trading-*'",
+        "test:unit:native:trading": "yarn nx affected --target=test:unit --exclude='*,!@suite-native/module-trading,!@suite-native/trading-*'",
+        "test:unit:all": "yarn nx run-many --target=test:unit",
+        "test:stylelint-rules": "node --test stylelint-local-rules/*.test.mjs",
+        "lint:js": "yarn nx affected --target=lint:js",
+        "lint:js:fix": "yarn lint:js --fix",
+        "lint:js:all": "yarn nx run-many --target=lint:js --exclude=trezor-suite,@trezor/scripts",
+        "lint:styles": "yarn test:stylelint-rules && yarn nx affected --target=lint:styles",
+        "lint:styles:all": "yarn test:stylelint-rules && yarn nx run-many --target=lint:styles",
         "lint": "yarn lint:styles && yarn lint:js",
-        "lint-staged": "npx lint-staged",
         "lint:shellcheck": "./scripts/shellcheck.sh",
-        "_______ Global Scripts _______": "Shared scripts for running in all workspaces",
-        "g:eslint": "cd $INIT_CWD && eslint --report-unused-disable-directives --cache --ignore-path ../../.gitignore",
+        "format": "yarn nx format:write",
+        "format:all": "yarn prettier --write \"**/*.{js,ts,tsx,mdx,md,html,json,yml,yaml}\"",
+        "format:verify": "yarn nx format:check",
+        "depcheck": "depcheck && yarn nx affected --target=depcheck",
+        "requirements:verify": "yarn workspace @trezor/requirements requirements:verify",
+        "requirements:fix": "yarn workspace @trezor/requirements requirements:fix",
+        "verify-project-references": "yarn update-project-references --test",
+        "check-workspace-resolutions": "yarn tsx ./scripts/check-workspace-resolutions.ts",
+        "build:libs:verify": "yarn nx affected --target=build:lib",
+        "validate": "yarn verify-project-references && yarn lint:js:fix && yarn lint:styles && yarn build:libs:verify && yarn type-check && yarn check-workspace-resolutions && yarn depcheck",
+        "_______ Global Scripts _______": "Generic script definitions to be run in individual workspaces.",
+        "g:eslint": "cd $INIT_CWD && eslint --cache --cache-strategy content --max-warnings 0",
         "g:jest": "cd $INIT_CWD && jest",
+        "g:jest:native": "cd $INIT_CWD && jest --runInBand",
         "g:prettier": "cd $INIT_CWD && prettier",
         "g:rimraf": "cd $INIT_CWD && rimraf",
         "g:tsc": "cd $INIT_CWD && tsc",
         "g:tsx": "cd $INIT_CWD && tsx",
-        "_______ Nx testing _______": "Nx wrapped commands for testing, linting, type checking...",
-        "nx:build:libs": "yarn nx affected --target=build:lib",
-        "nx:type-check": "yarn nx affected --target=type-check",
-        "nx:test-unit": "yarn nx affected --target=test:unit",
-        "nx:lint:js": "yarn nx affected --target=lint:js",
-        "nx:lint:styles": "yarn nx affected --target=lint:styles",
-        "nx:format": "yarn nx format:check",
+        "g:depcheck": "cd $INIT_CWD && depcheck",
         "_______ Commands _______": "Useful commands and scripts.",
-        "patch": "yarn patch-package",
+        "nx:show-affected": "yarn nx show projects --affected",
+        "convert-figma-palette": "yarn tsx ./scripts/convertFigmaPalette.ts",
         "update-project-references": "yarn tsx ./scripts/updateProjectReferences.ts",
-        "verify-project-references": "yarn update-project-references --test",
-        "check-workspace-resolutions": "yarn tsx ./scripts/check-workspace-resolutions.ts",
-        "generate-package": "yarn tsx ./scripts/generatePackage.js",
+        "generate-icons": "yarn workspace @suite-common/icons generate-icons && yarn workspace @trezor/icons generate-icons",
+        "generate-package": "yarn workspace @trezor/scripts generate-package",
+        "reserve-npm-package": "node ./scripts/ci/npm-reserve-package.js",
         "deps": "rimraf **/node_modules && yarn",
+        "list-outdated": "./scripts/list-outdated-dependencies/list-outdated-dependencies.sh",
         "message-system-sign-config": "yarn workspace @suite-common/message-system sign-config",
-        "format": "yarn nx format:write",
-        "format:all": "yarn prettier --write \"**/*.{js,ts,tsx,mdx,md,html,json,yml,yaml}\"",
-        "format:verify": "yarn prettier --check \"**/*.{js,ts,tsx,mdx,md,html,json}\"",
         "update-submodules": "./scripts/update-submodules.sh",
-        "update-coins": "./scripts/update-coins.sh",
         "update-models": "./scripts/update-models.sh",
-        "update-protobuf": "yarn workspace @trezor/protobuf update:protobuf && yarn workspace @trezor/protobuf update:schema",
-        "update-coinjoin-middleware": "yarn workspace @trezor/suite-data update-coinjoin-middleware",
-        "prepare-release": "./scripts/prepare-release.sh",
+        "update-protobuf": "./scripts/update-protobuf.sh",
+        "update-coinjoin-middleware": "yarn workspace @suite/app-assets update-coinjoin-middleware",
+        "prepare-desktop-release": "./scripts/prepare-desktop-release.sh",
+        "prepare-mobile-release": "./scripts/prepare-mobile-release.sh",
         "native:android": "yarn workspace @suite-native/app android",
         "native:ios": "yarn workspace @suite-native/app ios",
-        "native:prebuild": "yarn workspace @suite-native/app prebuild:clean",
+        "native:prebuild": "yarn workspace @suite-native/app prebuild",
+        "native:prebuild:no-clean": "yarn workspace @suite-native/app prebuild:no-clean",
+        "native:reverse-ports": "yarn workspace @suite-native/app reverse-ports",
+        "ws": "./scripts/workspace-run.sh",
         "_______ Aliases _______": "Aliases for longer commands which we often have to run manually. Names don't have to be pretty or make total sense.",
-        "refs": "yarn update-project-references",
+        "refs": "yarn update-project-references \"$@\" && yarn requirements:fix --only=easignore-mobile-closure",
         "types": "yarn type-check",
         "messages": "yarn message-system-sign-config",
-        "validate": "yarn verify-project-references && yarn lint:js && yarn nx:lint:styles && yarn nx:build:libs && yarn nx:type-check && yarn nx:test-unit && yarn check-workspace-resolutions",
         "a": "yarn native:android",
         "ios": "yarn native:ios",
         "p": "yarn native:prebuild",
+        "ports": "yarn native:reverse-ports",
         "s": "yarn native:start"
     },
-    "lint-staged": {
-        "packages/**/*.{ts,tsx}": [
-            "eslint --fix",
-            "git add"
-        ],
-        "packages/{suite,suite-web,suite-desktop-ui,connect-explorer,connect-popup,connect-ui,components}/**/*.{ts,tsx}": [
-            "stylelint --fix",
-            "git add"
-        ]
-    },
     "resolutions": {
-        "typescript": "5.3.3",
-        "react-native": "0.73.2",
-        "prettier": "3.2.5",
-        "type-fest": "2.12.2",
+        "typescript": "npm:@typescript/typescript6@6.0.2",
+        "@types/jest": "30.0.0",
+        "prettier": "^3.9.6",
+        "react-native": "0.86.0",
+        "type-fest": "5.5.0",
         "bcrypto": "5.4.0",
-        "react": "18.2.0",
-        "electron": "27.0.4",
-        "webpack": "^5.90.1",
-        "html-webpack-plugin": "^5.6.0",
-        "@types/node": "18.17.15",
-        "@types/react": "18.2.55",
-        "@sentry/types": "7.92.0"
+        "electron": "43.2.0",
+        "react": "19.2.3",
+        "@types/node": "22.13.10",
+        "bn.js": "5.2.3",
+        "buffer": "^6.0.3",
+        "node-addon-api": "8.5.0",
+        "node-gyp": "12.2.0",
+        "reselect": "5.2.0",
+        "### We need promise to be same version in mobile unless it produces undefined behavior, check PR #15815": "1.0.0",
+        "promise": "8.3.0",
+        "elliptic": "6.6.1",
+        "@headlessui/react": "^2.2.10",
+        "### Align versions of sentry internal packages, because electron & native use different versions of @core": "1.0.0",
+        "@sentry/core": "10.69.0",
+        "@sentry/browser": "10.69.0",
+        "expo-build-properties": "~57.0.6",
+        "@types/react": "19.2.14",
+        "react-dom": "19.2.3",
+        "expo-modules-core": "~57.0.6",
+        "test-renderer": "1.2.0",
+        "@solana/rpc@npm:6.9.0": "patch:@solana/rpc@npm%3A6.9.0#~/.yarn/patches/@solana-rpc-npm-6.9.0-ba7976484d.patch"
     },
     "devDependencies": {
-        "@babel/cli": "^7.23.9",
-        "@babel/core": "^7.23.9",
-        "@babel/node": "^7.23.9",
-        "@babel/plugin-proposal-class-properties": "^7.18.6",
-        "@babel/plugin-proposal-decorators": "^7.23.9",
-        "@babel/plugin-transform-runtime": "^7.23.9",
-        "@babel/preset-env": "^7.23.9",
-        "@babel/preset-react": "^7.23.3",
-        "@babel/preset-typescript": "^7.23.3",
-        "@babel/runtime": "^7.23.9",
-        "@suite-common/wallet-types": "workspace:*",
-        "@types/jest": "29.5.12",
-        "@types/node": "18.17.15",
-        "@types/prettier": "^3.0.0",
-        "@types/semver": "^7.5.6",
-        "@types/tar": "^6.1.11",
-        "@typescript-eslint/eslint-plugin": "^6.21.0",
-        "@typescript-eslint/parser": "^6.21.0",
-        "babel-jest": "29.7.0",
-        "eslint": "^8.56.0",
-        "eslint-plugin-chai-friendly": "^0.7.4",
-        "eslint-plugin-cypress": "^2.15.1",
-        "eslint-plugin-import": "^2.29.1",
-        "eslint-plugin-jest": "^27.6.3",
-        "eslint-plugin-jsx-a11y": "^6.8.0",
-        "eslint-plugin-react": "^7.33.2",
-        "eslint-plugin-react-hooks": "^4.6.0",
+        "@arethetypeswrong/cli": "^0.18.5",
+        "@babel/cli": "7.29.7",
+        "@babel/core": "7.29.7",
+        "@babel/node": "^7.29.7",
+        "@babel/plugin-proposal-decorators": "^7.29.7",
+        "@babel/plugin-transform-runtime": "7.29.7",
+        "@babel/preset-env": "7.29.7",
+        "@babel/preset-react": "^7.29.7",
+        "@babel/preset-typescript": "^7.29.7",
+        "@babel/runtime": "7.29.7",
+        "@react-native/jest-preset": "0.86.0",
+        "@swc/core": "^1.15.47",
+        "@swc/jest": "^0.2.39",
+        "@trezor/eslint": "workspace:*",
+        "@trezor/requirements": "workspace:*",
+        "@types/estree": "^1.0.8",
+        "@types/jest": "30.0.0",
+        "@types/node": "22.13.10",
+        "@typescript/native-preview": "npm:typescript@^7.0.2",
+        "babel-jest": "30.0.0",
+        "depcheck": "^1.4.7",
+        "eslint": "^10.8.1",
+        "husky": "^9.1.7",
         "jest": "29.7.0",
-        "jest-expo": "^50.0.2",
-        "metro-react-native-babel-preset": "0.77.0",
-        "nx": "^18.0.3",
-        "patch-package": "8.0.0",
-        "prettier": "3.2.5",
-        "prettier-eslint": "^16.3.0",
-        "rimraf": "^5.0.5",
-        "semver": "^7.6.0",
-        "tar": "^6.2.0",
+        "jest-environment-node": "^29.7.0",
+        "jest-expo": "~57.0.2",
+        "node-gyp": "12.2.0",
+        "nx": "23.1.0",
+        "postcss-styled-syntax": "^0.7.1",
+        "postcss-value-parser": "^4.2.0",
+        "prettier": "^3.9.6",
+        "rimraf": "^6.1.2",
+        "stylelint": "^17.1.1",
         "ts-node": "^10.9.2",
-        "tsconfig-paths": "^4.2.0",
         "tslib": "^2.6.2",
-        "tsx": "^4.7.0",
-        "typescript": "5.3.3",
+        "tsx": "^4.21.0",
+        "typescript": "npm:@typescript/typescript6@6.0.2",
+        "typescript-eslint": "^8.68.0",
+        "uint8array-tools": "^0.0.9",
         "version-bump-prompt": "^6.1.0"
     },
     "dependenciesMeta": {
-        "core-js-pure": {
-            "built": false
+        "@anthropic-ai/claude-code": {
+            "built": true
         },
-        "electron": {
+        "@bufbuild/buf": {
+            "built": true
+        },
+        "@parcel/watcher": {
+            "built": true
+        },
+        "@playwright/browser-chromium": {
+            "built": true
+        },
+        "@playwright/browser-firefox": {
+            "built": true
+        },
+        "@playwright/browser-webkit": {
+            "built": true
+        },
+        "@shopify/react-native-skia": {
+            "built": true
+        },
+        "@swc/core": {
+            "built": true
+        },
+        "bcrypto": {
+            "built": true
+        },
+        "better-sqlite3": {
+            "built": true
+        },
+        "detox": {
+            "built": true
+        },
+        "esbuild": {
+            "built": true
+        },
+        "msgpackr-extract": {
+            "built": true
+        },
+        "nx": {
+            "built": true
+        },
+        "opencode-ai": {
+            "built": true
+        },
+        "sharp": {
             "built": true
         },
         "trezor-suite": {
             "built": true
+        },
+        "ttf2woff2": {
+            "built": true
+        },
+        "unrs-resolver": {
+            "built": true
+        },
+        "usb": {
+            "built": true
         }
     },
-    "packageManager": "yarn@4.0.2"
+    "packageManager": "yarn@4.18.0"
 }

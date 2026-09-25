@@ -1,12 +1,28 @@
-import { ReactNode } from 'react';
+import { type ReactNode } from 'react';
+
 import styled from 'styled-components';
 
-const Container = styled.div<{
-    $valueInPercents: number;
-    $size: number;
-    $color?: string;
-    $backgroundColor?: string;
-}>`
+import {
+    type FrameProps,
+    type FramePropsKeys,
+    pickAndPrepareFrameProps,
+    withFrameProps,
+} from '../../../utils/frameProps';
+import { type TransientProps } from '../../../utils/transientProps';
+
+export const allowedProgressPieFrameProps = ['margin'] as const satisfies FramePropsKeys[];
+
+type AllowedFrameProps = Pick<FrameProps, (typeof allowedProgressPieFrameProps)[number]>;
+type TransientAllowedFrameProps = TransientProps<AllowedFrameProps>;
+
+const Container = styled.div<
+    TransientAllowedFrameProps & {
+        $valueInPercents: number;
+        $size: number;
+        $color?: string;
+        $backgroundColor?: string;
+    }
+>`
     display: flex;
     justify-content: center;
     align-items: center;
@@ -14,35 +30,41 @@ const Container = styled.div<{
     height: ${({ $size }) => `${$size}px`};
     border-radius: 50%;
     background: ${({ theme, $valueInPercents, $color, $backgroundColor }) =>
-        `conic-gradient(${$color || theme.BG_GREEN} ${3.6 * $valueInPercents}deg, ${
-            $backgroundColor || theme.STROKE_GREY
+        `conic-gradient(${$color || theme.contentBrand} ${3.6 * $valueInPercents}deg, ${
+            $backgroundColor || theme.borderNeutral
         } 0)`};
+
+    ${withFrameProps}
 `;
 
-export interface ProgressPieProps {
+export type ProgressPieProps = AllowedFrameProps & {
     valueInPercents: number; // 0-100
     size?: number;
     color?: string;
     backgroundColor?: string;
     children?: ReactNode;
-    className?: string;
-}
+};
 
 export const ProgressPie = ({
     size = 16,
     children,
     valueInPercents,
     backgroundColor,
-    className,
     color,
-}: ProgressPieProps) => (
-    <Container
-        $size={size}
-        $valueInPercents={valueInPercents}
-        $backgroundColor={backgroundColor}
-        $color={color}
-        className={className}
-    >
-        {children}
-    </Container>
-);
+    ...rest
+}: ProgressPieProps) => {
+    const frameProps = pickAndPrepareFrameProps(rest, allowedProgressPieFrameProps);
+
+    return (
+        <Container
+            data-component="ProgressPie"
+            $size={size}
+            $valueInPercents={valueInPercents}
+            $backgroundColor={backgroundColor}
+            $color={color}
+            {...frameProps}
+        >
+            {children}
+        </Container>
+    );
+};

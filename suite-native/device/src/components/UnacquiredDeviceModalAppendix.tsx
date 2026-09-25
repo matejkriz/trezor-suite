@@ -1,17 +1,13 @@
-import { VStack, BulletListItem } from '@suite-native/atoms';
-import { useTranslate } from '@suite-native/intl';
+import { BulletList, BulletListItem } from '@suite-native/atoms';
+import { Translation } from '@suite-native/intl';
 
-export const UnacquiredDeviceModalAppendix = () => {
-    const { translate } = useTranslate();
-
-    return (
-        <VStack>
-            <BulletListItem color="textSubdued">
-                {translate('moduleDevice.unacquiredDeviceModal.appendix.bullet1')}
-            </BulletListItem>
-            <BulletListItem color="textSubdued">
-                {translate('moduleDevice.unacquiredDeviceModal.appendix.bullet2')}
-            </BulletListItem>
-        </VStack>
-    );
-};
+export const UnacquiredDeviceModalAppendix = () => (
+    <BulletList textColor="contentSecondary" spacing="sp8">
+        <BulletListItem>
+            <Translation id="moduleDevice.unacquiredDeviceModal.appendix.bullet1" />
+        </BulletListItem>
+        <BulletListItem>
+            <Translation id="moduleDevice.unacquiredDeviceModal.appendix.bullet2" />
+        </BulletListItem>
+    </BulletList>
+);

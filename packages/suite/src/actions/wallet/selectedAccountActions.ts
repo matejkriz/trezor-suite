@@ -1,23 +1,47 @@
+import { type Dispatch, type UnknownAction } from '@reduxjs/toolkit';
+
+import { type SelectedAccountRootState } from '@suite/account';
+import { metadataActions } from '@suite/metadata';
 import {
-    selectDeviceDiscovery,
-    selectDevice,
+    type RouterRootState,
+    routerLocationChange,
+    selectRouteName,
+    selectRouterApp,
+    selectRouterParams,
+} from '@suite/router';
+import { type DeviceRootState, deviceActions, selectSelectedDevice } from '@suite-common/device';
+import { getNetwork } from '@suite-common/wallet-config';
+import {
+    type DiscoveryRootState,
+    type WalletSettingsRootState,
     accountsActions,
     blockchainActions,
     discoveryActions,
-    deviceActions,
+    feesActions,
+    selectDeviceAccounts,
+    selectDiscoveryForSelectedDevice,
+    selectEnabledNetworks,
 } from '@suite-common/wallet-core';
-import { getAccountNetwork } from '@suite-common/wallet-utils';
-import { SelectedAccountStatus } from '@suite-common/wallet-types';
-import { DiscoveryStatus } from '@suite-common/wallet-constants';
-import * as comparisonUtils from '@suite-common/suite-utils';
+import { type SelectedAccountStatus, type WalletParams } from '@suite-common/wallet-types';
+import { isChanged } from '@trezor/utils';
 
-import { ROUTER } from 'src/actions/suite/constants';
-import * as metadataActions from 'src/actions/suite/metadataActions';
+import { accountSearchActions } from 'src/reducers/wallet/accountSearchReducer';
+import { type AccountSearchState } from 'src/reducers/wallet/accountSearchReducer';
 import { getSelectedAccount } from 'src/utils/wallet/accountUtils';
-import { Action, Dispatch, GetState, AppState } from 'src/types/suite';
 
-const getAccountState = (state: AppState): SelectedAccountStatus => {
-    const device = selectDevice(state);
+type SelectedAccountState = DeviceRootState &
+    DiscoveryRootState &
+    RouterRootState &
+    SelectedAccountRootState &
+    WalletSettingsRootState & {
+        wallet: {
+            accountSearch: AccountSearchState;
+        };
+    };
+
+// move to selector!!!!
+export const getAccountState = (state: SelectedAccountState): SelectedAccountStatus => {
+    const device = selectSelectedDevice(state);
 
     // waiting for device
     if (!device) {
@@ -27,24 +51,18 @@ const getAccountState = (state: AppState): SelectedAccountStatus => {
         };
     }
 
-    if (device.authFailed) {
-        return {
-            status: 'exception',
-            loader: 'auth-failed',
-        };
-    }
-
-    // waiting for discovery
-    const discovery = selectDeviceDiscovery(state);
-    if (!device.state || !discovery) {
+    if (!device.state) {
         return {
             status: 'loading',
             loader: 'auth',
         };
     }
 
-    // account cannot exists since there are no selected networks in settings/wallet
-    if (discovery.networks.length === 0) {
+    const accounts = selectDeviceAccounts(state);
+
+    // account cannot exist since there are no discovered accounts (maybe no networks enabled)
+    const enabledNetworks = selectEnabledNetworks(state);
+    if (accounts.length === 0 && enabledNetworks.length === 0) {
         return {
             status: 'exception',
             loader: 'discovery-empty',
@@ -53,50 +71,51 @@ const getAccountState = (state: AppState): SelectedAccountStatus => {
 
     // get params from router
     // or set first default account from discovery list
-    const params =
-        state.router.app === 'wallet' && state.router.params
-            ? state.router.params
+    const params = (
+        selectRouterApp(state) === 'wallet' && selectRouterParams(state)
+            ? selectRouterParams(state)
             : {
                   accountIndex: 0,
                   accountType: 'normal' as const,
-                  symbol: discovery.networks[0],
-              };
+                  symbol: accounts[0]?.symbol || 'btc',
+              }
+    ) as Pick<NonNullable<WalletParams>, 'symbol' | 'accountIndex' | 'accountType'>;
 
-    const network = getAccountNetwork(params)!;
+    const network = getNetwork(params.symbol);
 
     // account cannot exists since requested network is not selected in settings/wallet
-    if (!discovery.networks.find(n => n === network.symbol)) {
+    if (!enabledNetworks.includes(network.symbol)) {
         return {
             status: 'exception',
             loader: 'account-not-enabled',
             network,
-            discovery,
             params,
         };
     }
 
-    const failed = discovery.failed.find(
+    const matchedFailed = accounts.find(
         f =>
+            f.failed &&
             f.symbol === network.symbol &&
             f.index === params.accountIndex &&
             f.accountType === params.accountType,
     );
+
     // discovery for requested network failed
-    if (failed) {
+    if (matchedFailed) {
         return {
             status: 'exception',
             loader: 'account-not-loaded',
+            account: matchedFailed,
             network,
-            discovery,
             params,
         };
     }
 
     // get selected account
-    const account = getSelectedAccount(device.state, state.wallet.accounts, params);
-
+    const account = getSelectedAccount(device.state.staticSessionId, state.wallet.accounts, params);
     // account does exist
-    if (account && account.visible) {
+    if (account?.visible) {
         if (account.backendType === 'coinjoin') {
             if (account.status === 'initial' || (account.status === 'error' && account.syncing)) {
                 return {
@@ -110,8 +129,8 @@ const getAccountState = (state: AppState): SelectedAccountStatus => {
                 return {
                     status: 'exception',
                     loader: 'account-not-loaded',
+                    account,
                     network,
-                    discovery,
                     params,
                 };
             }
@@ -122,24 +141,25 @@ const getAccountState = (state: AppState): SelectedAccountStatus => {
             status: 'loaded',
             account,
             network,
-            discovery,
             params,
         };
     }
+
+    const discovery = selectDiscoveryForSelectedDevice(state);
 
     // account doesn't exist (yet?) checking why...
     // discovery is still running
-    if (discovery.error) {
+    if (discovery?.status === 'failed') {
         return {
             status: 'exception',
             loader: 'discovery-error',
+            account: account ?? undefined,
             network,
-            discovery,
             params,
         };
     }
 
-    if (discovery.status !== DiscoveryStatus.COMPLETED) {
+    if (discovery?.status === 'progress') {
         return {
             status: 'loading',
             loader: 'account-loading',
@@ -151,15 +171,14 @@ const getAccountState = (state: AppState): SelectedAccountStatus => {
         status: 'exception',
         loader: 'account-not-exists',
         network,
-        discovery,
         params,
     };
 };
 
 // list of all actions which has influence on "selectedAccount" reducer
 // other actions will be ignored
-const actions = [
-    ROUTER.LOCATION_CHANGE,
+const actions = new Set<UnknownAction['type']>([
+    routerLocationChange.type,
     deviceActions.selectDevice.type,
     deviceActions.updateSelectedDevice.type,
     metadataActions.setAccountAdd.type,
@@ -172,58 +191,71 @@ const actions = [
     blockchainActions.setBackend.type,
     blockchainActions.synced.type,
     blockchainActions.connected.type,
-    blockchainActions.updateFee.type,
-    discoveryActions.stopDiscovery.type,
-    discoveryActions.interruptDiscovery.type,
-    discoveryActions.createDiscovery.type,
-    discoveryActions.startDiscovery.type,
     discoveryActions.updateDiscovery.type,
-    discoveryActions.removeDiscovery.type,
-    discoveryActions.completeDiscovery.type,
-];
+    feesActions.updateMultipleFees.type,
+]);
 
 /*
  * Called from WalletMiddleware
  */
-export const syncSelectedAccount = (action: Action) => (dispatch: Dispatch, getState: GetState) => {
-    // ignore not listed actions
-    if (actions.indexOf(action.type) < 0) return;
-    const state = getState();
-    // ignore if not in wallet
-    if (state.router.app !== 'wallet') return;
+type SyncSelectedAccountThunkState = SelectedAccountState;
 
-    // get new state
-    const newState = getAccountState(state);
-    if (!newState) return;
+export const syncSelectedAccountThunk =
+    (action: UnknownAction) =>
+    (dispatch: Dispatch<UnknownAction>, getState: () => SyncSelectedAccountThunkState) => {
+        // ignore not listed actions
+        if (!actions.has(action.type)) return;
+        // eslint-disable-next-line no-restricted-syntax -- This middleware thunk intentionally compares one state snapshot.
+        const state = getState();
+        // ignore if not in wallet or in global trading routes (buy, sell, exchange, redirect)
+        if (selectRouterApp(state) !== 'wallet') {
+            return;
+        }
 
-    // find differences
-    const stateChanged = comparisonUtils.isChanged(state.wallet.selectedAccount, newState, {
-        account: [
-            'descriptor',
-            'availableBalance',
-            'misc',
-            'marker',
-            'tokens',
-            'metadata',
-            'addresses',
-            'visible',
-            'utxo',
-            'status',
-            'syncing',
-        ],
-        discovery: [
-            'status',
-            'index',
-            // 'accountIndex',
-            // 'interrupted',
-            // 'completed',
-            // 'waitingForBlockchain',
-            // 'waitingForDevice',
-        ],
-    });
+        const routeName = selectRouteName(state);
 
-    if (stateChanged) {
-        // update values in reducer
-        dispatch(accountsActions.updateSelectedAccount(newState));
-    }
-};
+        if (
+            routeName?.startsWith('wallet-trading-buy') ||
+            routeName?.startsWith('wallet-trading-sell') ||
+            routeName?.startsWith('wallet-trading-exchange') ||
+            routeName === 'wallet-trading-redirect'
+        ) {
+            return;
+        }
+
+        // get new state
+        const newState = getAccountState(state);
+        if (!newState) return;
+
+        // find differences
+        const stateChanged = isChanged(state.wallet.selectedAccount, newState, {
+            account: [
+                'descriptor',
+                'availableBalance',
+                'misc',
+                'marker',
+                'tokens',
+                'metadata',
+                'addresses',
+                'visible',
+                'utxo',
+                'status',
+                'syncing',
+            ],
+        });
+
+        if (stateChanged) {
+            dispatch(accountsActions.updateSelectedAccount(newState));
+
+            // reset filter if user selects a different coin
+            const coinFilter = state.wallet.accountSearch?.coinFilter;
+            if (
+                coinFilter?.length !== 0 &&
+                newState.status !== 'none' &&
+                newState.network &&
+                !coinFilter.includes(newState.network.symbol)
+            ) {
+                dispatch(accountSearchActions.setCoinFilter([]));
+            }
+        }
+    };

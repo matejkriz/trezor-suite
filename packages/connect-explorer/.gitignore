@@ -1,0 +1,5 @@
+# NextJS ignore file
+.next/
+out/
+!public/
+next-env.d.ts

@@ -1,0 +1,426 @@
+import {
+    type BuyProviderInfo,
+    type BuyTrade,
+    type BuyTradeFinalStatus,
+    type CryptoId,
+    type ExchangeProviderInfo,
+    type ExchangeTrade,
+    type ExchangeTradeFinalStatus,
+    type SellFiatTrade,
+    type SellProviderInfo,
+    type SellTradeFinalStatus,
+} from 'invity-api';
+
+import { asNetworkSymbol } from '@suite-common/wallet-config';
+import {
+    type Network,
+    type NetworkSymbol,
+    getCoingeckoId,
+    getNetwork,
+    getNetworkByCoingeckoId,
+    getNetworkByTradeCryptoId,
+} from '@suite-common/wallet-config';
+import type {
+    Account,
+    AccountKey,
+    FormStateTrading,
+    TokenAddress,
+} from '@suite-common/wallet-types';
+import { getContractAddressForNetworkSymbol } from '@suite-common/wallet-utils';
+import { type TokenInfo } from '@trezor/connect';
+import { exhaustive } from '@trezor/type-utils';
+
+import { CONTRACT_ADDRESS_FOR_NATIVE_TOKEN, CRYPTO_PLATFORM_SEPARATOR } from './constants';
+import { regional } from './regional';
+import {
+    type TradingCountryCode,
+    type TradingCountrySubdivisionOption,
+    type TradingExchangeType,
+    type TradingParsedCryptoIdProps,
+    type TradingPaymentMethodProps,
+    type TradingProviderInfo,
+    type TradingSellType,
+    type TradingTradeBuySellMapProps,
+    type TradingTradeBuySellType,
+    type TradingTradeMapProps,
+    type TradingTradeStatusType,
+    type TradingTradeType,
+    type TradingType,
+} from './types';
+import { getCountrySubdivisionByCode } from './utils/countryUtils';
+
+type NetworkAndContractAddress = {
+    network: Network | undefined;
+    contractAddress: TokenAddress | undefined;
+};
+
+type TradingGetFormStateSellProps = {
+    activeSection: TradingSellType;
+    trade: SellFiatTrade;
+};
+
+type TradingGetFormStateExchangeProps = {
+    activeSection: TradingExchangeType;
+    trade: ExchangeTrade;
+};
+
+type TradingGetFormStateProps = {
+    providers: Record<string, ExchangeProviderInfo | SellProviderInfo> | undefined;
+    isSlip24Active?: boolean;
+    sendAccountKey: AccountKey | undefined;
+    receiveAccountKey?: AccountKey | undefined;
+} & (TradingGetFormStateSellProps | TradingGetFormStateExchangeProps);
+
+export const tradeFinalStatuses: Record<TradingType, TradingTradeStatusType[]> = {
+    buy: ['SUCCESS', 'ERROR', 'BLOCKED'] satisfies BuyTradeFinalStatus[],
+    sell: ['SUCCESS', 'ERROR', 'BLOCKED', 'CANCELLED', 'REFUNDED'] satisfies SellTradeFinalStatus[],
+    exchange: ['SUCCESS', 'ERROR', 'KYC'] satisfies ExchangeTradeFinalStatus[],
+};
+
+export const isFinalStatus = (
+    tradingType: TradingType,
+    tradeStatus: TradingTradeStatusType | undefined,
+) => (tradeStatus ? tradeFinalStatuses[tradingType].includes(tradeStatus) : false);
+
+export const isBuyTrade = (quote: TradingTradeType): quote is BuyTrade =>
+    'fiatStringAmount' in quote && 'receiveStringAmount' in quote;
+
+export const isSellFiatTrade = (quote: TradingTradeType): quote is SellFiatTrade =>
+    'cryptoStringAmount' in quote && 'fiatStringAmount' in quote;
+
+export const isExchangeTrade = (quote: TradingTradeType): quote is ExchangeTrade =>
+    'sendStringAmount' in quote && 'receiveStringAmount' in quote;
+
+export const isExchangeProvider = (provider: TradingProviderInfo) =>
+    provider && 'kycPolicyType' in provider;
+
+export const parseCryptoId = (cryptoId: CryptoId): TradingParsedCryptoIdProps => {
+    const parts = cryptoId.split(CRYPTO_PLATFORM_SEPARATOR);
+
+    return {
+        // TODO: This casting doesn't make any sense. Return new type called `NetworkId` instead of `CryptoId`
+        networkId: parts[0] as CryptoId,
+        contractAddress: parts[1] as TokenAddress | undefined,
+    };
+};
+
+export function composeCryptoId(coingeckoId: string, contractAddress?: string | null): CryptoId {
+    return (
+        contractAddress
+            ? `${coingeckoId}${CRYPTO_PLATFORM_SEPARATOR}${contractAddress}`
+            : coingeckoId
+    ) as CryptoId;
+}
+
+/**
+ * Get the crypto id for an account or token of non-testnet network
+ */
+export function getCryptoId(
+    networkSymbol: NetworkSymbol,
+    tokenContract?: TokenInfo['contract'],
+): CryptoId {
+    const network = getNetwork(networkSymbol);
+
+    if (tokenContract) {
+        return composeCryptoId(
+            network.coingeckoId!,
+            getContractAddressForNetworkSymbol(networkSymbol, tokenContract),
+        );
+    }
+
+    return network.tradeCryptoId as CryptoId;
+}
+
+export const isCryptoIdForNativeToken = (cryptoId: CryptoId) => {
+    const { contractAddress } = parseCryptoId(cryptoId);
+
+    return contractAddress === CONTRACT_ADDRESS_FOR_NATIVE_TOKEN;
+};
+
+export const cryptoIdToNetworkAndContractAddress = (
+    cryptoId: CryptoId | undefined,
+): NetworkAndContractAddress => {
+    if (!cryptoId) {
+        return { network: undefined, contractAddress: undefined };
+    }
+
+    const { networkId, contractAddress } = parseCryptoId(cryptoId);
+    const network = contractAddress
+        ? getNetworkByCoingeckoId(networkId)
+        : getNetworkByTradeCryptoId(networkId);
+
+    return { network, contractAddress };
+};
+
+export const cryptoIdToNetwork = (cryptoId: CryptoId | undefined): Network | undefined =>
+    cryptoIdToNetworkAndContractAddress(cryptoId)?.network;
+
+export const cryptoIdToNetworkSymbol = (
+    cryptoId: CryptoId | undefined,
+): NetworkSymbol | undefined => cryptoIdToNetwork(cryptoId)?.symbol;
+
+export const cryptoIdToNetworkSymbolAndContractAddress = (cryptoId: CryptoId | undefined) => {
+    const { network, contractAddress } = cryptoIdToNetworkAndContractAddress(cryptoId);
+    if (!network || !cryptoId) {
+        return { symbol: undefined, contractAddress: undefined };
+    }
+    const { symbol } = network;
+
+    if (isCryptoIdForNativeToken(cryptoId)) {
+        return { symbol, contractAddress: undefined };
+    }
+
+    return { symbol, contractAddress };
+};
+
+export const toTokenCryptoId = (symbol: NetworkSymbol, contractAddress: string): CryptoId =>
+    `${getCoingeckoId(symbol)}${CRYPTO_PLATFORM_SEPARATOR}${contractAddress}` as CryptoId;
+
+/** Convert testnet cryptoId to prod cryptoId (test-bitcoin -> bitcoin) */
+export const testnetToProdCryptoId = (cryptoId: CryptoId): CryptoId => {
+    const { networkId, contractAddress } = parseCryptoId(cryptoId);
+
+    return ((networkId.split('test-')?.[1] ?? networkId) +
+        (contractAddress ? `${CRYPTO_PLATFORM_SEPARATOR}${contractAddress}` : '')) as CryptoId;
+};
+
+export const getUnusedAddressFromAccount = (account: Account) => {
+    switch (account.networkType) {
+        case 'cardano':
+        case 'bitcoin': {
+            const firstUnused = account.addresses?.unused[0];
+            if (firstUnused) {
+                return { address: firstUnused.address, path: firstUnused.path };
+            }
+
+            return { address: undefined, path: undefined };
+        }
+        case 'ripple':
+        case 'ethereum':
+        case 'solana':
+        case 'tron':
+        case 'stellar': {
+            return {
+                address: account.descriptor,
+                path: account.path,
+            };
+        }
+        // no default
+    }
+};
+
+export const mapTestnetSymbol = (symbol: NetworkSymbol): NetworkSymbol => {
+    if (symbol === 'test') return asNetworkSymbol('btc');
+    if (symbol === 'tsep') return asNetworkSymbol('eth');
+    if (symbol === 'thod') return asNetworkSymbol('eth');
+    if (symbol === 'txrp') return asNetworkSymbol('xrp');
+    if (symbol === 'txlm') return asNetworkSymbol('xlm');
+
+    return symbol;
+};
+
+export const tradingGetSuccessQuotes = <T extends TradingType>(quotes: TradingTradeMapProps[T][]) =>
+    quotes.filter(quote => quote.error === undefined);
+
+export const getDefaultCountry = (country: TradingCountryCode = regional.UNKNOWN_COUNTRY) =>
+    regional.getCountryOptionWithWorldwideFallback(country);
+
+export const getDefaultCountrySubdivision = (
+    subdivision: string | undefined,
+    countryCode?: string,
+): TradingCountrySubdivisionOption | undefined => {
+    if (!subdivision) return undefined;
+
+    const found = getCountrySubdivisionByCode(subdivision, countryCode);
+
+    if (!found) return undefined;
+
+    return { value: found.code, label: found.name, name: found.name };
+};
+
+export const filterQuotesAccordingTags = <T extends TradingTradeBuySellType>(
+    quotes: TradingTradeBuySellMapProps[T][],
+) => quotes.filter(q => !q.tags?.includes('alternativeCurrency'));
+
+// fill orderId for all, paymentId for sell and buy, quoteId for exchange
+export const addIdsToQuotes = <T extends TradingType>(
+    quotes: TradingTradeMapProps[T][] | undefined,
+    type: TradingType,
+): TradingTradeMapProps[T][] => {
+    if (!quotes) quotes = [];
+
+    quotes.forEach(quote => {
+        const sellBuyQuote = ['buy', 'sell'].includes(type)
+            ? (quote as BuyTrade | SellFiatTrade)
+            : null;
+
+        if (sellBuyQuote && !sellBuyQuote.paymentId) {
+            sellBuyQuote.paymentId = crypto.randomUUID();
+        }
+
+        if (type === 'exchange' && !quote.quoteId) {
+            (quote as ExchangeTrade).quoteId = crypto.randomUUID();
+        }
+
+        quote.orderId = crypto.randomUUID();
+    });
+
+    return quotes;
+};
+
+export const getNetworkDecimalsWithFallback = (
+    symbol: NetworkSymbol | undefined,
+    fallback = getNetwork('btc').decimals,
+): number => (symbol ? (getNetwork(symbol).decimals ?? fallback) : fallback);
+
+export const getTradingQuotesByPaymentMethod = <T extends TradingTradeBuySellType>(
+    quotes: TradingTradeMapProps[T][],
+    currentPaymentMethod: TradingPaymentMethodProps,
+): TradingTradeMapProps[T][] =>
+    quotes.filter(
+        quote => quote.paymentMethod === currentPaymentMethod && quote.error === undefined,
+    );
+
+// Invity API can return multiple quotes per provider (`quote.exchange`) for the same payment
+// method, so deduplication by provider is safe — each provider only offers one rate at a time.
+export const getTradingQuotesDedupedByProvider = <T extends TradingTradeType>(quotes: T[]): T[] => [
+    ...new Map(quotes.map(quote => [quote.exchange, quote])).values(),
+];
+
+export const getTradingFormState = ({
+    activeSection,
+    trade,
+    providers,
+    isSlip24Active = false,
+    sendAccountKey,
+    receiveAccountKey,
+}: TradingGetFormStateProps): FormStateTrading => {
+    const provider = trade?.exchange ? providers?.[trade.exchange] : undefined;
+
+    // Support for SLIP-24
+    switch (activeSection) {
+        case 'sell': {
+            const defaultState = {
+                activeSection,
+                isSlip24Active,
+            };
+
+            if (
+                !trade.fiatStringAmount ||
+                !trade.fiatCurrency ||
+                !trade.cryptoCurrency ||
+                !trade.cryptoStringAmount ||
+                !provider?.companyName ||
+                !isSlip24Active
+            ) {
+                return defaultState;
+            }
+
+            const networkData = cryptoIdToNetworkAndContractAddress(trade.cryptoCurrency);
+
+            if (!networkData?.network) {
+                return defaultState;
+            }
+
+            return {
+                activeSection,
+                recipientName: provider.companyName,
+                isSlip24Active,
+                send: {
+                    cryptoId: trade.cryptoCurrency,
+                    accountKey: sendAccountKey,
+                    symbol: networkData.network.symbol,
+                    contractAddress: networkData.contractAddress,
+                    amount: trade.cryptoStringAmount,
+                },
+                receive: {
+                    amount: trade.fiatStringAmount,
+                    fiatCurrency: trade.fiatCurrency,
+                },
+            };
+        }
+        case 'exchange': {
+            const defaultState = {
+                activeSection,
+                isSlip24Active,
+            };
+
+            if (
+                !trade.receive ||
+                !trade.receiveStringAmount ||
+                !trade.send ||
+                !trade.sendStringAmount ||
+                !provider?.companyName
+            ) {
+                return defaultState;
+            }
+
+            const receiveNetworkData = cryptoIdToNetworkAndContractAddress(trade.receive);
+            const sendNetworkData = cryptoIdToNetworkAndContractAddress(trade.send);
+
+            if (!receiveNetworkData?.network || !sendNetworkData?.network) {
+                return defaultState;
+            }
+
+            return {
+                activeSection,
+                recipientName: provider.companyName,
+                isSlip24Active: isSlip24Active && !!receiveAccountKey,
+                receiveAddress: trade.receiveAddress,
+                send: {
+                    cryptoId: trade.send,
+                    accountKey: sendAccountKey,
+                    symbol: sendNetworkData.network.symbol,
+                    contractAddress: sendNetworkData.contractAddress,
+                    amount: trade.sendStringAmount,
+                },
+                receive: {
+                    cryptoId: trade.receive,
+                    accountKey: receiveAccountKey,
+                    symbol: receiveNetworkData.network.symbol,
+                    contractAddress: receiveNetworkData.contractAddress,
+                    amount: trade.receiveStringAmount,
+                },
+            };
+        }
+        /* istanbul ignore next */
+        default:
+            return exhaustive(activeSection);
+    }
+};
+
+export const getTradingPrefilledFromAccountData = (
+    { symbol, key }: Account,
+    cryptoId?: CryptoId | undefined,
+) => {
+    const defaultCryptoId = getNetwork(symbol).tradeCryptoId as CryptoId;
+
+    return {
+        cryptoId: cryptoId ?? defaultCryptoId,
+        key,
+    };
+};
+
+export const isBuyProviderInfo = (provider: TradingProviderInfo): provider is BuyProviderInfo =>
+    'brandName' in provider;
+
+export const getStatusUrl = (provider?: TradingProviderInfo, trade?: TradingTradeType) => {
+    const tradeStatusUrl = trade?.statusUrl;
+
+    if (tradeStatusUrl === null) {
+        return undefined;
+    }
+
+    return tradeStatusUrl || provider?.statusUrl;
+};
+
+export const isCrossChainTrade = (sendCryptoId?: CryptoId, receiveCryptoId?: CryptoId) => {
+    const sendNetworkSymbol = cryptoIdToNetworkSymbol(sendCryptoId);
+    const receiveNetworkSymbol = cryptoIdToNetworkSymbol(receiveCryptoId);
+
+    if (!sendNetworkSymbol || !receiveNetworkSymbol) {
+        return false;
+    }
+
+    return sendNetworkSymbol !== receiveNetworkSymbol;
+};

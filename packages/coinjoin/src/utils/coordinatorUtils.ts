@@ -1,17 +1,17 @@
 import { bufferUtils } from '@trezor/utils';
 import {
-    payments,
+    type Network,
+    bufferutils as bUtils,
     address as baddress,
     script as bscript,
-    bufferutils as bUtils,
-    Network,
+    payments,
 } from '@trezor/utxo-lib';
 
 import {
-    AllowedScriptTypes,
-    CoinjoinOutputAddedEvent,
-    CoinjoinInput,
-    CoinjoinOutput,
+    type AllowedScriptTypes,
+    type CoinjoinInput,
+    type CoinjoinOutput,
+    type CoinjoinOutputAddedEvent,
 } from '../types/coordinator';
 
 // WabiSabi coordinator is using custom format of address scriptPubKey
@@ -45,7 +45,7 @@ export const getScriptPubKeyFromAddress = (
 };
 
 // check WabiSabi.scriptPubKey format by OP and return AllowedScriptType
-export const getScriptTypeFromScriptPubKey = (scriptPubKey: string): AllowedScriptTypes => {
+const getScriptTypeFromScriptPubKey = (scriptPubKey: string): AllowedScriptTypes => {
     if (scriptPubKey.startsWith('0 ')) {
         return 'P2WPKH';
     }
@@ -112,8 +112,12 @@ const compareByteArray = (left: Buffer, right: Buffer) => {
 
     const min = Math.min(left.length, right.length);
     for (let i = 0; i < min; i++) {
-        if (left[i] < right[i]) return -1;
-        if (left[i] > right[i]) return 1;
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const leftByte: number = left[i];
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const rightByte: number = right[i];
+        if (leftByte < rightByte) return -1;
+        if (leftByte > rightByte) return 1;
     }
 
     return left.length - right.length;

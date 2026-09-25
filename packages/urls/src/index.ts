@@ -1,8 +1,15 @@
-import type * as Urls from './urls';
-import type * as GithubUrls from './github';
+import * as GithubUrls from './github';
+import * as Urls from './urls';
 
 export * from './urls';
 export * from './github';
 export * from './tor';
+export * from './deeplinks';
+export * from './keys';
+export * from './utms';
+export * from './chat';
 
-export type Url = (typeof Urls)[keyof typeof Urls] | (typeof GithubUrls)[keyof typeof GithubUrls];
+type AllUrls = typeof Urls & typeof GithubUrls;
+export type Url = AllUrls[keyof AllUrls];
+
+export const ALL_URLS: AllUrls = { ...Urls, ...GithubUrls };

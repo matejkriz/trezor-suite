@@ -1,26 +1,18 @@
-import { TruncateWithTooltip } from '@trezor/components';
-import { spacingsPx, typography } from '@trezor/theme';
-import { ReactNode } from 'react';
-import styled from 'styled-components';
+import { type ReactNode } from 'react';
 
-const Container = styled.div`
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    overflow: hidden;
-    align-self: center;
-`;
-
-const DeviceLabel = styled(TruncateWithTooltip)`
-    ${typography.body};
-    margin-bottom: -${spacingsPx.xxs};
-    min-width: 0;
-    color: ${({ theme }) => theme.textDefault};
-`;
+import { Column, Text } from '@trezor/components';
 
 export const DeviceDetail = ({ label, children }: { label: string; children: ReactNode }) => (
-    <Container>
-        <DeviceLabel>{label}</DeviceLabel>
+    <Column overflow="hidden" flex="1" alignItems="flex-start">
+        <Text
+            typographyStyle="body-sm"
+            ellipsisLineCount={1}
+            width="stretch"
+            data-testid="@menu/device/label"
+        >
+            {label}
+        </Text>
+
         {children}
-    </Container>
+    </Column>
 );

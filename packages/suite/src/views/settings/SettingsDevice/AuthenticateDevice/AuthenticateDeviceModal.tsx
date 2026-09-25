@@ -1,0 +1,48 @@
+import { useState } from 'react';
+
+import { selectIsDebugModeActive } from '@suite/debug';
+import { useServices } from '@suite-common/dependency-injection';
+import { checkDeviceAuthenticityThunk } from '@suite-common/device-authenticity';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { type StoredAuthenticateDeviceResult } from '@suite-common/suite-types';
+
+import { useSelector } from 'src/hooks/suite';
+
+import { AuthenticateDeviceFailStep } from './AuthenticateDeviceFailStep';
+import { AuthenticateDeviceInititalStep } from './AuthenticateDeviceInititalStep';
+
+type AuthenticateDeviceModalProps = {
+    handleClose: () => void;
+};
+
+export const AuthenticateDeviceModal = ({ handleClose }: AuthenticateDeviceModalProps) => {
+    // Intentionally using only local state: the checkDeviceAuthenticityThunk always sets the global state, but if we
+    // relied on it, user wouldn't be able to retry the check (would be DeviceCompromised right when you open the modal)
+    const [result, setResult] = useState<StoredAuthenticateDeviceResult | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const { dispatch } = useServices(injectDispatch);
+    const isDebugModeActive = useSelector(selectIsDebugModeActive);
+    const isCheckFailed = result?.valid === false;
+
+    const handleClick = async () => {
+        setIsLoading(true);
+        const result = await dispatch(
+            checkDeviceAuthenticityThunk({ allowDebugKeys: isDebugModeActive }),
+        );
+        if (result.payload?.valid === true) {
+            return handleClose();
+        }
+        setResult(result.payload);
+        setIsLoading(false);
+    };
+
+    return isCheckFailed ? (
+        <AuthenticateDeviceFailStep handleClose={handleClose} />
+    ) : (
+        <AuthenticateDeviceInititalStep
+            handleClose={handleClose}
+            handleClick={handleClick}
+            isLoading={isLoading}
+        />
+    );
+};

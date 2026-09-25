@@ -1,0 +1,33 @@
+import { execSync } from 'node:child_process';
+
+/**
+ * @typedef {import('app-builder-lib').CustomWindowsSign} CustomWindowsSign
+ */
+
+// electron-builder type declaration requires the function to return Promise, but jsign MUST be called with execSync!
+/** @type {CustomWindowsSign} */
+// eslint-disable-next-line require-await
+const signWindows = async configuration => {
+    // Check if IS_CODESIGN_BUILD is set and true
+    if (!process.env.IS_CODESIGN_BUILD || process.env.IS_CODESIGN_BUILD.toLowerCase() !== 'true') {
+        // eslint-disable-next-line no-console
+        console.log('This is DEV build, not signing');
+
+        return;
+    }
+
+    // do not include passwords or other sensitive data in the file
+    // rather create environment variables with sensitive data
+    const CERTIFICATE_NAME = process.env.WINDOWS_SIGN_CERTIFICATE_NAME;
+    const TOKEN_PASSWORD = process.env.WINDOWS_SIGN_TOKEN_PASSWORD;
+
+    execSync(
+        `java -jar ../suite-desktop-core/scripts/jsign-6.0.jar --keystore ../suite-desktop-core/scripts/hardwareToken.cfg --storepass '${TOKEN_PASSWORD}' --storetype PKCS11 --tsaurl http://timestamp.digicert.com --alias "${CERTIFICATE_NAME}" "${configuration.path}"`,
+        {
+            stdio: 'inherit',
+        },
+    );
+};
+
+// eslint-disable-next-line import/no-default-export
+export default signWindows;

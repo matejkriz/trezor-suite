@@ -1,0 +1,98 @@
+import { type NetworkSymbol, asNetworkSymbol } from '@suite-common/wallet-config';
+import { TestCategory, TestPriority, TestStream } from '@trezor/e2e-utils';
+
+import { expect, test } from '../../support/fixtures';
+import { createTestAnnotation } from '../../support/reporters/annotations';
+
+const ethSymbol = asNetworkSymbol('eth');
+
+test.describe('Coin Settings', { tag: ['@T3W1', '@T3T1'] }, () => {
+    test.beforeEach(async ({ onboardingPage, settingsPage }) => {
+        await onboardingPage.completeOnboarding();
+        await settingsPage.navigateTo('coins');
+    });
+
+    test(
+        'go to wallet settings page, check BTC, activate few networks, deactivate them, set custom backend',
+        {
+            annotation: createTestAnnotation({
+                testCase:
+                    'Verifies that a user can navigate to the wallet settings page, check BTC, activate few networks, deactivate them, and set a custom backend.',
+                category: TestCategory.Settings,
+                priority: TestPriority.Critical,
+                stream: TestStream.Network,
+            }),
+        },
+        async ({ page, dashboardPage, settingsPage, assetsSection }) => {
+            const defaultUncheckedMainnet: NetworkSymbol[] = [
+                asNetworkSymbol('btc'),
+                asNetworkSymbol('ltc'),
+                ethSymbol,
+                asNetworkSymbol('etc'),
+                asNetworkSymbol('xrp'),
+                // 'xlm', add when removed from experimental features
+                asNetworkSymbol('bch'),
+                asNetworkSymbol('doge'),
+                asNetworkSymbol('zec'),
+                asNetworkSymbol('ada'),
+                asNetworkSymbol('sol'),
+            ];
+            // Testnets are not shown in ActivateAssetsModal, must be enabled via coins settings
+            const defaultUncheckedTestnet: NetworkSymbol[] = [
+                asNetworkSymbol('test'),
+                asNetworkSymbol('tsep'),
+                asNetworkSymbol('thod'),
+                asNetworkSymbol('txrp'),
+                // 'txlm', add when removed from experimental features
+                asNetworkSymbol('dsol'),
+            ];
+            const defaultUnchecked: NetworkSymbol[] = [
+                ...defaultUncheckedMainnet,
+                ...defaultUncheckedTestnet,
+            ];
+
+            await test.step('Empty state on dashboard', async () => {
+                await settingsPage.toggleTestnetNetworks();
+                await settingsPage.navigateTo('coins');
+
+                for (const network of defaultUnchecked) {
+                    await settingsPage.coinsTab.expectNetworkDisabled(network);
+                }
+                // check dashboard with all coins disabled
+                await dashboardPage.navigateTo();
+                await expect(dashboardPage.discoveryEmptyHeader).toHaveTranslation(
+                    'TR_YOUR_WALLET_IS_READY_WHAT',
+                );
+                await expect(dashboardPage.discoveryEmptyDesc).toHaveTranslation(
+                    'TR_DASHBOARD_ACTIVATE_ASSETS_DESC',
+                );
+                await expect(dashboardPage.discoveryEmptyPrimaryButton).toHaveTranslation(
+                    'TR_DASHBOARD_GET_STARTED',
+                );
+            });
+
+            await test.step('Activate assets', async () => {
+                await dashboardPage.discoveryEmptyPrimaryButton.click();
+                for (const network of defaultUncheckedMainnet) {
+                    await assetsSection.activateAssetsModalNetworkButton(network).click();
+                }
+                await assetsSection.activateAssetsModalSaveButton.click();
+                await page.discoveryShouldFinish();
+                await settingsPage.navigateTo('coins');
+                for (const network of defaultUncheckedTestnet) {
+                    await settingsPage.coinsTab.enableNetwork(network);
+                }
+            });
+
+            await test.step('Connect to trusted ETH backend server', async () => {
+                const backendType = 'blockbook';
+                const customServer = 'https://eth.marek.pl/';
+
+                await settingsPage.coinsTab.expectNetworkEnabled(ethSymbol);
+                await settingsPage.coinsTab.openNetworkAdvanceSettings(ethSymbol);
+                await settingsPage.coinsTab.changeBackend(backendType, customServer);
+                await settingsPage.coinsTab.expectCustomBackendIndicator(ethSymbol);
+            });
+        },
+    );
+});

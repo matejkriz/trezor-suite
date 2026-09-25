@@ -1,0 +1,35 @@
+{
+    "name": "@suite/intl",
+    "version": "1.0.0",
+    "private": true,
+    "license": "See LICENSE.md in repo root",
+    "sideEffects": false,
+    "main": "src/index",
+    "scripts": {
+        "depcheck": "yarn g:depcheck",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
+        "test:unit": "yarn g:jest",
+        "translations:format": "yarn g:prettier --write \"../../suite/app-assets/files/translations/*\"",
+        "translations:extract": "formatjs extract src/messages.ts --format simple > ../../suite/app-assets/files/translations/master.json",
+        "translations:upload": "crowdin upload",
+        "translations:download": "crowdin download --all -l en -l es-ES -l cs -l de -l fr -l hu -l id -l it -l ja -l ko -l pt-BR -l ru -l tr -l uk -l zh-CN -l zh-TW",
+        "translations:backport-en": "yarn g:tsx ./scripts/backport-en.ts && yarn g:prettier --write \"./src/messages.ts\"",
+        "translations:list-duplicates": "yarn g:tsx ./scripts/list-duplicates.ts",
+        "translations:list-unused": "yarn g:tsx ./scripts/list-unused.ts",
+        "type-check": "yarn g:tsc --build"
+    },
+    "dependencies": {
+        "@crowdin/cli": "4.13.0",
+        "@formatjs/cli": "6.12.2",
+        "@suite-common/suite-utils": "workspace:*",
+        "@trezor/type-utils": "workspace:^",
+        "@trezor/utils": "workspace:^",
+        "react": "19.2.3",
+        "react-intl": "^8.1.3"
+    },
+    "devDependencies": {
+        "@suite-common/wallet-types": "workspace:*",
+        "@testing-library/dom": "^10.4.1",
+        "@testing-library/react": "^16.3.2"
+    }
+}

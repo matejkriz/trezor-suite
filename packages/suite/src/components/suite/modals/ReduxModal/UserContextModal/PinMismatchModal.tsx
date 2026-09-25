@@ -1,35 +1,33 @@
-import styled from 'styled-components';
-import { Button, Image } from '@trezor/components';
-import { Translation, Modal, ModalProps } from 'src/components/suite';
-import { changePin } from 'src/actions/settings/deviceSettingsActions';
-import { useDispatch } from 'src/hooks/suite';
+import { Translation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { H3, Modal } from '@trezor/components';
+import { PasswordIcon } from '@trezor/icons';
 
-const StyledImage = styled(Image)`
-    margin: 48px auto;
-`;
+import { changePinThunk } from 'src/actions/settings/deviceSettingsActions';
 
-const StyledModal = styled(Modal)`
-    width: 360px;
-`;
-
-export const PinMismatchModal = (props: ModalProps) => {
-    const dispatch = useDispatch();
+export const PinMismatchModal = () => {
+    const { dispatch } = useServices(injectDispatch);
 
     const onTryAgain = () => {
-        dispatch(changePin({}));
+        dispatch(changePinThunk({}));
     };
 
     return (
-        <StyledModal
-            // need to pass props when cloning this inside nested modal
-            {...props}
-            heading={<Translation id="TR_PIN_MISMATCH_HEADING" />}
-            data-test="@pin-mismatch"
+        <Modal
+            data-testid="@pin-mismatch"
+            bottomContent={
+                <Modal.Button onClick={onTryAgain} data-testid="@pin-mismatch/try-again-button">
+                    <Translation id="TR_TRY_AGAIN" />
+                </Modal.Button>
+            }
+            icon={PasswordIcon}
+            intent="warning"
+            width={600}
         >
-            <StyledImage image="UNI_ERROR" />
-            <Button onClick={onTryAgain} data-test="@pin-mismatch/try-again-button">
-                <Translation id="TR_TRY_AGAIN" />
-            </Button>
-        </StyledModal>
+            <H3>
+                <Translation id="TR_PIN_MISMATCH_HEADING" />
+            </H3>
+        </Modal>
     );
 };

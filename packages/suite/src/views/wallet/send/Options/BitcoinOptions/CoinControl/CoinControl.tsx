@@ -1,0 +1,272 @@
+import { useEffect, useState } from 'react';
+
+import styled from 'styled-components';
+
+import { selectCurrentTargetAnonymity } from '@suite/coinjoin';
+import { Translation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { getTxsPerPage } from '@suite-common/suite-utils';
+import { filterAndCategorizeUtxos } from '@suite-common/transaction-search';
+import { COMPOSE_ERROR_TYPES } from '@suite-common/wallet-constants';
+import { fetchUtxoTransactionsForAccountThunk } from '@suite-common/wallet-core';
+import { convertAmountUnitsToSubunits, formatNetworkAmount } from '@suite-common/wallet-utils';
+import {
+    Banner,
+    Card,
+    Checkbox,
+    Column,
+    Divider,
+    Icon,
+    Paragraph,
+    Row,
+    Switch,
+    Text,
+} from '@trezor/components';
+import { CaretUpIcon, InfoIcon, ShieldCheckIcon, ShieldWarningIcon } from '@trezor/icons';
+
+import { FormattedCryptoAmount } from 'src/components/suite';
+import { Pagination } from 'src/components/wallet';
+import { useSelector } from 'src/hooks/suite';
+import { useSendFormContext } from 'src/hooks/wallet';
+import { useBitcoinAmountUnit } from 'src/hooks/wallet/useBitcoinAmountUnit';
+import { selectAccountLabelsForSearch } from 'src/selectors/suite/selectAccountLabelsForSearch';
+
+import { UtxoSearch } from './UtxoSearch';
+import { UtxoSelectionList } from './UtxoSelectionList/UtxoSelectionList';
+import { UtxoSortingSelect } from './UtxoSortingSelect';
+
+const Empty = styled.div`
+    border-bottom: 1px solid ${({ theme }) => theme.borderNeutral};
+    margin-bottom: 12px;
+    padding: 12px 0;
+`;
+
+type CoinControlProps = {
+    close: () => void;
+};
+
+export const CoinControl = ({ close }: CoinControlProps) => {
+    const [currentPage, setSelectedPage] = useState(1);
+    const [searchQuery, setSearchQuery] = useState('');
+    const {
+        account,
+        formState: { errors },
+        getDefaultValue,
+        network,
+        outputs,
+        isLoading,
+        utxoSelection: {
+            allUtxosSelected,
+            composedInputs,
+            dustUtxos,
+            isCoinControlEnabled,
+            lowAnonymityUtxos,
+            selectedUtxos,
+            spendableUtxos,
+            toggleCheckAllUtxos,
+            toggleCoinControl,
+        },
+    } = useSendFormContext();
+    const { outputLabels } = useSelector(state => selectAccountLabelsForSearch(state, account));
+    const targetAnonymity = useSelector(selectCurrentTargetAnonymity);
+    const { dispatch } = useServices(injectDispatch);
+
+    const { shouldSendInSats } = useBitcoinAmountUnit(account.symbol);
+
+    const getTotal = (amounts: number[]) =>
+        amounts.reduce((previous, current) => previous + current, 0);
+    const getFormattedAmount = (amount: number) =>
+        formatNetworkAmount(amount.toString(), account.symbol);
+
+    // calculate and format amounts
+    const inputs = isCoinControlEnabled ? selectedUtxos : composedInputs;
+    const totalInputs = getTotal(inputs.map(input => Number(input.amount)));
+    const totalOutputs = getTotal(
+        outputs.map((_, i) => Number(getDefaultValue(`outputs.${i}.amount`, ''))),
+    );
+    const totalOutputsInSats = shouldSendInSats
+        ? totalOutputs
+        : Number(convertAmountUnitsToSubunits(totalOutputs.toString(), network.decimals));
+    const missingToInput = totalOutputsInSats - totalInputs;
+    const isMissingToAmount = missingToInput > 0; // relevant when the amount field is not validated, e.g. there is an error in the address
+    const missingAmountTooBig = missingToInput > Number.MAX_SAFE_INTEGER;
+    const amountHasError = errors.outputs?.some?.(error => error?.amount); // relevant when input is a number, but there is an error, e.g. decimals in sats
+    const notEnoughFundsSelectedError = !!errors.outputs?.some?.(
+        error => error?.amount?.type === COMPOSE_ERROR_TYPES.COIN_CONTROL,
+    );
+    const isMissingVisible =
+        isCoinControlEnabled &&
+        !isLoading &&
+        !missingAmountTooBig &&
+        !(amountHasError && !notEnoughFundsSelectedError) &&
+        (isMissingToAmount || notEnoughFundsSelectedError);
+    const missingToInputId = isMissingToAmount ? 'TR_MISSING_TO_INPUT' : 'TR_MISSING_TO_FEE';
+    const formattedTotal = getFormattedAmount(totalInputs);
+    const formattedMissing = isMissingVisible ? getFormattedAmount(missingToInput) : ''; // set to empty string when hidden to avoid affecting the layout
+
+    // Filter UTXOs based on searchQuery
+    const { filteredUtxos, filteredSpendableUtxos, filteredLowAnonymityUtxos, filteredDustUtxos } =
+        filterAndCategorizeUtxos({
+            searchQuery,
+            utxos: account.utxo || [],
+            spendableUtxos,
+            lowAnonymityUtxos,
+            dustUtxos,
+            outputLabels,
+        });
+
+    // pagination
+    const totalItems = filteredUtxos.length;
+    const utxosPerPage = getTxsPerPage(account.networkType);
+    const showPagination = totalItems > utxosPerPage;
+
+    // UTXOs and categories displayed on page
+    let previousItemsLength = 0;
+    const paginatedCategories = [
+        filteredSpendableUtxos,
+        filteredLowAnonymityUtxos,
+        filteredDustUtxos,
+    ].map(utxoCategory => {
+        const lastIndexOnPage = currentPage * utxosPerPage - previousItemsLength;
+        previousItemsLength += utxoCategory.length;
+
+        // avoid negative values which may cause unintended results
+        return utxoCategory.slice(
+            Math.max(0, lastIndexOnPage - utxosPerPage),
+            Math.max(0, lastIndexOnPage),
+        );
+    });
+    const spendableUtxosOnPage = paginatedCategories[0] ?? [];
+    const lowAnonymityUtxosOnPage = paginatedCategories[1] ?? [];
+    const dustUtxosOnPage = paginatedCategories[2] ?? [];
+    const isCoinjoinAccount = account.accountType === 'coinjoin';
+    const hasEligibleUtxos = spendableUtxos.length + lowAnonymityUtxos.length > 0;
+
+    // fetch all transactions so that we can show a transaction timestamp for each UTXO
+    useEffect(() => {
+        const promise = dispatch(
+            fetchUtxoTransactionsForAccountThunk({
+                accountKey: account.key,
+            }),
+        );
+
+        return () => {
+            promise.abort();
+        };
+    }, [account, dispatch]);
+
+    const missingToInputValues = {
+        amount: <FormattedCryptoAmount value={formattedMissing} symbol={account.symbol} />,
+    };
+
+    const handleAllUtxosSelected = () => {
+        setSearchQuery('');
+        setSelectedPage(1);
+        toggleCheckAllUtxos();
+    };
+
+    return (
+        <Card paddingType="large">
+            <Column gap={16}>
+                <Row justifyContent="space-between">
+                    <Translation id="TR_COIN_CONTROL" />
+                    <Row gap={16}>
+                        <Switch isChecked={!!isCoinControlEnabled} onChange={toggleCoinControl} />
+                        <Icon size={24} as={CaretUpIcon} onClick={close} />
+                    </Row>
+                </Row>
+
+                <Row justifyContent="space-between" margin={{ top: 24 }}>
+                    <Checkbox
+                        isChecked={allUtxosSelected}
+                        isDisabled={!hasEligibleUtxos}
+                        onChange={handleAllUtxosSelected}
+                    >
+                        <Text intent="neutral" priority="secondary">
+                            <Translation id="TR_SELECTED" values={{ amount: inputs.length }} />
+                        </Text>
+                    </Checkbox>
+
+                    <Text intent="neutral" priority="secondary">
+                        <FormattedCryptoAmount value={formattedTotal} symbol={account.symbol} />
+                    </Text>
+                </Row>
+
+                {isMissingVisible && (
+                    <Banner
+                        icon
+                        description={
+                            <Paragraph>
+                                <Translation id={missingToInputId} values={missingToInputValues} />
+                            </Paragraph>
+                        }
+                    />
+                )}
+
+                <Divider margin={0} />
+
+                {hasEligibleUtxos && (
+                    <Row gap={12}>
+                        <UtxoSearch
+                            searchQuery={searchQuery}
+                            setSearch={setSearchQuery}
+                            setSelectedPage={setSelectedPage}
+                        />
+                        <UtxoSortingSelect />
+                    </Row>
+                )}
+                {!!spendableUtxosOnPage.length && (
+                    <UtxoSelectionList
+                        withHeader={isCoinjoinAccount}
+                        heading={<Translation id="TR_PRIVATE" />}
+                        description={
+                            <Translation id="TR_PRIVATE_DESCRIPTION" values={{ targetAnonymity }} />
+                        }
+                        icon={ShieldCheckIcon}
+                        iconIntent="brand"
+                        utxos={spendableUtxosOnPage}
+                    />
+                )}
+                {!!lowAnonymityUtxosOnPage.length && (
+                    <UtxoSelectionList
+                        withHeader
+                        heading={<Translation id="TR_NOT_PRIVATE" />}
+                        description={
+                            <Translation
+                                id="TR_NOT_PRIVATE_DESCRIPTION"
+                                values={{ targetAnonymity }}
+                            />
+                        }
+                        icon={ShieldWarningIcon}
+                        iconIntent="warning"
+                        utxos={lowAnonymityUtxosOnPage}
+                    />
+                )}
+                {!hasEligibleUtxos && (
+                    <Empty>
+                        <Translation id="TR_NO_SPENDABLE_UTXOS" />
+                    </Empty>
+                )}
+                {!!dustUtxosOnPage.length && (
+                    <UtxoSelectionList
+                        withHeader
+                        heading={<Translation id="TR_DUST" />}
+                        description={<Translation id="TR_DUST_DESCRIPTION" />}
+                        icon={InfoIcon}
+                        iconIntent="neutral"
+                        utxos={dustUtxosOnPage}
+                    />
+                )}
+                {showPagination && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalItems={totalItems}
+                        perPage={utxosPerPage}
+                        onPageSelected={setSelectedPage}
+                    />
+                )}
+            </Column>
+        </Card>
+    );
+};

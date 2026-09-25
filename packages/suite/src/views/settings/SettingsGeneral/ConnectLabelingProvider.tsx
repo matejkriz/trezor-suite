@@ -1,38 +1,50 @@
-import {
-    ActionButton,
-    ActionColumn,
-    SectionItem,
-    TextColumn,
-    Translation,
-} from 'src/components/suite';
-import { useDispatch } from 'src/hooks/suite';
-import * as metadataLabelingActions from 'src/actions/suite/metadataLabelingActions';
-import { useAnchor } from 'src/hooks/suite/useAnchor';
-import { SettingsAnchor } from 'src/constants/suite/anchors';
+import { useDevice } from '@suite/device';
+import { Translation } from '@suite/intl';
+import { metadataLabelingActions } from '@suite/metadata';
+import { Anchor, SettingsAnchor } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { Tooltip } from '@trezor/components';
+import { ActionButton, ActionColumn, SectionItem, TextColumn } from '@trezor/product-components';
 
 export const ConnectLabelingProvider = () => {
-    const { anchorRef, shouldHighlight } = useAnchor(SettingsAnchor.LabelingConnect);
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
+    const { device } = useDevice();
+    const isDeviceConnected = device?.connected && device?.available;
+    const handleClick = () => dispatch(metadataLabelingActions.initThunk(true));
 
     return (
-        <SectionItem
-            data-test="@settings/labeling-connect"
-            ref={anchorRef}
-            shouldHighlight={shouldHighlight}
-        >
-            <TextColumn
-                title={<Translation id="TR_LABELING_NOT_SYNCED" />}
-                description={<Translation id="TR_TO_MAKE_YOUR_LABELS_PERSISTENT" />}
-            />
-            <ActionColumn>
-                <ActionButton
-                    variant="secondary"
-                    onClick={() => dispatch(metadataLabelingActions.init(true))}
-                    data-test="@settings/metadata/connect-provider-button"
+        <Anchor anchorId={SettingsAnchor.LabelingConnect}>
+            {({ anchorId, anchorRef, shouldHighlight }) => (
+                <SectionItem
+                    data-testid={anchorId}
+                    ref={anchorRef}
+                    shouldHighlight={shouldHighlight}
                 >
-                    <Translation id="TR_CONNECT" />
-                </ActionButton>
-            </ActionColumn>
-        </SectionItem>
+                    <TextColumn
+                        title={<Translation id="TR_LABELING_NOT_SYNCED" />}
+                        description={<Translation id="TR_TO_MAKE_YOUR_LABELS_PERSISTENT" />}
+                    />
+                    <ActionColumn>
+                        <Tooltip
+                            content={
+                                isDeviceConnected ? undefined : (
+                                    <Translation id="TR_DEVICE_NOT_CONNECTED" />
+                                )
+                            }
+                        >
+                            <ActionButton
+                                intent="brand"
+                                onClick={handleClick}
+                                isDisabled={!isDeviceConnected}
+                                data-testid="@settings/metadata/connect-provider-button"
+                            >
+                                <Translation id="TR_CONNECT" />
+                            </ActionButton>
+                        </Tooltip>
+                    </ActionColumn>
+                </SectionItem>
+            )}
+        </Anchor>
     );
 };

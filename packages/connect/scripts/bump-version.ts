@@ -2,8 +2,9 @@
 
 import child_process from 'child_process';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-const REPO_ROOT = path.join(__dirname, '..', '..', '..');
+const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 const args = process.argv.slice(2);
 
@@ -11,13 +12,12 @@ if (args.length !== 1) {
     throw new Error('semver arg is missing');
 }
 
-const [semver] = args;
+const semver = args[0] ?? '';
 
-const allowedSemver = ['prerelease', 'patch', 'minor', 'major'];
-
-if (!allowedSemver.includes(semver)) {
+const allowedSemvers = ['patch', 'prepatch', 'minor', 'preminor', 'prerelease'];
+if (!allowedSemvers.includes(semver)) {
     throw new Error(
-        `semver arg "${semver} is invalid. Must be one of [${allowedSemver.join(', ')}]`,
+        `semver arg "${semver} is invalid. Must be one of [${allowedSemvers.join(', ')}]`,
     );
 }
 
@@ -25,10 +25,10 @@ if (!allowedSemver.includes(semver)) {
 const connectPaths = [
     './packages/connect/package.json',
     './packages/connect/README.md',
-    './packages/connect/src/data/version.ts',
+    './packages/connect-common/src/data/version.ts',
     './packages/connect-web/package.json',
-    './packages/connect-web/src/webextension/trezor-usb-permissions.js',
     './packages/connect-webextension/package.json',
+    './packages/connect-mobile/package.json',
 ];
 
 const cmd = ['bump', semver];

@@ -1,13 +1,11 @@
+import { MODAL_CLOSE, MODAL_OPEN_USER_CONTEXT, MODAL_PRESERVE } from '@suite/modal';
 import { connectInitThunk } from '@suite-common/connect-init';
-import { testMocks } from '@suite-common/test-utils';
+import { mockSuiteDevice } from '@suite-common/suite-types/mocks';
 import { notificationsActions } from '@suite-common/toast-notifications';
 
 import * as publicKeyActions from 'src/actions/wallet/publicKeyActions';
-import { MODAL } from 'src/actions/suite/constants';
 
-const { getSuiteDevice } = testMocks;
-
-const LOCK_DEVICE = '@mocked/extraDependency/action/notImplemented/lockDevice';
+const LOCK_DEVICE = 'notImplemented/lockDevice';
 
 export default [
     {
@@ -19,7 +17,7 @@ export default [
             actions: [
                 { type: connectInitThunk.pending.type, payload: undefined },
                 { type: connectInitThunk.fulfilled.type, payload: undefined },
-                { type: MODAL.OPEN_USER_CONTEXT },
+                { type: MODAL_OPEN_USER_CONTEXT },
             ],
         },
     },
@@ -27,15 +25,17 @@ export default [
         description: 'Show public key success (bitcoin)',
         initialState: undefined,
         mocks: {},
-        action: publicKeyActions.showXpub,
+        action: publicKeyActions.showXpubThunk,
         result: {
             actions: [
                 { type: connectInitThunk.pending.type, payload: undefined },
                 { type: connectInitThunk.fulfilled.type, payload: undefined },
-                { type: MODAL.PRESERVE },
+                { type: MODAL_PRESERVE },
                 { type: LOCK_DEVICE },
                 { type: LOCK_DEVICE },
-                { type: MODAL.OPEN_USER_CONTEXT },
+                { type: '@suite/device/removeButtonRequests' },
+
+                { type: MODAL_OPEN_USER_CONTEXT },
             ],
         },
     },
@@ -45,31 +45,32 @@ export default [
             networkType: 'cardano',
         },
         mocks: {},
-        action: publicKeyActions.showXpub,
+        action: publicKeyActions.showXpubThunk,
         result: {
             actions: [
                 { type: connectInitThunk.pending.type, payload: undefined },
                 { type: connectInitThunk.fulfilled.type, payload: undefined },
-                { type: MODAL.PRESERVE },
+                { type: MODAL_PRESERVE },
                 { type: LOCK_DEVICE },
                 { type: LOCK_DEVICE },
-                { type: MODAL.OPEN_USER_CONTEXT },
+                { type: '@suite/device/removeButtonRequests' },
+                { type: MODAL_OPEN_USER_CONTEXT },
             ],
         },
     },
     {
-        description: 'Show public key failed, @trezor/connect method not specified',
+        description: 'Show public key errored, @trezor/connect method not specified',
         initialState: {
             networkType: 'ethereum',
         },
         mocks: {},
-        action: publicKeyActions.showXpub,
+        action: publicKeyActions.showXpubThunk,
         result: {
             actions: [
                 { type: connectInitThunk.pending.type, payload: undefined },
                 { type: connectInitThunk.fulfilled.type, payload: undefined },
-                { type: MODAL.PRESERVE },
-                { type: MODAL.CLOSE },
+                { type: MODAL_PRESERVE },
+                { type: MODAL_CLOSE },
                 {
                     type: notificationsActions.addToast.type,
                     payload: {
@@ -84,17 +85,18 @@ export default [
         description: 'Show public key, device not connected',
         initialState: {
             device: {
-                selectedDevice: getSuiteDevice({ connected: false }),
+                selectedDevice: mockSuiteDevice({ connected: false }),
+                devices: [],
             },
         },
         mocks: {},
-        action: publicKeyActions.showXpub,
+        action: publicKeyActions.showXpubThunk,
         result: {
             actions: [
                 { type: connectInitThunk.pending.type, payload: undefined },
                 { type: connectInitThunk.fulfilled.type, payload: undefined },
                 {
-                    type: MODAL.OPEN_USER_CONTEXT,
+                    type: MODAL_OPEN_USER_CONTEXT,
                 },
             ],
         },
@@ -104,10 +106,11 @@ export default [
         initialState: {
             device: {
                 selectedDevice: undefined,
+                devices: [],
             },
         },
         mocks: {},
-        action: publicKeyActions.showXpub,
+        action: publicKeyActions.showXpubThunk,
         result: {
             actions: [
                 { type: connectInitThunk.pending.type, payload: undefined },
@@ -119,17 +122,19 @@ export default [
         description: 'Show public key, @trezor/connect error',
         initialState: undefined,
         mocks: {
-            getPublicKey: { success: false, payload: { error: 'Runtime error' } },
+            getPublicKey: { success: false, error: { message: 'Runtime error' } },
         },
-        action: publicKeyActions.showXpub,
+        action: publicKeyActions.showXpubThunk,
         result: {
             actions: [
                 { type: connectInitThunk.pending.type, payload: undefined },
                 { type: connectInitThunk.fulfilled.type, payload: undefined },
-                { type: MODAL.PRESERVE },
+                { type: MODAL_PRESERVE },
                 { type: LOCK_DEVICE },
                 { type: LOCK_DEVICE },
-                { type: MODAL.CLOSE },
+                { type: '@suite/device/removeButtonRequests' },
+
+                { type: MODAL_CLOSE },
                 {
                     type: notificationsActions.addToast.type,
                     payload: { type: 'verify-xpub-error', error: 'Runtime error' },
@@ -143,18 +148,20 @@ export default [
         mocks: {
             getPublicKey: {
                 success: false,
-                payload: { error: 'Runtime error', code: 'Method_PermissionsNotGranted' },
+                error: { message: 'Runtime error', code: 'Method_PermissionsNotGranted' },
             },
         },
-        action: publicKeyActions.showXpub,
+        action: publicKeyActions.showXpubThunk,
         result: {
             actions: [
                 { type: connectInitThunk.pending.type, payload: undefined },
                 { type: connectInitThunk.fulfilled.type, payload: undefined },
-                { type: MODAL.PRESERVE },
+                { type: MODAL_PRESERVE },
                 { type: LOCK_DEVICE },
                 { type: LOCK_DEVICE },
-                { type: MODAL.CLOSE },
+                { type: '@suite/device/removeButtonRequests' },
+
+                { type: MODAL_CLOSE },
             ],
         },
     },

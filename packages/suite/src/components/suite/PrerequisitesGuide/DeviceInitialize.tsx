@@ -1,12 +1,28 @@
-import { MouseEvent } from 'react';
-import { Button } from '@trezor/components';
-import { Translation, TroubleshootingTips } from 'src/components/suite';
-import { useDispatch } from 'src/hooks/suite';
-import { goto } from 'src/actions/suite/routerActions';
-import { enableOnboardingReducer, resetOnboarding } from 'src/actions/onboarding/onboardingActions';
+import { type MouseEvent } from 'react';
+
+import { events, injectDesktopAnalytics } from '@suite/analytics';
+import { Translation } from '@suite/intl';
+import { gotoThunk } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { selectSelectedDevice } from '@suite-common/device';
+import { injectDispatch, injectGetState } from '@suite-common/redux-utils';
+import { Banner } from '@trezor/components';
+import { DeviceModelInternal } from '@trezor/device-utils';
+import { TrezorBodyIcon } from '@trezor/icons';
+
+import {
+    enableOnboardingReducer,
+    resetOnboarding,
+    updateAnalytics,
+} from 'src/actions/onboarding/onboardingActions';
+import { TroubleshootingTips } from 'src/components/suite/troubleshooting/TroubleshootingTips';
 
 export const DeviceInitialize = () => {
-    const dispatch = useDispatch();
+    const { analytics, dispatch, getState } = useServices(
+        injectDesktopAnalytics,
+        injectDispatch,
+        injectGetState,
+    );
 
     const handleCtaClick = (e: MouseEvent) => {
         e.stopPropagation();
@@ -15,22 +31,37 @@ export const DeviceInitialize = () => {
         // and resetting state disables onboarding reducer so we need to enable it again
         dispatch(enableOnboardingReducer(true));
 
-        dispatch(goto('onboarding-index'));
+        dispatch(updateAnalytics({ startTime: Date.now() }));
+
+        const device = selectSelectedDevice(getState());
+
+        analytics.report(
+            {
+                type: events.deviceSetupStartedEvent.name,
+                payload: {
+                    deviceModel: device?.features?.internal_model || DeviceModelInternal.UNKNOWN,
+                },
+            },
+            { force: true },
+        );
+        dispatch(gotoThunk({ routeName: 'onboarding-index' }));
     };
 
     return (
         <TroubleshootingTips
             label={<Translation id="TR_DEVICE_NOT_INITIALIZED" />}
+            intent="brand"
             cta={
-                <Button data-test="@button/go-to-onboarding" onClick={handleCtaClick}>
+                <Banner.Button data-testid="@button/go-to-onboarding" onClick={handleCtaClick}>
                     <Translation id="TR_GO_TO_ONBOARDING" />
-                </Button>
+                </Banner.Button>
             }
             items={[
                 {
                     key: 'device-initialize',
                     heading: <Translation id="TR_DEVICE_NOT_INITIALIZED" />,
                     description: <Translation id="TR_DEVICE_NOT_INITIALIZED_TEXT" />,
+                    icon: TrezorBodyIcon,
                 },
             ]}
         />

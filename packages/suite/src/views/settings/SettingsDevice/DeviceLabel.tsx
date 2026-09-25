@@ -1,31 +1,57 @@
-import { ActionColumn, SectionItem, TextColumn, Translation } from 'src/components/suite';
-import { MAX_LABEL_LENGTH } from 'src/constants/suite/device';
-import { useAnchor } from 'src/hooks/suite/useAnchor';
-import { SettingsAnchor } from 'src/constants/suite/anchors';
-import { ChangeDeviceLabel } from 'src/components/suite/ChangeDeviceLabel';
+import { useCallback } from 'react';
+import { FormProvider } from 'react-hook-form';
 
-interface DeviceLabelProps {
+import { Translation } from '@suite/intl';
+import { Anchor, SettingsAnchor } from '@suite/router';
+import { ActionColumn, SectionItem, TextColumn } from '@trezor/product-components';
+
+import { ChangeDeviceLabelForm } from 'src/components/suite/ChangeDeviceLabelForm';
+import { MAX_LABEL_LENGTH } from 'src/constants/suite/device';
+import { useChangeDeviceLabel } from 'src/hooks/suite/useChangeDeviceLabel';
+
+type DeviceLabelProps = {
     isDeviceLocked: boolean;
-}
+};
 
 export const DeviceLabel = ({ isDeviceLocked }: DeviceLabelProps) => {
-    const { anchorRef, shouldHighlight } = useAnchor(SettingsAnchor.DeviceLabel);
+    const { form, handleSubmit } = useChangeDeviceLabel();
+
+    const onSubmit = useCallback(
+        (event: React.MouseEvent<HTMLButtonElement>) => {
+            event.preventDefault();
+            handleSubmit();
+        },
+        [handleSubmit],
+    );
 
     return (
-        <SectionItem
-            data-test="@settings/device/device-label"
-            ref={anchorRef}
-            shouldHighlight={shouldHighlight}
-        >
-            <TextColumn
-                title={<Translation id="TR_DEVICE_SETTINGS_DEVICE_LABEL" />}
-                description={
-                    <Translation id="TR_LABEL_REQUIREMENTS" values={{ length: MAX_LABEL_LENGTH }} />
-                }
-            />
-            <ActionColumn>
-                <ChangeDeviceLabel isVertical isDeviceLocked={isDeviceLocked} />
-            </ActionColumn>
-        </SectionItem>
+        <Anchor anchorId={SettingsAnchor.DeviceLabel}>
+            {({ anchorId, anchorRef, shouldHighlight }) => (
+                <SectionItem
+                    data-testid={anchorId}
+                    ref={anchorRef}
+                    shouldHighlight={shouldHighlight}
+                >
+                    <TextColumn
+                        title={<Translation id="TR_DEVICE_SETTINGS_DEVICE_LABEL" />}
+                        description={
+                            <Translation
+                                id="TR_LABEL_REQUIREMENTS"
+                                values={{ length: MAX_LABEL_LENGTH }}
+                            />
+                        }
+                    />
+                    <ActionColumn>
+                        <FormProvider {...form}>
+                            <ChangeDeviceLabelForm
+                                isVertical
+                                isDeviceLocked={isDeviceLocked}
+                                onClick={onSubmit}
+                            />
+                        </FormProvider>
+                    </ActionColumn>
+                </SectionItem>
+            )}
+        </Anchor>
     );
 };

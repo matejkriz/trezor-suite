@@ -1,26 +1,29 @@
-import styled from 'styled-components';
-import { Spinner } from '@trezor/components';
-import { Translation, Modal } from 'src/components/suite';
+import { Translation } from '@suite/intl';
+import { selectSelectedDevice } from '@suite-common/device';
+import { Column, H3, Spinner } from '@trezor/components';
 
-const Expand = styled.div`
-    display: flex;
-    width: 100%;
-    justify-content: center;
-    margin: 40px 0;
-`;
+import { useSelector } from 'src/hooks/suite';
+import { CardWithDevice } from 'src/views/suite/SwitchDevice/CardWithDevice';
+import { SwitchDeviceModal } from 'src/views/suite/SwitchDevice/SwitchDeviceModal';
 
-const StyledModal = styled(Modal)`
-    width: 360px;
-`;
+export const DiscoveryLoader = () => {
+    const device = useSelector(selectSelectedDevice);
+    if (!device) return null;
 
-export const DiscoveryLoader = () => (
-    <StyledModal
-        heading={<Translation id="TR_COIN_DISCOVERY_IN_PROGRESS" />}
-        description={<Translation id="TR_TO_FIND_YOUR_ACCOUNTS_AND" />}
-        data-test="@discovery/loader"
-    >
-        <Expand>
-            <Spinner size={80} isGrey={false} />
-        </Expand>
-    </StyledModal>
-);
+    return (
+        <SwitchDeviceModal data-testid="@discovery/loader">
+            <CardWithDevice device={device}>
+                <Column
+                    justifyContent="center"
+                    alignItems="center"
+                    margin={{ top: 40, bottom: 24 }}
+                >
+                    <Spinner size={48} />
+                    <H3 align="center" margin={{ top: 48 }}>
+                        <Translation id="TR_COIN_DISCOVERY_LOADER_DESCRIPTION" />
+                    </H3>
+                </Column>
+            </CardWithDevice>
+        </SwitchDeviceModal>
+    );
+};

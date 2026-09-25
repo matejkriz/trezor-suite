@@ -1,0 +1,64 @@
+import Animated, {
+    type SharedValue,
+    useAnimatedStyle,
+    useDerivedValue,
+    withTiming,
+} from 'react-native-reanimated';
+
+import { IconButton } from '@suite-native/atoms';
+
+type SwipeableWalkthroughCloseButtonProps = {
+    onPressBack: () => void;
+    currentStepIndex: SharedValue<number>;
+};
+
+const ANIMATION_DURATION = 500;
+
+export const SwipeableWalkthroughCloseButton = ({
+    onPressBack,
+    currentStepIndex,
+}: SwipeableWalkthroughCloseButtonProps) => {
+    const xOpacity = useDerivedValue(() =>
+        withTiming(currentStepIndex.value === 0 ? 1 : 0, {
+            duration: ANIMATION_DURATION / (currentStepIndex.value === 0 ? 4 : 1),
+        }),
+    );
+
+    const caretOpacity = useDerivedValue(() =>
+        withTiming(currentStepIndex.value === 0 ? 0 : 1, { duration: ANIMATION_DURATION }),
+    );
+
+    const animatedXStyle = useAnimatedStyle(() => ({
+        position: 'absolute',
+        opacity: xOpacity.value,
+    }));
+
+    const animatedCaretStyle = useAnimatedStyle(() => ({
+        opacity: caretOpacity.value,
+    }));
+
+    return (
+        <Animated.View>
+            <IconButton
+                iconName="caretUp"
+                intent="neutral"
+                priority="secondary"
+                onPress={onPressBack}
+                accessibilityRole="button"
+                accessibilityLabel="Go back"
+                size="medium"
+                style={animatedCaretStyle}
+            />
+            <IconButton
+                style={animatedXStyle}
+                iconName="x"
+                intent="neutral"
+                priority="secondary"
+                onPress={onPressBack}
+                accessibilityRole="button"
+                accessibilityLabel="Go back"
+                size="medium"
+            />
+        </Animated.View>
+    );
+};

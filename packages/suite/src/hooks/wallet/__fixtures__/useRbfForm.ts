@@ -1,3 +1,16 @@
+import { type CoinjoinState } from '@suite/coinjoin';
+import { asNetworkSymbol } from '@suite-common/wallet-config';
+import {
+    type ChainedTransactions,
+    type FeesState,
+    type SelectedAccountLoaded,
+    type WalletAccountTransaction,
+    type WalletAccountTransactionWithRequiredRbfParams,
+    asAccountDescriptor,
+} from '@suite-common/wallet-types';
+import { type AccountUtxo } from '@trezor/connect';
+import { type DeepPartial } from '@trezor/type-utils';
+
 export { getRootReducer } from './useSendForm';
 
 const ABCD = 'abcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd';
@@ -5,7 +18,7 @@ const DCBA = 'dcbadcbadcbadcbadcbadcbadcbadcbadcbadcbadcbadcbadcbadcbadcbadcba';
 const DUST = 'dust-limit-utxo-should-never-be-used-aaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
 // m/44'/0'/0' all-all-all
-export const BTC_ACCOUNT = {
+export const BTC_ACCOUNT: DeepPartial<SelectedAccountLoaded> = {
     status: 'loaded',
     account: {
         symbol: 'btc',
@@ -13,8 +26,8 @@ export const BTC_ACCOUNT = {
         path: "m/44'/0'/0'",
         descriptor:
             'xpub6BiVtCpG9fQPxnPmHXG8PhtzQdWC2Su4qWu6XW9tpWFYhxydCLJGrWBJZ5H6qTAHdPQ7pQhtpjiYZVZARo14qHiay2fvrX996oEP42u8wZy',
-        deviceState: 'deviceState',
-        key: 'xpub-btc-deviceState',
+        deviceState: '1stTestnetAddress@device_id:0',
+        key: 'xpub-btc-1stTestnetAddress@device_id:0',
         addresses: {
             change: [
                 {
@@ -41,18 +54,17 @@ export const BTC_ACCOUNT = {
         availableBalance: '1',
         formattedBalance: '0.00000001 BTC',
         utxo: [{ amount: '1', txid: DUST }],
-        history: {},
     },
     network: { networkType: 'bitcoin', symbol: 'btc', decimals: 8, features: ['rbf'] },
 };
 
-const BTC_CJ_ACCOUNT = {
+const BTC_CJ_ACCOUNT: DeepPartial<SelectedAccountLoaded> = {
     ...BTC_ACCOUNT,
     account: {
         ...BTC_ACCOUNT.account,
         accountType: 'coinjoin',
         addresses: {
-            ...BTC_ACCOUNT.account.addresses,
+            ...BTC_ACCOUNT.account!.addresses,
             anonymitySet: {
                 '1MCgrVZjXRJJJhi2Z6SR11GpRjCyvNjscY': 1,
             },
@@ -71,8 +83,43 @@ const BTC_CJ_ACCOUNT = {
 //     // script_type: 'PAYTOADDRESS',
 // },
 
-const PREPARE_TX = (params = {}) => ({
-    symbol: 'btc',
+const txDummyData = {
+    deviceState: 'A@B:1',
+    descriptor: asAccountDescriptor(''),
+    type: 'sent',
+    txid: '',
+    amount: '',
+    fee: '',
+    targets: [],
+    tokens: [],
+    internalTransfers: [],
+    details: {
+        vin: [],
+        vout: [],
+        size: 0,
+        totalInput: '',
+        totalOutput: '',
+    },
+} satisfies Partial<WalletAccountTransaction>;
+
+// This type-magic here is for 2 reasons:
+//
+//   1. WalletAccountTransaction has rbfParams as optional, but we want to
+//      enforce it in this fixture as we test only this case here
+//
+//   2. We need to add `required` into AccountUtxo because this is then passed
+//      down into utxo-lib where it is present on ComposeInput. This is not
+//      ideal and pretty magic, maybe subject of future refactor.
+//
+type HackedTxType = WalletAccountTransactionWithRequiredRbfParams & {
+    rbfParams: WalletAccountTransactionWithRequiredRbfParams['rbfParams'] & {
+        type: 'bitcoin';
+        utxo: Array<AccountUtxo & { required?: boolean }>;
+    };
+};
+
+const PREPARE_TX = (params: Partial<HackedTxType['rbfParams']> = {}): HackedTxType => ({
+    symbol: asNetworkSymbol('btc'),
     rbfParams: {
         txid: 'ABCD',
         utxo: [
@@ -105,14 +152,36 @@ const PREPARE_TX = (params = {}) => ({
             path: "m/44'/0'/0'/1/0",
             address: '1DyHzbQUoQEsLxJn6M7fMD8Xdt1XvNiwNE',
             transfers: 1,
+            balance: '0',
+            sent: '0',
+            received: '0',
         },
         feeRate: '3.79',
         baseFee: 175,
+        type: 'bitcoin',
         ...params,
     },
+    ...txDummyData,
 });
 
-export const composeAndSign = [
+type MockedWalletStore = {
+    selectedAccount: DeepPartial<SelectedAccountLoaded>;
+    fees?: FeesState;
+    coinjoin?: DeepPartial<CoinjoinState>;
+};
+
+type ComposeAndSignFixture = {
+    description: string;
+    store: MockedWalletStore;
+    tx: WalletAccountTransactionWithRequiredRbfParams;
+    composedLevels: any;
+    composeTransactionCalls: number;
+    chainedTxs?: ChainedTransactions;
+    signedTx?: any;
+    decreasedOutputs?: boolean | string;
+};
+
+export const composeAndSign: ComposeAndSignFixture[] = [
     {
         description:
             'change-output reduced by fee. outputs order not affected. change was at the end of original tx.',
@@ -178,10 +247,10 @@ export const composeAndSign = [
             },
         },
         chainedTxs: {
-            own: [{ txid: 'aaaa', fee: '500' }],
+            own: [{ symbol: asNetworkSymbol('btc'), ...txDummyData, txid: 'aaaa', fee: '500' }],
             others: [
-                { txid: 'bbbb', fee: '500' },
-                { txid: 'cccc', fee: '5000' },
+                { symbol: asNetworkSymbol('btc'), ...txDummyData, txid: 'bbbb', fee: '500' },
+                { symbol: asNetworkSymbol('btc'), ...txDummyData, txid: 'cccc', fee: '5000' },
             ],
         },
         tx: PREPARE_TX({
@@ -393,11 +462,15 @@ export const composeAndSign = [
             },
             fees: {
                 btc: {
-                    minFee: 1,
-                    maxFee: 100,
-                    blockHeight: 1,
-                    blockTime: 1,
-                    levels: [{ label: 'normal', feePerUnit: '10', blocks: 1 }],
+                    status: 'loaded',
+                    data: {
+                        minPriorityFee: 0,
+                        minFee: 1,
+                        maxFee: 100,
+                        blockHeight: 1,
+                        blockTime: 1,
+                        levels: [{ label: 'normal', feePerUnit: '10', blocks: 1 }],
+                    },
                 },
             },
         },
@@ -469,11 +542,15 @@ export const composeAndSign = [
             },
             fees: {
                 btc: {
-                    minFee: 1,
-                    maxFee: 100,
-                    blockHeight: 1,
-                    blockTime: 1,
-                    levels: [{ label: 'normal', feePerUnit: '10', blocks: 1 }],
+                    status: 'loaded',
+                    data: {
+                        minPriorityFee: 0,
+                        minFee: 1,
+                        maxFee: 100,
+                        blockHeight: 1,
+                        blockTime: 1,
+                        levels: [{ label: 'normal', feePerUnit: '10', blocks: 1 }],
+                    },
                 },
             },
         },
@@ -538,11 +615,15 @@ export const composeAndSign = [
             },
             fees: {
                 btc: {
-                    minFee: 4, // this is essential for this test
-                    maxFee: 100,
-                    blockHeight: 1,
-                    blockTime: 1,
-                    levels: [{ label: 'normal', feePerUnit: '10', blocks: 1 }],
+                    status: 'loaded',
+                    data: {
+                        minPriorityFee: 0,
+                        minFee: 4, // this is essential for this test
+                        maxFee: 100,
+                        blockHeight: 1,
+                        blockTime: 1,
+                        levels: [{ label: 'normal', feePerUnit: '10', blocks: 1 }],
+                    },
                 },
             },
         },
@@ -614,11 +695,15 @@ export const composeAndSign = [
             },
             fees: {
                 btc: {
-                    minFee: 1,
-                    maxFee: 100,
-                    blockHeight: 1,
-                    blockTime: 1,
-                    levels: [{ label: 'normal', feePerUnit: '10', blocks: 1 }],
+                    status: 'loaded',
+                    data: {
+                        minPriorityFee: 0,
+                        minFee: 1,
+                        maxFee: 100,
+                        blockHeight: 1,
+                        blockTime: 1,
+                        levels: [{ label: 'normal', feePerUnit: '10', blocks: 1 }],
+                    },
                 },
             },
         },
@@ -901,7 +986,7 @@ export const composeAndSign = [
                         },
                     ],
                     addresses: {
-                        ...BTC_CJ_ACCOUNT.account.addresses,
+                        ...BTC_CJ_ACCOUNT.account!.addresses,
                         anonymitySet: {
                             bc1ptxs597p3fnpd8gwut5p467ulsydae3rp9z75hd99w8k3ljr9g9rqx6ynaw: 1,
                         },
@@ -909,7 +994,7 @@ export const composeAndSign = [
                 },
             },
             coinjoin: {
-                accounts: [{ key: BTC_CJ_ACCOUNT.account.key }],
+                accounts: [{ key: BTC_CJ_ACCOUNT.account!.key }],
             },
         },
         tx: PREPARE_TX({
@@ -978,7 +1063,7 @@ export const composeAndSign = [
                         },
                     ],
                     addresses: {
-                        ...BTC_CJ_ACCOUNT.account.addresses,
+                        ...BTC_CJ_ACCOUNT.account!.addresses,
                         anonymitySet: {
                             bc1ptxs597p3fnpd8gwut5p467ulsydae3rp9z75hd99w8k3ljr9g9rqx6ynaw: 10,
                         },
@@ -988,7 +1073,7 @@ export const composeAndSign = [
             coinjoin: {
                 accounts: [
                     {
-                        key: BTC_CJ_ACCOUNT.account.key,
+                        key: BTC_CJ_ACCOUNT.account!.key,
                         session: {},
                         prison: {
                             cdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdab00000000:
@@ -1050,6 +1135,4 @@ export const composeAndSign = [
 // TODO: multiple inputs (select one for decrease)
 // TODO: custom fee + set-max (decrease)
 // TODO: mad clicking (composeDebounce)
-// TODO: finalize (check constants)
-// TODO: with locktime
-// TODO: ethereum cases
+// TODO: ethereum cases (don't forget to test when proposed network fee > previous fee and < previous fee + 1 )

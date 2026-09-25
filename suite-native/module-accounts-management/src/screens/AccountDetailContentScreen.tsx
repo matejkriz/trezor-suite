@@ -1,82 +1,35 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useEffect, useMemo } from 'react';
+import { useSelector } from 'react-redux';
 
+import { useServices } from '@suite-common/dependency-injection';
+import { type Account, type TokenAddress } from '@suite-common/wallet-types';
+import { events, injectNativeAnalytics } from '@suite-native/analytics';
 import { Screen } from '@suite-native/navigation';
-import {
-    AccountsRootState,
-    fetchTransactionsThunk,
-    selectAccountLabel,
-    selectAccountByKey,
-    TransactionsRootState,
-    FiatRatesRootState,
-} from '@suite-common/wallet-core';
+import { type TokensRootState, selectAccountTokenInfo } from '@suite-native/tokens';
 import { TransactionList } from '@suite-native/transactions';
-import {
-    selectAccountOrTokenAccountTransactions,
-    selectEthereumAccountTokenInfo,
-} from '@suite-native/ethereum-tokens';
-import { analytics, EventType } from '@suite-native/analytics';
-import { SettingsSliceRootState } from '@suite-native/module-settings';
-import { TokenAddress } from '@suite-common/wallet-types';
 
+import { AccountDetailEmptyState } from '../components/AccountDetailEmptyState';
+import { AssetDetailScreenHeader } from '../components/AssetDetailScreenHeader';
 import { TransactionListHeader } from '../components/TransactionListHeader';
-import { AccountDetailScreenHeader } from '../components/AccountDetailScreenHeader';
-import { TokenAccountDetailScreenSubHeader } from '../components/TokenAccountDetailScreenSubHeader';
 
 type AccountDetailContentScreenProps = {
-    accountKey: string;
+    account: Account;
     tokenContract?: TokenAddress;
 };
 
 export const AccountDetailContentScreen = ({
-    accountKey,
+    account,
     tokenContract,
 }: AccountDetailContentScreenProps) => {
-    const dispatch = useDispatch();
-
-    const [areTokensIncluded, setAreTokensIncluded] = useState(false);
-    const account = useSelector((state: AccountsRootState) =>
-        selectAccountByKey(state, accountKey),
-    );
-    const accountLabel = useSelector((state: AccountsRootState) =>
-        selectAccountLabel(state, accountKey),
-    );
-
-    const accountTransactions = useSelector(
-        (state: TransactionsRootState & FiatRatesRootState & SettingsSliceRootState) =>
-            accountKey
-                ? selectAccountOrTokenAccountTransactions(
-                      state,
-                      accountKey,
-                      tokenContract ?? null,
-                      areTokensIncluded,
-                  )
-                : [],
-    );
-    const token = useSelector((state: AccountsRootState) =>
-        selectEthereumAccountTokenInfo(state, accountKey, tokenContract),
-    );
-
-    const fetchMoreTransactions = useCallback(
-        (pageToFetch: number, perPage: number) => {
-            if (!accountKey) {
-                return;
-            }
-            dispatch(
-                fetchTransactionsThunk({
-                    accountKey,
-                    page: pageToFetch,
-                    perPage,
-                }),
-            ).unwrap();
-        },
-        [accountKey, dispatch],
+    const { analytics } = useServices(injectNativeAnalytics);
+    const token = useSelector((state: TokensRootState) =>
+        selectAccountTokenInfo(state, account.key, tokenContract),
     );
 
     useEffect(() => {
         if (account) {
             analytics.report({
-                type: EventType.AssetDetail,
+                type: events.assetDetailEvent.name,
                 payload: {
                     assetSymbol: account.symbol,
                     tokenSymbol: token?.symbol,
@@ -84,51 +37,32 @@ export const AccountDetailContentScreen = ({
                 },
             });
         }
-    }, [account, token?.symbol, token?.contract]);
-
-    const toggleIncludeTokenTransactions = useCallback(() => {
-        setAreTokensIncluded(prev => !prev);
-    }, []);
+    }, [account, token?.symbol, token?.contract, analytics, token]);
 
     const listHeaderComponent = useMemo(
-        () => (
-            <TransactionListHeader
-                accountKey={accountKey}
-                tokenContract={tokenContract}
-                areTokensIncluded={areTokensIncluded}
-                toggleIncludeTokenTransactions={toggleIncludeTokenTransactions}
-            />
-        ),
-        [accountKey, tokenContract, areTokensIncluded, toggleIncludeTokenTransactions],
+        () => <TransactionListHeader accountKey={account.key} tokenContract={tokenContract} />,
+        [account.key, tokenContract],
+    );
+
+    const listEmptyComponent = useMemo(
+        () => <AccountDetailEmptyState accountKey={account.key} tokenContract={tokenContract} />,
+        [account.key, tokenContract],
     );
 
     return (
         <Screen
-            screenHeader={
-                token?.name ? (
-                    <TokenAccountDetailScreenSubHeader
-                        tokenName={token.name}
-                        accountKey={accountKey}
-                    />
-                ) : (
-                    <AccountDetailScreenHeader
-                        accountLabel={accountLabel}
-                        accountKey={accountKey}
-                    />
-                )
-            }
-            // The padding is handled inside the TransactionList to prevent scrollbar glitches.
-            customVerticalPadding={0}
-            customHorizontalPadding={0}
+            /** Adding scrollable wraps content in ScrollView which is unwanted for this screen because list component already adds the scrollview **/
             isScrollable={false}
+            header={<AssetDetailScreenHeader account={account} tokenContract={tokenContract} />}
+            noHorizontalPadding
+            noBottomPadding
+            hasBottomInset={false}
         >
             <TransactionList
-                areTokensIncluded={areTokensIncluded}
-                accountKey={accountKey}
+                account={account}
                 tokenContract={tokenContract}
-                transactions={accountTransactions}
-                fetchMoreTransactions={fetchMoreTransactions}
                 listHeaderComponent={listHeaderComponent}
+                listEmptyComponent={listEmptyComponent}
             />
         </Screen>
     );

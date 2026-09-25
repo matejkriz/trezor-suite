@@ -1,12 +1,12 @@
-import { IntlShape } from 'react-intl';
+import type { IntlShape } from 'react-intl';
 
-import { PROTO } from '@trezor/connect';
-import { FiatCurrencyCode } from '@suite-common/suite-config';
+import type { BaseCurrencyCode } from '@trezor/blockchain-link-types';
+import type { PROTO } from '@trezor/connect';
 
 export type FormatterProviderConfig = {
     locale: string;
     bitcoinAmountUnit: PROTO.AmountUnit;
-    fiatCurrency: FiatCurrencyCode;
+    baseCurrency: BaseCurrencyCode;
     is24HourFormat: boolean;
 };
 

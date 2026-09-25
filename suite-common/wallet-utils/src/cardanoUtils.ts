@@ -1,24 +1,20 @@
-import BigNumber from 'bignumber.js';
-
+import { type AccountType } from '@suite-common/wallet-config';
 import {
-    Account,
-    Output,
-    PrecomposedTransactionFinal,
-    PrecomposedTransactionFinalCardano,
-    PoolsResponse,
-    StakePool,
+    type Account,
+    type Output,
+    type PrecomposedTransactionFinal,
+    type PrecomposedTransactionFinalCardano,
 } from '@suite-common/wallet-types';
-import { CARDANO, CardanoCertificate, CardanoOutput, PROTO } from '@trezor/connect';
-import { Network } from '@suite-common/wallet-config';
+import { CARDANO, type CardanoCertificate, PROTO } from '@trezor/connect';
 
 import {
-    amountToSatoshi,
-    formatAmount,
+    convertAmountSubunitsToUnits,
+    convertAmountUnitsToSubunits,
     formatNetworkAmount,
-    networkAmountToSatoshi,
-} from './accountUtils';
+    networkAmountToSmallestUnit,
+} from './amountUtils';
 
-export const getDerivationType = (accountType: Network['accountType']) => {
+export const getDerivationType = (accountType: AccountType) => {
     switch (accountType) {
         case 'normal':
             return 1;
@@ -31,7 +27,8 @@ export const getDerivationType = (accountType: Network['accountType']) => {
     }
 };
 
-export const getStakingPath = (account: Account) => `m/1852'/1815'/${account.index}'/2/0`;
+export const getStakingPath = (account: Pick<Account, 'index'>) =>
+    `m/1852'/1815'/${account.index}'/2/0`;
 
 export const getProtocolMagic = (accountSymbol: Account['symbol']) =>
     // TODO: use testnet magic from connect once this PR is merged https://github.com/trezor/connect/pull/1046
@@ -39,8 +36,7 @@ export const getProtocolMagic = (accountSymbol: Account['symbol']) =>
 
 export const getAddressType = () => PROTO.CardanoAddressType.BASE;
 
-export const getNetworkId = (accountSymbol: Account['symbol']) =>
-    accountSymbol === 'ada' ? CARDANO.NETWORK_IDS.mainnet : CARDANO.NETWORK_IDS.testnet;
+export const getNetworkId = () => CARDANO.NETWORK_IDS.mainnet;
 
 export const getUnusedChangeAddress = (account: Pick<Account, 'addresses'>) => {
     if (!account.addresses) return;
@@ -53,7 +49,7 @@ export const getUnusedChangeAddress = (account: Pick<Account, 'addresses'>) => {
     return changeAddress;
 };
 
-export const getAddressParameters = (account: Account, path: string) => ({
+export const getAddressParameters = (account: Pick<Account, 'index'>, path: string) => ({
     path,
     addressType: getAddressType(),
     stakingPath: getStakingPath(account),
@@ -68,7 +64,7 @@ export const transformUserOutputs = (
     outputs.map((output, i) => {
         const setMax = i === maxOutputIndex;
         const amount =
-            output.amount === '' ? undefined : networkAmountToSatoshi(output.amount, symbol);
+            output.amount === '' ? undefined : networkAmountToSmallestUnit(output.amount, symbol);
         const tokenDecimals = accountTokens?.find(t => t.contract === output.token)?.decimals ?? 0;
 
         return {
@@ -79,7 +75,7 @@ export const transformUserOutputs = (
                       {
                           unit: output.token,
                           quantity: output.amount
-                              ? amountToSatoshi(output.amount, tokenDecimals)
+                              ? convertAmountUnitsToSubunits(output.amount, tokenDecimals)
                               : '0',
                       },
                   ]
@@ -93,22 +89,6 @@ export const getShortFingerprint = (fingerprint: string) => {
     const lastPart = fingerprint.substring(fingerprint.length - 10);
 
     return `${firstPart}…${lastPart}`;
-};
-
-export const parseAsset = (
-    hex: string,
-): {
-    policyId: string;
-    assetNameInHex: string;
-} => {
-    const policyIdSize = 56;
-    const policyId = hex.slice(0, policyIdSize);
-    const assetNameInHex = hex.slice(policyIdSize);
-
-    return {
-        policyId,
-        assetNameInHex,
-    };
 };
 
 export const getDelegationCertificates = (
@@ -134,29 +114,30 @@ export const getDelegationCertificates = (
     return result;
 };
 
-export const isPoolOverSaturated = (pool: StakePool, additionalStake?: string) =>
-    new BigNumber(pool.live_stake)
-        .plus(additionalStake ?? '0')
-        .div(pool.saturation)
-        .toNumber() > 0.8;
+export const getVotingCertificates = (
+    stakingPath: string,
+    dRep: { hex?: string; type: PROTO.CardanoDRepType },
+) => {
+    const result: CardanoCertificate[] = [
+        {
+            type: PROTO.CardanoCertificateType.VOTE_DELEGATION,
+            path: stakingPath,
+            dRep: {
+                keyHash: dRep.type === PROTO.CardanoDRepType.KEY_HASH ? dRep.hex : undefined,
+                scriptHash: dRep.type === PROTO.CardanoDRepType.SCRIPT_HASH ? dRep.hex : undefined,
+                type: dRep.type,
+            },
+        },
+    ];
 
-export const getStakePoolForDelegation = (trezorPools: PoolsResponse, accountBalance: string) => {
-    let pool = trezorPools.next;
-    if (isPoolOverSaturated(pool, accountBalance)) {
-        pool = trezorPools.pools[0];
-    }
-
-    return pool;
+    return result;
 };
+
 // Type guard to differentiate between PrecomposedTransactionFinal and PrecomposedTransactionFinalCardano
 export const isCardanoTx = (
     account: Account,
     _tx: PrecomposedTransactionFinalCardano | PrecomposedTransactionFinal,
 ): _tx is PrecomposedTransactionFinalCardano => account.networkType === 'cardano';
-
-export const isCardanoExternalOutput = (
-    output: CardanoOutput,
-): output is Extract<CardanoOutput, 'address'> => 'address' in output;
 
 export const formatMaxOutputAmount = (
     maxAmount: string | undefined,
@@ -170,9 +151,24 @@ export const formatMaxOutputAmount = (
         return formatNetworkAmount(maxAmount, account.symbol);
     }
 
+    const { assets } = maxOutput;
+    // @ts-expect-error: indexing with noUncheckedIndexedAccess
+    const firstAsset: (typeof assets)[number] = assets[0];
     // output with a token, format using token decimals
-    const tokenDecimals =
-        account.tokens?.find(t => t.contract === maxOutput.assets[0].unit)?.decimals ?? 0;
+    const tokenDecimals = account.tokens?.find(t => t.contract === firstAsset.unit)?.decimals ?? 0;
 
-    return formatAmount(maxAmount, tokenDecimals);
+    return convertAmountSubunitsToUnits(maxAmount, tokenDecimals);
+};
+
+export const getCardanoFingerprint = (
+    tokens: Account['tokens'],
+    symbol: string | undefined,
+): string | undefined => {
+    if (!tokens) {
+        return undefined;
+    }
+
+    const token = tokens.find(t => t.symbol?.toLowerCase() === symbol?.toLowerCase());
+
+    return token?.fingerprint;
 };

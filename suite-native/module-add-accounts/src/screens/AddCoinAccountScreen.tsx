@@ -1,96 +1,86 @@
-import { G } from '@mobily/ts-belt';
+import { useCallback } from 'react';
 
+import { events } from '@suite-common/analytics';
+import { useServices } from '@suite-common/dependency-injection';
+import { AccountTypeDecisionBottomSheet, useAddCoinAccount } from '@suite-native/add-coin-account';
+import { injectNativeAnalytics } from '@suite-native/analytics';
+import { VStack } from '@suite-native/atoms';
+import { NetworkListItem } from '@suite-native/coin-enabling';
+import { Icon } from '@suite-native/icons';
+import { Translation } from '@suite-native/intl';
 import {
-    AddCoinAccountStackParamList,
-    AddCoinAccountStackRoutes,
+    type AddCoinAccountStackParamList,
+    type AddCoinAccountStackRoutes,
     Screen,
-    ScreenSubHeader,
-    StackProps,
+    type StackProps,
 } from '@suite-native/navigation';
-import { Card, VStack } from '@suite-native/atoms';
-import { useTranslate } from '@suite-native/intl';
-import { SelectableNetworkItem } from '@suite-native/accounts';
-
-import { accountTypeTranslationKeys, useAddCoinAccount } from '../hooks/useAddCoinAccount';
-import { AccountTypeDecisionBootomSheet } from '../components/AccountTypeDecisionBootomSheet';
+import { useScreenHeaderSearch } from '@suite-native/search';
+import { isNotNullOrUndefined } from '@trezor/utils';
 
 export const AddCoinAccountScreen = ({
     route,
 }: StackProps<AddCoinAccountStackParamList, AddCoinAccountStackRoutes.AddCoinAccount>) => {
-    const { translate } = useTranslate();
+    const { analytics } = useServices(injectNativeAnalytics);
+
+    const reportSearchAnalytics = useCallback(
+        () =>
+            analytics.report({
+                type: events.settingsNetworkSearchUsedEvent.name,
+                payload: { platform: 'mobile', origin: 'add-account' },
+            }),
+        [analytics],
+    );
+
+    const { header, searchQuery } = useScreenHeaderSearch({
+        title: <Translation id="moduleAddAccounts.addCoinAccountScreen.title" />,
+        closeActionType: 'close',
+        isCompactOnly: true,
+        onSearchUsed: reportSearchAnalytics,
+    });
 
     const {
         supportedNetworkSymbols,
         onSelectedNetworkItem,
         networkSymbolWithTypeToBeAdded,
         clearNetworkWithTypeToBeAdded,
-        navigateToAccountTypeSelectionScreen,
-        addCoinAccount,
-    } = useAddCoinAccount();
+        handleAccountTypeSelection,
+        handleAccountTypeConfirmation,
+        getAccountTypeToBeAddedName,
+        bottomSheetRef,
+    } = useAddCoinAccount(searchQuery);
 
     const { flowType } = route.params;
 
-    const accountTypeName = networkSymbolWithTypeToBeAdded
-        ? translate(accountTypeTranslationKeys[networkSymbolWithTypeToBeAdded[1]].titleKey)
-        : '';
-
-    const handleTypeSelectionTap = () => {
-        if (networkSymbolWithTypeToBeAdded) {
-            navigateToAccountTypeSelectionScreen(
-                networkSymbolWithTypeToBeAdded[0],
-                flowType,
-                networkSymbolWithTypeToBeAdded[1],
-            );
-        }
-    };
-
-    const handleConfirmTap = () => {
-        if (networkSymbolWithTypeToBeAdded) {
-            // Timeout is needed so AccountTypeDecisionBootomSheet has time to hide otherwise app crashes
-            setTimeout(() => {
-                addCoinAccount({
-                    networkSymbol: networkSymbolWithTypeToBeAdded[0],
-                    accountType: networkSymbolWithTypeToBeAdded[1],
-                    flowType,
-                });
-            }, 100);
-            clearNetworkWithTypeToBeAdded();
-        }
-    };
+    const handleTypeSelectionTap = () => handleAccountTypeSelection(flowType);
+    const handleConfirmTap = () => handleAccountTypeConfirmation(flowType);
 
     return (
-        <Screen
-            screenHeader={
-                <ScreenSubHeader
-                    content={translate('moduleAddAccounts.addCoinAccountScreen.title')}
-                />
-            }
-        >
-            <Card>
-                <VStack spacing="large">
-                    {supportedNetworkSymbols.map(networkSymbol => (
-                        <SelectableNetworkItem
-                            key={networkSymbol}
-                            symbol={networkSymbol}
-                            data-testID={`@add-account/select-coin/${networkSymbol}`}
-                            onPress={() =>
-                                onSelectedNetworkItem({
-                                    networkSymbol,
-                                    flowType,
-                                })
-                            }
-                        />
-                    ))}
-                </VStack>
-            </Card>
-            <AccountTypeDecisionBootomSheet
+        <Screen header={header}>
+            <VStack spacing="sp12">
+                {supportedNetworkSymbols.map(symbol => (
+                    <NetworkListItem
+                        key={symbol}
+                        symbol={symbol}
+                        accessory={<Icon name="caretRight" color="contentSecondary" />}
+                        onPress={() =>
+                            onSelectedNetworkItem({
+                                symbol,
+                                flowType,
+                            })
+                        }
+                        accessibilityRole="button"
+                        testID={`@onboarding/select-coin/${symbol}`}
+                    />
+                ))}
+            </VStack>
+            <AccountTypeDecisionBottomSheet
                 coinName={
-                    G.isNotNullable(networkSymbolWithTypeToBeAdded)
+                    isNotNullOrUndefined(networkSymbolWithTypeToBeAdded)
                         ? networkSymbolWithTypeToBeAdded[0]
                         : ''
                 }
-                typeName={accountTypeName}
-                isVisible={G.isNotNullable(networkSymbolWithTypeToBeAdded)}
+                typeName={getAccountTypeToBeAddedName()}
+                ref={bottomSheetRef}
                 onClose={clearNetworkWithTypeToBeAdded}
                 onTypeSelectionTap={handleTypeSelectionTap}
                 onConfirmTap={handleConfirmTap}

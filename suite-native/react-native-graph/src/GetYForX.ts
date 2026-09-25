@@ -1,4 +1,4 @@
-import type { Vector, PathCommand } from '@shopify/react-native-skia';
+import type { PathCommand, Vector } from '@shopify/react-native-skia';
 import { PathVerb, vec } from '@shopify/react-native-skia';
 
 // code from William Candillon
@@ -77,7 +77,7 @@ const solveCubic = (a: number, b: number, c: number, d: number): number[] => {
     }
 
     // Convert back from depressed cubic
-    for (let i = 0; i < roots.length; i++) roots[i] -= b / (3 * a);
+    for (let i = 0; i < roots.length; i++) roots[i]! -= b / (3 * a);
 
     return roots;
 };

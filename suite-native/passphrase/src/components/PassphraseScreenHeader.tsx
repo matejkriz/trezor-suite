@@ -1,0 +1,102 @@
+import { useCallback } from 'react';
+import { useSelector } from 'react-redux';
+
+import { useNavigation, useRoute } from '@react-navigation/native';
+
+import { useServices } from '@suite-common/dependency-injection';
+import { selectSelectedDevice } from '@suite-common/device';
+import { injectDispatch } from '@suite-common/redux-utils';
+import {
+    cancelDiscoveryThunk,
+    selectIsCreatingNewPassphraseWallet,
+} from '@suite-common/wallet-core';
+import { useAlert } from '@suite-native/alerts';
+import { events, injectNativeAnalytics } from '@suite-native/analytics';
+import { IconButton, ScreenHeaderWrapper } from '@suite-native/atoms';
+import { Translation } from '@suite-native/intl';
+import {
+    AppTabsRoutes,
+    type AuthorizeDeviceStackParamList,
+    type AuthorizeDeviceStackRoutes,
+    HomeStackRoutes,
+    type RootStackParamList,
+    RootStackRoutes,
+    type StackToTabCompositeProps,
+    useInterceptNativeNavigation,
+    useNavigateToInitialScreen,
+} from '@suite-native/navigation';
+import TrezorConnect from '@trezor/connect';
+
+type NavigationProp = StackToTabCompositeProps<
+    AuthorizeDeviceStackParamList,
+    AuthorizeDeviceStackRoutes,
+    RootStackParamList
+>;
+
+export const PassphraseScreenHeader = () => {
+    const navigation = useNavigation<NavigationProp>();
+    const route = useRoute();
+    const device = useSelector(selectSelectedDevice);
+    const { analytics, dispatch } = useServices(injectNativeAnalytics, injectDispatch);
+
+    const { showAlert } = useAlert();
+
+    const isCreatingNewWalletInstance = useSelector(selectIsCreatingNewPassphraseWallet);
+
+    const navigateToInitialScreen = useNavigateToInitialScreen();
+
+    const handleClose = useCallback(() => {
+        navigation.navigate(RootStackRoutes.AppTabs, {
+            screen: AppTabsRoutes.HomeStack,
+            params: {
+                screen: HomeStackRoutes.Home,
+            },
+        });
+        analytics.report({
+            type: events.passphraseExitEvent.name,
+            payload: { screen: route.name },
+        });
+
+        if (device) {
+            dispatch(cancelDiscoveryThunk(device));
+        }
+    }, [navigation, analytics, route.name, device, dispatch]);
+
+    const handleCancel = useCallback(() => {
+        if (isCreatingNewWalletInstance) {
+            showAlert({
+                title: <Translation id="modulePassphrase.confirmOnDevice.warningSheet.title" />,
+                description: undefined,
+                primaryButtonTitle: (
+                    <Translation id="modulePassphrase.confirmOnDevice.warningSheet.primaryButton" />
+                ),
+                primaryButtonColorProps: { intent: 'critical', priority: 'primary' },
+                onPressPrimaryButton: handleClose,
+                secondaryButtonTitle: (
+                    <Translation id="modulePassphrase.confirmOnDevice.warningSheet.secondaryButton" />
+                ),
+                secondaryButtonColorProps: { intent: 'critical', priority: 'secondary' },
+            });
+        } else {
+            TrezorConnect.cancel();
+            navigateToInitialScreen();
+        }
+    }, [handleClose, navigateToInitialScreen, isCreatingNewWalletInstance, showAlert]);
+
+    useInterceptNativeNavigation({ onPress: handleCancel });
+
+    return (
+        <ScreenHeaderWrapper>
+            <IconButton
+                iconName="x"
+                intent="neutral"
+                priority="secondary"
+                size="medium"
+                accessibilityRole="button"
+                accessibilityLabel="close"
+                onPress={handleCancel}
+                testID="@passphrase/closeButton"
+            />
+        </ScreenHeaderWrapper>
+    );
+};

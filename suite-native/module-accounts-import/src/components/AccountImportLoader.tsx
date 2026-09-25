@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Animated, {
     useAnimatedStyle,
     withDelay,
@@ -6,14 +6,16 @@ import Animated, {
     withTiming,
 } from 'react-native-reanimated';
 
-import Lottie from 'lottie-react-native';
-
-import { Box, Text } from '@suite-native/atoms';
-import { prepareNativeStyle, useNativeStyles } from '@trezor/styles';
-
-import spinnerSuccess from '../assets/spinnerSuccess.json';
+import { Box, Spinner, type SpinnerLoadingState, Text } from '@suite-native/atoms';
+import { Translation } from '@suite-native/intl';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
 
 const LINE_VISIBILITY_DURATION = 1000;
+
+type AccountImportLoaderProps = {
+    loadingState: SpinnerLoadingState;
+    onComplete?: () => void;
+};
 
 const loaderContainerStyle = prepareNativeStyle(() => ({
     alignItems: 'center',
@@ -21,30 +23,25 @@ const loaderContainerStyle = prepareNativeStyle(() => ({
     flex: 1,
 }));
 
-const successSpinnerStyle = prepareNativeStyle(utils => ({
-    width: 50,
-    height: 50,
-    marginBottom: utils.spacings.large,
-}));
-
 const ANIMATION_SAFETY_MARGIN = 5;
 
 const textContainerStyle = prepareNativeStyle(utils => ({
     overflow: 'hidden',
-    height: utils.typography.titleSmall.lineHeight + ANIMATION_SAFETY_MARGIN * 2,
+    height: utils.typography['headline-sm'].lineHeight + ANIMATION_SAFETY_MARGIN * 2,
     paddingHorizontal: ANIMATION_SAFETY_MARGIN,
 }));
 
 const textStyle = prepareNativeStyle(utils => ({
-    lineHeight: utils.typography.titleSmall.lineHeight + ANIMATION_SAFETY_MARGIN * 2,
+    lineHeight: utils.typography['headline-sm'].lineHeight + ANIMATION_SAFETY_MARGIN * 2,
     textAlign: 'center',
 }));
 
-export const AccountImportLoader = () => {
+export const AccountImportLoader = ({ loadingState, onComplete }: AccountImportLoaderProps) => {
     const { applyStyle } = useNativeStyles();
     const [lineHeight1, setLineHeight1] = useState(0);
     const [lineHeight2, setLineHeight2] = useState(0);
     const [lineHeight3, setLineHeight3] = useState(0);
+    const [hasTextAnimationFinished, setHasTextAnimationFinished] = useState(false);
     const animatedTextStyle = useAnimatedStyle(() => ({
         transform: [
             {
@@ -58,45 +55,52 @@ export const AccountImportLoader = () => {
         ],
     }));
 
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            setHasTextAnimationFinished(true);
+        }, 3 * LINE_VISIBILITY_DURATION);
+
+        return () => {
+            clearTimeout(timeout);
+        };
+    }, []);
+
+    // Spinner should not stop spinning before the text animation is finished.
+    const spinnerLoadingState = hasTextAnimationFinished ? loadingState : 'idle';
+
     return (
         <Box style={applyStyle(loaderContainerStyle)}>
-            <Box>
-                <Lottie
-                    source={spinnerSuccess}
-                    autoPlay
-                    style={applyStyle(successSpinnerStyle)}
-                    loop={false}
-                    resizeMode="cover"
-                />
+            <Box marginBottom="sp24">
+                <Spinner loadingState={spinnerLoadingState} onComplete={onComplete} />
             </Box>
             <Box style={applyStyle(textContainerStyle)}>
                 <Animated.View style={animatedTextStyle}>
                     <Text
-                        variant="titleSmall"
+                        variant="headline-sm"
                         style={applyStyle(textStyle)}
                         onLayout={event => {
                             setLineHeight1(event.nativeEvent.layout.y);
                         }}
                     >
-                        Retrieving Balances
+                        <Translation id="moduleAccountImport.accountImportLoaderScreen.loaderState.balances" />
                     </Text>
                     <Text
-                        variant="titleSmall"
+                        variant="headline-sm"
                         style={applyStyle(textStyle)}
                         onLayout={event => {
                             setLineHeight2(event.nativeEvent.layout.y);
                         }}
                     >
-                        Confirming assets
+                        <Translation id="moduleAccountImport.accountImportLoaderScreen.loaderState.assets" />
                     </Text>
                     <Text
-                        variant="titleSmall"
+                        variant="headline-sm"
                         style={applyStyle(textStyle)}
                         onLayout={event => {
                             setLineHeight3(event.nativeEvent.layout.y);
                         }}
                     >
-                        Checking transactions
+                        <Translation id="moduleAccountImport.accountImportLoaderScreen.loaderState.transactions" />
                     </Text>
                 </Animated.View>
             </Box>

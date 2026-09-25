@@ -1,5 +1,4 @@
-import { NotificationEntry } from '@suite-common/toast-notifications';
-import { settingsCommonConfig } from '@suite-common/suite-config';
+import { type NotificationEntry } from '@suite-common/toast-notifications';
 
 const IMPORTANT_NOTIFICATION_TYPES: Array<NotificationEntry['type']> = [
     'tx-sent',
@@ -15,7 +14,6 @@ const IMPORTANT_NOTIFICATION_TYPES: Array<NotificationEntry['type']> = [
 ];
 
 export default {
-    ...settingsCommonConfig,
     DEFAULT_GRAPH_RANGE: {
         label: 'all',
         startDate: null,

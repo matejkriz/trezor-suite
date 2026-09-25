@@ -1,38 +1,63 @@
-import { MiddlewareAPI } from 'redux';
-import BigNumber from 'bignumber.js';
+import { type UnknownAction, isAnyOf } from '@reduxjs/toolkit';
 
-import { getPhysicalDeviceCount } from '@suite-common/suite-utils';
+import { type DesktopAnalyticsDep, events } from '@suite/analytics';
 import {
+    type CoinjoinRootState,
+    coinjoinAccountUnregister,
+    coinjoinSessionCompleted,
+    coinjoinSessionPause,
+    selectAnonymityGainToReportByAccountKey,
+    selectCoinjoinAccountByKey,
+    updateLastAnonymityReportTimestamp,
+} from '@suite/coinjoin';
+import {
+    type RouterRootState,
+    anchorChange,
+    routerLocationChange,
+    selectRouteName,
+    selectRouterUrl,
+} from '@suite/router';
+import { onSuiteReady } from '@suite/suite-lifecycle';
+import { deviceActions, selectDevices, selectDevicesCount } from '@suite-common/device';
+import { firmwareUpdateThunk } from '@suite-common/firmware';
+import { type WithServices, createMiddlewareWithExtraDeps } from '@suite-common/redux-utils';
+import { UNIT_ABBREVIATIONS } from '@suite-common/suite-constants';
+import {
+    getIsDeviceDescriptorApiTypeBluetooth,
+    getPhysicalDeviceCount,
+} from '@suite-common/suite-utils';
+import { type TokenDefinitionsRootState } from '@suite-common/token-definitions';
+import {
+    changeCoinVisibilityEvent,
     discoveryActions,
-    selectDevices,
-    selectDevicesCount,
-    deviceActions,
+    setBitcoinAmountUnits,
 } from '@suite-common/wallet-core';
-import { analytics, EventType } from '@trezor/suite-analytics';
-import { TRANSPORT, DEVICE } from '@trezor/connect';
+import { type AccountKey } from '@suite-common/wallet-types';
+import {
+    accumulateAccountCountBySymbolAndType,
+    getAccountTotalStakingBalance,
+    getAccountsWithSomeTransactionHistory,
+} from '@suite-common/wallet-utils';
+import { TRANSPORT, isTransportEventOfType } from '@trezor/connect';
 import {
     getBootloaderHash,
     getBootloaderVersion,
     getFirmwareRevision,
+    getFirmwareSource,
     getFirmwareVersion,
     hasBitcoinOnlyFirmware,
     isDeviceInBootloaderMode,
 } from '@trezor/device-utils';
+import { BigNumber } from '@trezor/utils';
 
-import { SUITE, ROUTER } from 'src/actions/suite/constants';
-import { COINJOIN } from 'src/actions/wallet/constants';
+import { type SuiteRootState } from 'src/reducers/suite/suiteReducer';
 import {
+    type GetSuiteReadyPayloadState,
     getSuiteReadyPayload,
+    redactAnchor,
     redactRouterUrl,
-    redactTransactionIdFromAnchor,
 } from 'src/utils/suite/analytics';
-import type { AppState, Action, Dispatch } from 'src/types/suite';
-import {
-    selectAnonymityGainToReportByAccountKey,
-    selectCoinjoinAccountByKey,
-} from 'src/reducers/wallet/coinjoinReducer';
-import { updateLastAnonymityReportTimestamp } from 'src/actions/wallet/coinjoinAccountActions';
-import { Account } from '@suite-common/wallet-types';
+import { hasVisibleTokens } from 'src/utils/wallet/tokenUtils';
 
 /*
     In analytics middleware we may intercept actions we would like to log. For example:
@@ -41,189 +66,260 @@ import { Account } from '@suite-common/wallet-types';
     - transport (webusb/bridge) and its version
     - backup type (shamir/bip39)
 */
-const analyticsMiddleware =
-    (api: MiddlewareAPI<Dispatch, AppState>) => (next: Dispatch) => (action: Action) => {
-        const prevRouterUrl = api.getState().router.url;
-        // pass action
-        next(action);
+export type PrepareAnalyticsMiddlewareDeps = WithServices<DesktopAnalyticsDep>;
 
-        const state = api.getState();
+type AnalyticsMiddlewareState = CoinjoinRootState &
+    GetSuiteReadyPayloadState &
+    RouterRootState &
+    TokenDefinitionsRootState & {
+        suite: Pick<SuiteRootState['suite'], 'lifecycle'>;
+    };
 
-        if (deviceActions.authDevice.match(action)) {
+const createAnalyticsMiddleware = createMiddlewareWithExtraDeps<
+    PrepareAnalyticsMiddlewareDeps,
+    UnknownAction,
+    AnalyticsMiddlewareState
+>;
+
+export const prepareAnalyticsMiddleware = createAnalyticsMiddleware(
+    (action: UnknownAction, { extra, next, dispatch, getState }) => {
+        const prevRouterUrl = selectRouterUrl(getState());
+        const prevRouteName = selectRouteName(getState());
+        // NOTE: pass action on, keep the result
+        const result = next(action);
+
+        // Keep one post-action state snapshot for all analytics derived from this action.
+        // eslint-disable-next-line no-restricted-syntax
+        const state = getState();
+        const { analytics } = extra.services;
+
+        if (isAnyOf(firmwareUpdateThunk.fulfilled, firmwareUpdateThunk.rejected)(action)) {
+            const { device, toBtcOnly, toFwVersion, error = '' } = action.payload ?? {};
+
+            if (device?.features) {
+                analytics.report({
+                    type: events.deviceUpdateFirmwareEvent.name,
+                    payload: {
+                        model: device.features.internal_model,
+                        fromFwVersion:
+                            device?.firmware === 'none' ? 'none' : getFirmwareVersion(device),
+                        fromBlVersion: getBootloaderVersion(device),
+                        error,
+                        toBtcOnly,
+                        toFwVersion,
+                        firmwareSource: getFirmwareSource(device),
+                    },
+                });
+            }
+        }
+
+        if (deviceActions.addAuthorizedDevice.match(action)) {
             analytics.report({
-                type: EventType.SelectWalletType,
-                payload: { type: action.payload.device.walletNumber ? 'hidden' : 'standard' },
+                type: events.selectWalletTypeEvent.name,
+                payload: {
+                    type: action.payload.device.walletNumber ? 'hidden' : 'standard',
+                },
+            });
+        } else if (onSuiteReady.match(action)) {
+            getSuiteReadyPayload(state).then(payload => {
+                analytics.report({
+                    type: events.suiteReadyEvent.name,
+                    payload,
+                });
+            });
+        } else if (isTransportEventOfType(action, TRANSPORT.START)) {
+            analytics.report({
+                type: events.transportTypeEvent.name,
+                payload: {
+                    type: action.payload.type,
+                    version: action.payload.version,
+                },
+            });
+        } else if (deviceActions.connectDevice.match(action)) {
+            const { device } = action.payload;
+            const { features, mode } = device;
+
+            if (!features || !mode) return result;
+
+            if (!isDeviceInBootloaderMode(device)) {
+                analytics.report({
+                    type: events.deviceConnectEvent.name,
+                    payload: {
+                        mode,
+                        firmware: getFirmwareVersion(device),
+                        firmwareRevision: getFirmwareRevision(device),
+                        bootloaderHash: getBootloaderHash(device),
+                        backup_type: features.backup_type || 'Bip39',
+                        pin_protection: features.pin_protection,
+                        passphrase_protection: features.passphrase_protection,
+                        totalInstances: selectDevicesCount(state),
+                        isBitcoinOnly: hasBitcoinOnlyFirmware(device),
+                        isBitcoinOnlyDevice: !!features.unit_btconly,
+                        totalDevices: getPhysicalDeviceCount(selectDevices(state)),
+                        language: features.language,
+                        model: features.internal_model,
+                        optiga_sec: features.optiga_sec,
+                        firmwareSource: getFirmwareSource(device),
+                        connectionType: getIsDeviceDescriptorApiTypeBluetooth(device)
+                            ? 'bluetooth'
+                            : 'cable',
+                    },
+                });
+            } else {
+                analytics.report({
+                    type: events.deviceConnectEvent.name,
+                    payload: {
+                        mode: 'bootloader',
+                        firmware: getFirmwareVersion(device),
+                        bootloader: getBootloaderVersion(device),
+                        firmwareSource: getFirmwareSource(device),
+                    },
+                });
+            }
+        } else if (deviceActions.deviceDisconnect.match(action)) {
+            analytics.report({
+                type: events.deviceDisconnectEvent.name,
+            });
+        } else if (discoveryActions.updateDiscovery.match(action)) {
+            if (action.payload.status.status !== 'complete') return result;
+
+            const accountsWithNonZeroBalance = state.wallet.accounts
+                .filter(
+                    account =>
+                        new BigNumber(account.balance).gt(0) ||
+                        new BigNumber(getAccountTotalStakingBalance(account) || 0).gt(0) ||
+                        hasVisibleTokens(
+                            account.symbol,
+                            account.tokens ?? [],
+                            state.tokenDefinitions,
+                        ),
+                )
+                .reduce(accumulateAccountCountBySymbolAndType, {});
+
+            const accountsWithTokens = state.wallet.accounts
+                .filter(account => new BigNumber(account.tokens?.length || 0).gt(0))
+                .reduce<Record<string, number>>((acc, { symbol, tokens }) => {
+                    if (
+                        tokens?.length &&
+                        !hasVisibleTokens(symbol, tokens, state.tokenDefinitions)
+                    ) {
+                        return acc;
+                    }
+                    acc[symbol] = (acc[symbol] || 0) + 1;
+
+                    return acc;
+                }, {});
+
+            const accountsWithStaking = state.wallet.accounts
+                .filter(account => new BigNumber(getAccountTotalStakingBalance(account) || 0).gt(0))
+                .reduce(accumulateAccountCountBySymbolAndType, {});
+
+            analytics.report({
+                type: events.accountsStatusEvent.name,
+                payload: getAccountsWithSomeTransactionHistory(state.wallet.accounts).reduce(
+                    accumulateAccountCountBySymbolAndType,
+                    {},
+                ),
+            });
+
+            analytics.report({
+                type: events.accountsNonZeroBalanceEvent.name,
+                payload: accountsWithNonZeroBalance,
+            });
+
+            analytics.report({
+                type: events.accountsTokensStatusEvent.name,
+                payload: accountsWithTokens,
+            });
+
+            analytics.report({
+                type: events.accountsActiveStakingEvent.name,
+                payload: accountsWithStaking,
+            });
+        } else if (routerLocationChange.match(action)) {
+            if (
+                state.suite.lifecycle.status !== 'initial' &&
+                state.suite.lifecycle.status !== 'loading'
+            ) {
+                analytics.report({
+                    type: events.routerLocationChangeEvent.name,
+                    payload: {
+                        prevRouterUrl: redactRouterUrl(prevRouterUrl),
+                        nextRouterUrl: redactRouterUrl(selectRouterUrl(state)),
+                        anchor: redactAnchor(action.payload.anchor),
+                    },
+                });
+
+                if (selectRouteName(state) === 'suite-earn' && prevRouteName !== 'suite-earn') {
+                    analytics.report({
+                        type: events.yieldEarnEntryEvent.name,
+                        payload: { from: prevRouteName ?? 'unknown' },
+                    });
+                }
+            }
+        } else if (anchorChange.match(action)) {
+            if (action.payload) {
+                analytics.report({
+                    type: events.routerLocationChangeEvent.name,
+                    payload: {
+                        prevRouterUrl: redactRouterUrl(prevRouterUrl),
+                        nextRouterUrl: redactRouterUrl(prevRouterUrl),
+                        anchor: redactAnchor(action.payload),
+                    },
+                });
+            }
+        } else if (
+            isAnyOf(
+                coinjoinSessionCompleted,
+                coinjoinSessionPause,
+                coinjoinAccountUnregister,
+            )(action)
+        ) {
+            const coinjoinAccount = selectCoinjoinAccountByKey(
+                state,
+                action.payload.accountKey as AccountKey,
+            );
+            const anonymityGainToReport = selectAnonymityGainToReportByAccountKey(
+                state,
+                action.payload.accountKey as AccountKey,
+            );
+
+            if (coinjoinAccount && anonymityGainToReport !== null) {
+                analytics.report(
+                    {
+                        type: events.coinjoinAnonymityGainEvent.name,
+                        payload: {
+                            networkSymbol: coinjoinAccount.symbol,
+                            value: anonymityGainToReport,
+                        },
+                    },
+                    { anonymize: true },
+                );
+                dispatch(updateLastAnonymityReportTimestamp(action.payload.accountKey));
+            }
+        } else if (deviceActions.setRememberDevice.match(action)) {
+            analytics.report({
+                type: action.payload.remember
+                    ? events.switchDeviceRememberEvent.name
+                    : events.switchDeviceForgetEvent.name,
+            });
+        } else if (changeCoinVisibilityEvent.match(action)) {
+            analytics.report({
+                type: events.settingsCoinsEvent.name,
+                payload: {
+                    symbol: action.payload.symbol,
+                    value: action.payload.shouldBeVisible,
+                },
+            });
+        } else if (setBitcoinAmountUnits.match(action)) {
+            analytics.report({
+                type: events.settingsGeneralChangeBitcoinUnitEvent.name,
+                payload: {
+                    unit: UNIT_ABBREVIATIONS[action.payload],
+                },
             });
         }
 
-        switch (action.type) {
-            case SUITE.READY:
-                // reporting can start when analytics is properly initialized and enabled
-                analytics.report({
-                    type: EventType.SuiteReady,
-                    payload: getSuiteReadyPayload(state),
-                });
-                break;
-            case TRANSPORT.START:
-                analytics.report({
-                    type: EventType.TransportType,
-                    payload: {
-                        type: action.payload.type,
-                        version: action.payload.version,
-                    },
-                });
-                break;
-            case DEVICE.CONNECT: {
-                const { features, mode } = action.payload;
-
-                if (!features || !mode) return;
-
-                if (!isDeviceInBootloaderMode(action.payload)) {
-                    analytics.report({
-                        type: EventType.DeviceConnect,
-                        payload: {
-                            mode,
-                            firmware: getFirmwareVersion(action.payload),
-                            firmwareRevision: getFirmwareRevision(action.payload),
-                            bootloaderHash: getBootloaderHash(action.payload),
-                            backup_type: features.backup_type || 'Bip39',
-                            pin_protection: features.pin_protection,
-                            passphrase_protection: features.passphrase_protection,
-                            totalInstances: selectDevicesCount(state),
-                            isBitcoinOnly: hasBitcoinOnlyFirmware(action.payload),
-                            totalDevices: getPhysicalDeviceCount(selectDevices(state)),
-                            language: features.language,
-                            model: features.internal_model,
-                        },
-                    });
-                } else {
-                    analytics.report({
-                        type: EventType.DeviceConnect,
-                        payload: {
-                            mode: 'bootloader',
-                            firmware: getFirmwareVersion(action.payload),
-                            bootloader: getBootloaderVersion(action.payload),
-                        },
-                    });
-                }
-                break;
-            }
-            case DEVICE.DISCONNECT:
-                analytics.report({ type: EventType.DeviceDisconnect });
-                break;
-            case discoveryActions.completeDiscovery.type: {
-                const accumulateAccountCountBySymbolAndType = (
-                    acc: { [key: string]: number },
-                    { symbol, accountType }: Account,
-                ) => {
-                    // change coinjoin accounts to taproot for analytics
-                    const accType = accountType === 'coinjoin' ? 'taproot' : accountType;
-
-                    const id = `${symbol}_${accType}`;
-                    acc[id] = (acc[id] || 0) + 1;
-
-                    return acc;
-                };
-
-                const accountsWithTransactions = state.wallet.accounts
-                    .filter(account => account.history.total + (account.history.unconfirmed || 0))
-                    .reduce(accumulateAccountCountBySymbolAndType, {});
-
-                const accountsWithNonZeroBalance = state.wallet.accounts
-                    .filter(
-                        account =>
-                            new BigNumber(account.balance).gt(0) ||
-                            new BigNumber(
-                                (account.tokens || []).filter(token =>
-                                    new BigNumber(token.balance || 0).gt(0),
-                                ).length,
-                            ).gt(0),
-                    )
-                    .reduce(accumulateAccountCountBySymbolAndType, {});
-
-                const accountsWithTokens = state.wallet.accounts
-                    .filter(account => new BigNumber((account.tokens || []).length).gt(0))
-                    .reduce((acc: { [key: string]: number }, { symbol }: Account) => {
-                        acc[symbol] = (acc[symbol] || 0) + 1;
-
-                        return acc;
-                    }, {});
-
-                analytics.report({
-                    type: EventType.AccountsStatus,
-                    payload: { ...accountsWithTransactions },
-                });
-
-                analytics.report({
-                    type: EventType.AccountsNonZeroBalance,
-                    payload: { ...accountsWithNonZeroBalance },
-                });
-
-                analytics.report({
-                    type: EventType.AccountsTokensStatus,
-                    payload: { ...accountsWithTokens },
-                });
-                break;
-            }
-            case ROUTER.LOCATION_CHANGE:
-                if (
-                    state.suite.lifecycle.status !== 'initial' &&
-                    state.suite.lifecycle.status !== 'loading'
-                ) {
-                    analytics.report({
-                        type: EventType.RouterLocationChange,
-                        payload: {
-                            prevRouterUrl: redactRouterUrl(prevRouterUrl),
-                            nextRouterUrl: redactRouterUrl(action.payload.url),
-                            anchor: redactTransactionIdFromAnchor(action.payload.anchor),
-                        },
-                    });
-                }
-                break;
-            case ROUTER.ANCHOR_CHANGE:
-                if (action.payload) {
-                    analytics.report({
-                        type: EventType.RouterLocationChange,
-                        payload: {
-                            prevRouterUrl: redactRouterUrl(prevRouterUrl),
-                            nextRouterUrl: redactRouterUrl(prevRouterUrl),
-                            anchor: redactTransactionIdFromAnchor(action.payload),
-                        },
-                    });
-                }
-                break;
-            case COINJOIN.SESSION_COMPLETED:
-            case COINJOIN.SESSION_PAUSE:
-            case COINJOIN.ACCOUNT_UNREGISTER: {
-                const coinjoinAccount = selectCoinjoinAccountByKey(
-                    state,
-                    action.payload.accountKey,
-                );
-                const anonymityGainToReport = selectAnonymityGainToReportByAccountKey(
-                    state,
-                    action.payload.accountKey,
-                );
-                if (coinjoinAccount && anonymityGainToReport !== null) {
-                    analytics.report(
-                        {
-                            type: EventType.CoinjoinAnonymityGain,
-                            payload: {
-                                networkSymbol: coinjoinAccount.symbol,
-                                value: anonymityGainToReport,
-                            },
-                        },
-                        { anonymize: true },
-                    );
-                    api.dispatch(updateLastAnonymityReportTimestamp(action.payload.accountKey));
-                }
-                break;
-            }
-
-            default:
-                break;
-        }
-
-        return action;
-    };
-
-export default analyticsMiddleware;
+        return result;
+    },
+);

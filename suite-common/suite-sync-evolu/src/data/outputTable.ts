@@ -1,0 +1,126 @@
+import {
+    type Evolu,
+    type InferRow,
+    NonEmptyTrimmedString1000,
+    type ObjectType,
+    type QueryRows,
+    createIdFromString,
+    createQueryBuilder,
+    id,
+    nullOr,
+    object,
+} from '@evolu/common';
+
+import {
+    type EntityListener,
+    type OutputTable,
+    type SuiteSyncOutput,
+    createSuiteSyncOutputId,
+    createSuiteSyncUpdateError,
+} from '@suite-common/suite-sync-storage';
+import { asNetworkSymbol } from '@suite-common/wallet-config';
+import { asAccountDescriptor, asTxTargetId } from '@suite-common/wallet-types';
+import { err, ok } from '@trezor/type-utils';
+
+import { normalizeLabel } from './normalizeLabel';
+
+export const OutputEvoluId = id('OutputLabelId');
+export type OutputEvoluId = typeof OutputEvoluId.Output;
+
+const outputTableColumns = {
+    id: OutputEvoluId,
+    label: nullOr(NonEmptyTrimmedString1000),
+    txId: NonEmptyTrimmedString1000,
+    outputIndex: NonEmptyTrimmedString1000, // Todo: rename: txTargetId
+    accountDescriptor: NonEmptyTrimmedString1000,
+    networkSymbol: NonEmptyTrimmedString1000,
+};
+
+export const EvoluOutput: ObjectType<typeof outputTableColumns> = object(outputTableColumns);
+
+/**
+ * IMPORTANT: Only additive changes allowed. Schema MUST BE always backwards
+ *            compatible!
+ *
+ * Todo: Rename to `Target`?
+ */
+export const OutputTableSchema = {
+    output: outputTableColumns,
+};
+
+const createQuery = createQueryBuilder(OutputTableSchema);
+
+export class OutputEvoluTable implements OutputTable {
+    constructor(private evolu: Evolu<typeof OutputTableSchema>) {}
+
+    update = ({ txId, txTargetId, label, accountDescriptor, networkSymbol }: SuiteSyncOutput) => {
+        const idResult = OutputEvoluId.from(
+            createIdFromString(createSuiteSyncOutputId(txId, txTargetId)),
+        );
+
+        if (!idResult.ok) {
+            return err(createSuiteSyncUpdateError(idResult.error));
+        }
+
+        const validated = EvoluOutput.fromUnknown({
+            id: idResult.value,
+            txId,
+            outputIndex: `${txTargetId}`,
+            label: normalizeLabel(label),
+            accountDescriptor,
+            networkSymbol,
+        });
+
+        if (!validated.ok) {
+            return err(createSuiteSyncUpdateError({ caused: validated.error }));
+        }
+
+        this.evolu.upsert('output', validated.value);
+
+        return ok();
+    };
+
+    private getQuery = () => createQuery(db => db.selectFrom('output').selectAll());
+
+    subscribe = ({ onChange }: EntityListener<SuiteSyncOutput>) => {
+        const query = this.getQuery();
+
+        const process = (labels: QueryRows<InferRow<typeof query>>) => {
+            const acc: SuiteSyncOutput[] = [];
+
+            for (const label of labels) {
+                if (
+                    label.txId === null ||
+                    label.outputIndex === null ||
+                    label.accountDescriptor === null ||
+                    label.networkSymbol === null
+                ) {
+                    continue;
+                }
+
+                const accountDescriptor = asAccountDescriptor(label.accountDescriptor);
+
+                acc.push({
+                    id: createSuiteSyncOutputId(label.txId, label.outputIndex),
+                    txId: label.txId,
+                    txTargetId: asTxTargetId(label.outputIndex),
+                    label: label.label,
+                    accountDescriptor,
+                    networkSymbol: asNetworkSymbol(label.networkSymbol),
+                });
+            }
+
+            if (acc.length > 0) {
+                onChange(acc);
+            }
+        };
+
+        const unsubscribe = this.evolu.subscribeQuery(query)(() => {
+            const deviceLabels = this.evolu.getQueryRows(query);
+            process(deviceLabels);
+        });
+        this.evolu.loadQuery(query).then(process);
+
+        return unsubscribe;
+    };
+}

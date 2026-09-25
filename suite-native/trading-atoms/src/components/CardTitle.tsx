@@ -1,0 +1,15 @@
+import { type ReactNode } from 'react';
+
+import { Box, Text } from '@suite-native/atoms';
+
+export type CardTitleProps = {
+    children: ReactNode;
+};
+
+export const CardTitle = ({ children }: CardTitleProps) => (
+    <Box flex={1}>
+        <Text variant="body-sm" color="contentSecondary" numberOfLines={1}>
+            {children}
+        </Text>
+    </Box>
+);

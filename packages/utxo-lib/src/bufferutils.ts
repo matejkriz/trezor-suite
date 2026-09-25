@@ -5,17 +5,19 @@
 // - added `BufferWritter` "writeInt64", "writeUInt16" methods.
 // - `BufferWritter.writeUInt64` is accepting string or number.
 
-import BN from 'bn.js';
-import pushdata from 'pushdata-bitcoin';
-import varuint from 'varuint-bitcoin';
-import { Int64LE } from 'int64-buffer';
+import * as varuint from 'varuint-bitcoin';
+
 import { bufferUtils } from '@trezor/utils';
-import * as types from './types';
+
+import * as pushdata from './script/pushdata';
+import { BufferSchema, Type, UInt32, assertType } from './types/validation';
+
+const OUT_OF_RANGE_ERROR = 'value out of range';
 
 export function verifuint(value: number, max: number) {
     if (typeof value !== 'number') throw new Error('cannot write a non-number as a number');
     if (value < 0) throw new Error('specified a negative value for writing an unsigned value');
-    if (value > max) throw new Error('value out of range');
+    if (value > max) throw new Error(OUT_OF_RANGE_ERROR);
     if (Math.floor(value) !== value) throw new Error('value has a fractional component');
 }
 
@@ -34,14 +36,13 @@ export function readUInt64LEasString(buffer: Buffer, offset: number) {
         const result = readUInt64LE(buffer, offset);
 
         return result.toString();
-    } catch (error) {
+    } catch {
         const aUint = buffer.readUInt32LE(offset);
         const bUint = buffer.readUInt32LE(offset + 4);
-        const m = new BN(0x100000000);
-        const a = new BN(aUint);
-        const b = new BN(bUint).mul(m);
+        const a = BigInt(aUint);
+        const b = BigInt(bUint) * 0x100000000n;
 
-        return a.add(b).toString();
+        return (a + b).toString();
     }
 }
 
@@ -65,35 +66,33 @@ export function writeUInt64LEasString(buffer: Buffer, value: string | number, of
     if (typeof value !== 'string') {
         return writeUInt64LE(buffer, value, offset);
     }
-    const v = new Int64LE(value);
-    v.toBuffer().copy(buffer, offset);
 
-    return offset + 8;
+    if (value.trim() === '') {
+        throw new Error('cannot write an empty string as a number');
+    }
+
+    return buffer.writeBigUInt64LE(BigInt(value), offset);
 }
 
 export function writeInt64LE(buffer: Buffer, value: number, offset: number) {
-    const v = new Int64LE(value);
-    const a = v.toArray();
-    for (let i = 0; i < 8; i++) {
-        buffer.writeUInt8(a[i], offset + i);
-    }
-
-    return offset + 8;
+    return buffer.writeBigInt64LE(BigInt(value), offset);
 }
 
 export function readVarInt(buffer: Buffer, offset: number) {
-    const result = varuint.decode(buffer, offset);
+    const { numberValue, bytes } = varuint.decode(buffer, offset);
+
+    if (numberValue === null) throw new Error(OUT_OF_RANGE_ERROR);
 
     return {
-        number: result,
-        size: varuint.decode.bytes,
+        number: numberValue,
+        size: bytes,
     };
 }
 
 export function writeVarInt(buffer: Buffer, number: number, offset: number) {
-    varuint.encode(number, buffer, offset);
+    const { bytes } = varuint.encode(number, buffer, offset);
 
-    return varuint.encode.bytes;
+    return bytes;
 }
 
 export function cloneBuffer(buffer: Buffer): Buffer {
@@ -103,25 +102,11 @@ export function cloneBuffer(buffer: Buffer): Buffer {
     return clone;
 }
 
-// These types need to be defined here, otherwise
-// importing @trezor/utxo-lib/lib from blockchain-link fails
-// because of missing pushdata-bitcoin types
-type PushDataSize = (len: number) => number;
-type ReadPushDataInt = (
-    buffer: Buffer,
-    offset: number,
-) => {
-    opcode: number;
-    number: number;
-    size: number;
-};
-type WritePushDataInt = (buffer: Buffer, number: number, offset: number) => number;
-
-export const pushDataSize: PushDataSize = pushdata.encodingLength;
-export const readPushDataInt: ReadPushDataInt = pushdata.decode;
+export const pushDataSize = pushdata.encodingLength;
+export const readPushDataInt = pushdata.decode;
 // export const varIntBuffer = varuint.encode; // TODO: not-used
 export const varIntSize = varuint.encodingLength;
-export const writePushDataInt: WritePushDataInt = pushdata.encode;
+export const writePushDataInt = pushdata.encode;
 export const { reverseBuffer, getChunkSize } = bufferUtils;
 
 /**
@@ -132,7 +117,7 @@ export class BufferWriter {
         public buffer: Buffer,
         public offset: number = 0,
     ) {
-        types.typeforce(types.tuple(types.Buffer, types.UInt32), [buffer, offset]);
+        assertType(Type.Tuple([BufferSchema, UInt32]), [buffer, offset]);
     }
 
     writeUInt8(i: number): void {
@@ -163,8 +148,8 @@ export class BufferWriter {
     }
 
     writeVarInt(i: number): void {
-        varuint.encode(i, this.buffer, this.offset);
-        this.offset += varuint.encode.bytes;
+        const { bytes } = varuint.encode(i, this.buffer, this.offset);
+        this.offset += bytes;
     }
 
     writeSlice(slice: Buffer): void {
@@ -193,7 +178,7 @@ export class BufferReader {
         public buffer: Buffer,
         public offset: number = 0,
     ) {
-        types.typeforce(types.tuple(types.Buffer, types.UInt32), [buffer, offset]);
+        assertType(Type.Tuple([BufferSchema, UInt32]), [buffer, offset]);
     }
 
     readUInt8(): number {
@@ -246,10 +231,11 @@ export class BufferReader {
     }
 
     readVarInt(): number {
-        const vi = varuint.decode(this.buffer, this.offset);
-        this.offset += varuint.decode.bytes;
+        const { numberValue, bytes } = varuint.decode(this.buffer, this.offset);
+        if (numberValue === null) throw new Error(OUT_OF_RANGE_ERROR);
+        this.offset += bytes;
 
-        return vi;
+        return numberValue;
     }
 
     readSlice(n: number): Buffer {

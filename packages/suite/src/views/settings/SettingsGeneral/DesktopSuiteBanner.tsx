@@ -1,55 +1,30 @@
 import { useState } from 'react';
+
+import { AnimatePresence, motion } from 'framer-motion';
 import styled from 'styled-components';
-import { AnimatePresence, HTMLMotionProps, motion } from 'framer-motion';
-import { Button, H2, Icon, Image, Paragraph, motionEasing } from '@trezor/components';
-import { analytics, EventType } from '@trezor/suite-analytics';
+
+import { events, injectDesktopAnalytics } from '@suite/analytics';
+import { useExternalLink } from '@suite/external-links';
+import { setFlag } from '@suite/flags';
+import { Translation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { Box, Button, H2, Icon, IconButton, Image, Paragraph, Row } from '@trezor/components';
+import { SCREEN_QUERY } from '@trezor/components/src/config/variables';
+import { AppleLogoIcon, LinuxLogoIcon, WindowsLogoIcon, XIcon } from '@trezor/icons';
 import { SUITE_URL } from '@trezor/urls';
 
-import { useDispatch } from 'src/hooks/suite/useDispatch';
-import { setFlag } from 'src/actions/suite/suiteActions';
-import { Translation, TrezorLink } from 'src/components/suite';
-import { SCREEN_QUERY } from '@trezor/components/src/config/variables';
+import { bannerAnimationConfig } from '../../dashboard/banner-animations';
 
 const Container = styled(motion.div)`
     position: relative;
-    display: flex;
-    align-items: center;
-    width: 100%;
-    margin-bottom: 40px;
-    padding: 12px 20px;
     border-radius: 12px;
-    background: ${({ theme }) => theme.BG_GREEN};
+    background: ${({ theme }) => theme.surfaceFillBrandDark};
     overflow: hidden;
+    margin-bottom: 48px;
 `;
 
-const CloseButton = styled(Icon)`
-    position: absolute;
-    right: 16px;
-    top: 16px;
-    width: auto;
-    height: auto;
-    padding: 4px;
-    border-radius: 4px;
-    transition:
-        opacity 0.15s,
-        background 0.15s;
-    cursor: pointer;
-
-    path {
-        fill: ${({ theme }) => theme.BG_WHITE};
-    }
-
-    &:hover {
-        background: ${({ theme }) => theme.BG_GREEN_HOVER};
-        opacity: 0.7;
-    }
-
-    &:active {
-        opacity: 0.9;
-    }
-`;
-
-const StyledImage = styled(Image)`
+const ImageContainer = styled.div`
     margin-right: 24px;
 
     ${SCREEN_QUERY.BELOW_LAPTOP} {
@@ -67,19 +42,7 @@ const TextContainer = styled.div`
     grid-column: 1/3;
 
     * {
-        color: ${({ theme }) => theme.TYPE_WHITE};
-    }
-`;
-
-const StyledButton = styled(Button)`
-    background: ${({ theme }) => theme.BG_WHITE};
-    color: ${({ theme }) => theme.TYPE_GREEN};
-    transition: opacity 0.2s;
-
-    &:hover,
-    &:focus {
-        background: ${({ theme }) => theme.BG_WHITE};
-        opacity: 0.8;
+        color: ${({ theme }) => theme.contentOnDarkPrimary};
     }
 `;
 
@@ -88,37 +51,15 @@ const OSIcons = styled.div`
     align-self: center;
     align-items: center;
     gap: 6px;
-    opacity: 0.7;
-
-    path {
-        fill: ${({ theme }) => theme.BG_WHITE};
-    }
 `;
 
 export const DesktopSuiteBanner = () => {
+    const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
     const [isVisible, setIsVisible] = useState(true);
 
-    const dispatch = useDispatch();
-
+    const href = useExternalLink(SUITE_URL);
     const handleClose = () => {
         setIsVisible(false);
-    };
-
-    const animationConfig: HTMLMotionProps<'div'> = {
-        initial: { opacity: 1, transform: 'scale(1)', marginBottom: 40, height: 'auto' },
-        exit: { opacity: 0, transform: 'scale(0.7)', marginBottom: -60, height: 60 },
-        transition: {
-            duration: 0.33,
-            ease: motionEasing.transition,
-            height: {
-                duration: 0.23,
-                ease: motionEasing.transition,
-            },
-            opacity: {
-                duration: 0.23,
-                ease: motionEasing.transition,
-            },
-        },
     };
 
     return (
@@ -127,49 +68,61 @@ export const DesktopSuiteBanner = () => {
                 <Container
                     key="container"
                     onAnimationComplete={() =>
-                        dispatch(dispatch(setFlag('showSettingsDesktopAppPromoBanner', false)))
+                        dispatch(
+                            dispatch(
+                                setFlag({ key: 'showSettingsDesktopAppPromoBanner', value: false }),
+                            ),
+                        )
                     }
-                    {...animationConfig}
+                    {...bannerAnimationConfig}
                 >
-                    <CloseButton
-                        size={18}
-                        icon="CROSS"
-                        onClick={handleClose}
-                        data-test="@banner/install-desktop-suite/close-button"
-                    />
+                    <Row alignItems="center" width="100%" margin={{ vertical: 12, horizontal: 20 }}>
+                        <Box position={{ type: 'absolute', top: 16, right: 16 }} cursor="pointer">
+                            <IconButton
+                                icon={XIcon}
+                                onClick={handleClose}
+                                data-testid="@banner/install-desktop-suite/close-button"
+                                intent="neutral"
+                                priority="secondary"
+                                isInverse
+                                tooltip={{ content: <Translation id="TR_CLOSE" /> }}
+                            />
+                        </Box>
 
-                    <StyledImage image="TREZOR_PATTERN" width={140} />
+                        <ImageContainer>
+                            <Image image="TREZOR_PATTERN" width={140} />
+                        </ImageContainer>
 
-                    <Content>
-                        <TextContainer>
-                            <H2>
-                                <Translation id="TR_DESKTOP_APP_PROMO_HEADING" />
-                            </H2>
-                            <Paragraph>
-                                <Translation id="TR_DESKTOP_APP_PROMO_TEXT" />
-                            </Paragraph>
-                        </TextContainer>
+                        <Content>
+                            <TextContainer>
+                                <H2>
+                                    <Translation id="TR_DESKTOP_APP_PROMO_HEADING" />
+                                </H2>
+                                <Paragraph>
+                                    <Translation id="TR_DESKTOP_APP_PROMO_TEXT" />
+                                </Paragraph>
+                            </TextContainer>
 
-                        <TrezorLink
-                            href={SUITE_URL}
-                            variant="nostyle"
-                            onClick={() =>
-                                analytics.report({
-                                    type: EventType.GetDesktopApp,
-                                })
-                            }
-                        >
-                            <StyledButton>
+                            <Button
+                                intent="brand"
+                                href={href}
+                                onClick={() =>
+                                    analytics.report({
+                                        type: events.promoDesktopEvent.name,
+                                        payload: { placement: 'settings' },
+                                    })
+                                }
+                            >
                                 <Translation id="TR_DESKTOP_APP_PROMO_GET" />
-                            </StyledButton>
-                        </TrezorLink>
+                            </Button>
 
-                        <OSIcons>
-                            <Icon icon="OS_MAC" />
-                            <Icon icon="OS_LINUX" />
-                            <Icon icon="OS_WINDOWS" size={20} />
-                        </OSIcons>
-                    </Content>
+                            <OSIcons>
+                                <Icon as={AppleLogoIcon} intent="brand" />
+                                <Icon as={LinuxLogoIcon} intent="brand" />
+                                <Icon as={WindowsLogoIcon} intent="brand" size={20} />
+                            </OSIcons>
+                        </Content>
+                    </Row>
                 </Container>
             )}
         </AnimatePresence>

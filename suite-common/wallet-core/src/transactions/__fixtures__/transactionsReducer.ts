@@ -1,8 +1,23 @@
 import { testMocks } from '@suite-common/test-utils';
+import { asNetworkSymbol } from '@suite-common/wallet-config';
+import { asAccountDescriptor } from '@suite-common/wallet-types';
+import { mockWalletAccount } from '@suite-common/wallet-types/mocks';
 
-const ACCOUNT = testMocks.getWalletAccount();
+import type { transactionsActions } from '../transactionsActions';
+import type { TransactionsState } from '../transactionsReducerTypes';
 
-export const addTransaction = [
+const ACCOUNT = mockWalletAccount({
+    descriptor: asAccountDescriptor('btc1'),
+    symbol: asNetworkSymbol('btc'),
+    deviceState: '1@2:3',
+});
+
+export const addTransaction: {
+    description: string;
+    initialState: Partial<TransactionsState>;
+    actionPayload: ReturnType<typeof transactionsActions.addTransaction>['payload'];
+    result: Partial<TransactionsState>;
+}[] = [
     {
         description: 'tx exists and will NOT be replaced',
         initialState: {
@@ -102,7 +117,14 @@ export const addTransaction = [
             transactions: [
                 testMocks.getWalletTransaction({
                     blockHeight: undefined,
-                    rbfParams: { txid: '00', utxo: [], outputs: [], feeRate: '1', baseFee: 1 },
+                    rbfParams: {
+                        type: 'bitcoin',
+                        txid: '00',
+                        utxo: [],
+                        outputs: [],
+                        feeRate: '1',
+                        baseFee: 1,
+                    },
                 }),
             ],
         },
@@ -110,7 +132,14 @@ export const addTransaction = [
             [ACCOUNT.key]: [
                 testMocks.getWalletTransaction({
                     blockHeight: undefined,
-                    rbfParams: { txid: '00', utxo: [], outputs: [], feeRate: '1', baseFee: 1 },
+                    rbfParams: {
+                        type: 'bitcoin',
+                        txid: '00',
+                        utxo: [],
+                        outputs: [],
+                        feeRate: '1',
+                        baseFee: 1,
+                    },
                 }),
             ],
         },
@@ -127,7 +156,14 @@ export const addTransaction = [
             transactions: [
                 testMocks.getWalletTransaction({
                     blockHeight: 0,
-                    rbfParams: { txid: '00', utxo: [], outputs: [], feeRate: '1', baseFee: 1 },
+                    rbfParams: {
+                        type: 'bitcoin',
+                        txid: '00',
+                        utxo: [],
+                        outputs: [],
+                        feeRate: '1',
+                        baseFee: 1,
+                    },
                 }),
             ],
         },
@@ -147,5 +183,63 @@ export const addTransaction = [
             transactions: [testMocks.getWalletTransaction({ txid: '00' })],
         },
         result: { [ACCOUNT.key]: [testMocks.getWalletTransaction({ txid: '00' })] },
+    },
+    {
+        description: 'confirmed tx replaces the fake pending record in place, keeping its position',
+        initialState: {
+            transactions: {
+                [ACCOUNT.key]: [
+                    testMocks.getWalletTransaction({
+                        txid: '00',
+                        blockHeight: undefined,
+                        deadline: 10,
+                    }),
+                    testMocks.getWalletTransaction({ txid: '01' }),
+                ],
+            },
+        },
+        actionPayload: {
+            account: ACCOUNT,
+            transactions: [testMocks.getWalletTransaction({ txid: '00', blockHeight: 11 })],
+        },
+        result: {
+            [ACCOUNT.key]: [
+                testMocks.getWalletTransaction({ txid: '00', blockHeight: 11 }),
+                testMocks.getWalletTransaction({ txid: '01' }),
+            ],
+        },
+    },
+];
+
+export const removeTransaction: {
+    description: string;
+    initialState: Partial<TransactionsState>;
+    actionPayload: ReturnType<typeof transactionsActions.removeTransaction>['payload'];
+    result: Partial<TransactionsState>;
+}[] = [
+    {
+        description: 'tx will be removed from existing account',
+        initialState: {
+            transactions: {
+                [ACCOUNT.key]: [testMocks.getWalletTransaction()],
+            },
+        },
+        actionPayload: {
+            account: ACCOUNT,
+            txs: [testMocks.getWalletTransaction()],
+        },
+        result: { [ACCOUNT.key]: [] },
+    },
+    {
+        description:
+            'removing tx from nonexistent account, must NOT add accountKey into transactions',
+        initialState: {
+            transactions: {},
+        },
+        actionPayload: {
+            account: ACCOUNT,
+            txs: [testMocks.getWalletTransaction()],
+        },
+        result: {},
     },
 ];

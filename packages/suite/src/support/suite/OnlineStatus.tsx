@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
-import { useDispatch } from 'src/hooks/suite';
-import { updateOnlineStatus } from 'src/actions/suite/suiteActions';
+
+import { updateOnlineStatus } from '@suite/suite-lifecycle';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
 
 /**
  * Navigator online/offline handler
@@ -9,7 +11,7 @@ import { updateOnlineStatus } from 'src/actions/suite/suiteActions';
  */
 
 const OnlineStatus = () => {
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
 
     useEffect(() => {
         const statusHandler = () => {

@@ -1,65 +1,160 @@
-import { ReactNode } from 'react';
-import styled, { DefaultTheme } from 'styled-components';
+import { type HTMLProps } from 'react';
+
+import styled, { css } from 'styled-components';
+
+import { type BorderWidth, type BoxShadow, type Color } from '@trezor/theme';
+
 import {
-    CSSColor,
-    Color,
-    Elevation,
-    borders,
-    mapElevationToBackground,
-    mapElevationToBorder,
-    spacingsPx,
-} from '@trezor/theme';
-import { ElevationContext, useElevation } from '../ElevationContext/ElevationContext';
-import { UIVariant } from '../../config/types';
-import { ComponentFrame, FrameProps } from '../common/ComponentFrame';
+    type FrameProps,
+    type FramePropsKeys,
+    pickAndPrepareFrameProps,
+    withFrameProps,
+} from '../../utils/frameProps';
+import { type TransientProps } from '../../utils/transientProps';
+import { commonFocusStyles } from '../../utils/utils';
 
-type BoxVariant = Extract<UIVariant, 'primary' | 'warning' | 'destructive' | 'info'>;
+const getValueWithUnit = (value: string | number) =>
+    typeof value === 'number' ? `${value}px` : value;
 
-type MapArgs = {
-    variant: BoxVariant;
-    theme: DefaultTheme;
-};
+export const allowedBoxFrameProps = [
+    'margin',
+    'padding',
+    'width',
+    'overflow',
+    'borderRadius',
+    'minWidth',
+    'maxWidth',
+    'height',
+    'minHeight',
+    'maxHeight',
+    'flex',
+    'position',
+    'cursor',
+    'zIndex',
+    'aspectRatio',
+    'opacity',
+    'userSelect',
+    'pointerEvents',
+    'display',
+] as const satisfies FramePropsKeys[];
+type AllowedFrameProps = Pick<FrameProps, (typeof allowedBoxFrameProps)[number]>;
 
-const mapVariantToBackgroundColor = ({ variant, theme }: MapArgs): CSSColor => {
-    const colorMap: Record<BoxVariant, Color> = {
-        primary: 'borderSecondary',
-        info: 'textAlertBlue',
-        warning: 'textAlertYellow',
-        destructive: 'borderAlertRed',
-    };
+const Container = styled.div<
+    TransientProps<AllowedFrameProps> & {
+        $borderWidth?: BorderWidth;
+        $borderOffset?: number;
+        $backgroundColor?: Color;
+        $backgroundColorOnInteraction?: Color;
+        $borderColor?: Color;
+        $shadow?: BoxShadow;
+    }
+>`
+    background: unset;
+    box-shadow: unset;
+    outline: ${({ $borderColor, theme }) => theme[$borderColor ?? 'borderNeutral']} solid 0;
+    border: 0;
+    transition: 0.2s ease-in-out;
 
-    return theme[colorMap[variant]];
-};
+    ${({ $borderWidth }) =>
+        $borderWidth &&
+        css`
+            outline-width: ${getValueWithUnit($borderWidth)};
+        `}
 
-export type BoxProps = FrameProps & {
-    variant?: BoxVariant;
-    children: ReactNode;
-    forceElevation?: Elevation;
-};
+    ${({ $borderOffset }) =>
+        $borderOffset !== undefined &&
+        css`
+            outline-offset: ${getValueWithUnit($borderOffset)};
+        `}
 
-const Wrapper = styled.div<{ $variant?: BoxVariant; $elevation: Elevation }>`
-    display: flex;
-    align-items: center;
-    flex: 1;
-    border-radius: ${borders.radii.sm};
-    padding: ${spacingsPx.md};
-    background: ${mapElevationToBackground};
-    border: solid 1px ${mapElevationToBorder};
+    ${({ $backgroundColor, theme }) =>
+        $backgroundColor &&
+        css`
+            background: ${theme[$backgroundColor]};
+        `}
 
-    ${({ $variant, theme }) =>
-        $variant === undefined
-            ? `padding-left: ${spacingsPx.lg};`
-            : `border-left: 6px solid ${mapVariantToBackgroundColor({ variant: $variant, theme })};`}
+    ${({ $backgroundColorOnInteraction, theme }) =>
+        $backgroundColorOnInteraction &&
+        css`
+            &:hover,
+            &:focus {
+                background: ${theme[$backgroundColorOnInteraction]};
+            }
+        `}
+
+    ${({ $shadow }) =>
+        $shadow &&
+        css`
+            box-shadow: ${({ theme }) => theme[$shadow]};
+        `}
+
+    &:focus-visible {
+        ${commonFocusStyles}
+    }
+
+    ${withFrameProps};
 `;
 
-export const Box = ({ variant, children, margin, forceElevation, ...rest }: BoxProps) => {
-    const { elevation } = useElevation(forceElevation);
+export type BoxProps = Pick<
+    HTMLProps<HTMLElement>,
+    'onClick' | 'onMouseEnter' | 'onMouseLeave' | 'tabIndex'
+> &
+    AllowedFrameProps & {
+        children?: React.ReactNode;
+        borderWidth?: BorderWidth;
+        borderOffset?: number;
+        backgroundColor?: Color;
+        backgroundColorOnInteraction?: Color;
+        borderColor?: Color;
+        shadow?: BoxShadow;
+        'data-testid'?: string;
+        'data-component'?: string;
+        'aria-hidden'?: boolean;
+        as?: React.ElementType;
+        ref?: React.RefObject<HTMLElement | null>;
+    };
+
+export const Box = ({
+    children,
+    borderWidth,
+    borderOffset,
+    backgroundColor,
+    backgroundColorOnInteraction,
+    borderColor,
+    shadow,
+    'data-testid': dataTestId,
+    'data-component': dataComponent = 'Box',
+    'aria-hidden': ariaHidden,
+    as = 'div',
+    onClick,
+    onMouseEnter,
+    onMouseLeave,
+    tabIndex,
+    ref,
+    ...rest
+}: BoxProps) => {
+    const frameProps = pickAndPrepareFrameProps(rest, allowedBoxFrameProps);
 
     return (
-        <ComponentFrame margin={margin}>
-            <Wrapper $variant={variant} $elevation={elevation} {...rest}>
-                <ElevationContext baseElevation={elevation}>{children}</ElevationContext>
-            </Wrapper>
-        </ComponentFrame>
+        <Container
+            as={as}
+            data-testid={dataTestId}
+            data-component={dataComponent}
+            aria-hidden={ariaHidden}
+            $borderWidth={borderWidth}
+            $borderOffset={borderOffset}
+            $backgroundColor={backgroundColor}
+            $backgroundColorOnInteraction={backgroundColorOnInteraction}
+            $borderColor={borderColor}
+            onClick={onClick}
+            onMouseEnter={onMouseEnter}
+            onMouseLeave={onMouseLeave}
+            $shadow={shadow}
+            tabIndex={tabIndex}
+            ref={ref}
+            {...frameProps}
+        >
+            {children}
+        </Container>
     );
 };

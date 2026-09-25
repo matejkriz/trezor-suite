@@ -1,25 +1,30 @@
-import { scheduleAction, arrayShuffle, urlToOnion } from '@trezor/utils';
-import { TypedEmitter } from '@trezor/utils';
 import type { BlockbookAPI } from '@trezor/blockchain-link/src/workers/blockbook/websocket';
+import {
+    TypedEmitter,
+    arrayShuffle,
+    getWeakRandomInt,
+    scheduleAction,
+    urlToOnion,
+} from '@trezor/utils';
 
-import { RequestOptions, resetIdentityCircuit } from '../utils/http';
-import type {
-    BlockbookBlock,
-    BlockFilterResponse,
-    MempoolFilterResponse,
-    BlockbookTransaction,
-} from '../types/backend';
-import type { CoinjoinBackendSettings, Logger } from '../types';
 import { FILTERS_REQUEST_TIMEOUT, HTTP_REQUEST_GAP, HTTP_REQUEST_TIMEOUT } from '../constants';
+import type { CoinjoinBackendSettings, Logger } from '../types';
 import { CoinjoinWebsocketController } from './CoinjoinWebsocketController';
 import { identifyWsError } from './backendUtils';
+import type {
+    BlockFilterResponse,
+    BlockbookBlock,
+    BlockbookTransaction,
+    CoinjoinBackendClientShape,
+    MempoolFilterResponse,
+} from '../types/backend';
+import { type RequestOptions, resetIdentityCircuit } from '../utils/http';
 
 type CoinjoinBackendClientSettings = CoinjoinBackendSettings & {
-    timeout?: number;
     logger?: Logger;
 };
 
-export class CoinjoinBackendClient {
+export class CoinjoinBackendClient implements CoinjoinBackendClientShape {
     protected readonly logger;
     protected readonly blockbookUrls;
     protected readonly onionDomains;
@@ -38,9 +43,9 @@ export class CoinjoinBackendClient {
 
     constructor(settings: CoinjoinBackendClientSettings) {
         this.logger = settings.logger;
-        this.blockbookUrls = arrayShuffle(settings.blockbookUrls);
+        this.blockbookUrls = arrayShuffle(settings.blockbookUrls, { randomInt: getWeakRandomInt });
         this.onionDomains = settings.onionDomains ?? {};
-        this.blockbookRequestId = Math.floor(Math.random() * settings.blockbookUrls.length);
+        this.blockbookRequestId = getWeakRandomInt(0, settings.blockbookUrls.length);
         this.websockets = new CoinjoinWebsocketController(settings);
 
         // This allows to subscribe to mempool WS disconnecting in this.subscribeMempoolTxs(),
@@ -50,8 +55,21 @@ export class CoinjoinBackendClient {
 
     fetchBlock(height: number, options?: RequestOptions): Promise<BlockbookBlock> {
         const identity = this.identitiesBlockbook[height & 0x3]; // Works only when identities.length === 4
+        const pageSize = 1000;
 
-        return this.getBlockbookApi(api => api.getBlock(height), { identity, ...options });
+        return this.getBlockbookApi(
+            async api => {
+                const block = await api.getBlock(height, { pageSize });
+
+                for (let page = 2; page <= (block.totalPages ?? 1); ++page) {
+                    const { txs } = await api.getBlock(height, { page, pageSize });
+                    block.txs.push(...txs);
+                }
+
+                return block;
+            },
+            { identity, ...options },
+        );
     }
 
     fetchBlockHash(height: number, options?: RequestOptions): Promise<string> {
@@ -60,7 +78,7 @@ export class CoinjoinBackendClient {
         );
     }
 
-    fetchTransaction(txid: string, options?: RequestOptions): Promise<BlockbookTransaction> {
+    fetchTransaction(txid: string, options?: RequestOptions) {
         const lastCharCode = txid.charCodeAt(txid.length - 1);
         const identity = this.identitiesBlockbook[lastCharCode & 0x3]; // Works only when identities.length === 4
 
@@ -86,7 +104,10 @@ export class CoinjoinBackendClient {
                     .then<BlockFilterResponse>(({ blockFiltersBatch, ...rest }) => {
                         if (!blockFiltersBatch.length) return { status: 'up-to-date' };
                         const filters = blockFiltersBatch.map(item => {
-                            const [blockHeight, blockHash, filter] = item.split(':');
+                            const itemParts = item.split(':');
+                            const blockHeight = itemParts[0] ?? '';
+                            const blockHash = itemParts[1] ?? '';
+                            const filter = itemParts[2] ?? '';
 
                             return { blockHeight: Number(blockHeight), blockHash, filter };
                         });
@@ -194,7 +215,9 @@ export class CoinjoinBackendClient {
         return scheduleAction(
             async () => {
                 const urlIndex = this.blockbookRequestId++ % this.blockbookUrls.length;
-                const clearnet = this.blockbookUrls[urlIndex];
+                const { blockbookUrls } = this;
+                // @ts-expect-error: indexing with noUncheckedIndexedAccess
+                const clearnet: string = blockbookUrls[urlIndex];
                 const url = (preferOnion && urlToOnion(clearnet, this.onionDomains)) || clearnet;
                 const api = await this.websockets
                     .getOrCreate({ identity, ...options, url })

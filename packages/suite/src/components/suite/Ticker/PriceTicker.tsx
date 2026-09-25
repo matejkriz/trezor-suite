@@ -1,61 +1,70 @@
 import styled from 'styled-components';
-import { differenceInMinutes } from 'date-fns';
-import { FormattedRelativeTime } from 'react-intl';
 
-import { Tooltip } from '@trezor/components';
-import { FiatValue, Translation } from 'src/components/suite';
-import { NoRatesTooltip } from './NoRatesTooltip';
+import { HiddenPlaceholder } from '@suite/discreet-mode';
+import { Translation } from '@suite/intl';
+import type { NetworkSymbol } from '@suite-common/wallet-config';
+import type { TokenAddress } from '@suite-common/wallet-types';
+import { LastUpdateTooltip } from '@trezor/product-components';
 import { typography } from '@trezor/theme';
 
+import { BaseCurrencyValue } from 'src/components/suite/BaseCurrencyValue';
+
+import { NoRatesTooltip } from './NoRatesTooltip';
+
 const FiatRateWrapper = styled.span`
+    ${typography['body-sm-strong']}
     display: flex;
     align-items: center;
-    color: ${({ theme }) => theme.TYPE_DARK_GREY};
-    ${typography.hint}
+    color: ${({ theme }) => theme.contentPrimary};
 `;
 
-const LastUpdate = styled.div`
-    text-transform: none;
+const Empty = styled.div`
+    ${typography['body-sm-strong']}
+    color: ${({ theme }) => theme.contentSecondary};
 `;
 
 interface PriceTickerProps {
-    symbol: string;
-    tooltipPos?: 'top' | 'bottom';
-    compact?: boolean;
+    symbol: NetworkSymbol;
+    contractAddress?: TokenAddress;
+    noEmptyStateTooltip?: boolean;
+    showLoadingSkeleton?: boolean;
 }
-export const PriceTicker = ({ symbol, tooltipPos = 'top', compact = false }: PriceTickerProps) => {
-    const rateAge = (timestamp: number) => differenceInMinutes(new Date(timestamp), new Date());
+
+export const PriceTicker = ({
+    symbol,
+    contractAddress,
+    noEmptyStateTooltip,
+    showLoadingSkeleton = true,
+}: PriceTickerProps) => {
+    const emptyStateComponent = noEmptyStateTooltip ? <Empty>—</Empty> : <NoRatesTooltip />;
 
     return (
-        <FiatValue amount="1" symbol={symbol}>
-            {({ rate, timestamp }) =>
-                rate && timestamp ? (
-                    <Tooltip
-                        maxWidth={285}
-                        placement={tooltipPos}
-                        content={
-                            <LastUpdate>
-                                <Translation
-                                    id="TR_LAST_UPDATE"
-                                    values={{
-                                        value: (
-                                            <FormattedRelativeTime
-                                                value={rateAge(timestamp) * 60}
-                                                numeric="auto"
-                                                updateIntervalInSeconds={10}
-                                            />
-                                        ),
-                                    }}
-                                />
-                            </LastUpdate>
-                        }
-                    >
-                        <FiatRateWrapper>{rate}</FiatRateWrapper>
-                    </Tooltip>
-                ) : (
-                    <NoRatesTooltip iconOnly={compact} />
-                )
-            }
-        </FiatValue>
+        <HiddenPlaceholder>
+            <BaseCurrencyValue
+                amount="1"
+                symbol={symbol}
+                tokenAddress={contractAddress}
+                showLoadingSkeleton={showLoadingSkeleton}
+                fiatRateFormatterOptions={{
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 4,
+                }}
+            >
+                {({ rate, timestamp }) =>
+                    rate && timestamp ? (
+                        <LastUpdateTooltip
+                            timestamp={timestamp}
+                            renderTooltipContent={relativeTime => (
+                                <Translation id="TR_LAST_UPDATE" values={{ value: relativeTime }} />
+                            )}
+                        >
+                            <FiatRateWrapper>{rate}</FiatRateWrapper>
+                        </LastUpdateTooltip>
+                    ) : (
+                        emptyStateComponent
+                    )
+                }
+            </BaseCurrencyValue>
+        </HiddenPlaceholder>
     );
 };

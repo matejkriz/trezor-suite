@@ -1,4 +1,6 @@
-import { Translation } from 'src/components/suite';
+import { Translation } from '@suite/intl';
+import { CloudIcon } from '@trezor/icons';
+
 import { AccountExceptionLayout } from 'src/components/wallet';
 
 /**
@@ -8,6 +10,7 @@ import { AccountExceptionLayout } from 'src/components/wallet';
 export const AccountNotExists = () => (
     <AccountExceptionLayout
         title={<Translation id="TR_ACCOUNT_EXCEPTION_NOT_EXIST" />}
-        image="CLOUDY"
+        icon={CloudIcon}
+        iconVariant="neutral"
     />
 );

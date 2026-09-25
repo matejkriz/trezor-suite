@@ -1,19 +1,21 @@
-import { Meta, StoryObj } from '@storybook/react';
-import { H1, LoadingContent as LoadingContentComponent, LoadingContentProps } from '../../../index';
+import { type Meta, type StoryObj } from '@storybook/react';
 
-const meta: Meta = {
-    title: 'Loaders/LoadingContent',
-} as Meta;
+import { H1, LoadingContent as LoadingContentComponent } from '../../../index';
+
+const meta: Meta<typeof LoadingContentComponent> = {
+    title: 'LoadingContent',
+};
 export default meta;
 
-export const LoadingContent: StoryObj<LoadingContentProps> = {
+export const LoadingContent: StoryObj<typeof meta> = {
     render: ({ ...args }) => (
         <LoadingContentComponent {...args}>
             <H1>$1337</H1>
         </LoadingContentComponent>
     ),
     args: {
-        size: 20,
+        size: 24,
         isLoading: true,
+        slideContent: true,
     },
 };

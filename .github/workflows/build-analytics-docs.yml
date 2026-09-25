@@ -1,0 +1,58 @@
+name: "[Build] analytics-docs"
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  DEV_SERVER_URL: "https://dev.suite.sldev.cz"
+
+jobs:
+  build-analytics-docs:
+    if: github.repository == 'trezor/trezor-suite'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+
+      - name: Configure aws credentials
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
+        with:
+          role-to-assume: arn:aws:iam::538326561891:role/gh_actions_trezor_suite_dev_deploy
+          aws-region: eu-central-1
+
+      - name: Setup node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version-file: ".nvmrc"
+          cache: yarn
+
+      - name: Install SafeDep PMG
+        uses: safedep/pmg@be0a93f10fbec6a5c94dd78bc722abf1b7fbfc2d # v0.26.0
+        continue-on-error: true
+        with:
+          version: v0.19.1
+      - name: Install dependencies
+        run: |
+          echo -e "\nenableHardenedMode: false" >> .yarnrc.yml
+          yarn workspaces focus @trezor/analytics-docs
+
+      - name: Build analytics-docs
+        env:
+          BASE_PATH: /analytics-docs/
+        run: yarn workspace @trezor/analytics-docs build
+
+      - name: Upload analytics-docs to dev.suite.sldev.cz
+        env:
+          ANALYTICS_DOCS_DEPLOY_PATH: s3://dev.suite.sldev.cz/analytics-docs
+        run: |
+          aws s3 sync --delete ./packages/analytics-docs/dist ${ANALYTICS_DOCS_DEPLOY_PATH}

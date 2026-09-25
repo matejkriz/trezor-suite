@@ -1,67 +1,28 @@
+import { sha256 as nobleSha256 } from '@noble/hashes/sha2.js';
+import { base58check as createBase58check } from '@scure/base';
+
+const bs58check = createBase58check(nobleSha256);
+
+import { isCashAddress, toCashAddress, toLegacyAddress } from './bchUtils';
 import { bitcoin as BITCOIN_NETWORK, isNetworkType } from './networks';
-import bchaddrjs from 'bchaddrjs';
-import bs58 from 'bs58';
-import bs58check from 'bs58check';
-import { blake256 } from './crypto';
 
-export function decodeBlake(buffer: Buffer) {
-    const want = buffer.subarray(-4);
-    const payload = buffer.subarray(0, -4);
-    const got = blake256(blake256(payload)).subarray(0, 4);
-
-    if ((want[0] ^ got[0]) | (want[1] ^ got[1]) | (want[2] ^ got[2]) | (want[3] ^ got[3]))
-        throw new Error('invalid checksum');
-
-    return payload;
+export function encode(payload: Buffer) {
+    return bs58check.encode(payload);
 }
 
-export function decodeBlake256Key(key: string) {
-    const bytes = bs58.decode(key);
-    const buffer = Buffer.from(bytes);
-
-    return decodeBlake(buffer);
-}
-
-export function decodeBlake256(address: string) {
-    const bytes = bs58.decode(address);
-    const buffer = Buffer.from(bytes);
-    if (buffer.length !== 26) throw new Error(`${address} invalid address length`);
-    let payload;
-    try {
-        payload = decodeBlake(buffer);
-    } catch (e) {
-        if (e instanceof Error) {
-            throw new Error(`${address} ${e.message}`);
-        }
-        throw new Error(`${address} ${e}`);
-    }
-
-    return payload;
-}
-
-export function encodeBlake256(payload: Buffer) {
-    const checksum = blake256(blake256(payload)).subarray(0, 4);
-
-    return bs58.encode(Buffer.concat([payload, checksum]));
-}
-
-export function encode(payload: Buffer, network = BITCOIN_NETWORK) {
-    return isNetworkType('decred', network) ? encodeBlake256(payload) : bs58check.encode(payload);
-}
-
-export function decode(payload: string, network = BITCOIN_NETWORK) {
-    return isNetworkType('decred', network) ? decodeBlake256(payload) : bs58check.decode(payload);
+export function decode(payload: string) {
+    return bs58check.decode(payload);
 }
 
 export function decodeAddress(address: string, network = BITCOIN_NETWORK) {
-    // Zcash and Decred add an extra prefix resulting in a bigger (22 bytes) payload.
-    // Identify them by checking if the version is multibyte (2 bytes instead of 1)
+    // Zcash adds an extra prefix resulting in a bigger (22 bytes) payload.
+    // Identify it by checking if the version is multibyte (2 bytes instead of 1)
     let payload: Buffer;
     if (isNetworkType('bitcoinCash', network)) {
-        if (!bchaddrjs.isCashAddress(address)) throw Error(`${address} is not a cash address`);
-        payload = Buffer.from(bs58check.decode(bchaddrjs.toLegacyAddress(address)));
+        if (!isCashAddress(address)) throw Error(`${address} is not a cash address`);
+        payload = Buffer.from(bs58check.decode(toLegacyAddress(address)));
     } else {
-        payload = Buffer.from(decode(address, network));
+        payload = Buffer.from(decode(address));
     }
 
     // TODO: 4.0.0, move to "toOutputScript"
@@ -71,15 +32,17 @@ export function decodeAddress(address: string, network = BITCOIN_NETWORK) {
     const multibyte = payload.length === 22;
     const offset = multibyte ? 2 : 1;
 
-    const version = multibyte ? payload.readUInt16BE(0) : payload[0];
+    // @ts-expect-error: indexing with noUncheckedIndexedAccess
+    const indexedByte: number = payload[0];
+    const version: number = multibyte ? payload.readUInt16BE(0) : indexedByte;
     const hash = payload.subarray(offset);
 
     return { version, hash };
 }
 
 export function encodeAddress(hash: Buffer, version: number, network = BITCOIN_NETWORK) {
-    // Zcash and Decred add an extra prefix resulting in a bigger (22 bytes) payload.
-    // Identify them by checking if the version is multibyte (2 bytes instead of 1)
+    // Zcash adds an extra prefix resulting in a bigger (22 bytes) payload.
+    // Identify it by checking if the version is multibyte (2 bytes instead of 1)
     const multibyte = version > 0xff;
     const size = multibyte ? 22 : 21;
     const offset = multibyte ? 2 : 1;
@@ -93,7 +56,7 @@ export function encodeAddress(hash: Buffer, version: number, network = BITCOIN_N
 
     hash.copy(payload, offset);
 
-    const encoded = encode(payload, network);
+    const encoded = encode(payload);
 
-    return isNetworkType('bitcoinCash', network) ? bchaddrjs.toCashAddress(encoded) : encoded;
+    return isNetworkType('bitcoinCash', network) ? toCashAddress(encoded) : encoded;
 }

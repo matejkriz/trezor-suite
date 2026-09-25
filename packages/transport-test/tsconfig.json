@@ -1,0 +1,12 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": { "outDir": "libDev" },
+    "references": [
+        { "path": "../transport-common" },
+        { "path": "../eslint" },
+        { "path": "../protobuf" },
+        { "path": "../transport-bridge" },
+        { "path": "../trezor-user-env-link" },
+        { "path": "../utils" }
+    ]
+}

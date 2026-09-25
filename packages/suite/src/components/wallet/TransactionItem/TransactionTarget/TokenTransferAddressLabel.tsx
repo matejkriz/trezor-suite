@@ -1,32 +1,29 @@
-import { ArrayElement } from '@trezor/type-utils';
-import { Translation, AddressLabeling } from 'src/components/suite';
-import { WalletAccountTransaction } from 'src/types/wallet';
-import { BlurWrapper } from '../TransactionItemBlurWrapper';
-import { NetworkSymbol } from '@suite-common/wallet-config';
+import { Address } from '@suite/address';
+import { Translation } from '@suite/intl';
+import type { NetworkSymbol } from '@suite-common/wallet-config';
+import { type ArrayElement, exhaustive } from '@trezor/type-utils';
+
+import { AccountLabelForOwnAddress } from 'src/components/suite/labeling/AccountLabelForOwnAddress';
+import { type WalletAccountTransaction } from 'src/types/wallet';
+
+type TokenTransfer = ArrayElement<WalletAccountTransaction['tokens']>;
 
 interface TokenTransferAddressLabelProps {
-    networkSymbol: NetworkSymbol;
-    transfer: ArrayElement<WalletAccountTransaction['tokens']>;
-    type: WalletAccountTransaction['type'];
-    isPhishingTransaction: boolean;
+    symbol: NetworkSymbol;
+    transfer: TokenTransfer;
 }
 
-export const TokenTransferAddressLabel = ({
-    networkSymbol,
-    transfer,
-    type,
-    isPhishingTransaction,
-}: TokenTransferAddressLabelProps) => {
-    if (type === 'self') {
-        return <Translation id="TR_SENT_TO_SELF" />;
+export const TokenTransferAddressLabel = ({ symbol, transfer }: TokenTransferAddressLabelProps) => {
+    switch (transfer.type) {
+        case 'sent':
+            return <AccountLabelForOwnAddress address={transfer.to} symbol={symbol} />;
+        case 'recv':
+            return <AccountLabelForOwnAddress address={transfer.from} symbol={symbol} />;
+        case 'self':
+            return <Translation id="TR_SENT_TO_SELF" />;
+        case 'unknown':
+            return <Address value={transfer.to} isTruncated />;
+        default:
+            return exhaustive(transfer.type);
     }
-    if (type === 'sent') {
-        return (
-            <BlurWrapper $isBlurred={isPhishingTransaction}>
-                <AddressLabeling address={transfer.to} networkSymbol={networkSymbol} />
-            </BlurWrapper>
-        );
-    }
-
-    return <BlurWrapper $isBlurred={isPhishingTransaction}>{transfer.to}</BlurWrapper>;
 };

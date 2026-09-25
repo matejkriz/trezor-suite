@@ -1,0 +1,80 @@
+import { useSelector } from 'react-redux';
+
+import { useServices } from '@suite-common/dependency-injection';
+import { selectIsNoPhysicalDeviceConnected } from '@suite-common/device';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { selectIsDeviceAutoEjectEnabled, toggleAutoEjectThunk } from '@suite-common/wallet-core';
+import { useAlert } from '@suite-native/alerts';
+import { events, injectNativeAnalytics } from '@suite-native/analytics';
+import { TouchableSwitchRow } from '@suite-native/atoms';
+import { Translation } from '@suite-native/intl';
+import { useToast } from '@suite-native/toasts';
+
+export const AutoEjectSwitch = () => {
+    const { analytics, dispatch } = useServices(injectNativeAnalytics, injectDispatch);
+    const { showAlert, hideAlert } = useAlert();
+
+    const { showToast } = useToast();
+
+    const isNoPhysicalDeviceConnected = useSelector(selectIsNoPhysicalDeviceConnected);
+
+    const isAutoEjectEnabled = useSelector(selectIsDeviceAutoEjectEnabled);
+
+    const onToggleAutoEject = () => {
+        if (!isAutoEjectEnabled) {
+            showToast({
+                intent: 'neutral',
+                message: isNoPhysicalDeviceConnected ? (
+                    <Translation id="moduleSettings.viewOnly.autoEject.toast.walletsEjected" />
+                ) : (
+                    <Translation id="moduleSettings.viewOnly.autoEject.toast.walletsWillBeEjected" />
+                ),
+            });
+        }
+        analytics.report({
+            type: events.settingsAutoEjectToggleEvent.name,
+            payload: {
+                enabled: !isAutoEjectEnabled,
+            },
+        });
+        dispatch(toggleAutoEjectThunk());
+    };
+
+    const handleToggleAutoEject = () => {
+        if (isAutoEjectEnabled) {
+            onToggleAutoEject();
+        } else {
+            showAlert({
+                title: (
+                    <Translation
+                        id={
+                            isNoPhysicalDeviceConnected
+                                ? 'moduleSettings.viewOnly.autoEject.switch.alert.disconnectedTrezorTitle'
+                                : 'moduleSettings.viewOnly.autoEject.switch.alert.connectedTrezorTitle'
+                        }
+                    />
+                ),
+                primaryButtonTitle: (
+                    <Translation id="moduleSettings.viewOnly.autoEject.switch.alert.primaryButtonTitle" />
+                ),
+                primaryButtonColorProps: { intent: 'critical', priority: 'primary' },
+                secondaryButtonTitle: <Translation id="generic.buttons.cancel" />,
+                secondaryButtonColorProps: { intent: 'critical', priority: 'secondary' },
+                onPressSecondaryButton: hideAlert,
+                onPressPrimaryButton: onToggleAutoEject,
+            });
+        }
+    };
+
+    return (
+        <TouchableSwitchRow
+            isChecked={isAutoEjectEnabled}
+            onChange={handleToggleAutoEject}
+            accessibilityLabel="autoEjectToggle"
+            text={<Translation id="moduleSettings.viewOnly.autoEject.switch.title" />}
+            description={<Translation id="moduleSettings.viewOnly.autoEject.switch.description" />}
+            icon="eject"
+            testID="@settings/auto-eject-toggle"
+        />
+    );
+};

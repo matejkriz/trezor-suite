@@ -1,39 +1,43 @@
-import styled from 'styled-components';
-import { Button, H3, Box, Divider, BoxProps } from '@trezor/components';
-import { Translation } from 'src/components/suite';
-import { ReactNode } from 'react';
-import { borders } from '@trezor/theme';
+import { type ReactNode } from 'react';
 
-const Heading = styled.div`
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-`;
-
-const StyledBox = styled(Box)`
-    flex-direction: column;
-    align-items: flex-start;
-    border-left-width: 10px;
-    border-radius: ${borders.radii.lg};
-`;
+import { Translation } from '@suite/intl';
+import { Banner, type BannerProps, Column, type Margin, Text } from '@trezor/components';
+import { ShareNetworkIcon } from '@trezor/icons';
 
 interface Props {
     onClose: () => void;
-    variant: BoxProps['variant'];
+    intent: BannerProps['intent'];
     title: ReactNode;
     children: React.ReactNode;
+    hasIcon?: boolean;
+    margin?: Margin;
 }
 
-export const CloseableBanner = ({ onClose, variant, title, children }: Props) => (
-    <StyledBox variant={variant}>
-        <Heading>
-            <H3>{title}</H3>
-            <Button variant="tertiary" onClick={onClose}>
+export const CloseableBanner = ({
+    onClose,
+    intent,
+    title,
+    children,
+    hasIcon = false,
+    margin,
+}: Props) => (
+    <Banner
+        intent={intent}
+        rightContent={
+            <Banner.Button onClick={onClose}>
                 <Translation id="TR_GOT_IT" />
-            </Button>
-        </Heading>
-        <Divider />
-        {children}
-    </StyledBox>
+            </Banner.Button>
+        }
+        icon={hasIcon ? ShareNetworkIcon : undefined}
+        margin={margin}
+        description={
+            <Column gap={4} flex="1" alignItems="flex-start" justifyContent="stretch">
+                <Text typographyStyle="body-md-strong" intent="info">
+                    {title}
+                </Text>
+
+                {children}
+            </Column>
+        }
+    />
 );

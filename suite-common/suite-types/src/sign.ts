@@ -1,4 +1,4 @@
-import BigNumber from 'bignumber.js';
+import { type BigNumber } from '@trezor/utils';
 
 export type SignOperator = 'positive' | 'negative';
 

@@ -1,0 +1,76 @@
+import { Type } from '@sinclair/typebox';
+
+import { ParamsTable } from '../../../components/ParamsTable';
+
+export const InitSchema = Type.Object({
+    manifest: Type.Object({
+        appUrl: Type.String(),
+        email: Type.String(),
+    }),
+    debug: Type.Optional(Type.Boolean()),
+    transportReconnect: Type.Optional(Type.Boolean()),
+    pendingTransportEvent: Type.Optional(Type.Boolean()),
+    requestedPermissions: Type.Optional(
+        Type.Array(
+            Type.Object({
+                permission: Type.String(),
+                coin: Type.Optional(Type.String()),
+            }),
+        ),
+    ),
+    coreMode: Type.Optional(
+        Type.Union([
+            Type.Literal('auto'),
+            Type.Literal('core-in-suite-desktop'),
+            Type.Literal('core-in-suite-web'),
+        ]),
+    ),
+});
+
+export const paramDescriptions = {
+    manifest: 'Application manifest with your email and appUrl.',
+    debug: 'default `false`. Prints debug logs.',
+    transportReconnect:
+        'default `true`. If transport dies during lifecycle of application, this field decides whether TrezorConnect tries to reestablish connection with transport layer.',
+    pendingTransportEvent:
+        'default `true`. Postpone emitting TRANSPORT.START event to the moment when connected device becomes available.',
+    requestedPermissions:
+        'Permissions your application will need, declared up front so the user can approve the whole set in a single prompt instead of being asked per call. See [Permissions](/details/permissions).',
+    coreMode: `default \`auto\`.
+In the default \`auto\` mode, TrezorConnect will automatically choose \`core-in-suite-desktop\` if Suite desktop is available and \`core-in-suite-web\` otherwise, to allow for webUSB use.`,
+};
+
+## Init
+
+To initiate TrezorConnect, please provide the manifest object with your email and appURL. This is crucial for us to identify your use of TrezorConnect and to contact you if necessary.
+If the manifest object is not set, TrezorConnect methods will not be available.
+
+It is also possible to customize more advanced options for TrezorConnect.
+
+```javascript
+const result = await TrezorConnect.init({
+    manifest: {
+        appUrl: 'https://your.application.com',
+        appName: 'Trezor Connect Example',
+        email: 'your@email.com',
+    },
+    // More advanced options
+    debug: true,
+    coreMode: 'auto',
+    // Declare the permissions your app needs so the user can approve them all at once.
+    // See the Permissions page for details.
+    requestedPermissions: [
+        { permission: 'read_account_info', coin: 'btc' },
+        { permission: 'read_address', coin: 'btc' },
+        { permission: 'sign', coin: 'eth' },
+    ],
+});
+```
+
+### Params
+
+<ParamsTable schema={InitSchema} descriptions={paramDescriptions} />
+
+### Result
+
+TrezorConnect.init returns `Promise<void>`

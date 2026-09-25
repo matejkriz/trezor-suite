@@ -1,28 +1,26 @@
 import { arrayPartition, arrayToDictionary } from '@trezor/utils';
 
-import { Account } from '../Account';
-import { Alice } from '../Alice';
-import type { CoinjoinRound, CoinjoinRoundOptions } from '../CoinjoinRound';
-import { CoinjoinPrison } from '../CoinjoinPrison';
-import * as middleware from '../middleware';
-import { Round } from '../coordinator';
-import { ROUND_SELECTION_REGISTRATION_OFFSET, ROUND_SELECTION_MAX_OUTPUTS } from '../../constants';
+import { ROUND_SELECTION_MAX_OUTPUTS, ROUND_SELECTION_REGISTRATION_OFFSET } from '../../constants';
 import { RoundPhase, SessionPhase, WabiSabiProtocolErrorCode } from '../../enums';
+import type { AliceGenerator, AliceShape } from '../../types/alice';
+import type { CoinjoinPrisonShape } from '../../types/prison';
+import type {
+    CoinjoinRoundGenerator,
+    CoinjoinRoundOptions,
+    CoinjoinRoundShape,
+} from '../../types/round';
 import { getInputSize, getOutputSize } from '../../utils/coordinatorUtils';
-
-export type CoinjoinRoundGenerator = (
-    ...args: ConstructorParameters<typeof CoinjoinRound>
-) => CoinjoinRound;
-
-export type AliceGenerator = (...args: ConstructorParameters<typeof Alice>) => Alice;
+import { type Account } from '../Account';
+import { type Round } from '../coordinator';
+import * as middleware from '../middleware';
 
 export interface SelectRoundProps {
     roundGenerator: CoinjoinRoundGenerator;
     aliceGenerator: AliceGenerator;
     accounts: Account[];
     statusRounds: Round[];
-    coinjoinRounds: CoinjoinRound[];
-    prison: CoinjoinPrison;
+    coinjoinRounds: CoinjoinRoundShape[];
+    prison: CoinjoinPrisonShape;
     options: CoinjoinRoundOptions;
     runningAffiliateServer: boolean;
 }
@@ -51,7 +49,7 @@ export const getRoundCandidates = ({
             // try to create new CoinjoinRound
             try {
                 return roundGenerator(round, prison, options);
-            } catch (e) {
+            } catch {
                 // constructor fails on invalid round data (highly unlikely)
                 return [];
             }
@@ -208,6 +206,8 @@ export const getAccountCandidates = ({
                     key: account.accountKey,
                     reason: SessionPhase.CriticalError,
                 });
+
+                return [];
             }
 
             logger.info(`Found account candidate ~~${accountKey}~~ with ${utxos.length} inputs`);
@@ -251,7 +251,7 @@ export const getAccountCandidates = ({
 };
 
 interface SelectInputsForRoundProps extends Pick<SelectRoundProps, 'aliceGenerator' | 'options'> {
-    roundCandidates: CoinjoinRound[];
+    roundCandidates: CoinjoinRoundShape[];
     accountCandidates: ReturnType<typeof getAccountCandidates>;
 }
 
@@ -262,7 +262,7 @@ const selectInputsForBlameRound = ({
     options: { logger },
 }: SelectInputsForRoundProps) =>
     roundCandidates.find(round => {
-        const inputs: CoinjoinRound['inputs'] = [];
+        const inputs: AliceShape[] = [];
         accountCandidates.forEach(account => {
             const utxos = account.blameOf ? account.blameOf[round.blameOf] : null;
             if (utxos && utxos.length > 0) {
@@ -403,13 +403,23 @@ export const selectInputsForRound = async ({
 
     // get index of Round with maximum possible utxos
     const roundIndex = sumUtxosInRounds.findIndex(count => count === maxUtxosInRound);
-    const selectedRound = normalRounds[roundIndex];
+    // @ts-expect-error: indexing with noUncheckedIndexedAccess
+    const selectedRound: (typeof normalRounds)[number] = normalRounds[roundIndex];
 
     // setup new Round
     accountCandidates.forEach((account, accountIndex) => {
         // find utxos assigned to this Round and Account
-        const utxoIndexes = utxoSelection[roundIndex][accountIndex];
-        const selectedUtxos = utxoIndexes.map(utxoIndex => account.utxos[utxoIndex]);
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const roundSelection: (typeof utxoSelection)[number] = utxoSelection[roundIndex];
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const utxoIndexes: (typeof roundSelection)[number] = roundSelection[accountIndex];
+        const selectedUtxos = utxoIndexes.map(utxoIndex => {
+            const { utxos } = account;
+            // @ts-expect-error: indexing with noUncheckedIndexedAccess
+            const utxo: (typeof utxos)[number] = utxos[utxoIndex];
+
+            return utxo;
+        });
 
         // Temporary workaround for middleware issue: https://github.com/zkSNACKs/WalletWasabi/issues/10759
         const feeRate = selectedRound.roundParameters.MiningFeeRate;
@@ -451,14 +461,14 @@ export const selectRound = async ({
     prison,
     options,
     runningAffiliateServer,
-}: SelectRoundProps) => {
+}: SelectRoundProps): Promise<CoinjoinRoundShape | undefined> => {
     const { logger, setSessionPhase } = options;
 
     const unregisteredAccounts = getUnregisteredAccounts({ accounts, coinjoinRounds, options });
     const unregisteredAccountKeys = unregisteredAccounts.map(({ accountKey }) => accountKey);
 
     logger.info('Looking for rounds');
-    if (!runningAffiliateServer) {
+    if (options.affiliationId && !runningAffiliateServer) {
         logger.warn('Affiliate server is not running. Round selection ignored');
         setSessionPhase({
             phase: SessionPhase.AffiliateServerOffline,

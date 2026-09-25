@@ -1,7 +1,10 @@
 import { useCallback, useEffect } from 'react';
-import { useFieldArray, UseFormReturn } from 'react-hook-form';
-import { FormState, UseSendFormState, SendContextValues } from 'src/types/wallet/sendForm';
-import { DEFAULT_PAYMENT, DEFAULT_OPRETURN } from '@suite-common/wallet-constants';
+import { type UseFormReturn, type useFieldArray } from 'react-hook-form';
+
+import { DEFAULT_OPRETURN, DEFAULT_PAYMENT } from '@suite-common/wallet-constants';
+import { type FormState } from '@suite-common/wallet-types';
+
+import { type SendContextValues, type UseSendFormState } from 'src/types/wallet/sendForm';
 
 type Props = UseFormReturn<FormState> & {
     outputsFieldArray: ReturnType<typeof useFieldArray<FormState, 'outputs'>>;
@@ -22,7 +25,9 @@ export const useSendFormOutputs = ({
     composeRequest,
 }: Props) => {
     const addOutput = useCallback(() => {
-        outputsFieldArray.append(
+        const lastOpReturn = outputsFieldArray.fields.at(-1)?.type === 'opreturn';
+        outputsFieldArray.insert(
+            outputsFieldArray.fields.length - Number(lastOpReturn),
             {
                 ...DEFAULT_PAYMENT,
                 currency: localCurrencyOption,
@@ -50,21 +55,7 @@ export const useSendFormOutputs = ({
     );
 
     const addOpReturn = () => {
-        // const outputs = getValues('outputs');
-        const values = getValues();
-        const lastOutput = values.outputs[values.outputs.length - 1];
-        const isLastOutputDirty = lastOutput.address.length > 0 || lastOutput.amount.length > 0;
-        if (isLastOutputDirty) {
-            outputsFieldArray.append({ ...DEFAULT_OPRETURN });
-        } else {
-            reset(
-                {
-                    ...values,
-                    outputs: [DEFAULT_OPRETURN],
-                },
-                { keepErrors: true },
-            );
-        }
+        outputsFieldArray.append({ ...DEFAULT_OPRETURN });
     };
 
     const removeOpReturn = (index: number) => {

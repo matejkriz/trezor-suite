@@ -1,0 +1,40 @@
+{
+    "name": "@suite-common/connect-popup",
+    "version": "1.0.0",
+    "private": true,
+    "license": "See LICENSE.md in repo root",
+    "sideEffects": false,
+    "main": "src/index",
+    "scripts": {
+        "depcheck": "yarn g:depcheck",
+        "type-check": "yarn g:tsc --build tsconfig.json",
+        "test:unit": "yarn g:jest",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'"
+    },
+    "dependencies": {
+        "@reduxjs/toolkit": "2.12.0",
+        "@suite-common/analytics": "workspace:*",
+        "@suite-common/device": "workspace:*",
+        "@suite-common/networks": "workspace:*",
+        "@suite-common/redux-utils": "workspace:*",
+        "@suite-common/toast-notifications": "workspace:*",
+        "@suite-common/wallet-config": "workspace:*",
+        "@suite-common/wallet-core": "workspace:*",
+        "@suite-common/wallet-types": "workspace:*",
+        "@suite-common/wallet-utils": "workspace:*",
+        "@trezor/connect": "workspace:*",
+        "@trezor/connect-common": "workspace:^",
+        "@trezor/crypto-utils": "workspace:*",
+        "@trezor/network-solana": "workspace:*",
+        "@trezor/network-stellar": "workspace:*",
+        "@trezor/type-utils": "workspace:^",
+        "@trezor/utils": "workspace:*",
+        "react": "19.2.3",
+        "react-redux": "9.3.0"
+    },
+    "devDependencies": {
+        "@suite-common/suite-types": "workspace:*",
+        "@suite-common/test-utils": "workspace:*",
+        "@types/react": "19.2.14"
+    }
+}

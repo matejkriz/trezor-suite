@@ -1,162 +1,72 @@
-import styled from 'styled-components';
-import { EventType, analytics } from '@trezor/suite-analytics';
-import {
-    Button,
-    ButtonGroup,
-    Dropdown,
-    DropdownMenuItemProps,
-    IconButton,
-    IconProps,
-} from '@trezor/components';
-import { spacingsPx } from '@trezor/theme';
-import { getNetwork, hasNetworkFeatures } from '@suite-common/wallet-utils';
-import { WalletParams } from 'src/types/wallet';
-import { Translation } from 'src/components/suite/Translation';
-import { useDispatch, useSelector } from 'src/hooks/suite';
-import { goto } from 'src/actions/suite/routerActions';
+import { selectFullSelectedAccount } from '@suite/account';
+import { useDevice } from '@suite/device';
+import { Translation } from '@suite/intl';
+import { selectRouterParams } from '@suite/router';
+import { Row } from '@trezor/components';
+import { ButtonGroup } from '@trezor/components/src/components/buttons/ButtonGroup/ButtonGroup';
+import { ArrowDownIcon, ArrowUpIcon } from '@trezor/icons';
+
 import { AppNavigationTooltip } from 'src/components/suite/AppNavigation/AppNavigationTooltip';
-import { openModal } from 'src/actions/suite/modalActions';
-import { selectSelectedAccount } from 'src/reducers/wallet/selectedAccountReducer';
+import { HeaderActionButton } from 'src/components/suite/layouts/SuiteLayout/PageHeader/HeaderActionButton';
+import { TradeActions } from 'src/components/suite/layouts/SuiteLayout/PageHeader/TradeActions';
+import { useSelector } from 'src/hooks/suite';
+import { type WalletParams } from 'src/types/wallet';
 
-const Container = styled.div`
-    display: flex;
-    align-items: center;
-    gap: ${spacingsPx.xxs};
-`;
-
-type ActionItem = {
-    id: string;
-    icon?: IconProps['icon'];
-    callback: () => void;
-    title: JSX.Element;
-    'data-test'?: string;
-    isHidden?: boolean;
-};
+import { HeaderDropdown } from './HeaderDropdown';
+import { useGoToWithAnalytics } from './useGoToWithAnalytics';
 
 export const HeaderActions = () => {
-    const account = useSelector(selectSelectedAccount);
-    const routerParams = useSelector(state => state.router.params) as WalletParams;
-    const selectedAccount = useSelector(state => state.wallet.selectedAccount);
+    const goToWithAnalytics = useGoToWithAnalytics();
+    const selectedAccount = useSelector(selectFullSelectedAccount);
+    const routerParams = useSelector(selectRouterParams) as WalletParams;
+    const { device } = useDevice();
 
-    const dispatch = useDispatch();
-    const layoutSize = useSelector(state => state.resize.size);
-    const isMobileLayout = layoutSize === 'TINY';
-
-    const network = getNetwork(routerParams?.symbol || '');
-    const networkType = account?.networkType || network?.networkType || '';
-    const accountType = account?.accountType || routerParams?.accountType || '';
-
-    const goToWithAnalytics = (...[routeName, options]: Parameters<typeof goto>) => {
-        if (account?.symbol) {
-            analytics.report({
-                type: EventType.AccountsActions,
-                payload: { symbol: account.symbol, action: routeName },
-            });
-        }
-        dispatch(goto(routeName, options));
-    };
-
-    const additionalActions: ActionItem[] = [
-        {
-            id: 'wallet-add-token',
-            callback: () => {
-                if (account?.symbol) {
-                    analytics.report({
-                        type: EventType.AccountsActions,
-                        payload: { symbol: account.symbol, action: 'add-token' },
-                    });
-                }
-                dispatch(openModal({ type: 'add-token' }));
-            },
-            title: <Translation id="TR_TOKENS_ADD" />,
-            isHidden: !['ethereum'].includes(networkType),
-        },
-        {
-            id: 'wallet-sign-verify',
-            callback: () => {
-                goToWithAnalytics('wallet-sign-verify', { preserveParams: true });
-            },
-            title: <Translation id="TR_NAV_SIGN_AND_VERIFY" />,
-            icon: 'SIGNATURE',
-            // show dots when acc missing as they are hidden only in case of XRP
-            isHidden: account ? !hasNetworkFeatures(account, 'sign-verify') : false,
-        },
-    ];
-
-    const visibleAdditionalActions = additionalActions?.filter(action => !action.isHidden);
-
-    const isCoinmarketAvailable = !['coinjoin'].includes(accountType);
+    const accountType = selectedAccount.account?.accountType || routerParams?.accountType || '';
+    const isTradingAvailable = !['coinjoin'].includes(accountType);
     const isAccountLoading = selectedAccount.status === 'loading';
-
-    const ButtonComponent = isMobileLayout ? IconButton : Button;
+    const isDeviceConnected = device?.connected && device?.available;
 
     return (
-        <Container>
-            {visibleAdditionalActions?.length > 0 && (
-                <AppNavigationTooltip>
-                    <Dropdown
-                        alignMenu="bottom-right"
-                        isDisabled={isAccountLoading}
-                        data-test="@wallet/menu/extra-dropdown"
-                        items={[
-                            {
-                                key: 'extra',
-                                options: visibleAdditionalActions.map<DropdownMenuItemProps>(
-                                    item => ({
-                                        key: item.id,
-                                        onClick: isAccountLoading ? undefined : item.callback,
-                                        label: item.title,
-                                        'data-test': `@wallet/menu/${item.id}`,
-                                    }),
-                                ),
-                            },
-                        ]}
-                    />
-                </AppNavigationTooltip>
-            )}
+        <Row gap={12} alignItems="center">
+            <HeaderDropdown isDisabled={isAccountLoading} showSignAndVerify />
 
-            {isCoinmarketAvailable && (
-                <AppNavigationTooltip>
-                    <ButtonComponent
-                        icon="REFRESH"
-                        onClick={() => {
-                            goToWithAnalytics('wallet-coinmarket-buy', { preserveParams: true });
-                        }}
-                        data-test="@wallet/menu/wallet-coinmarket-buy"
-                        variant="tertiary"
-                        size="small"
-                        isDisabled={isAccountLoading}
-                    >
-                        <Translation id="TR_NAV_TRADE" />
-                    </ButtonComponent>
-                </AppNavigationTooltip>
-            )}
+            {isTradingAvailable && <TradeActions selectedAccount={selectedAccount} />}
 
             <AppNavigationTooltip>
-                <ButtonGroup size="small" isDisabled={isAccountLoading}>
-                    <ButtonComponent
-                        key="wallet-send"
-                        icon="SEND"
-                        onClick={() => {
-                            goToWithAnalytics('wallet-send', { preserveParams: true });
-                        }}
-                        data-test="@wallet/menu/wallet-send"
-                    >
-                        <Translation id="TR_NAV_SEND" />
-                    </ButtonComponent>
-
-                    <ButtonComponent
+                <ButtonGroup
+                    isDisabled={isAccountLoading}
+                    intent={isDeviceConnected ? 'brand' : 'neutral'}
+                    priority={isDeviceConnected ? 'primary' : 'secondary'}
+                >
+                    <HeaderActionButton
                         key="wallet-receive"
-                        icon="RECEIVE"
+                        icon={ArrowDownIcon}
                         onClick={() => {
-                            goToWithAnalytics('wallet-receive', { preserveParams: true });
+                            goToWithAnalytics({
+                                routeName: 'wallet-receive',
+                                preserveParams: true,
+                            });
                         }}
-                        data-test="@wallet/menu/wallet-receive"
+                        data-testid="@wallet/menu/wallet-receive"
                     >
                         <Translation id="TR_NAV_RECEIVE" />
-                    </ButtonComponent>
+                    </HeaderActionButton>
+
+                    <HeaderActionButton
+                        key="wallet-send"
+                        icon={ArrowUpIcon}
+                        onClick={() => {
+                            goToWithAnalytics({
+                                routeName: 'wallet-send',
+                                preserveParams: true,
+                            });
+                        }}
+                        data-testid="@wallet/menu/wallet-send"
+                    >
+                        <Translation id="TR_NAV_SEND" />
+                    </HeaderActionButton>
                 </ButtonGroup>
             </AppNavigationTooltip>
-        </Container>
+        </Row>
     );
 };

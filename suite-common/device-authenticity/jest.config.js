@@ -1,6 +1,6 @@
-const baseConfig = require('../../jest.config.base');
+const baseConfig = require('../../jest.config.base.swc');
 
 module.exports = {
     ...baseConfig,
-    roots: ['<rootDir>/src', '<rootDir>/tests', '<rootDir>/../test-utils/__mocks__'],
+    roots: ['<rootDir>/src', '<rootDir>/../test-utils/__mocks__'],
 };

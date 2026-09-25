@@ -1,28 +1,25 @@
-import { isAnyOf } from '@reduxjs/toolkit';
-import { A, D, G, pipe } from '@mobily/ts-belt';
-import { memoize, memoizeWithArgs } from 'proxy-memoize';
+import { type ActionCreatorWithPreparedPayload, current, isAnyOf } from '@reduxjs/toolkit';
 
-import { createReducerWithExtraDeps } from '@suite-common/redux-utils';
-import { enhanceHistory, isTestnet, isUtxoBased } from '@suite-common/wallet-utils';
-import { Account, AccountKey } from '@suite-common/wallet-types';
-import { AccountType, networks, NetworkSymbol } from '@suite-common/wallet-config';
+import { deviceActions } from '@suite-common/device';
+import {
+    type ActionTypesDep,
+    type ReducersDep,
+    createReducerWithExtraDeps,
+} from '@suite-common/redux-utils';
+import { getNetwork } from '@suite-common/wallet-config';
+import { type Account } from '@suite-common/wallet-types';
+import { accountEqualTo, compareAccountsByCoin, enhanceHistory } from '@suite-common/wallet-utils';
+import { typedObjectKeys } from '@trezor/utils';
 
 import { accountsActions } from './accountsActions';
-import { formattedAccountTypeMap } from './accountsConstants';
-import {
-    DeviceRootState,
-    selectDevice,
-    selectIsNoPhysicalDeviceConnected,
-    selectIsPortfolioTrackerDevice,
-    selectPersistedDeviceStates,
-} from '../device/deviceReducer';
-import { DiscoveryRootState, selectIsDeviceDiscoveryActive } from '../discovery/discoveryReducer';
 
-export const accountsInitialState: Account[] = [];
+export type AccountsState = Account[];
+
+export const accountsInitialState: AccountsState = [];
 
 export type AccountsRootState = {
     wallet: {
-        accounts: Account[];
+        accounts: AccountsState;
     };
 };
 
@@ -31,14 +28,34 @@ const findCoinjoinAccount =
     (account: Account): account is Extract<Account, { backendType: 'coinjoin' }> =>
         account.key === key && account.backendType === 'coinjoin';
 
-const accountEqualTo = (b: Account) => (a: Account) =>
-    a.deviceState === b.deviceState && a.descriptor === b.descriptor && a.symbol === b.symbol;
+const isHistoryUnchanged = (prev: Account['history'], next: Account['history']) => {
+    const keys = typedObjectKeys(prev);
+    if (keys.length !== Object.keys(next).length) return false;
+
+    return keys.every(key => prev[key] === next[key]);
+};
+
+// `history` is the only field we rebuild here (enhanceHistory), so it's always a fresh object even
+// when the values are unchanged - compare it by its own keys. Every other field keeps the caller's
+// reference, so a shallow (reference) compare is enough to detect a real change.
+const isUnchangedAccount = (prev: Account, next: Account) => {
+    const keys = typedObjectKeys(prev);
+    if (keys.length !== Object.keys(next).length) return false;
+
+    return keys.every(key =>
+        key === 'history'
+            ? isHistoryUnchanged(prev.history, next.history)
+            : prev[key] === next[key],
+    );
+};
 
 const update = (state: Account[], account: Account) => {
     const accountIndex = state.findIndex(accountEqualTo(account));
+    const prev = state[accountIndex];
 
-    if (accountIndex !== -1) {
-        state[accountIndex] = {
+    if (prev) {
+        const prevUnwrapped = current(prev);
+        const next: Account = {
             ...account,
             // remove "transactions" field, they are stored in "transactionReducer"
             history: enhanceHistory(account.history),
@@ -46,11 +63,33 @@ const update = (state: Account[], account: Account) => {
 
         if (!account.marker) {
             // immer.js doesn't update fields that are set to undefined, so instead we delete the field
-            delete state[accountIndex].marker;
+            delete next.marker;
         }
+
+        // Locally tracked tokens must survive an update built from an older account snapshot
+        // (e.g. a concurrent sync). A wrapped-native (WETH) balance exists only as a local entry:
+        // wrapping emits no ERC-20 Transfer, so the backend never reports the token on its own.
+        if (next.networkType === 'ethereum' && prevUnwrapped.tokens?.length) {
+            const nextContracts = new Set(next.tokens?.map(token => token.contract.toLowerCase()));
+            const locallyTrackedTokens = prevUnwrapped.tokens.filter(
+                token => !nextContracts.has(token.contract.toLowerCase()),
+            );
+
+            if (locallyTrackedTokens.length > 0) {
+                next.tokens = (next.tokens ?? []).concat(locallyTrackedTokens);
+            }
+        }
+
+        // Skip the write when nothing changed, so the entity reference (and the components subscribed
+        // to it) stay stable. current() unwraps the immer draft, otherwise reads of nested fields
+        // return proxies and the reference compare would never match.
+        if (isUnchangedAccount(prevUnwrapped, next)) return;
+
+        state[accountIndex] = next;
     } else {
         console.warn(
-            `Tried to update account that does not exist: ${account.descriptor} (symbol: ${account.symbol})`,
+            // do not log the descriptor: it is confidential and would leak into Sentry breadcrumbs
+            `Tried to update account that does not exist (symbol: ${account.symbol}, type: ${account.accountType}, index: ${account.index})`,
         );
     }
 };
@@ -58,7 +97,11 @@ const update = (state: Account[], account: Account) => {
 const remove = (state: Account[], accounts: Account[]) => {
     accounts.forEach(a => {
         const index = state.findIndex(accountEqualTo(a));
-        state.splice(index, 1);
+        // a missing account yields index -1, and splice(-1, 1) would delete the
+        // last, unrelated account instead of being a no-op
+        if (index !== -1) {
+            state.splice(index, 1);
+        }
     });
 };
 
@@ -68,44 +111,59 @@ const setMetadata = (state: Account[], account: Account) => {
     state[index].metadata = account.metadata;
 };
 
+export type AccountsReducerDeps = ActionTypesDep<'storageLoad'> &
+    ReducersDep<'storageLoadAccounts'> & {
+        actions: {
+            setAccountAddMetadata: ActionCreatorWithPreparedPayload<[Account], Account>;
+        };
+    };
+
 export const prepareAccountsReducer = createReducerWithExtraDeps(
     accountsInitialState,
-    (builder, extra) => {
+    (builder, extra: AccountsReducerDeps) => {
         builder
             .addCase(accountsActions.removeAccount, (state, action) => {
                 remove(state, action.payload);
             })
             .addCase(accountsActions.createAccount, (state, action) => {
-                // TODO: check if account already exist, for example 2 device instances with same passphrase
-                const account = {
-                    ...action.payload,
-                    // remove "transactions" field, they are stored in "transactionReducer"
-                    history: enhanceHistory(action.payload.history),
-                };
-                state.push(account);
-            })
-            .addCase(accountsActions.createIndexLabeledAccount, (state, action) => {
-                const { deviceState, symbol, accountType } = action.payload;
-                const matchingNetworkAndTypeAccounts = state.filter(
-                    account =>
-                        account.deviceState === deviceState &&
-                        account.symbol === symbol &&
-                        account.accountType === accountType,
-                );
+                const { account: accountPayload, supportedNetworks } = action.payload;
+                const { symbol, index } = accountPayload;
+                const networkName = getNetwork(symbol).name;
+                const accountLabel = accountPayload.accountLabel ?? `${networkName} #${index + 1}`;
+                // remove "transactions" field, they are stored in "transactionReducer"
+                const history = enhanceHistory(accountPayload.history);
 
-                const indexOfPreviousAccount = matchingNetworkAndTypeAccounts.length;
-                const networkName = networks[symbol].name;
-                const accountLabel = `${networkName} #${indexOfPreviousAccount + 1}`;
+                const account = { ...accountPayload, accountLabel, history };
 
-                const account = {
-                    ...action.payload,
-                    accountLabel,
-                    history: enhanceHistory(action.payload.history),
-                };
-                state.push(account);
+                if (state.some(accountEqualTo(account))) {
+                    console.warn(
+                        // do not log the whole account: descriptor/addresses/balance are confidential and would leak into Sentry breadcrumbs
+                        `Duplicated account found, updating instead (symbol: ${account.symbol}, type: ${account.accountType}, index: ${account.index})`,
+                    );
+                    update(state, account);
+                } else {
+                    // Keep the state sorted by coin so that consumers get the canonical order for free.
+                    const insertAtIndex = state.findIndex(
+                        existingAccount =>
+                            compareAccountsByCoin(account, existingAccount, supportedNetworks) < 0,
+                    );
+
+                    if (insertAtIndex === -1) {
+                        state.push(account);
+                    } else {
+                        state.splice(insertAtIndex, 0, account);
+                    }
+                }
             })
             .addCase(accountsActions.updateAccount, (state, action) => {
-                update(state, action.payload);
+                update(state, action.payload.account);
+            })
+            .addCase(accountsActions.addAccountTokens, (state, action) => {
+                const { accountKey, tokens } = action.payload;
+                const accountByAccountKey = state.find(account => account.key === accountKey);
+                if (accountByAccountKey) {
+                    accountByAccountKey.tokens = (accountByAccountKey.tokens ?? []).concat(tokens);
+                }
             })
             .addCase(accountsActions.renameAccount, (state, action) => {
                 const { accountKey, accountLabel } = action.payload;
@@ -113,7 +171,7 @@ export const prepareAccountsReducer = createReducerWithExtraDeps(
                 if (accountByAccountKey) accountByAccountKey.accountLabel = accountLabel;
             })
             .addCase(accountsActions.changeAccountVisibility, (state, action) => {
-                update(state, action.payload);
+                update(state, action.payload.account);
             })
             .addCase(accountsActions.startCoinjoinAccountSync, (state, action) => {
                 const account = state.find(findCoinjoinAccount(action.payload.accountKey));
@@ -129,262 +187,13 @@ export const prepareAccountsReducer = createReducerWithExtraDeps(
                 }
             })
             .addCase(extra.actionTypes.storageLoad, extra.reducers.storageLoadAccounts)
+            // Persistence of accounts and transactions in suite-native depends on device.remember state,
+            // but redux-persist is not checking for changes in other reducers.
+            // This is a workaround to update redux-persist state.
+            .addCase(deviceActions.setRememberDevice, state => [...state])
             .addMatcher(isAnyOf(extra.actions.setAccountAddMetadata), (state, action) => {
                 const { payload } = action;
                 setMetadata(state, payload);
             });
     },
 );
-
-export const selectAccounts = (state: AccountsRootState) => state.wallet.accounts;
-
-export const selectAccountsByDeviceState = memoizeWithArgs(
-    (state: AccountsRootState, deviceState: string): Account[] =>
-        pipe(
-            selectAccounts(state),
-            A.filter(account => account.deviceState === deviceState),
-        ) as Account[],
-    // cache up to 3 devices to make sure it works correctly
-    { size: 3 },
-);
-
-export const selectDeviceAccounts = (state: AccountsRootState & DeviceRootState) => {
-    const device = selectDevice(state);
-
-    if (!device?.state) return [];
-
-    return selectAccountsByDeviceState(state, device.state);
-};
-
-export const selectDeviceAccountsForNetworkSymbolAndAccountType = memoizeWithArgs(
-    (
-        state: AccountsRootState & DeviceRootState,
-        networkSymbol?: NetworkSymbol,
-        accountType?: AccountType,
-    ) => {
-        if (!networkSymbol || !accountType) {
-            return [];
-        }
-        const accounts = selectDeviceAccounts(state);
-
-        return accounts.filter(
-            account => account.symbol === networkSymbol && account.accountType === accountType,
-        );
-    },
-    // memoize data for every network
-    { size: D.keys(networks).length },
-);
-
-export const selectDeviceAccountKeyForNetworkSymbolAndAccountTypeWithIndex = (
-    state: AccountsRootState & DeviceRootState,
-    networkSymbol?: NetworkSymbol,
-    accountType?: AccountType,
-    accountIndex?: number,
-) => {
-    if (!networkSymbol || !accountType || accountIndex === undefined || accountIndex < 0) {
-        return undefined;
-    }
-    const accounts = selectDeviceAccountsForNetworkSymbolAndAccountType(
-        state,
-        networkSymbol,
-        accountType,
-    );
-
-    return accounts[accountIndex]?.key;
-};
-
-export const selectDeviceAccountsLengthPerNetwork = (state: AccountsRootState & DeviceRootState) =>
-    pipe(
-        selectDeviceAccounts(state),
-        A.groupBy(account => account.symbol),
-        Object.entries,
-        A.map(([symbol, accounts]) => [symbol, accounts.length]),
-        pairs => Object.fromEntries(pairs),
-    );
-
-export const selectDeviceMainnetAccounts = memoize((state: AccountsRootState & DeviceRootState) =>
-    pipe(
-        selectDeviceAccounts(state),
-        A.filter(account => !isTestnet(account.symbol)),
-    ),
-);
-
-export const selectNumberOfAccounts = (state: AccountsRootState) => selectAccounts(state).length;
-
-export const selectUserHasAccounts = (state: AccountsRootState): boolean =>
-    pipe(selectAccounts(state), A.isNotEmpty);
-
-export const selectAccountByKey = (state: AccountsRootState, accountKey?: AccountKey) => {
-    if (!accountKey) return null;
-
-    const accounts = selectAccounts(state);
-
-    return accounts.find(account => account.key === accountKey) ?? null;
-};
-
-export const selectHasAccountTransactions = (state: AccountsRootState, accountKey: AccountKey) => {
-    const account = selectAccountByKey(state, accountKey);
-
-    return !!account?.history.total;
-};
-
-export const selectDeviceAccountsByNetworkSymbol = memoizeWithArgs(
-    (state: AccountsRootState & DeviceRootState, networkSymbol: NetworkSymbol | null) => {
-        if (G.isNull(networkSymbol)) return [];
-
-        const accounts = selectDeviceAccounts(state);
-
-        return A.filter(accounts, account => account.symbol === networkSymbol);
-    },
-    {
-        size: Object.keys(networks).length,
-    },
-);
-
-export const selectVisibleNonEmptyDeviceAccountsByNetworkSymbol = (
-    state: AccountsRootState & DeviceRootState,
-    networkSymbol: NetworkSymbol | null,
-) =>
-    selectDeviceAccountsByNetworkSymbol(state, networkSymbol).filter(
-        account => !account.empty || account.visible,
-    );
-
-export const selectAccountsByNetworkAndDeviceState = memoizeWithArgs(
-    (state: AccountsRootState, deviceState: string, networkSymbol: NetworkSymbol) => {
-        const accounts = selectAccounts(state);
-
-        return accounts.filter(
-            account => account.deviceState === deviceState && account.symbol === networkSymbol,
-        );
-    },
-    {
-        size: 80,
-    },
-);
-
-export const selectAccountLabel = (
-    state: AccountsRootState,
-    accountKey?: AccountKey,
-): string | null => {
-    const account = selectAccountByKey(state, accountKey);
-
-    if (!account) return null;
-
-    return account.accountLabel ?? null;
-};
-
-export const selectAccountNetworkSymbol = (
-    state: AccountsRootState,
-    accountKey?: AccountKey,
-): NetworkSymbol | null => {
-    const account = selectAccountByKey(state, accountKey);
-
-    if (!account) return null;
-
-    return account.symbol;
-};
-
-export const selectFormattedAccountType = (
-    state: AccountsRootState,
-    accountKey: AccountKey,
-): string | null => {
-    const account = selectAccountByKey(state, accountKey);
-    if (!account) return null;
-
-    const { networkType, accountType } = account;
-    const formattedType = formattedAccountTypeMap[networkType]?.[accountType];
-
-    if (!formattedType) return null;
-
-    return formattedType;
-};
-
-export const selectIsAccountUtxoBased = (state: AccountsRootState, accountKey: AccountKey) => {
-    const account = selectAccountByKey(state, accountKey);
-
-    return account ? isUtxoBased(account) : false;
-};
-
-export const selectIsTestnetAccount = (state: AccountsRootState, accountKey: AccountKey) => {
-    const account = selectAccountByKey(state, accountKey);
-
-    return account ? isTestnet(account.symbol) : false;
-};
-
-export const selectDeviceAccountByDescriptorAndNetworkSymbol = (
-    state: AccountsRootState & DeviceRootState,
-    accountDescriptor: string,
-    networkSymbol: NetworkSymbol,
-) => {
-    const accounts = selectDeviceAccounts(state);
-
-    return (
-        A.find(
-            accounts,
-            account => account.descriptor === accountDescriptor && account.symbol === networkSymbol,
-        ) ?? null
-    );
-};
-
-export const selectDeviceAccountKeyByDescriptorAndNetworkSymbol = (
-    state: AccountsRootState & DeviceRootState,
-    accountDescriptor?: string,
-    networkSymbol?: NetworkSymbol,
-): AccountKey | null => {
-    if (!accountDescriptor || !networkSymbol) return null;
-    const account = selectDeviceAccountByDescriptorAndNetworkSymbol(
-        state,
-        accountDescriptor,
-        networkSymbol,
-    );
-
-    return account?.key ?? null;
-};
-
-export const selectAccountsSymbols = memoize(
-    (state: AccountsRootState): NetworkSymbol[] =>
-        pipe(
-            selectAccounts(state),
-            A.map(a => a.symbol),
-            A.uniq,
-        ) as NetworkSymbol[],
-);
-
-export const selectIsDeviceAccountless = (state: AccountsRootState & DeviceRootState) =>
-    pipe(selectDeviceAccounts(state), A.isEmpty);
-
-export const selectIsDeviceDiscoveryEmpty = (
-    state: AccountsRootState & DeviceRootState & DiscoveryRootState,
-) => {
-    const isDeviceAccountless = selectIsDeviceAccountless(state);
-    const isDeviceDiscoveryActive = selectIsDeviceDiscoveryActive(state);
-
-    return isDeviceAccountless && !isDeviceDiscoveryActive;
-};
-
-export const selectDevicelessAccounts = (state: AccountsRootState & DeviceRootState) => {
-    const persistedDevicesStates = selectPersistedDeviceStates(state);
-
-    return pipe(
-        selectAccounts(state),
-        A.filter(account => !persistedDevicesStates.includes(account.deviceState)),
-    ) as Account[];
-};
-
-export const selectAreAllDevicesDisconnectedOrAccountless = (
-    state: AccountsRootState & DeviceRootState & DiscoveryRootState,
-) => {
-    const isDeviceDiscoveryEmpty = selectIsDeviceDiscoveryEmpty(state);
-    const isNoPhysicalDeviceConnected = selectIsNoPhysicalDeviceConnected(state);
-
-    return isDeviceDiscoveryEmpty && isNoPhysicalDeviceConnected;
-};
-
-export const selectIsPortfolioTrackerEmpty = (
-    state: AccountsRootState & DeviceRootState & DiscoveryRootState,
-) => {
-    const isPortfolioTrackerDevice = selectIsPortfolioTrackerDevice(state);
-    const isDeviceDiscoveryEmpty = selectIsDeviceDiscoveryEmpty(state);
-
-    return isPortfolioTrackerDevice && isDeviceDiscoveryEmpty;
-};

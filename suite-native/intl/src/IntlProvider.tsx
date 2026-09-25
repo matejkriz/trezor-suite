@@ -1,27 +1,36 @@
+// Polyfill to support plural syntax
+import 'intl-pluralrules';
+
+// Polyfill Intl for iOS D(Hermes doesn't support some Intl features natively on iOS)
+// Always required - base polyfills
+import '@formatjs/intl-getcanonicallocales/polyfill.js';
+import '@formatjs/intl-locale/polyfill.js';
+// Intl.ListFormat polyfill and locale data
+import '@formatjs/intl-listformat/polyfill.js';
+import '@formatjs/intl-listformat/locale-data/en.js';
+import '@formatjs/intl-listformat/locale-data/cs.js';
+import '@formatjs/intl-listformat/locale-data/de.js';
+import '@formatjs/intl-listformat/locale-data/id.js';
+import '@formatjs/intl-listformat/locale-data/pt.js';
+import '@formatjs/intl-listformat/locale-data/ja.js';
+
 import { IntlProvider as ReactIntlProvider } from 'react-intl';
+import { useSelector } from 'react-redux';
 
-import { en } from './en';
+import { useSystemLocaleListener } from './hooks/useSystemLocaleListener';
+import { useTranslatedMessages } from './hooks/useTranslatedMessages';
+import { DEFAULT_LOCALE } from './languages';
+import { selectLocale } from './localeSlice';
 
-// flatten object to single level deep like { a: { b: { c: 1 } } } => { 'a.b.c': 1 }
-const flatten = (obj: Record<string, any>, prefix = '') => {
-    const result: Record<string, any> = {};
-    Object.keys(obj).forEach(key => {
-        const value = obj[key];
-        const prefixedKey = prefix ? `${prefix}.${key}` : key;
-        if (typeof value === 'object') {
-            Object.assign(result, flatten(value, prefixedKey));
-        } else {
-            result[prefixedKey] = value;
-        }
-    });
+export const IntlProvider = ({ children }: { children: React.ReactNode }) => {
+    useSystemLocaleListener();
 
-    return result;
+    const locale = useSelector(selectLocale);
+    const messages = useTranslatedMessages();
+
+    return (
+        <ReactIntlProvider locale={locale} defaultLocale={DEFAULT_LOCALE} messages={messages}>
+            {children}
+        </ReactIntlProvider>
+    );
 };
-
-const enFlat = flatten(en);
-
-export const IntlProvider = ({ children }: { children: React.ReactNode }) => (
-    <ReactIntlProvider locale="en" defaultLocale="en" messages={enFlat}>
-        {children}
-    </ReactIntlProvider>
-);

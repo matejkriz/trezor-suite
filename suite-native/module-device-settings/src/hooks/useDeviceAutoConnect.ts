@@ -1,0 +1,81 @@
+import { useCallback } from 'react';
+import { useSelector } from 'react-redux';
+
+import { useNavigation } from '@react-navigation/native';
+import { isRejected } from '@reduxjs/toolkit';
+
+import { useServices } from '@suite-common/dependency-injection';
+import { selectSelectedDevice } from '@suite-common/device';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { removeThpCredentialsThunk } from '@suite-common/thp';
+import { useTranslate } from '@suite-native/intl';
+import {
+    type DeviceSettingsStackParamList,
+    DeviceSettingsStackRoutes,
+    type StackNavigationProps,
+} from '@suite-native/navigation';
+import { useThpAutoconnectActions } from '@suite-native/thp';
+import { useToast } from '@suite-native/toasts';
+import TrezorConnect from '@trezor/connect';
+
+import { selectDeviceAutoConnectCredentials } from '../selectors';
+
+type NavigationProp = StackNavigationProps<
+    DeviceSettingsStackParamList,
+    DeviceSettingsStackRoutes.DeviceSettings
+>;
+
+export const useDeviceAutoConnect = () => {
+    const { dispatch } = useServices(injectDispatch);
+    const navigation = useNavigation<NavigationProp>();
+
+    const { showToast } = useToast();
+    const { translate } = useTranslate();
+
+    const { startThpAutoconnect } = useThpAutoconnectActions();
+
+    const device = useSelector(selectSelectedDevice);
+    const autoConnectCredentials = useSelector(selectDeviceAutoConnectCredentials);
+    const isAutoConnectEnabled = autoConnectCredentials.length > 0;
+
+    const enableAutoConnect = useCallback(async () => {
+        const result = await startThpAutoconnect();
+
+        if (result && isRejected(result)) {
+            TrezorConnect.cancel();
+            showToast({
+                intent: 'critical',
+                message: translate('moduleDeviceSettings.autoConnect.errorToast'),
+            });
+        } else {
+            showToast({
+                intent: 'brand',
+                message: translate('moduleDeviceSettings.autoConnect.successToast'),
+            });
+        }
+        navigation.goBack();
+    }, [navigation, startThpAutoconnect, showToast, translate]);
+
+    const disableAutoConnect = useCallback(() => {
+        dispatch(
+            removeThpCredentialsThunk({
+                device,
+                credentials: autoConnectCredentials,
+            }),
+        );
+    }, [dispatch, device, autoConnectCredentials]);
+
+    const toggleAutoConnect = useCallback(() => {
+        if (!isAutoConnectEnabled) {
+            navigation.navigate(DeviceSettingsStackRoutes.DeviceAutoConnectStack);
+        } else {
+            disableAutoConnect();
+        }
+    }, [isAutoConnectEnabled, navigation, disableAutoConnect]);
+
+    return {
+        isAutoConnectEnabled,
+        enableAutoConnect,
+        toggleAutoConnect,
+    };
+};

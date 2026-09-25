@@ -1,0 +1,20 @@
+{
+    "name": "@trezor/analytics-uploader",
+    "version": "1.5.0",
+    "license": "See LICENSE.md in repo root",
+    "sideEffects": false,
+    "main": "src/index.ts",
+    "scripts": {
+        "test:unit": "yarn g:jest",
+        "depcheck": "yarn g:depcheck",
+        "type-check": "yarn g:tsc --build",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'"
+    },
+    "dependencies": {
+        "@trezor/env-utils": "workspace:*",
+        "@trezor/utils": "workspace:*"
+    },
+    "peerDependencies": {
+        "tslib": "^2.6.2"
+    }
+}

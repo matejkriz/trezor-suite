@@ -1,38 +1,35 @@
-import React from 'react';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import { useSelector } from 'react-redux';
 
-import { ListItemSkeleton, HStack, Text } from '@suite-native/atoms';
-import { Icon } from '@suite-common/icons';
-import { useTranslate } from '@suite-native/intl';
+import { HStack, ListItemSkeleton, Text } from '@suite-native/atoms';
+import { Icon } from '@suite-native/icons';
+import { Translation } from '@suite-native/intl';
 
-const DEFAULT_LIST_SKELETON_COUNT = 3;
-const MINIMUM_LIST_SKELETON_COUNT = 1;
+import { selectIsAssetListEmpty, selectIsAssetListLoading } from '../assetsSelectors';
 
-export const DiscoveryAssetsLoader = ({ numberOfAssets }: { numberOfAssets: number }) => {
-    const { translate } = useTranslate();
-    const isListEmpty = numberOfAssets === 0;
+export const DiscoveryAssetsLoader = () => {
+    const isAssetListLoading = useSelector(selectIsAssetListLoading);
+    const isAssetListEmpty = useSelector(selectIsAssetListEmpty);
 
-    const discoveryProgressText = translate(
-        isListEmpty
-            ? 'assets.dashboard.discoveryProgress.loading'
-            : 'assets.dashboard.discoveryProgress.stillWorking',
-    );
-
-    // There should always be
-    const numberOfSkeletons = Math.max(
-        DEFAULT_LIST_SKELETON_COUNT - numberOfAssets,
-        MINIMUM_LIST_SKELETON_COUNT,
-    );
+    if (!isAssetListLoading) {
+        return null;
+    }
 
     return (
-        <>
-            {Array.from({ length: numberOfSkeletons }, (_, i) => (
-                <ListItemSkeleton key={i} />
-            ))}
-
-            <HStack justifyContent="center">
-                <Icon size="mediumLarge" name="trezor" />
-                <Text variant="callout">{discoveryProgressText}</Text>
+        <Animated.View entering={FadeInDown} layout={LinearTransition}>
+            <ListItemSkeleton />
+            <HStack justifyContent="center" marginBottom="sp16">
+                <Icon size="mediumLarge" name="trezorLogo" />
+                <Text variant="body-sm-strong">
+                    <Translation
+                        id={
+                            isAssetListEmpty
+                                ? 'assets.dashboard.discoveryProgress.loading'
+                                : 'assets.dashboard.discoveryProgress.stillWorking'
+                        }
+                    />
+                </Text>
             </HStack>
-        </>
+        </Animated.View>
     );
 };

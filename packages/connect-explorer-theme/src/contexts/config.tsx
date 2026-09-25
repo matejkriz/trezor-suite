@@ -1,35 +1,39 @@
 import type { ReactElement, ReactNode } from 'react';
-import { createContext, useContext, useState } from 'react';
+import { useState } from 'react';
 
-import type { FrontMatter, PageMapItem, PageOpts } from 'nextra';
+import type { PageMapItem, PageOpts } from 'nextra';
 import { metaSchema } from 'nextra/normalize-pages';
-import type { ZodError } from 'zod';
+import { ZodError } from 'zod';
 
-import type { DocsThemeConfig } from '../constants';
-import { DEEP_OBJECT_KEYS, DEFAULT_THEME, themeSchema } from '../constants';
-import type { Context } from '../types';
+import type { DocsThemeConfig } from '../schema';
+import { themeSchema } from '../schema';
+import { DEEP_OBJECT_KEYS, DEFAULT_THEME } from '../theme';
 import { MenuProvider } from './menu';
-
-type Config<FrontMatterType = FrontMatter> = DocsThemeConfig &
-    Pick<PageOpts<FrontMatterType>, 'flexsearch' | 'newNextLinkBehavior' | 'title' | 'frontMatter'>;
-
-const ConfigContext = createContext<Config>({} as Config);
-
-export function useConfig<FrontMatterType = FrontMatter>() {
-    return useContext<Config<FrontMatterType>>(ConfigContext);
-}
+import { type Config, ConfigContext } from './useConfig';
 
 let theme: DocsThemeConfig;
 let isValidated = false;
 
 function normalizeZodMessage(error: unknown): string {
-    return (error as ZodError).issues
+    if (!(error instanceof ZodError)) {
+        return String(error);
+    }
+
+    return error.issues
         .flatMap(issue => {
             const themePath = issue.path.length > 0 && `Path: "${issue.path.join('.')}"`;
-            const unionErrors =
-                'unionErrors' in issue ? issue.unionErrors.map(normalizeZodMessage) : [];
+            const nestedErrors =
+                issue.code === 'invalid_union'
+                    ? issue.errors.flatMap(errs =>
+                          errs.map(e =>
+                              [e.message, e.path.length > 0 && `Path: "${e.path.join('.')}"`]
+                                  .filter(Boolean)
+                                  .join('. '),
+                          ),
+                      )
+                    : [];
 
-            return [[issue.message, themePath].filter(Boolean).join('. '), ...unionErrors];
+            return [[issue.message, themePath].filter(Boolean).join('. '), ...nestedErrors];
         })
         .join('\n');
 }
@@ -59,7 +63,7 @@ export const ConfigProvider = ({
     value: { themeConfig, pageOpts },
 }: {
     children: ReactNode;
-    value: Context;
+    value: { themeConfig: DocsThemeConfig; pageOpts: PageOpts };
 }): ReactElement => {
     const [menu, setMenu] = useState(false);
     // Merge only on first load
@@ -85,15 +89,12 @@ export const ConfigProvider = ({
             );
         }
         validateMeta(pageOpts.pageMap);
+        // eslint-disable-next-line react-hooks/globals
         isValidated = true;
     }
     const extendedConfig: Config = {
-        newNextLinkBehavior: false,
         ...theme,
         flexsearch: pageOpts.flexsearch,
-        ...(typeof pageOpts.newNextLinkBehavior === 'boolean' && {
-            newNextLinkBehavior: pageOpts.newNextLinkBehavior,
-        }),
         title: pageOpts.title,
         frontMatter: pageOpts.frontMatter,
     };

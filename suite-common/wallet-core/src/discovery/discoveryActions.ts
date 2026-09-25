@@ -1,62 +1,56 @@
 import { createAction } from '@reduxjs/toolkit';
 
-import { Discovery, PartialDiscovery } from '@suite-common/wallet-types';
+import { type DiscoveryStatus } from '@suite-common/wallet-types';
+import { type DeviceUniquePath } from '@trezor/connect';
 
 export const DISCOVERY_MODULE_PREFIX = '@common/wallet-core/discovery';
 
-export const createDiscovery = createAction(
-    `${DISCOVERY_MODULE_PREFIX}/create`,
-    (payload: Discovery) => ({
-        payload,
+export const updateDiscovery = createAction(
+    `${DISCOVERY_MODULE_PREFIX}/update`,
+    (status: DiscoveryStatus, path: DeviceUniquePath) => ({
+        payload: {
+            status,
+            path,
+        },
     }),
 );
+
+export const deleteDiscovery = createAction(
+    `${DISCOVERY_MODULE_PREFIX}/delete`,
+    (path: DeviceUniquePath) => ({
+        payload: {
+            path,
+        },
+    }),
+);
+
+type StartDiscoveryParams = {
+    isAddingHiddenWallet?: boolean;
+    isAddingExistingWallet?: boolean;
+    useScopedCallIds?: boolean;
+};
 
 export const startDiscovery = createAction(
     `${DISCOVERY_MODULE_PREFIX}/start`,
-    (payload: Discovery) => ({
-        payload,
+    (
+        path: DeviceUniquePath,
+        {
+            isAddingHiddenWallet,
+            isAddingExistingWallet,
+            useScopedCallIds,
+        }: StartDiscoveryParams = {},
+    ) => ({
+        payload: {
+            path,
+            isAddingHiddenWallet,
+            isAddingExistingWallet,
+            useScopedCallIds,
+        },
     }),
-);
-
-export const interruptDiscovery = createAction(
-    `${DISCOVERY_MODULE_PREFIX}/interrupt`,
-    (payload: PartialDiscovery) => ({
-        payload,
-    }),
-);
-
-export const completeDiscovery = createAction(
-    `${DISCOVERY_MODULE_PREFIX}/complete`,
-    (payload: PartialDiscovery) => ({
-        payload,
-    }),
-);
-
-export const stopDiscovery = createAction(
-    `${DISCOVERY_MODULE_PREFIX}/stop`,
-    (payload: PartialDiscovery) => ({
-        payload,
-    }),
-);
-
-export const removeDiscovery = createAction(
-    `${DISCOVERY_MODULE_PREFIX}/remove`,
-    (deviceState: string): { payload: string } => ({
-        payload: deviceState,
-    }),
-);
-
-export const updateDiscovery = createAction(
-    `${DISCOVERY_MODULE_PREFIX}/update`,
-    (payload: PartialDiscovery) => ({ payload }),
 );
 
 export const discoveryActions = {
-    createDiscovery,
-    startDiscovery,
-    removeDiscovery,
     updateDiscovery,
-    completeDiscovery,
-    stopDiscovery,
-    interruptDiscovery,
+    deleteDiscovery,
+    startDiscovery,
 };

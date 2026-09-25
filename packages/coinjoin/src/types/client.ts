@@ -1,11 +1,12 @@
-import { SessionPhase, WabiSabiProtocolErrorCode } from '../enums';
-import { Round } from './coordinator';
-import { CoinjoinRequestEvent, CoinjoinRoundEvent } from './round';
-import { LogEvent } from './logger';
+import type { Round } from './coordinator';
+import type { LogEvent } from './logger';
+import type { CoinjoinPrisonEvents } from './prison';
+import type { CoinjoinRequestEvent, CoinjoinRoundEvent, SessionPhaseEvent } from './round';
 
 export interface CoinjoinStatusEvent {
     rounds: Round[];
     changed: Round[];
+    prevStatusTimestamp?: number;
     feeRateMedian: number;
     coordinationFeeRate: {
         rate: number;
@@ -29,23 +30,5 @@ export interface CoinjoinClientEvents {
     round: CoinjoinRoundEvent;
     request: CoinjoinRequestEvent[];
     log: LogEvent;
-    'session-phase': {
-        phase: SessionPhase;
-        accountKeys: string[];
-    };
-}
-
-export interface CoinjoinPrisonEvents {
-    change: { prison: CoinjoinPrisonInmate[] };
-}
-
-export interface CoinjoinPrisonInmate {
-    type: 'input' | 'output' | 'account';
-    accountKey: string;
-    id: string; // AccountUtxo/Alice.outpoint or AccountAddress scriptPubKey or Account key
-    sentenceStart: number;
-    sentenceEnd: number;
-    errorCode?: WabiSabiProtocolErrorCode | 'blameOf';
-    reason?: string;
-    roundId?: string;
+    'session-phase': SessionPhaseEvent;
 }

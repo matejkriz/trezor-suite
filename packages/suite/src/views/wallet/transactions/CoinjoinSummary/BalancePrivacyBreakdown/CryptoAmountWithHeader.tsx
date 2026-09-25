@@ -1,25 +1,26 @@
-import { ReactNode } from 'react';
+import { type ReactNode } from 'react';
+
 import styled from 'styled-components';
-import { variables } from '@trezor/components';
-import { FiatValue } from 'src/components/suite/FiatValue';
-import { FormattedCryptoAmount } from 'src/components/suite/FormattedCryptoAmount';
-import { NetworkSymbol } from 'src/types/wallet';
+
+import { type NetworkSymbol } from '@suite-common/wallet-config';
 import { formatNetworkAmount } from '@suite-common/wallet-utils';
+import { typography } from '@trezor/theme';
+
+import { BaseCurrencyValue } from 'src/components/suite/BaseCurrencyValue';
+import { FormattedCryptoAmount } from 'src/components/suite/FormattedCryptoAmount';
 
 const Container = styled.div`
     display: flex;
     flex-direction: column;
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-    font-size: ${variables.FONT_SIZE.SMALL};
+    color: ${({ theme }) => theme.contentSecondary};
+    ${typography['body-sm']}
 `;
 
 const Header = styled.div`
     display: flex;
     align-items: center;
     height: 15px;
-    font-weight: ${variables.FONT_WEIGHT.DEMI_BOLD};
-    line-height: 1;
+    ${typography['body-md-strong']}
 
     > :first-child {
         margin-right: 6px;
@@ -29,9 +30,8 @@ const Header = styled.div`
 
 const CryptoAmount = styled(FormattedCryptoAmount)<{ $color?: string }>`
     margin: 6px 0 4px;
-    color: ${({ theme, $color }) => $color || theme.TYPE_DARK_GREY};
-    font-weight: ${variables.FONT_WEIGHT.DEMI_BOLD};
-    font-size: ${variables.FONT_SIZE.H3};
+    color: ${({ theme, $color }) => $color || theme.contentPrimary};
+    ${typography['headline-sm']}
 `;
 
 interface CryptoAmountWithHeaderProps {
@@ -57,7 +57,7 @@ export const CryptoAmountWithHeader = ({
         </Header>
 
         <CryptoAmount value={formatNetworkAmount(value, symbol)} symbol={symbol} $color={color} />
-        <FiatValue
+        <BaseCurrencyValue
             amount={formatNetworkAmount(value, symbol)}
             symbol={symbol}
             showApproximationIndicator

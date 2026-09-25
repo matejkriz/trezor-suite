@@ -1,21 +1,20 @@
-import BigNumber from 'bignumber.js';
-
 import type {
-    BlockfrostUtxos,
-    BlockfrostTransaction,
-    BlockfrostAccountInfo,
-    ParseAssetResult,
-} from '@trezor/blockchain-link-types/src/blockfrost';
-import type { VinVout } from '@trezor/blockchain-link-types/src/blockbook';
-import type {
-    Utxo,
-    Transaction,
-    AccountInfo,
     AccountAddresses,
+    AccountInfo,
+    AssetBalance,
+    BlockfrostAccountInfo,
+    BlockfrostTransaction,
+    BlockfrostUtxos,
+    ParseAssetResult,
     TokenInfo,
     TokenTransfer,
+    Transaction,
     TransferType,
-} from '@trezor/blockchain-link-types/src/common';
+    Utxo,
+    VinVout,
+} from '@trezor/blockchain-link-types';
+import { isNotNullOrUndefined } from '@trezor/utils';
+import { BigNumber, type BigNumberValue } from '@trezor/utils/src/bigNumber';
 
 import { enhanceVinVout, filterTargets, sumVinVout, transformTarget } from './utils';
 
@@ -50,18 +49,47 @@ const hexToString = (input: string): string => {
     return str;
 };
 
-const getSubtype = (tx: Pick<BlockfrostTransaction, 'txData'>) => {
-    const withdrawal = tx.txData.withdrawal_count > 0;
-    if (withdrawal) {
+const getSubtype = (
+    tx: Pick<BlockfrostTransaction, 'txData'>,
+    totalInput: BigNumberValue,
+    totalOutput: BigNumberValue,
+    allOutputsAreChange: boolean,
+) => {
+    const { withdrawal_count, stake_cert_count, delegation_count, deposit, fees } = tx.txData;
+
+    // Deregistering needs an empty reward account, so a withdrawal here means unstake, not claim.
+    if (withdrawal_count > 0 && stake_cert_count === 0) {
         return 'withdrawal';
     }
 
-    const registrations = tx.txData.stake_cert_count;
-    const delegations = tx.txData.delegation_count;
-    if (registrations === 0 && delegations === 0) return;
+    // governance_delegation is detected heuristically.
+    // Blockfrost txData does not expose governance (DRep) certificates, so we infer it as:
+    // - no withdrawals
+    // - no stake or pool delegation certificates
+    // - zero deposit
+    // - self transaction where totalInput === totalOutput + fee
+    // - all outputs go to change addresses (no value transfer)
+    // - non-zero fee
+    // This may still misclassify rare fee-only self transactions.
+    if (
+        withdrawal_count === 0 &&
+        stake_cert_count === 0 &&
+        delegation_count === 0 &&
+        new BigNumber(deposit || 0).isZero()
+    ) {
+        const fee = new BigNumber(fees || 0);
+        const isFeeOnly =
+            fee.gt(0) && new BigNumber(totalInput).eq(new BigNumber(totalOutput).plus(fee));
 
-    if (registrations > 0) {
-        if (new BigNumber(tx.txData.deposit).gt(0)) {
+        if (isFeeOnly && allOutputsAreChange) {
+            return 'governance_delegation';
+        }
+    }
+
+    if (stake_cert_count === 0 && delegation_count === 0) return;
+
+    if (stake_cert_count > 0) {
+        if (new BigNumber(deposit).gt(0)) {
             // transaction could both register staking address and delegate stake at the same time. In that case we treat it as "stake registration"
             return 'stake_registration';
         }
@@ -69,7 +97,7 @@ const getSubtype = (tx: Pick<BlockfrostTransaction, 'txData'>) => {
         return 'stake_deregistration';
     }
 
-    if (delegations > 0) {
+    if (delegation_count > 0) {
         return 'stake_delegation';
     }
 };
@@ -86,22 +114,33 @@ export const parseAsset = (hex: string): ParseAssetResult => {
     };
 };
 
+export const transformToken = (token: AssetBalance) => {
+    const { policyId, assetName } = parseAsset(token.unit);
+
+    const symbol = token.ticker || assetName || token.fingerprint!;
+
+    return {
+        name: token.name || symbol,
+        contract: token.unit,
+        symbol,
+        decimals: token.decimals,
+        fingerprint: token.fingerprint!,
+        policyId,
+    };
+};
+
 export const transformTokenInfo = (
     tokens: BlockfrostAccountInfo['tokens'],
 ): TokenInfo[] | undefined => {
-    if (!tokens || !Array.isArray(tokens)) return undefined;
-    const info = tokens.map(token => {
-        const { assetName } = parseAsset(token.unit);
+    if (!tokens || !Array.isArray(tokens)) {
+        return undefined;
+    }
 
-        return {
-            type: 'BLOCKFROST',
-            name: token.fingerprint!, // this is safe as fingerprint is defined for all tokens except lovelace and lovelace is never included in account.tokens
-            contract: token.unit,
-            symbol: assetName || token.fingerprint!,
-            balance: token.quantity,
-            decimals: token.decimals,
-        };
-    });
+    const info = tokens.map(token => ({
+        balance: token.quantity,
+        standard: 'BLOCKFROST' as const,
+        ...transformToken(token),
+    }));
 
     return info.length > 0 ? info : undefined;
 };
@@ -129,9 +168,10 @@ export const filterTokenTransfers = (
         output.amount
             .filter(a => a.unit !== 'lovelace')
             .forEach(asset => {
-                const token = asset.unit;
-                const inputs = transformInputOutput(tx.txUtxos.inputs, token);
-                const outputs = transformInputOutput(tx.txUtxos.outputs, token);
+                const tokenUnit = asset.unit;
+
+                const inputs = transformInputOutput(tx.txUtxos.inputs, tokenUnit);
+                const outputs = transformInputOutput(tx.txUtxos.outputs, tokenUnit);
                 const outgoing = filterTargets(myAddresses, inputs); // inputs going from account address
                 const incoming = filterTargets(myAddresses, outputs); // outputs to account address
                 const isChange = accountAddress.change.find(a => a.address === output.address);
@@ -140,7 +180,7 @@ export const filterTokenTransfers = (
 
                 const incomingForOutput = filterTargets(
                     myNonChangeAddresses,
-                    transformInputOutput([output], token),
+                    transformInputOutput([output], tokenUnit),
                 );
 
                 let amount = '0';
@@ -155,25 +195,22 @@ export const filterTokenTransfers = (
                 // fingerprint is always defined on tokens
                 if (amount === '0' || !asset.fingerprint) return null;
 
-                const { assetName } = parseAsset(token);
                 transfers.push({
+                    ...transformToken(asset),
                     type,
-                    name: asset.fingerprint,
-                    symbol: assetName || asset.fingerprint,
-                    contract: asset.unit,
-                    decimals: asset.decimals,
                     amount: amount.toString(),
                     from:
                         type === 'sent' || type === 'self'
                             ? tx.address
-                            : tx.txUtxos.inputs.find(i => i.amount.find(a => a.unit === token))
+                            : tx.txUtxos.inputs.find(i => i.amount.find(a => a.unit === tokenUnit))
                                   ?.address || '',
                     to: type === 'recv' ? tx.address : output.address,
+                    standard: 'BLOCKFROST',
                 });
             });
     });
 
-    return transfers.filter(t => !!t) as TokenTransfer[];
+    return transfers.filter(isNotNullOrUndefined);
 };
 
 export const transformTransaction = (
@@ -197,7 +234,7 @@ export const transformTransaction = (
 
     let type: Transaction['type'];
     let targets: VinVout[] = [];
-    let amount: BigNumber.Value =
+    let amount: BigNumberValue =
         blockfrostTxData.txData.output_amount.find(b => b.unit === 'lovelace')?.quantity || '0';
     const fee = blockfrostTxData.txData.fees;
 
@@ -216,6 +253,11 @@ export const transformTransaction = (
     const internal = accountAddress ? filterTargets(accountAddress.change, outputs) : [];
     const totalInput = inputs.reduce(sumVinVout, 0);
     const totalOutput = outputs.reduce(sumVinVout, 0);
+    const allOutputsAreChange =
+        fullData &&
+        blockfrostTxData.txUtxos.outputs.every(o =>
+            accountAddress?.change.some(c => c.address === o.address),
+        );
 
     if (outgoing.length === 0 && incoming.length === 0) {
         type = 'unknown';
@@ -227,22 +269,23 @@ export const transformTransaction = (
     ) {
         // all inputs and outputs are mine
         type = 'self';
-        targets = outputs.filter(o => internal.indexOf(o) < 0);
+        targets = outputs.filter(o => !internal.includes(o));
         // recalculate amount, amount spent is just a fee
         amount = blockfrostTxData.txData.fees;
 
-        if (blockfrostTxData.txData.withdrawal_count > 0) {
-            // output including fee is larger than the sum of all inputs,
-            // so there must be more coin somewhere and that's the withdrawal amount
-            withdrawal = new BigNumber(totalOutput)
-                .plus(blockfrostTxData.txData.fees)
-                .minus(totalInput)
-                .toString();
+        const depositBn = new BigNumber(blockfrostTxData.txData.deposit || 0);
+        if (!depositBn.isZero()) {
+            // deposit paid for stake address registration
+            deposit = depositBn.abs().toString(); // +2ADA register, -2ADA deregister
         }
 
-        if (new BigNumber(blockfrostTxData.txData.deposit).gt(0)) {
-            // deposit paid for stake address registration
-            deposit = blockfrostTxData.txData.deposit;
+        if (blockfrostTxData.txData.withdrawal_count > 0) {
+            // Outputs plus fee exceed inputs by the withdrawal and any refunded deposit.
+            // `deposit` is negative on a deregistration, so adding it back cancels the refund.
+            const extra = new BigNumber(totalOutput)
+                .plus(blockfrostTxData.txData.fees || 0)
+                .minus(totalInput);
+            withdrawal = extra.plus(depositBn).abs().toString();
         }
     } else if (outgoing.length === 0 && incoming.length > 0) {
         // none of the input is mine but and output or token transfer is mine
@@ -255,7 +298,7 @@ export const transformTransaction = (
         }
     } else {
         type = 'sent';
-        targets = outputs.filter(o => internal.indexOf(o) < 0);
+        targets = outputs.filter(o => !internal.includes(o));
         // regular targets
         if (voutLength) {
             // bitcoin-like transaction
@@ -284,7 +327,7 @@ export const transformTransaction = (
         tokens,
         internalTransfers: [],
         cardanoSpecific: {
-            subtype: getSubtype(blockfrostTxData),
+            subtype: getSubtype(blockfrostTxData, totalInput, totalOutput, allOutputsAreChange),
             withdrawal,
             deposit,
         },

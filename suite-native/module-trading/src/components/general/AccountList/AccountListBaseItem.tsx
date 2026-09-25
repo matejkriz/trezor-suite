@@ -1,0 +1,172 @@
+import { type ReactNode } from 'react';
+import { useSelector } from 'react-redux';
+
+import { selectAccountLabel } from '@suite-native/accounts';
+import { Box, HStack, PressableOpacity, Text, VStack } from '@suite-native/atoms';
+import { useCoinLabel } from '@suite-native/device';
+import {
+    CompactCryptoAmountFormatter,
+    CryptoToFiatAmountFormatter,
+} from '@suite-native/formatters';
+import { Icon, TokenIcon } from '@suite-native/icons';
+import { useTranslate } from '@suite-native/intl';
+import { type CombinedLabelingState } from '@suite-native/labeling';
+import { type ReceiveAccount } from '@suite-native/trading-types';
+import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
+
+export type AccountListBaseItemProps = {
+    receiveAccount: ReceiveAccount;
+    label: ReactNode;
+    info?: ReactNode;
+    isAddressDetail: boolean;
+    isFreshAddress?: boolean;
+    onPress: () => void;
+};
+
+type TextColor = 'contentPrimary' | 'contentSecondary';
+
+const labelTextStyle = prepareNativeStyle<{ textColor: TextColor; flex: number }>(
+    ({ colors }, { textColor, flex }) => ({
+        color: colors[textColor],
+        flex,
+    }),
+);
+
+const amountTextStyle = prepareNativeStyle<{ textColor: TextColor }>(
+    ({ colors }, { textColor }) => ({
+        color: colors[textColor],
+        textAlign: 'right',
+        flex: 0,
+    }),
+);
+
+const bottomContentStyle = prepareNativeStyle<{ hasSingleChildren: boolean }>(
+    (_, { hasSingleChildren }) => ({
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        extend: {
+            condition: hasSingleChildren,
+            style: { justifyContent: 'flex-end' },
+        },
+    }),
+);
+
+const containerStyle = prepareNativeStyle(({ spacings }) => ({
+    minHeight: spacings.sp64,
+}));
+
+const AccountListLabel = ({ label, flex }: { label: ReactNode; flex: number }) => {
+    const { applyStyle } = useNativeStyles();
+
+    return (
+        <Text
+            variant="body-md"
+            style={applyStyle(labelTextStyle, { textColor: 'contentPrimary', flex })}
+            numberOfLines={1}
+        >
+            {label}
+        </Text>
+    );
+};
+
+export const AccountListBaseItem = ({
+    receiveAccount: { account, address },
+    label,
+    info,
+    isAddressDetail,
+    isFreshAddress = false,
+    onPress,
+}: AccountListBaseItemProps) => {
+    const { applyStyle } = useNativeStyles();
+    const { translate } = useTranslate();
+    const coinLabel = useCoinLabel();
+
+    const cryptoValue = isAddressDetail ? (address?.balance ?? '0') : account.availableBalance;
+
+    const shouldDisplayCaret = !isAddressDetail && !!account.addresses;
+    const shouldDisplayBalance = !isFreshAddress;
+
+    const accountLabel =
+        useSelector((state: CombinedLabelingState) =>
+            selectAccountLabel(state, account.deviceState, account.descriptor, account.symbol),
+        ) ?? undefined;
+
+    return (
+        <PressableOpacity
+            onPress={onPress}
+            accessibilityRole="button"
+            accessibilityLabel={accountLabel}
+            testID={isFreshAddress ? '@trading/account-list/fresh-address' : undefined}
+        >
+            <HStack
+                alignItems="center"
+                spacing="sp12"
+                paddingVertical="sp16"
+                justifyContent="center"
+                style={applyStyle(containerStyle)}
+            >
+                {!isAddressDetail && (
+                    <Box justifyContent="center">
+                        <TokenIcon
+                            tokenSymbol={account.symbol}
+                            networkSymbol={account.symbol}
+                            size="extraSmall"
+                        />
+                    </Box>
+                )}
+                {!info && (
+                    <Box flex={1}>
+                        <AccountListLabel label={label} flex={0} />
+                    </Box>
+                )}
+                <VStack flex={info ? 1 : 0} spacing={0}>
+                    <HStack alignItems="center" justifyContent="space-between">
+                        {/* If no info is provided, display empty Box to maintain layout consistency */}
+                        {info ? <AccountListLabel label={label} flex={1} /> : <Box />}
+                        {shouldDisplayBalance && (
+                            <CompactCryptoAmountFormatter
+                                value={cryptoValue}
+                                symbol={account.symbol}
+                                variant="body-md"
+                                style={applyStyle(amountTextStyle, {
+                                    textColor: 'contentPrimary',
+                                })}
+                                accessibilityLabel={translate(
+                                    'moduleTrading.accountScreen.balanceCrypto',
+                                    { coinLabel },
+                                )}
+                                isBalance={false}
+                            />
+                        )}
+                    </HStack>
+                    <HStack style={applyStyle(bottomContentStyle, { hasSingleChildren: false })}>
+                        <Box>{info}</Box>
+                        {shouldDisplayBalance && cryptoValue && (
+                            <CryptoToFiatAmountFormatter
+                                value={cryptoValue}
+                                symbol={account.symbol}
+                                variant="body-sm"
+                                style={applyStyle(labelTextStyle, {
+                                    textColor: 'contentSecondary',
+                                    flex: 1,
+                                })}
+                                accessibilityLabel={translate(
+                                    'moduleTrading.accountScreen.balanceFiat',
+                                )}
+                            />
+                        )}
+                    </HStack>
+                </VStack>
+                {shouldDisplayCaret && (
+                    <Box justifyContent="center">
+                        <Icon
+                            name="caretRight"
+                            color="contentPrimary"
+                            accessibilityHint={translate('moduleTrading.accountScreen.step2Hint')}
+                        />
+                    </Box>
+                )}
+            </HStack>
+        </PressableOpacity>
+    );
+};

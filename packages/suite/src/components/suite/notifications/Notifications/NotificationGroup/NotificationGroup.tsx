@@ -1,82 +1,70 @@
-import styled from 'styled-components';
+import { Translation, type TranslationKey } from '@suite/intl';
+import { getSeenAndUnseenNotifications } from '@suite-common/toast-notifications';
+import { Column, H2, H4, IconCircle, Paragraph } from '@trezor/components';
+import { BellZIcon } from '@trezor/icons';
 
-import { variables, Paragraph } from '@trezor/components';
-import { AppState } from 'src/types/suite';
-import { Translation } from 'src/components/suite';
-import { getSeenAndUnseenNotifications } from 'src/utils/suite/notification';
+import { type AppState } from 'src/types/suite';
+
 import { NotificationList } from './NotificationList/NotificationList';
 
-const SectionHeadline = styled.div`
-    margin-top: 14px;
-    font-size: ${variables.FONT_SIZE.TINY};
-    font-weight: ${variables.FONT_WEIGHT.DEMI_BOLD};
-    text-transform: uppercase;
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    height: 16px;
-    line-height: 1.33;
-    letter-spacing: 0.2px;
-    opacity: 0.6;
-`;
-
-const EmptyWrapper = styled.div`
-    white-space: break-spaces;
-`;
-
-const EmptyHeadline = styled.div`
-    font-size: ${variables.FONT_SIZE.NORMAL};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-    margin: 10px 0 6px;
-`;
-
-const EmptyDescriptionP = styled(Paragraph)`
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-`;
 interface NotificationGroupProps {
     notifications: AppState['notifications'];
+    emptyTitle?: TranslationKey;
+    emptyDescription?: TranslationKey;
 }
-export const NotificationGroup = (props: NotificationGroupProps) => {
-    const { seenNotifications, unseenNotifications } = getSeenAndUnseenNotifications(
-        props.notifications,
-    );
+export const NotificationGroup = ({
+    notifications,
+    emptyTitle = 'NOTIFICATIONS_EMPTY_TITLE',
+    emptyDescription = 'NOTIFICATIONS_EMPTY_DESC',
+}: NotificationGroupProps) => {
+    const { seenNotifications, unseenNotifications } = getSeenAndUnseenNotifications(notifications);
 
     const seenCount = seenNotifications.length;
     const unseenCount = unseenNotifications.length;
 
     if (unseenCount === 0 && seenCount === 0) {
         return (
-            <EmptyWrapper>
-                <EmptyHeadline>
-                    <Translation id="NOTIFICATIONS_EMPTY_TITLE" />
-                </EmptyHeadline>
-                <EmptyDescriptionP typographyStyle="hint">
-                    <Translation id="NOTIFICATIONS_EMPTY_DESC" />
-                </EmptyDescriptionP>
-            </EmptyWrapper>
+            <Column
+                alignItems="center"
+                gap={16}
+                padding={{ vertical: 64 }}
+                data-testid="@activity/empty"
+            >
+                <IconCircle icon={BellZIcon} size={112} intent="info" />
+                <Column alignItems="center" gap={4}>
+                    <H2 data-testid="@activity/empty/title">
+                        <Translation id={emptyTitle} />
+                    </H2>
+                    <Paragraph typographyStyle="body-md" intent="neutral" priority="secondary">
+                        <Translation id={emptyDescription} />
+                    </Paragraph>
+                </Column>
+            </Column>
         );
     }
 
     return (
-        <>
+        <Column gap={24} data-testid="@activity/list">
             {unseenCount > 0 && (
-                <>
-                    <SectionHeadline>
+                <Column gap={12} data-testid="@activity/list/unseen">
+                    <H4>
                         <Translation
                             id="NOTIFICATIONS_UNSEEN_TITLE"
                             values={{ count: unseenCount }}
                         />
-                    </SectionHeadline>
+                    </H4>
                     <NotificationList notifications={unseenNotifications} />
-                </>
+                </Column>
             )}
 
             {seenCount > 0 && (
-                <>
-                    <SectionHeadline>
+                <Column gap={12} data-testid="@activity/list/seen">
+                    <H4>
                         <Translation id="NOTIFICATIONS_SEEN_TITLE" />
-                    </SectionHeadline>
+                    </H4>
                     <NotificationList notifications={seenNotifications} />
-                </>
+                </Column>
             )}
-        </>
+        </Column>
     );
 };

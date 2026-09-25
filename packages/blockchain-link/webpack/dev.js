@@ -1,8 +1,9 @@
-const webpack = require('webpack');
-const HtmlWebpackPlugin = require('html-webpack-plugin');
-const { SRC, BUILD, PORT } = require('./constants');
+import HtmlWebpackPlugin from 'html-webpack-plugin';
+import webpack from 'webpack';
 
-module.exports = {
+import { BUILD, PORT, SRC } from './constants.js';
+
+export default {
     target: 'web',
     mode: 'development',
     devtool: 'source-map',
@@ -22,7 +23,6 @@ module.exports = {
             directory: `${SRC}ui`,
         },
         hot: false,
-        https: false,
         port: PORT,
     },
     module: {
@@ -51,22 +51,16 @@ module.exports = {
     resolve: {
         modules: [SRC, 'node_modules'],
         extensions: ['.ts', '.js'],
-        fallback: {
-            https: false, // required by ripple-lib
-            crypto: require.resolve('crypto-browserify'),
-            stream: require.resolve('stream-browserify'),
-        },
     },
     performance: {
         hints: false,
     },
     plugins: [
-        // provide fallback plugins
+        // Provide fallback plugins.
         new webpack.ProvidePlugin({
             Buffer: ['buffer', 'Buffer'],
-            process: 'process/browser',
+            process: 'process/browser.js',
         }),
-        new webpack.NormalModuleReplacementPlugin(/^ws$/, `${SRC}/utils/ws`),
         new HtmlWebpackPlugin({
             chunks: ['indexUI'],
             template: `${SRC}ui/index.html`,

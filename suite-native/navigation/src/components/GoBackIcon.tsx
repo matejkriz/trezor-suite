@@ -1,27 +1,35 @@
+import { useCallback } from 'react';
+
 import { useNavigation } from '@react-navigation/native';
 
 import { IconButton } from '@suite-native/atoms';
 
-import { CloseActionType } from '../navigators';
+import { type CloseActionType } from '../navigators';
 
 type GoBackIconProps = {
     closeActionType?: CloseActionType;
+    closeAction?: () => void;
+    testID?: string;
 };
 
-export const GoBackIcon = ({ closeActionType = 'back' }: GoBackIconProps) => {
+export const GoBackIcon = ({ closeActionType = 'back', closeAction, testID }: GoBackIconProps) => {
     const navigation = useNavigation();
 
-    const handleGoBack = () => {
-        if (navigation.canGoBack()) {
+    const handleGoBack = useCallback(() => {
+        if (closeAction) {
+            closeAction();
+        } else if (navigation.canGoBack()) {
             navigation.goBack();
         }
-    };
+    }, [closeAction, navigation]);
 
     return (
         <IconButton
-            iconName={closeActionType === 'back' ? 'chevronLeft' : 'close'}
+            testID={testID}
+            iconName={closeActionType === 'back' ? 'caretLeft' : 'x'}
+            intent="neutral"
+            priority="secondary"
             size="medium"
-            colorScheme="tertiaryElevation0"
             onPress={handleGoBack}
             accessibilityRole="button"
             accessibilityLabel="Go back"

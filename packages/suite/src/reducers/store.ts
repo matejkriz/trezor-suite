@@ -1,94 +1,146 @@
 // fixes bindActionCreators() https://github.com/reduxjs/redux-thunk/blob/e3d452948d5562b9ce871cc9391403219f83b4ff/extend-redux.d.ts#L11
-/// <reference types="redux-thunk/extend-redux" />
-import { configureStore, combineReducers } from '@reduxjs/toolkit';
-import thunkMiddleware from 'redux-thunk';
+import {
+    type DevToolsEnhancerOptions,
+    type Dispatch,
+    type Middleware,
+    type Reducer,
+    type ReducersMapObject,
+    type UnknownAction,
+    combineReducers,
+} from '@reduxjs/toolkit';
 import { createLogger } from 'redux-logger';
 
-import { prepareFirmwareReducer } from '@suite-common/wallet-core';
+import { type BackupState, backupMiddleware, backupReducer } from '@suite/backup';
+import { type DesktopBluetoothState, prepareDesktopBluetoothReducer } from '@suite/bluetooth';
+import { type RecoveryState, recoveryReducer } from '@suite/recovery';
+import { type DesktopSuiteSyncState, prepareSuiteSyncReducer } from '@suite/suite-sync';
+import { type FirmwareUpdateState, prepareFirmwareReducer } from '@suite-common/firmware';
+import { type GeolocationState, geolocationReducer } from '@suite-common/geolocation';
 import { addLog } from '@suite-common/logger';
+import { type NetworksState, networksReducer } from '@suite-common/networks';
+import {
+    type PersistentDeviceDataState,
+    preparePersistentDeviceDataReducer,
+} from '@suite-common/persistent-device-data';
+import { type ReceiveState, prepareReceiveReducer } from '@suite-common/receive';
+import { type SuiteSyncDataState, suiteSyncDataReducer } from '@suite-common/suite-sync';
+import { type SuiteSyncQuotaManagerState } from '@suite-common/suite-sync-quota-manager';
+import { type ThpState, prepareThpReducer } from '@suite-common/thp';
+import {
+    type TokenDefinitionsState,
+    prepareTokenDefinitionsReducer,
+} from '@suite-common/token-definitions';
 import { isCodesignBuild } from '@trezor/env-utils';
 
-import suiteMiddlewares from 'src/middlewares/suite';
-import walletMiddlewares from 'src/middlewares/wallet';
+import { suiteSyncQuotaManagerSlice } from 'src/actions/suiteSyncQuotaManager/suiteSyncQuotaManagerSlice';
 import onboardingMiddlewares from 'src/middlewares/onboarding';
-import firmwareMiddlewares from 'src/middlewares/firmware';
-import backupMiddlewares from 'src/middlewares/backup';
-import recoveryMiddlewares from 'src/middlewares/recovery';
-import suiteReducers from 'src/reducers/suite';
-import walletReducers from 'src/reducers/wallet';
+import { type GetSuiteMiddlewareDeps, getSuiteMiddleware } from 'src/middlewares/suite';
+import { toastMiddleware } from 'src/middlewares/suite/toastMiddleware';
+import { type GetWalletMiddlewaresDeps, getWalletMiddlewares } from 'src/middlewares/wallet';
 import onboardingReducers from 'src/reducers/onboarding';
-import recoveryReducers from 'src/reducers/recovery';
-import backupReducers from 'src/reducers/backup';
+import { type OnboardingState } from 'src/reducers/onboarding/onboardingReducer';
+import { type SuiteReducersState, suiteReducers } from 'src/reducers/suite';
+import { type WalletState, walletReducers } from 'src/reducers/wallet';
+import {
+    type GlobalSendReceiveFiltersState,
+    globalSendReceiveFiltersReducer,
+} from 'src/slices/wallet/globalSendReceiveFilters';
 
-// toastMiddleware can be used only in suite-desktop and suite-web
-// it's not included into `@suite-middlewares` index
-import toastMiddleware from 'src/middlewares/suite/toastMiddleware';
-import type { PreloadStoreAction } from 'src/support/suite/preloadStore';
-
-import { desktopReducer } from './desktop';
+import { type BioAuthState, prepareBioAuthReducer } from './bioAuth';
+import { type DesktopState, desktopReducer } from './desktop';
 import { extraDependencies } from '../support/extraDependencies';
 
 const firmwareReducer = prepareFirmwareReducer(extraDependencies);
+const tokenDefinitionsReducer = prepareTokenDefinitionsReducer(extraDependencies);
+const bluetoothReducer = prepareDesktopBluetoothReducer(extraDependencies);
+const thpReducer = prepareThpReducer(extraDependencies);
+const suiteSyncReducer = prepareSuiteSyncReducer(extraDependencies);
+const suiteSyncQuotaManagerReducer = suiteSyncQuotaManagerSlice.prepareReducer(extraDependencies);
+const receiveReducer = prepareReceiveReducer(extraDependencies);
+const persistentDeviceDataReducer = preparePersistentDeviceDataReducer(extraDependencies);
 
-const rootReducer = combineReducers({
+export type AppState = SuiteReducersState & {
+    networks: NetworksState;
+    onboarding: OnboardingState;
+    receive: ReceiveState;
+    wallet: WalletState;
+    recovery: RecoveryState;
+    firmware: FirmwareUpdateState;
+    backup: BackupState;
+    desktop: DesktopState;
+    bioAuth: BioAuthState;
+    tokenDefinitions: Partial<TokenDefinitionsState>;
+    bluetooth: DesktopBluetoothState;
+    thp: ThpState;
+    suiteSync: DesktopSuiteSyncState;
+    suiteSyncQuotaManager: SuiteSyncQuotaManagerState;
+    suiteSyncData: SuiteSyncDataState;
+    geolocation: GeolocationState;
+    globalSendReceiveFilters: GlobalSendReceiveFiltersState;
+    persistentDeviceData: PersistentDeviceDataState;
+};
+
+export type SuiteRootReducer = Reducer<AppState, UnknownAction, Partial<AppState>>;
+
+export const rootReducer: SuiteRootReducer = combineReducers({
     ...suiteReducers,
+    networks: networksReducer,
     onboarding: onboardingReducers,
+    receive: receiveReducer,
     wallet: walletReducers,
-    recovery: recoveryReducers,
+    recovery: recoveryReducer,
     firmware: firmwareReducer,
-    backup: backupReducers,
+    backup: backupReducer,
     desktop: desktopReducer,
-});
+    bioAuth: prepareBioAuthReducer(extraDependencies),
+    tokenDefinitions: tokenDefinitionsReducer,
+    bluetooth: bluetoothReducer,
+    thp: thpReducer,
+    suiteSync: suiteSyncReducer,
+    suiteSyncQuotaManager: suiteSyncQuotaManagerReducer,
+    suiteSyncData: suiteSyncDataReducer,
+    geolocation: geolocationReducer,
+    globalSendReceiveFilters: globalSendReceiveFiltersReducer,
+    persistentDeviceData: persistentDeviceDataReducer,
+} satisfies ReducersMapObject<AppState, never, Record<keyof AppState, never>>);
 
-export type AppState = ReturnType<typeof rootReducer>;
+const loggerExcludedActions = [addLog.type];
 
-const middleware = [
-    thunkMiddleware.withExtraArgument(extraDependencies),
-    toastMiddleware,
-    ...suiteMiddlewares,
-    ...walletMiddlewares,
-    ...onboardingMiddlewares,
-    ...firmwareMiddlewares,
-    ...backupMiddlewares,
-    ...recoveryMiddlewares,
-];
+type GetCustomMiddlewareDeps = GetSuiteMiddlewareDeps & GetWalletMiddlewaresDeps;
 
-const excludedActions = [addLog.type];
+export const getCustomMiddleware = (getExtra: () => GetCustomMiddlewareDeps | null) => {
+    const middleware = [
+        toastMiddleware,
+        ...getSuiteMiddleware(getExtra),
+        ...getWalletMiddlewares(getExtra),
+        ...onboardingMiddlewares,
+        backupMiddleware,
+    ];
 
-if (!isCodesignBuild()) {
-    const excludeLogger = (_getState: any, action: any): boolean =>
-        // exclude generated lifecycle actions
-        // https://redux-toolkit.js.org/api/createAsyncThunk#promise-lifecycle-actions
-        !action?.meta?.requestId &&
-        // explicitly excluded actions
-        !excludedActions.some(act => action.type === act);
+    if (!isCodesignBuild()) {
+        const excludeLogger = (_getState: any, action: any): boolean =>
+            // exclude generated lifecycle actions
+            // https://redux-toolkit.js.org/api/createAsyncThunk#promise-lifecycle-actions
+            !action?.meta?.requestId &&
+            // explicitly excluded actions
+            !loggerExcludedActions.includes(action.type);
 
-    const logger = createLogger({
-        level: 'info',
-        predicate: excludeLogger,
-        collapsed: true,
-    });
-    middleware.push(logger);
-}
+        const logger = createLogger({
+            level: 'info',
+            predicate: excludeLogger,
+            collapsed: true,
+        });
+        middleware.push(logger);
+    }
 
-const devTools =
-    typeof window === 'object' && window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__
+    return middleware as Middleware<Dispatch, AppState>[];
+};
+
+export const devTools: DevToolsEnhancerOptions | false =
+    typeof window === 'object' &&
+    '__REDUX_DEVTOOLS_EXTENSION_COMPOSE__' in window &&
+    window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__
         ? {
-              actionsBlacklist: excludedActions,
+              actionsDenylist: loggerExcludedActions,
           }
         : false;
-
-export const initStore = (preloadStoreAction?: PreloadStoreAction) => {
-    // get initial state by calling STORAGE.LOAD action with optional payload
-    // payload will be processed in each reducer explicitly
-    const preloadedState = preloadStoreAction
-        ? rootReducer(undefined, preloadStoreAction)
-        : undefined;
-
-    return configureStore({
-        reducer: rootReducer,
-        preloadedState,
-        middleware,
-        devTools,
-    });
-};

@@ -1,157 +1,88 @@
-import { useMemo, ReactNode } from 'react';
-import styled from 'styled-components';
-import { Translation, TrezorLink } from 'src/components/suite';
-import { variables, Button, CollapsibleBox, useElevation } from '@trezor/components';
-import { TREZOR_SUPPORT_URL } from '@trezor/urls';
-import TrezorConnect from '@trezor/connect';
-import { isAndroid } from '@trezor/env-utils';
-import { Elevation, mapElevationToBorder } from '@trezor/theme';
+import { type ReactNode, useState } from 'react';
 
-const WhiteCollapsibleBox = styled(CollapsibleBox)``;
+import { Translation } from '@suite/intl';
+import { Banner, type BannerIntent, Box, Button, Column, Modal } from '@trezor/components';
+import { QuestionIcon } from '@trezor/icons';
 
-const ItemLabel = styled.span`
-    color: ${({ theme }) => theme.TYPE_DARK_GREY};
-    font-size: ${variables.FONT_SIZE.SMALL};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-`;
+import { TroubleshootingTipsFooter } from './TroubleshootingTipsFooter';
+import { type TroubleshootingTipsItem } from './TroubleshootingTipsItem';
+import { TroubleshootingTipsList } from './TroubleshootingTipsList';
 
-const ItemDescription = styled.span`
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    font-size: ${variables.FONT_SIZE.TINY};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-    margin-top: 2px;
-`;
-
-const Bullet = styled.span`
-    margin-right: 8px;
-    font-size: ${variables.FONT_SIZE.NORMAL};
-    color: ${({ theme }) => theme.TYPE_DARK_GREY};
-`;
-
-const Items = styled.div`
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 20px;
-`;
-
-const Item = styled.div`
-    display: flex;
-
-    & + & {
-        margin-top: 16px;
-    }
-`;
-
-const ItemContent = styled.div`
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-`;
-
-const ItemAction = styled.div`
-    display: flex;
-    flex: 1;
-    justify-content: flex-end;
-    padding-left: 24px;
-`;
-
-const ContactSupport = styled.div<{ $elevation: Elevation }>`
-    display: flex;
-    justify-content: space-between;
-    margin: 24px -16px 0;
-    padding: 20px 20px 0;
-    border-top: 1px solid ${mapElevationToBorder};
-    align-items: center;
-`;
-
-const FooterText = styled.span`
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
-    font-size: ${variables.FONT_SIZE.TINY};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
-`;
-
-const StyledButton = styled(Button)`
-    margin: 0 20px 20px;
-`;
-
-interface Item {
-    key: string;
-    heading?: ReactNode;
-    description?: ReactNode;
-    hide?: boolean;
-    noBullet?: boolean;
-    action?: ReactNode;
-}
-
-interface TroubleshootingTipsProps {
-    label: ReactNode;
+type TroubleshootingTipsBaseProps = {
+    label?: ReactNode;
+    ctaLabel?: ReactNode;
     cta?: ReactNode;
-    items: Item[];
-    offerWebUsb?: boolean;
-    opened?: boolean;
-    'data-test'?: string;
-}
+    'data-testid'?: string;
+    toggleText?: ReactNode;
+    intent?: BannerIntent;
+    items: TroubleshootingTipsItem[];
+};
 
 export const TroubleshootingTips = ({
     label,
     items,
     cta,
-    offerWebUsb,
-    opened,
-    'data-test': dataTest,
-}: TroubleshootingTipsProps) => {
-    const { elevation } = useElevation();
+    ctaLabel,
+    toggleText,
+    intent = 'warning',
+    'data-testid': dataTest,
+}: TroubleshootingTipsBaseProps) => {
+    // todo: this filter is duplicated with TroubleshootingTipsList
+    const visibleTips = items.filter(item => !item.hide);
 
-    const memoizedItems = useMemo(
-        () =>
-            items
-                .filter(item => !item.hide)
-                .map(item => (
-                    <Item key={item.key}>
-                        {!item.noBullet && <Bullet>&bull;</Bullet>}
+    const hasOtherCta = Boolean(cta);
 
-                        <ItemContent>
-                            <ItemLabel>{item.heading}</ItemLabel>
-                            <ItemDescription>{item.description}</ItemDescription>
-                        </ItemContent>
+    const TroubleshootingButton = () => {
+        const [isTroubleshootingModalVisible, setIsTroubleshootingModalVisible] = useState(false);
+        const onOpen = () => {
+            setIsTroubleshootingModalVisible(true);
+        };
+        const onCancel = () => {
+            setIsTroubleshootingModalVisible(false);
+        };
 
-                        {item.action && <ItemAction>{item.action}</ItemAction>}
-                    </Item>
-                )),
-        [items],
-    );
-
-    return (
-        <WhiteCollapsibleBox
-            variant="large"
-            heading={cta}
-            iconLabel={label}
-            isOpen={opened}
-            data-test={dataTest || '@onboarding/expand-troubleshooting-tips'}
-        >
-            {items.length > 0 && <Items>{memoizedItems}</Items>}
-
-            {offerWebUsb && !isAndroid() && (
-                <StyledButton
-                    variant="secondary"
-                    data-test="@onboarding/try-bridge-button"
-                    onClick={() => TrezorConnect.disableWebUSB()}
+        return (
+            <Column
+                alignItems="center"
+                data-testid={dataTest || '@onboarding/troubleshooting-tips'}
+            >
+                <Button
+                    onClick={onOpen}
+                    intent="neutral"
+                    size={hasOtherCta ? 'small' : 'large'}
+                    priority={hasOtherCta ? 'secondary' : undefined}
+                    iconLeft={QuestionIcon}
+                    data-testid="@onboarding/troubleshooting-tips/button"
                 >
-                    <Translation id="TR_DISABLE_WEBUSB_TRY_BRIDGE" />
-                </StyledButton>
-            )}
+                    {toggleText ?? <Translation id="TR_TROUBLE_SHOOTING_TIPS" />}
+                </Button>
 
-            <ContactSupport $elevation={elevation}>
-                <FooterText>
-                    <Translation id="TR_ONBOARDING_TROUBLESHOOTING_FAILED" />
-                </FooterText>
+                {isTroubleshootingModalVisible && (
+                    <Modal
+                        heading={toggleText ?? <Translation id="TR_TROUBLE_SHOOTING_TIPS" />}
+                        onCancel={onCancel}
+                        intent="info"
+                        bottomContent={<TroubleshootingTipsFooter />}
+                        data-testid="@onboarding/troubleshooting-tips/modal"
+                    >
+                        <TroubleshootingTipsList items={visibleTips} />
+                    </Modal>
+                )}
+            </Column>
+        );
+    };
 
-                <TrezorLink variant="nostyle" href={TREZOR_SUPPORT_URL}>
-                    <Button variant="tertiary" size="small">
-                        <Translation id="TR_CONTACT_SUPPORT" />
-                    </Button>
-                </TrezorLink>
-            </ContactSupport>
-        </WhiteCollapsibleBox>
+    return cta ? (
+        <Column gap={80} alignItems="center">
+            <Banner
+                rightContent={cta}
+                intent={intent}
+                maxWidth={600}
+                description={ctaLabel ?? label}
+            />
+            {visibleTips.length > 0 && <TroubleshootingButton />}
+        </Column>
+    ) : (
+        <Box margin={{ top: 80 }}>{visibleTips.length > 0 && <TroubleshootingButton />}</Box>
     );
 };

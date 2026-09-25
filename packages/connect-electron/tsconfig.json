@@ -1,0 +1,11 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": { "outDir": "libDev" },
+    "references": [
+        { "path": "../connect" },
+        { "path": "../connect-common" },
+        { "path": "../ipc-proxy" },
+        { "path": "../utils" },
+        { "path": "../requirements" }
+    ]
+}

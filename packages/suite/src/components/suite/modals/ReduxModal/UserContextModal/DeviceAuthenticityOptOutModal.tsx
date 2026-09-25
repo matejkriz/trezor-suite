@@ -1,33 +1,13 @@
 import { useState } from 'react';
-import styled from 'styled-components';
-import { Button, Image, Paragraph } from '@trezor/components';
-import { Translation, CheckItem, Modal } from 'src/components/suite';
-import { deviceAutenticityOptOut } from 'src/actions/suite/suiteActions';
-import { useDispatch } from 'src/hooks/suite';
 
-const StyledParagraph = styled(Paragraph)`
-    text-align: left;
-    padding: 16px;
-`;
+import { Translation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { Banner, Card, Column, H3, Modal, Paragraph } from '@trezor/components';
+import { QuestionFilledIcon, ShieldWarningIcon, WarningFilledIcon } from '@trezor/icons';
 
-const CheckboxWrapper = styled.div`
-    display: flex;
-    flex-direction: row;
-    justify-content: center;
-    margin-top: 32px;
-`;
-
-const StyledModal = styled(Modal)`
-    width: 600px;
-    ${Modal.Content} {
-        justify-content: center;
-        align-items: center;
-    }
-`;
-
-const WarningImage = styled(Image)`
-    margin: 24px 0;
-`;
+import { toggleDeviceAuthenticityCheck } from 'src/actions/suite/suiteActions';
+import { CheckItem } from 'src/components/suite/CheckItem';
 
 type DeviceAuthenticityOptOutModalProps = {
     onCancel: () => void;
@@ -35,50 +15,62 @@ type DeviceAuthenticityOptOutModalProps = {
 
 export const DeviceAuthenticityOptOutModal = ({ onCancel }: DeviceAuthenticityOptOutModalProps) => {
     const [isConfirmed, setIsConfirmed] = useState(false);
+    const { dispatch } = useServices(injectDispatch);
 
-    const dispatch = useDispatch();
-
-    const handleDeviceAuthenticityOptOut = () => {
-        dispatch(deviceAutenticityOptOut(true));
+    const handleTurningOffRevisionCheck = () => {
+        dispatch(toggleDeviceAuthenticityCheck(false));
         onCancel();
     };
 
     return (
-        <StyledModal
-            isCancelable
+        <Modal
             onCancel={onCancel}
-            heading={<Translation id="TR_DEVICE_AUTHENTICITY_OPT_OUT_MODAL_HEADING" />}
-            bottomBarComponents={
-                <Button
-                    variant="destructive"
-                    onClick={handleDeviceAuthenticityOptOut}
-                    isDisabled={!isConfirmed}
-                    data-test="@device-authenticity/opt-out/button"
-                >
-                    <Translation id="TR_DEVICE_AUTHENTICITY_OPT_OUT_MODAL_BUTTON" />
-                </Button>
+            icon={ShieldWarningIcon}
+            width={600}
+            bottomContent={
+                <>
+                    <Modal.Button
+                        onClick={handleTurningOffRevisionCheck}
+                        isDisabled={!isConfirmed}
+                        data-testid="@device-authenticity/opt-out-button"
+                    >
+                        <Translation id="TR_DEVICE_AUTHENTICITY_OPT_OUT_MODAL_BUTTON" />
+                    </Modal.Button>
+                    <Modal.Button intent="neutral" priority="secondary" onClick={onCancel}>
+                        <Translation id="TR_CANCEL" />
+                    </Modal.Button>
+                </>
             }
+            intent="warning"
         >
-            <WarningImage image="UNI_ERROR" />
-
-            <StyledParagraph>
-                <Translation id="TR_DEVICE_AUTHENTICITY_OPT_OUT_MODAL_DESCRIPTION_1" />
-            </StyledParagraph>
-            <StyledParagraph>
-                <Translation id="TR_DEVICE_AUTHENTICITY_OPT_OUT_MODAL_DESCRIPTION_2" />
-            </StyledParagraph>
-            <StyledParagraph>
+            <H3>
+                <Translation id="TR_DEVICE_AUTHENTICITY_OPT_OUT_MODAL_TITLE" />
+            </H3>
+            <Paragraph intent="neutral" priority="secondary" typographyStyle="body-sm">
                 <Translation id="TR_DEVICE_AUTHENTICITY_OPT_OUT_MODAL_DESCRIPTION_3" />
-            </StyledParagraph>
-
-            <CheckboxWrapper>
+            </Paragraph>
+            <Column gap={12} margin={{ top: 24 }} alignItems="center">
+                <Banner
+                    icon={QuestionFilledIcon}
+                    description={
+                        <Translation id="TR_DEVICE_AUTHENTICITY_OPT_OUT_MODAL_DESCRIPTION_1" />
+                    }
+                />
+                <Banner
+                    icon={WarningFilledIcon}
+                    description={
+                        <Translation id="TR_DEVICE_AUTHENTICITY_OPT_OUT_MODAL_DESCRIPTION_2" />
+                    }
+                />
+            </Column>
+            <Card margin={{ top: 20 }}>
                 <CheckItem
                     title={<Translation id="TR_DEVICE_AUTHENTICITY_OPT_OUT_MODAL_CHECKBOX_TITLE" />}
                     isChecked={isConfirmed}
                     onClick={() => setIsConfirmed(!isConfirmed)}
-                    data-test="@device-authenticity/checkbox"
+                    data-testid="@device-authenticity/checkbox"
                 />
-            </CheckboxWrapper>
-        </StyledModal>
+            </Card>
+        </Modal>
     );
 };

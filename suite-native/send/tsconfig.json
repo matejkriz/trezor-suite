@@ -1,0 +1,38 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": { "outDir": "libDev" },
+    "references": [
+        { "path": "../../suite-common/device" },
+        { "path": "../../suite-common/mev" },
+        {
+            "path": "../../suite-common/redux-utils"
+        },
+        {
+            "path": "../../suite-common/wallet-core"
+        },
+        {
+            "path": "../../suite-common/wallet-types"
+        },
+        {
+            "path": "../../suite-common/wallet-utils"
+        },
+        { "path": "../analytics" },
+        { "path": "../device-mutex" },
+        { "path": "../tokens" },
+        { "path": "../transaction-management" },
+        {
+            "path": "../../packages/blockchain-link-types"
+        },
+        { "path": "../../packages/type-utils" },
+        { "path": "../../packages/utils" },
+        {
+            "path": "../../suite-common/dependency-injection"
+        },
+        {
+            "path": "../../suite-common/test-utils"
+        },
+        {
+            "path": "../../suite-common/wallet-config"
+        }
+    ]
+}

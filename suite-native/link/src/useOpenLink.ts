@@ -1,24 +1,39 @@
-import { Linking } from 'react-native';
 import { useCallback } from 'react';
+import { Linking } from 'react-native';
 
 import { useToast } from '@suite-native/toasts';
+
+interface OpenLinkOptions {
+    enforce?: boolean; // Bypasses canOpenURL check, needed for URLs meant to open in external apps.
+}
 
 export const useOpenLink = () => {
     const { showToast } = useToast();
 
+    const showErrorToast = useCallback(() => {
+        showToast({
+            intent: 'critical',
+            icon: 'warning',
+            message: 'Unable to open the link',
+        });
+    }, [showToast]);
+
     const handleOpenLink = useCallback(
-        async (href: string) => {
+        async (href: string, { enforce }: OpenLinkOptions = {}) => {
             try {
+                const canOpenURL = await Linking.canOpenURL(href);
+
+                if (!canOpenURL && !enforce) {
+                    showErrorToast();
+
+                    return;
+                }
                 await Linking.openURL(href);
             } catch {
-                showToast({
-                    variant: 'error',
-                    icon: 'warningTriangle',
-                    message: 'Unable to open the link',
-                });
+                showErrorToast();
             }
         },
-        [showToast],
+        [showErrorToast],
     );
 
     return handleOpenLink;

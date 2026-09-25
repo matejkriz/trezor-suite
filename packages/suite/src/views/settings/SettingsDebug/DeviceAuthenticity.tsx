@@ -1,24 +1,26 @@
+import { selectIsUnlockedBootloaderAllowed, suiteSettingsActions } from '@suite/settings';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
 import { Switch } from '@trezor/components';
+import { ActionColumn, SectionItem, TextColumn } from '@trezor/product-components';
 
-import { useSelector, useDispatch } from 'src/hooks/suite';
-import { ActionColumn, SectionItem, TextColumn } from 'src/components/suite';
-import { setDebugMode } from 'src/actions/suite/suiteActions';
+import { useSelector } from 'src/hooks/suite';
 
 export const DeviceAuthenticity = () => {
-    const dispatch = useDispatch();
-    const debug = useSelector(state => state.suite.settings.debug);
+    const { dispatch } = useServices(injectDispatch);
+    const isUnlockedBootloaderAllowed = useSelector(selectIsUnlockedBootloaderAllowed);
 
-    const handleChange = (state?: boolean) =>
-        dispatch(setDebugMode({ isUnlockedBootloaderAllowed: state }));
+    const handleChange = (state: boolean) =>
+        dispatch(suiteSettingsActions.setDebugMode({ isUnlockedBootloaderAllowed: state }));
 
     return (
-        <SectionItem data-test="@settings/debug/device-authenticity/switch">
+        <SectionItem data-testid="@settings/debug/device-authenticity/switch">
             <TextColumn
                 title="Allow unlocked bootloader"
                 description="Skip device authenticity check when bootloader is unlocked."
             />
             <ActionColumn>
-                <Switch onChange={handleChange} isChecked={!!debug.isUnlockedBootloaderAllowed} />
+                <Switch onChange={handleChange} isChecked={isUnlockedBootloaderAllowed} />
             </ActionColumn>
         </SectionItem>
     );

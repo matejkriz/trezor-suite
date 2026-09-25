@@ -1,0 +1,348 @@
+import { useEffect, useRef } from 'react';
+
+import { injectDesktopAnalytics } from '@suite/analytics';
+import { Translation } from '@suite/intl';
+import { events } from '@suite-common/analytics';
+import { useServices } from '@suite-common/dependency-injection';
+import { getNetwork, getNetworkDisplaySymbol } from '@suite-common/wallet-config';
+import {
+    getYieldFlowStepSequence,
+    getYieldWithdrawInputToken,
+    splitYieldPendingTransaction,
+} from '@suite-common/wallet-core';
+import { getApyBreakdown } from '@suite-common/wallet-utils';
+import { Banner, Column, Text } from '@trezor/components';
+
+import { FormattedCryptoAmount } from 'src/components/suite/FormattedCryptoAmount';
+import { useFetchFees } from 'src/components/wallet/Fees/CollapsibleFees/hooks/useFetchFees';
+import { useMessageSystemWrappedNative } from 'src/hooks/suite/useMessageSystemWrappedNative';
+
+import { useYieldWithdrawContext } from './useYieldWithdrawContext';
+import { YieldActionStep } from '../common/YieldActionStep';
+import { YieldActionStepWarning } from '../common/YieldActionStepWarning';
+import { YieldDisabledBanner } from '../common/YieldDisabledBanner';
+import { YieldFlowCompleteWithdraw } from '../common/YieldFlowCompleteWithdraw';
+import { YieldFlowStepList } from '../common/YieldFlowStepList';
+import { YieldUnwrapStep } from '../common/YieldUnwrapStep';
+
+export const YieldWithdrawForm = () => {
+    const { analytics } = useServices(injectDesktopAnalytics);
+
+    const {
+        account,
+        vault,
+        token,
+        receiptToken,
+        maxAmount,
+        errorMessage,
+        pendingTransaction,
+        amountIssues,
+        isSubmittingAction,
+        flowType,
+        completedInput,
+        completedOutput,
+        selectMaxWithdraw,
+        isMaxWithdrawInfoVisible,
+        toggleWithdrawFlowType,
+        submitAction,
+        submitUnwrap,
+        skipUnwrap,
+        openPendingTransaction,
+        fiatToggle,
+        setMaxAmount,
+        flow,
+    } = useYieldWithdrawContext();
+
+    useFetchFees({ networkSymbol: account.symbol });
+
+    const {
+        isDisabled: isUnwrapDisabled,
+        content: unwrapDisabledContent,
+        variant: unwrapDisabledVariant,
+    } = useMessageSystemWrappedNative('unwrap');
+
+    const { actionPendingTransaction: withdrawPendingTransaction } = splitYieldPendingTransaction(
+        pendingTransaction,
+        flowType,
+    );
+    const unwrapPendingTransaction =
+        pendingTransaction?.type === 'unwrap' ? pendingTransaction : undefined;
+    const isSharesInput = flowType === 'redeem';
+    const withdrawInputUnit = isSharesInput ? 'shares' : 'asset';
+    const inputTokenSymbol = getYieldWithdrawInputToken({
+        flowData: { account, vault, token, receiptToken },
+        flowType,
+    }).symbol;
+    const otherUnitTokenSymbol = isSharesInput ? token.symbol : receiptToken.symbol;
+    const isAmountTooHigh = amountIssues.includes('amount-too-high');
+    const isAmountInvalidDecimals = amountIssues.includes('amount-invalid-decimals');
+    const hasBlockingAmountIssue = amountIssues.length > 0;
+
+    const nativeSymbol = getNetworkDisplaySymbol(account.symbol);
+    const withdrawActionToken = flowType === 'redeem' ? receiptToken : token;
+    // Approximate fiat value shown under the amount input, from the token's own rate.
+    const actionApproxFiat = {
+        symbol: withdrawActionToken.networkSymbol,
+        tokenContractAddress: withdrawActionToken.contractAddress,
+    };
+    const unwrapApproxFiat = {
+        symbol: token.networkSymbol,
+        tokenContractAddress: token.contractAddress,
+    };
+    const sequence = getYieldFlowStepSequence({
+        flowType,
+        isWrappedNativeVault: flow.isWrappedNativeVault,
+    });
+
+    const shouldCheckWithdrawAmount = !isAmountInvalidDecimals && !withdrawPendingTransaction;
+    const shouldCheckUnwrapAmount = !isAmountInvalidDecimals && !unwrapPendingTransaction;
+
+    const handleOnWithdraw = () => {
+        const apyBreakdown = getApyBreakdown(vault.rewardRate?.components);
+        analytics.report({
+            type: events.yieldWithdrawEvent.name,
+            payload: {
+                type: 'withdraw',
+                operation: flowType,
+                action: 'continue',
+                networkSymbol: token.networkSymbol,
+                vaultId: vault.id,
+                wrappedNative: flow.isWrappedNativeVault,
+                ...(apyBreakdown && { apyBreakdown }),
+            },
+        });
+
+        submitAction();
+    };
+
+    const handleOnUnwrap = () => {
+        analytics.report({
+            type: events.yieldWithdrawEvent.name,
+            payload: {
+                type: 'unwrap',
+                operation: flowType,
+                action: 'continue',
+                networkSymbol: token.networkSymbol,
+                vaultId: vault.id,
+            },
+        });
+
+        submitUnwrap();
+    };
+
+    const handleOnSkipUnwrap = () => {
+        analytics.report({
+            type: events.yieldWithdrawEvent.name,
+            payload: {
+                type: 'unwrap',
+                operation: flowType,
+                action: 'cancel',
+                networkSymbol: token.networkSymbol,
+                vaultId: vault.id,
+            },
+        });
+
+        skipUnwrap();
+    };
+
+    const handleToggleWithdrawInputUnit = () => {
+        const nextUnit = withdrawInputUnit === 'shares' ? 'asset' : 'shares';
+
+        analytics.report({
+            type: events.yieldInteractionEvent.name,
+            payload: {
+                element: 'withdraw-unit-toggle',
+                value: nextUnit,
+                networkSymbol: token.networkSymbol,
+                vaultId: vault.id,
+            },
+        });
+
+        toggleWithdrawFlowType();
+    };
+
+    // Fire once per form mount when the user first hits the insufficient-funds banner
+    // (no actionable button on this banner, so impression is the only signal available).
+    const hasFiredInsufficientFundsRef = useRef(false);
+    const showsInsufficientFunds = shouldCheckWithdrawAmount && isAmountTooHigh;
+
+    useEffect(() => {
+        if (!showsInsufficientFunds || hasFiredInsufficientFundsRef.current) {
+            return;
+        }
+        hasFiredInsufficientFundsRef.current = true;
+
+        analytics.report({
+            type: events.yieldInteractionEvent.name,
+            payload: {
+                element: 'insufficient-funds-banner',
+                networkSymbol: token.networkSymbol,
+                vaultId: vault.id,
+            },
+        });
+    }, [showsInsufficientFunds, analytics, token.networkSymbol, vault.id]);
+
+    const handleMaxClick = () => {
+        analytics.report({
+            type: events.yieldInteractionEvent.name,
+            payload: {
+                element: 'withdraw-max',
+                value: withdrawInputUnit,
+                networkSymbol: token.networkSymbol,
+                vaultId: vault.id,
+            },
+        });
+
+        selectMaxWithdraw();
+    };
+
+    const getWithdrawWarning = () => {
+        if (shouldCheckWithdrawAmount && isAmountTooHigh) {
+            return <YieldActionStepWarning isInsufficientFunds />;
+        }
+
+        if (isMaxWithdrawInfoVisible) {
+            return (
+                <Banner
+                    intent="info"
+                    data-testid="@yield/form/max-withdraw-info"
+                    description={
+                        <Translation
+                            id="TR_EARN_YIELD_MAX_WITHDRAW_INFO"
+                            values={{ receiptTokenSymbol: receiptToken.symbol }}
+                        />
+                    }
+                />
+            );
+        }
+
+        return undefined;
+    };
+
+    return (
+        <Column width="100%" alignItems="center">
+            <Column gap={24} width="100%" maxWidth={500}>
+                {flow.currentStep !== 'complete' && (
+                    <>
+                        <Text typographyStyle="headline-md">
+                            <Translation id="TR_EARN_YIELD_WITHDRAW_TITLE" />
+                        </Text>
+
+                        {errorMessage && (
+                            <Banner
+                                intent="warning"
+                                description={<Translation id={errorMessage} />}
+                            />
+                        )}
+                    </>
+                )}
+
+                <YieldFlowStepList
+                    sequence={sequence}
+                    currentStep={flow.currentStep}
+                    hasStepList={sequence.includes('unwrap')}
+                    steps={{
+                        action: {
+                            title: <Translation id="TR_EARN_YIELD_WITHDRAW_ASSETS" />,
+                            content: () => (
+                                <YieldActionStep
+                                    flowType={flowType}
+                                    token={withdrawActionToken}
+                                    approxFiat={actionApproxFiat}
+                                    summaryValue={
+                                        <FormattedCryptoAmount
+                                            value={maxAmount}
+                                            symbol={inputTokenSymbol}
+                                        />
+                                    }
+                                    warning={getWithdrawWarning()}
+                                    isDisabled={
+                                        hasBlockingAmountIssue ||
+                                        isSubmittingAction ||
+                                        !!withdrawPendingTransaction
+                                    }
+                                    isPending={isSubmittingAction}
+                                    pendingTransaction={withdrawPendingTransaction}
+                                    unitToggle={
+                                        // Switching flow mid-submit can dispose its session before
+                                        // the pending transaction is stored.
+                                        !isSubmittingAction
+                                            ? {
+                                                  otherTokenSymbol: otherUnitTokenSymbol,
+                                                  onClick: handleToggleWithdrawInputUnit,
+                                              }
+                                            : undefined
+                                    }
+                                    onMaxClick={handleMaxClick}
+                                    onSubmit={handleOnWithdraw}
+                                    onPendingTxClick={openPendingTransaction}
+                                />
+                            ),
+                        },
+                        unwrap: {
+                            title: (
+                                <Translation
+                                    id="TR_EARN_YIELD_UNWRAP_TITLE"
+                                    values={{ tokenSymbol: token.symbol, nativeSymbol }}
+                                />
+                            ),
+                            description: (
+                                <Translation
+                                    id="TR_EARN_YIELD_UNWRAP_DESCRIPTION"
+                                    values={{
+                                        tokenSymbol: token.symbol,
+                                        networkName: getNetwork(account.symbol).name,
+                                    }}
+                                />
+                            ),
+                            // Unwrapping may be disabled remotely; skipping it stays available so the
+                            // user can finish the flow and keep the wrapped token.
+                            content: () => (
+                                <Column gap={16}>
+                                    {isUnwrapDisabled && (
+                                        <YieldDisabledBanner
+                                            type="unwrap"
+                                            content={unwrapDisabledContent}
+                                            variant={unwrapDisabledVariant}
+                                        />
+                                    )}
+                                    <YieldUnwrapStep
+                                        tokenSymbol={token.symbol}
+                                        tokenDecimals={token.decimals}
+                                        tokenBalance={token.balance}
+                                        approxFiat={unwrapApproxFiat}
+                                        fiatToggle={fiatToggle}
+                                        onMaxClick={() => setMaxAmount(token.balance)}
+                                        isSubmitting={isSubmittingAction}
+                                        isSubmitDisabled={
+                                            isUnwrapDisabled || hasBlockingAmountIssue
+                                        }
+                                        warning={
+                                            shouldCheckUnwrapAmount && isAmountTooHigh ? (
+                                                <YieldActionStepWarning isInsufficientFunds />
+                                            ) : undefined
+                                        }
+                                        pendingTransaction={unwrapPendingTransaction}
+                                        onSubmit={handleOnUnwrap}
+                                        onSkip={handleOnSkipUnwrap}
+                                        onPendingTxClick={openPendingTransaction}
+                                    />
+                                </Column>
+                            ),
+                        },
+                        complete: {
+                            isListItem: false,
+                            content: () => (
+                                <YieldFlowCompleteWithdraw
+                                    input={completedInput}
+                                    output={completedOutput}
+                                    vaultId={vault.id}
+                                />
+                            ),
+                        },
+                    }}
+                />
+            </Column>
+        </Column>
+    );
+};

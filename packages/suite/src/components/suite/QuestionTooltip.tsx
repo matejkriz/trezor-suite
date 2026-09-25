@@ -1,21 +1,18 @@
+import { type JSX } from 'react';
+
 import styled from 'styled-components';
-import { Tooltip, H3 } from '@trezor/components';
-import { Translation } from 'src/components/suite';
-import { ExtendedMessageDescriptor } from 'src/types/suite';
+
+import { type ExtendedMessageDescriptor, Translation } from '@suite/intl';
+import { H3, Tooltip } from '@trezor/components';
 
 const Wrapper = styled.div`
     display: flex;
     align-items: center;
 `;
 
-const Label = styled(H3)`
-    margin-right: 4px;
-    color: ${({ theme }) => theme.TYPE_DARK_GREY};
-`;
-
 // Label container to avoid jumping when tooltip appears
 const FakeTooltipContainer = styled.div`
-    border-bottom: 1.5px solid transparent;
+    border-bottom: 2px solid transparent;
 `;
 
 interface QuestionTooltipProps {
@@ -31,13 +28,16 @@ export const QuestionTooltip = ({ label, tooltip, className }: QuestionTooltipPr
             (tooltip ? (
                 <Tooltip
                     content={typeof tooltip === 'string' ? <Translation id={tooltip} /> : tooltip}
-                    dashed
                 >
-                    <Label>{typeof label === 'string' ? <Translation id={label} /> : label}</Label>
+                    <H3 margin={{ right: 4 }} intent="neutral" priority="secondary">
+                        {typeof label === 'string' ? <Translation id={label} /> : label}
+                    </H3>
                 </Tooltip>
             ) : (
                 <FakeTooltipContainer>
-                    <Label>{typeof label === 'string' ? <Translation id={label} /> : label}</Label>
+                    <H3 margin={{ right: 4 }} intent="neutral" priority="secondary">
+                        {typeof label === 'string' ? <Translation id={label} /> : label}
+                    </H3>
                 </FakeTooltipContainer>
             ))}
     </Wrapper>

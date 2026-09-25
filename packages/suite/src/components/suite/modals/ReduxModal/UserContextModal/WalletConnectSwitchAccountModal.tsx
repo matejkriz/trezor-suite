@@ -1,0 +1,98 @@
+import { useMemo, useState } from 'react';
+
+import { Translation } from '@suite/intl';
+import { closeModal } from '@suite/modal';
+import { useServices } from '@suite-common/dependency-injection';
+import { selectSupportedNetworkSymbols } from '@suite-common/networks';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { selectAllAccountsToList } from '@suite-common/wallet-core';
+import { type Account } from '@suite-common/wallet-types';
+import { sortByCoin } from '@suite-common/wallet-utils';
+import {
+    getSessionNetworks,
+    selectSessions,
+    switchSelectedAccountThunk,
+    walletConnectActions,
+} from '@suite-common/walletconnect';
+import { Column, Modal, type Option, Select } from '@trezor/components';
+
+import { useSelector } from 'src/hooks/suite';
+
+import { WalletConnectAccountOption } from './WalletConnectAccountOption';
+
+interface WalletConnectSwitchAccountModalProps {
+    sessionTopic: string;
+}
+
+export const WalletConnectSwitchAccountModal = ({
+    sessionTopic,
+}: WalletConnectSwitchAccountModalProps) => {
+    const { dispatch } = useServices(injectDispatch);
+    const supportedNetworks = useSelector(selectSupportedNetworkSymbols);
+    const sessions = useSelector(selectSessions);
+    const session = sessions.find(s => s.topic === sessionTopic);
+    const accounts = useSelector(selectAllAccountsToList);
+
+    const selectableAccounts = useMemo<Account[]>(
+        () =>
+            session
+                ? sortByCoin(
+                      getSessionNetworks(session)
+                          .filter(network => network.status === 'active')
+                          .flatMap(network =>
+                              accounts.filter(account => account.symbol === network.symbol),
+                          ),
+                      supportedNetworks,
+                  )
+                : [],
+        [accounts, session, supportedNetworks],
+    );
+    const [selectedDefaultAccount, setSelectedDefaultAccount] = useState<Account | null>(
+        session?.lastAccount || selectableAccounts[0] || null,
+    );
+
+    const handleSwitch = () => {
+        if (selectedDefaultAccount && session) {
+            dispatch(switchSelectedAccountThunk({ account: selectedDefaultAccount, sessionTopic }));
+            dispatch(
+                walletConnectActions.saveSession({
+                    ...session,
+                    lastAccount: selectedDefaultAccount,
+                }),
+            );
+        }
+        dispatch(closeModal());
+    };
+    const handleCancel = () => {
+        dispatch(closeModal());
+    };
+
+    return (
+        <Modal
+            bottomContent={
+                <>
+                    <Modal.Button intent="brand" onClick={handleSwitch}>
+                        <Translation id="TR_CONFIRM" />
+                    </Modal.Button>
+                </>
+            }
+            heading={<Translation id="TR_SWITCH_ACCOUNT" />}
+            onCancel={handleCancel}
+        >
+            <Column gap={8}>
+                <Select
+                    isSearchable={false}
+                    isClearable={false}
+                    size="large"
+                    isMenuFullWidth
+                    value={selectedDefaultAccount}
+                    options={selectableAccounts}
+                    formatOptionLabel={(account: Account) => (
+                        <WalletConnectAccountOption account={account} />
+                    )}
+                    onChange={(option: Option) => setSelectedDefaultAccount(option)}
+                />
+            </Column>
+        </Modal>
+    );
+};

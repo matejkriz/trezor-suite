@@ -1,0 +1,41 @@
+import { type ReactNode } from 'react';
+
+import { Translation } from '@suite/intl';
+import { gotoThunk } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { type IconCircleIntent, type IconComponent } from '@trezor/components';
+import { WarningIcon } from '@trezor/icons';
+
+import { AccountExceptionLayout } from 'src/components/wallet';
+
+type EarnExceptionProps = {
+    title: ReactNode;
+    icon?: IconComponent;
+    iconVariant?: IconCircleIntent;
+};
+
+export const EarnException = ({
+    title,
+    icon = WarningIcon,
+    iconVariant = 'neutral',
+}: EarnExceptionProps) => {
+    const { dispatch } = useServices(injectDispatch);
+
+    return (
+        <AccountExceptionLayout
+            title={title}
+            icon={icon}
+            iconVariant={iconVariant}
+            actions={[
+                {
+                    key: 'back-to-earn-dashboard',
+                    intent: 'neutral',
+                    priority: 'secondary',
+                    onClick: () => dispatch(gotoThunk({ routeName: 'suite-earn' })),
+                    children: <Translation id="TR_EARN_YIELD_BACK_TO_OVERVIEW" />,
+                },
+            ]}
+        />
+    );
+};

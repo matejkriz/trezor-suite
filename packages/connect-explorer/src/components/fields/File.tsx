@@ -1,19 +1,23 @@
+import { type ChangeEventHandler } from 'react';
+
 import { Button } from '@trezor/components';
 
 import { Row } from './Row';
-import type { Field } from '../../types';
+import type { FieldBasic } from '../../types';
 
 interface FileProps {
-    field: Field<any>;
+    field: FieldBasic<any>;
     disabled?: boolean;
-    onChange: (field: Field<any>, value: any) => any;
+    onChange: (field: FieldBasic<any>, value: any) => any;
 }
 
 const File = ({ disabled, field, onChange }: FileProps) => {
-    const onFilesAdded = evt => {
+    const onFilesAdded: ChangeEventHandler<HTMLInputElement> = evt => {
         if (disabled) return;
         const files = evt?.target.files;
-        const file = files[0];
+        if (!files || files.length === 0) return;
+        // @ts-expect-error: indexing with noUncheckedIndexedAccess
+        const file: File = files[0];
         const reader = new FileReader();
         reader.onload = event => {
             onChange(field, event?.target?.result);
@@ -23,7 +27,7 @@ const File = ({ disabled, field, onChange }: FileProps) => {
 
     return (
         <Row style={{ cursor: disabled ? 'default' : 'pointer' }}>
-            <Button onClick={() => document!.getElementById('files')?.click()}>Chose File</Button>
+            <Button onClick={() => document.getElementById('files')?.click()}>Choose File</Button>
 
             <input
                 style={{ display: 'none' }}

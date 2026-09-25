@@ -1,116 +1,174 @@
-import { MiddlewareAPI } from 'redux';
-import { AnyAction, isAnyOf } from '@reduxjs/toolkit';
+import { type UnknownAction, isAnyOf } from '@reduxjs/toolkit';
 
+import { type FlagsRootState } from '@suite/flags';
+import { METADATA } from '@suite/metadata';
+import { type ModalRootState } from '@suite/modal';
+import { recoveryActions } from '@suite/recovery';
 import {
-    authConfirm,
+    type RouterRootState,
+    gotoThunk,
+    routerAppChanged,
+    selectCanSwitchDevice,
+} from '@suite/router';
+import { updateOnlineStatus } from '@suite/suite-lifecycle';
+import {
+    type DeviceRootState,
     deviceActions,
-    forgetDisconnectedDevices,
-    handleDeviceConnect,
-    handleDeviceDisconnect,
-    observeSelectedDevice,
+    isTrezorDeviceWithState,
+    selectDevicePath,
     selectDeviceThunk,
-} from '@suite-common/wallet-core';
+} from '@suite-common/device';
+import { type WithServices, createMiddlewareWithExtraDeps } from '@suite-common/redux-utils';
+import { type SuiteSyncDep } from '@suite-common/suite-sync-types';
+import { isAnyDeviceEventAction } from '@suite-common/suite-utils';
 import { notificationsActions } from '@suite-common/toast-notifications';
-import { DEVICE, DeviceModelInternal } from '@trezor/connect';
+import {
+    type AccountsRootState,
+    type WalletSettingsRootState,
+    forgetDisconnectedDevicesThunk,
+    handleDeviceDisconnectThunk,
+    observeSelectedDeviceThunk,
+    selectIsDeviceAutoEjectEnabled,
+    startOrRestartDiscoveryThunk,
+} from '@suite-common/wallet-core';
 
-import { SUITE, ROUTER, METADATA } from 'src/actions/suite/constants';
-import { AppState, Action, Dispatch } from 'src/types/suite';
-import { handleProtocolRequest } from 'src/actions/suite/protocolActions';
-import { appChanged, setFlag } from 'src/actions/suite/suiteActions';
+import { handleProtocolRequestThunk } from 'src/actions/suite/protocolActions';
+import { desktopHandshake, setRecentlyDisconnectedDevice } from 'src/actions/suite/suiteActions';
 
-const isActionDeviceRelated = (action: AnyAction): boolean => {
+type SuiteMiddlewareState = AccountsRootState &
+    DeviceRootState &
+    RouterRootState &
+    WalletSettingsRootState & {
+        flags: Pick<FlagsRootState['flags'], 'hasSeenDisconnectTooltip'>;
+        modal: Pick<ModalRootState['modal'], 'context'>;
+    };
+
+const isActionDeviceRelated = (action: UnknownAction): boolean => {
     if (
         isAnyOf(
-            deviceActions.authDevice,
-            deviceActions.authFailed,
             deviceActions.selectDevice,
-            deviceActions.receiveAuthConfirm,
-            deviceActions.updatePassphraseMode,
             deviceActions.addButtonRequest,
             deviceActions.removeButtonRequests,
-            deviceActions.rememberDevice,
+            deviceActions.setRememberDevice,
             deviceActions.forgetDevice,
+            // ?
+            deviceActions.setDeviceState,
+            deviceActions.setDiscovered,
         )(action)
     ) {
         return true;
     }
 
     if (action.type === METADATA.SET_DEVICE_METADATA) return true;
+    if (action.type === METADATA.SET_DEVICE_METADATA_PASSWORDS) return true;
 
-    if (Object.values(DEVICE).includes(action.type)) return true;
+    if (isAnyDeviceEventAction(action)) return true;
 
     return false;
 };
-const suite =
-    (api: MiddlewareAPI<Dispatch, AppState>) =>
-    (next: Dispatch) =>
-    (action: Action): Action => {
-        const prevApp = api.getState().router.app;
-        if (action.type === ROUTER.LOCATION_CHANGE && action.payload.app !== prevApp) {
-            api.dispatch(appChanged(action.payload.app));
+
+export type PrepareSuiteMiddlewareDeps = WithServices<SuiteSyncDep>;
+
+const createSuiteMiddleware = createMiddlewareWithExtraDeps<
+    PrepareSuiteMiddlewareDeps,
+    UnknownAction,
+    SuiteMiddlewareState
+>;
+
+export const prepareSuiteMiddleware = createSuiteMiddleware(
+    (action, { dispatch, next, getState, extra }) => {
+        if (
+            routerAppChanged.match(action) &&
+            (action.payload === 'recovery' || action.payload === 'onboarding')
+        ) {
+            dispatch(recoveryActions.resetReducer());
         }
 
         // this action needs to be processed before propagation to deviceReducer
         // otherwise device will not be accessible and related data will not be removed (accounts, txs...)
-        if (action.type === DEVICE.DISCONNECT) {
-            api.dispatch(forgetDisconnectedDevices(action.payload));
+        if (deviceActions.deviceDisconnect.match(action)) {
+            // Keep the pre-disconnect state snapshot used by the delayed tooltip decision.
+            // eslint-disable-next-line no-restricted-syntax
+            const state = getState();
+            const isAutoEjectEnabled = selectIsDeviceAutoEjectEnabled(state);
+            dispatch(
+                forgetDisconnectedDevicesThunk({
+                    device: action.payload,
+                    forceForget: isAutoEjectEnabled,
+                }),
+            );
+
+            if (!isAutoEjectEnabled) {
+                if (action.payload.id) {
+                    dispatch(setRecentlyDisconnectedDevice(action.payload.id));
+                }
+
+                setTimeout(() => {
+                    const hasModalContext = state.modal.context !== '@modal/context-none';
+                    const { route } = state.router;
+                    const isForegroundApp = !!route?.isForegroundApp;
+                    const isModalActive = hasModalContext || isForegroundApp;
+
+                    if (
+                        !state.flags.hasSeenDisconnectTooltip &&
+                        state.wallet.accounts.length > 0 &&
+                        !isModalActive
+                    ) {
+                        dispatch(
+                            gotoThunk({
+                                routeName: 'suite-switch-device',
+                                params: { cancelable: true },
+                            }),
+                        );
+                    }
+                }, 1000);
+            }
         }
 
         // pass action to reducers
         next(action);
 
-        if (deviceActions.createDeviceInstance.match(action)) {
-            api.dispatch(selectDeviceThunk(action.payload));
-        }
-
         if (deviceActions.forgetDevice.match(action)) {
-            api.dispatch(handleDeviceDisconnect(action.payload));
-        }
+            const { device } = action.payload;
 
-        if (deviceActions.connectDevice.match(action)) {
-            const isT2B1 = action.payload?.features?.internal_model === DeviceModelInternal.T2B1;
-            const isT2B1DashboardPromoBannerActive =
-                api.getState().suite.flags.showDashboardT2B1PromoBanner;
-
-            if (isT2B1 && isT2B1DashboardPromoBannerActive) {
-                api.dispatch(setFlag('showDashboardT2B1PromoBanner', false));
+            if (isTrezorDeviceWithState(device)) {
+                extra.services.suiteSync.turnOffSuiteSyncForWallet({
+                    deviceStaticSessionId: device.state.staticSessionId,
+                });
             }
+
+            dispatch(handleDeviceDisconnectThunk(device));
         }
 
-        switch (action.type) {
-            case SUITE.DESKTOP_HANDSHAKE:
-                if (action.payload.protocol) {
-                    api.dispatch(handleProtocolRequest(action.payload.protocol));
-                }
-                if (action.payload.desktopUpdate?.firstRun) {
-                    api.dispatch(
-                        notificationsActions.addToast({
-                            type: 'auto-updater-new-version-first-run',
-                            version: action.payload.desktopUpdate.firstRun,
-                        }),
-                    );
-                }
-                break;
-            case DEVICE.CONNECT:
-            case DEVICE.CONNECT_UNACQUIRED:
-                api.dispatch(handleDeviceConnect(action.payload));
-                break;
-            case DEVICE.DISCONNECT:
-                api.dispatch(handleDeviceDisconnect(action.payload));
-                break;
-            case SUITE.REQUEST_AUTH_CONFIRM:
-                api.dispatch(authConfirm());
-                break;
-            default:
-                break;
+        if (desktopHandshake.match(action)) {
+            if (action.payload.protocol) {
+                dispatch(handleProtocolRequestThunk(action.payload.protocol));
+            }
+            if (action.payload.desktopUpdate?.firstRun) {
+                dispatch(
+                    notificationsActions.addToast({
+                        type: 'auto-updater-new-version-first-run',
+                        version: action.payload.desktopUpdate.firstRun,
+                    }),
+                );
+            }
+        } else if (deviceActions.deviceDisconnect.match(action)) {
+            const selectedDevicePath = selectDevicePath(getState());
+            const canSwitchDevice = selectCanSwitchDevice(getState());
+            if (selectedDevicePath === action.payload.path && !canSwitchDevice) {
+                dispatch(selectDeviceThunk({ device: undefined }));
+            } else {
+                dispatch(handleDeviceDisconnectThunk(action.payload));
+            }
+        } else if (updateOnlineStatus.match(action) && action.payload) {
+            // Restart discovery to reconnect to backends when user goes offline -> online.
+            dispatch(startOrRestartDiscoveryThunk());
         }
-
         if (isActionDeviceRelated(action)) {
             // keep suite reducer synchronized with other reducers (selected device)
-            api.dispatch(observeSelectedDevice());
+            dispatch(observeSelectedDeviceThunk());
         }
 
         return action;
-    };
-
-export default suite;
+    },
+);

@@ -5,17 +5,38 @@
         {
             "path": "../../suite-common/analytics"
         },
-        { "path": "../../suite-common/icons" },
+        {
+            "path": "../../suite-common/dependency-injection"
+        },
+        {
+            "path": "../../suite-common/redux-utils"
+        },
         { "path": "../analytics" },
+        { "path": "../app-init" },
         { "path": "../atoms" },
-        { "path": "../device" },
-        { "path": "../feature-flags" },
+        { "path": "../biometrics" },
+        { "path": "../icons" },
         { "path": "../intl" },
         { "path": "../link" },
-        { "path": "../module-settings" },
         { "path": "../navigation" },
-        { "path": "../theme" },
-        { "path": "../../packages/styles" },
-        { "path": "../../packages/theme" }
+        { "path": "../settings" },
+        { "path": "../trading-residence" },
+        { "path": "../trading-state" },
+        {
+            "path": "../../packages/analytics-uploader"
+        },
+        { "path": "../../packages/env-utils" },
+        {
+            "path": "../../packages/styles-native"
+        },
+        { "path": "../../packages/theme" },
+        { "path": "../../packages/urls" },
+        { "path": "../../packages/utils" },
+        {
+            "path": "../../suite-common/message-system"
+        },
+        { "path": "../feature-flags" },
+        { "path": "../test-utils-store" },
+        { "path": "../../packages/requirements" }
     ]
 }

@@ -1,109 +1,135 @@
-import styled from 'styled-components';
-import { AnimatePresence, MotionProps, motion } from 'framer-motion';
-import { hasBitcoinOnlyFirmware, isBitcoinOnlyDevice } from '@trezor/device-utils';
-import { selectDeviceSupportedNetworks, startDiscoveryThunk } from '@suite-common/wallet-core';
-import { Button, motionEasing } from '@trezor/components';
+import { useMemo } from 'react';
 
-import { DeviceBanner, SettingsLayout, SettingsSection } from 'src/components/settings';
-import { CoinGroup, SectionItem, TooltipSymbol, Translation } from 'src/components/suite';
-import { useEnabledNetworks } from 'src/hooks/settings/useEnabledNetworks';
-import { useAnchor } from 'src/hooks/suite/useAnchor';
-import { SettingsAnchor } from 'src/constants/suite/anchors';
+import { AnimatePresence, type MotionProps, motion } from 'framer-motion';
+
+import { events, injectDesktopAnalytics } from '@suite/analytics';
+import { isCoinjoinSupportedSymbol } from '@suite/coinjoin';
+import { useDevice } from '@suite/device';
+import { selectFlags } from '@suite/flags';
+import { Translation } from '@suite/intl';
+import { ContextMessage } from '@suite/message-system';
+import { openModal } from '@suite/modal';
+import { selectIsTestnetNetworksEnabled } from '@suite/settings';
+import { useServices } from '@suite-common/dependency-injection';
+import { Context } from '@suite-common/message-system';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { type Network, type NetworkSymbol } from '@suite-common/wallet-config';
 import {
-    useDevice,
-    useRediscoveryNeeded,
-    useDispatch,
-    useSelector,
-    useDiscovery,
-} from 'src/hooks/suite';
+    changeCoinVisibilityThunk,
+    selectDeviceSupportedNetworks,
+    selectEnabledNetworks,
+    selectShowRediscoverButton,
+    startOrRestartDiscoveryThunk,
+} from '@suite-common/wallet-core';
+import { Box, Button, Column, Switch, Text, Tooltip, motionEasing } from '@trezor/components';
+import { hasBitcoinOnlyFirmware, isBitcoinOnlyDevice } from '@trezor/device-utils';
+import { CoinIcon } from '@trezor/icons';
+import { SettingsSection } from '@trezor/product-components';
+import { breakpoints } from '@trezor/theme';
+
+import { SettingsLayout } from 'src/components/settings/SettingsLayout';
+import { NetworkList } from 'src/components/suite/NetworkList/NetworkList';
+import { NetworkSettingsSearchInput } from 'src/components/suite/NetworkList/NetworkSettingsSearchInput';
+import { useNetworkSupport } from 'src/hooks/settings/useNetworkSupport';
+import { useSelector } from 'src/hooks/suite';
+import { useIsContentBelowBreakpoint } from 'src/support/suite/ContentFlex';
 
 import { FirmwareTypeSuggestion } from './FirmwareTypeSuggestion';
-import { spacingsPx } from '@trezor/theme';
-import { selectSuiteFlags } from '../../../reducers/suite/suiteReducer';
+import { NoNetworkSearchResults } from './NoNetworkSearchResults';
+import { useNetworkSettingsSearch } from './useNetworkSettingsSearch';
 
-const StyledButton = styled(Button)`
-    margin-top: ${spacingsPx.xl};
-`;
-
-const StyledSettingsSection = styled(SettingsSection)`
-    overflow: hidden;
-`;
-
-const StyledSectionItem = styled(SectionItem)`
-    > div {
-        flex-direction: column;
-    }
-`;
-
-const getDiscoveryButtonAnimationConfig = (isConfirmed: boolean): MotionProps => ({
-    initial: {
-        height: 0,
-        opacity: 0,
-        translateY: 16,
-        translateX: -28,
-        scale: 0.96,
+const discoveryButtonAnimationConfig: MotionProps = {
+    initial: { opacity: 0, y: 16 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: 16 },
+    transition: {
+        ease: motionEasing.transition,
+        duration: 0.2,
+        opacity: { duration: 0.35 },
     },
-    animate: {
-        height: 'auto',
-        opacity: 1,
-        translateY: 0,
-        translateX: 0,
-        scale: 1,
-        transition: {
-            ease: motionEasing.transition,
-            duration: 0.2,
-            opacity: {
-                duration: 0.35,
-                ease: motionEasing.transition,
-            },
-        },
-    },
-    exit: {
-        height: 0,
-        opacity: 0,
-        translateY: 16,
-        translateX: isConfirmed ? 0 : -24,
-        scale: 0.96,
-        transformOrigin: 'bottom left',
-        transition: {
-            ease: motionEasing.transition,
-            duration: 0.2,
-            opacity: {
-                ease: motionEasing.enter,
-            },
-        },
-    },
-});
+};
 
 export const SettingsCoins = () => {
-    const { firmwareTypeBannerClosed } = useSelector(selectSuiteFlags);
+    const hasContentBelowTabletWidth = useIsContentBelowBreakpoint(breakpoints.tablet);
+    const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
+    const { firmwareTypeBannerClosed } = useSelector(selectFlags);
+    const enabledNetworks = useSelector(selectEnabledNetworks);
+    const {
+        showUnsupportedCoins,
+        supportedMainnets,
+        unsupportedMainnets,
+        supportedTestnets,
+        unsupportedTestnets,
+    } = useNetworkSupport();
+    const deviceSupportedNetworkSymbols = useSelector(selectDeviceSupportedNetworks);
+    const { device, isLocked } = useDevice();
+    const isDeviceLocked = !!device && isLocked();
+    const isDiscoveryButtonVisible = useSelector(state =>
+        selectShowRediscoverButton(state, device),
+    );
+    const useTestnetNetworks = useSelector(selectIsTestnetNetworksEnabled);
 
-    const isDiscoveryButtonVisible = useRediscoveryNeeded();
-    const { mainnets, testnets, enabledNetworks, setEnabled } = useEnabledNetworks();
-    const deviceSupportedNetworks = useSelector(selectDeviceSupportedNetworks);
+    const allSearchableNetworks = useMemo(
+        () => [
+            ...supportedMainnets,
+            ...(useTestnetNetworks ? supportedTestnets : []),
+            ...(showUnsupportedCoins ? unsupportedMainnets : []),
+            ...(showUnsupportedCoins && useTestnetNetworks ? unsupportedTestnets : []),
+        ],
+        [
+            showUnsupportedCoins,
+            supportedMainnets,
+            supportedTestnets,
+            unsupportedMainnets,
+            unsupportedTestnets,
+            useTestnetNetworks,
+        ],
+    );
+
+    const {
+        searchQuery,
+        hasActiveSearch,
+        hasNoSearchResults,
+        filterNetworks,
+        handleSearchChange,
+        handleSearchClear,
+    } = useNetworkSettingsSearch(allSearchableNetworks);
+
+    const filteredSupportedMainnets = filterNetworks(supportedMainnets);
+    const filteredSupportedTestnets = filterNetworks(supportedTestnets);
+    const filteredUnsupportedMainnets = filterNetworks(unsupportedMainnets);
+    const filteredUnsupportedTestnets = filterNetworks(unsupportedTestnets);
+
+    const showSupportedMainnets = !hasActiveSearch || filteredSupportedMainnets.length > 0;
+    const showSupportedTestnetsSection =
+        useTestnetNetworks &&
+        supportedTestnets.length > 0 &&
+        (!hasActiveSearch || filteredSupportedTestnets.length > 0);
+    const showUnsupportedSection =
+        showUnsupportedCoins &&
+        (unsupportedMainnets.length > 0 ||
+            (useTestnetNetworks && unsupportedTestnets.length > 0)) &&
+        (!hasActiveSearch ||
+            filteredUnsupportedMainnets.length > 0 ||
+            filteredUnsupportedTestnets.length > 0);
+    const showUnsupportedMainnets =
+        unsupportedMainnets.length > 0 &&
+        (!hasActiveSearch || filteredUnsupportedMainnets.length > 0);
+    const showUnsupportedTestnets =
+        useTestnetNetworks &&
+        unsupportedTestnets.length > 0 &&
+        (!hasActiveSearch || filteredUnsupportedTestnets.length > 0);
+
     const supportedEnabledNetworks = enabledNetworks.filter(enabledNetwork =>
-        deviceSupportedNetworks.includes(enabledNetwork),
+        deviceSupportedNetworkSymbols.includes(enabledNetwork),
     );
-
-    const { anchorRef: anchorRefCrypto, shouldHighlight: shouldHighlightCrypto } = useAnchor(
-        SettingsAnchor.Crypto,
-    );
-    const { anchorRef: anchorRefTestnetCrypto, shouldHighlight: shouldHighlightTestnetCrypto } =
-        useAnchor(SettingsAnchor.TestnetCrypto);
-
-    const { device } = useDevice();
-    const dispatch = useDispatch();
-    const { isDiscoveryRunning } = useDiscovery();
 
     const bitcoinOnlyFirmware = hasBitcoinOnlyFirmware(device);
-    const bitcoinNetworks = ['btc', 'test', 'regtest'];
 
     const onlyBitcoinNetworksEnabled =
         !!supportedEnabledNetworks.length &&
-        supportedEnabledNetworks.every(coin => bitcoinNetworks.includes(coin));
+        supportedEnabledNetworks.every(symbol => isCoinjoinSupportedSymbol(symbol));
     const bitcoinOnlyDevice = isBitcoinOnlyDevice(device);
-
-    const showDeviceBanner = device?.connected === false; // device is remembered and disconnected
 
     const showFirmwareTypeBanner =
         !firmwareTypeBannerClosed &&
@@ -111,66 +137,138 @@ export const SettingsCoins = () => {
         !bitcoinOnlyDevice &&
         (bitcoinOnlyFirmware || (!bitcoinOnlyFirmware && onlyBitcoinNetworksEnabled));
 
-    const startDiscovery = () => {
-        dispatch(startDiscoveryThunk());
+    const onToggle = (symbol: NetworkSymbol, isEnabled?: boolean) => {
+        dispatch(
+            changeCoinVisibilityThunk({
+                symbol,
+                shouldBeVisible: isEnabled ?? true,
+            }),
+        );
     };
 
-    const animation = getDiscoveryButtonAnimationConfig(!!isDiscoveryRunning);
+    const onSettings = (symbol: NetworkSymbol) => {
+        dispatch(openModal({ type: 'advanced-coin-settings', symbol }));
+    };
+
+    const renderRightContent = ({
+        networkSymbol,
+        isEnabled,
+    }: {
+        networkSymbol: NetworkSymbol;
+        isEnabled: boolean;
+    }) => (
+        <Switch
+            size="medium"
+            isChecked={isEnabled}
+            data-testid={`@settings/wallet/network/${networkSymbol}/switch`}
+            onChange={isChecked => onToggle(networkSymbol, isChecked)}
+        />
+    );
+
+    const renderNetworkList = (networks: Network[]) => (
+        <NetworkList
+            networks={networks}
+            enabledNetworks={enabledNetworks}
+            onClick={onToggle}
+            onSettings={onSettings}
+            renderRightContent={({ network, isEnabled }) =>
+                renderRightContent({
+                    networkSymbol: network.symbol,
+                    isEnabled,
+                })
+            }
+        />
+    );
+
+    const startDiscovery = () => {
+        analytics.report({
+            type: events.settingsLoadNetworksClickedEvent.name,
+            payload: {
+                platform: 'desktop',
+                origin: 'network-settings',
+            },
+        });
+        dispatch(startOrRestartDiscoveryThunk());
+    };
 
     return (
         <SettingsLayout>
-            {showDeviceBanner && (
-                <DeviceBanner
-                    title={
-                        <Translation id="TR_SETTINGS_COINS_BANNER_DESCRIPTION_REMEMBERED_DISCONNECTED" />
-                    }
-                />
-            )}
+            <ContextMessage context={Context.getSettings('networks')} />
 
-            {showFirmwareTypeBanner && <FirmwareTypeSuggestion />}
-
-            <StyledSettingsSection title={<Translation id="TR_COINS" />} icon="COIN">
-                <StyledSectionItem ref={anchorRefCrypto} shouldHighlight={shouldHighlightCrypto}>
-                    <CoinGroup
-                        networks={mainnets}
-                        onToggle={setEnabled}
-                        selectedNetworks={enabledNetworks}
-                    />
-
-                    <AnimatePresence>
-                        {isDiscoveryButtonVisible && (
-                            <motion.div {...animation} key="discover-button">
-                                <StyledButton onClick={startDiscovery}>
-                                    <Translation id="TR_DISCOVERY_NEW_COINS" />
-                                </StyledButton>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </StyledSectionItem>
-            </StyledSettingsSection>
+            <Column gap={16}>{showFirmwareTypeBanner && <FirmwareTypeSuggestion />}</Column>
 
             <SettingsSection
-                title={
-                    <>
-                        <Translation id="TR_TESTNET_COINS" />{' '}
-                        <TooltipSymbol
-                            content={<Translation id="TR_TESTNET_COINS_DESCRIPTION" />}
-                        />
-                    </>
-                }
-                icon="COIN"
+                hasVerticalLayout={hasContentBelowTabletWidth}
+                title={<Translation id="TR_COINS" />}
+                icon={CoinIcon}
+                hasContainer={false}
             >
-                <SectionItem
-                    ref={anchorRefTestnetCrypto}
-                    shouldHighlight={shouldHighlightTestnetCrypto}
-                >
-                    <CoinGroup
-                        networks={testnets}
-                        onToggle={setEnabled}
-                        selectedNetworks={enabledNetworks}
+                <Column gap={24} width="100%">
+                    <NetworkSettingsSearchInput
+                        searchQuery={searchQuery}
+                        onSearchChange={handleSearchChange}
+                        onSearchClear={handleSearchClear}
                     />
-                </SectionItem>
+                    {hasNoSearchResults ? (
+                        <NoNetworkSearchResults />
+                    ) : (
+                        <Column gap={32} width="100%">
+                            {showSupportedMainnets && renderNetworkList(filteredSupportedMainnets)}
+
+                            {showSupportedTestnetsSection && (
+                                <Column gap={12} width="100%">
+                                    <Text typographyStyle="body-md">
+                                        <Translation id="TR_TESTNET_COINS" />
+                                    </Text>
+                                    {renderNetworkList(filteredSupportedTestnets)}
+                                </Column>
+                            )}
+
+                            {showUnsupportedSection && (
+                                <Column gap={12} width="100%">
+                                    <Text typographyStyle="headline-sm">
+                                        <Translation id="TR_UNSUPPORTED_COINS" />
+                                    </Text>
+                                    <Column gap={24} width="100%">
+                                        {showUnsupportedMainnets &&
+                                            renderNetworkList(filteredUnsupportedMainnets)}
+                                        {showUnsupportedTestnets && (
+                                            <Column gap={12} width="100%">
+                                                <Text typographyStyle="body-md">
+                                                    <Translation id="TR_TESTNET_COINS" />
+                                                </Text>
+                                                {renderNetworkList(filteredUnsupportedTestnets)}
+                                            </Column>
+                                        )}
+                                    </Column>
+                                </Column>
+                            )}
+                        </Column>
+                    )}
+                </Column>
             </SettingsSection>
+
+            <Box position={{ type: 'fixed', bottom: 16 }}>
+                <AnimatePresence>
+                    {isDiscoveryButtonVisible && (
+                        <motion.div {...discoveryButtonAnimationConfig} key="discover-button">
+                            <Tooltip
+                                isActive={isDeviceLocked}
+                                content={<Translation id="TR_CONNECT_YOUR_DEVICE" />}
+                            >
+                                <Button
+                                    data-testid="@settings-coins/discovery-button"
+                                    onClick={startDiscovery}
+                                    isDisabled={isDeviceLocked}
+                                    isFloating
+                                >
+                                    <Translation id="TR_DISCOVERY_NEW_COINS" />
+                                </Button>
+                            </Tooltip>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </Box>
         </SettingsLayout>
     );
 };

@@ -1,143 +1,216 @@
-import { sortByCoin, getFailedAccounts, accountSearchFn } from '@suite-common/wallet-utils';
-import { Account } from '@suite-common/wallet-types';
-import { useAccountSearch, useDiscovery, useSelector } from 'src/hooks/suite';
-import { selectDevice } from '@suite-common/wallet-core';
-import { selectAccountLabels } from 'src/reducers/suite/metadataReducer';
-import { Translation } from 'src/components/suite';
+import { type ReactNode, type RefObject, memo, useCallback, useMemo } from 'react';
+
+import { getDefaultAccountLabel } from '@suite/account';
+import { selectCoinjoinIsPreloading } from '@suite/coinjoin';
+import { Translation, useTranslation } from '@suite/intl';
+import { selectAccountLabelsLegacy } from '@suite/metadata';
+import { type RouteParams, selectRouterParams } from '@suite/router';
+import { selectSelectedDevice } from '@suite-common/device';
+import { selectAccountsWithSuiteSyncLabel } from '@suite-common/suite-sync';
+import { selectTokenDefinitions } from '@suite-common/token-definitions';
+import { getTokens, selectAllAccountsToList } from '@suite-common/wallet-core';
+import { type Account } from '@suite-common/wallet-types';
+import { accountSearchFn, getAccountTypeName } from '@suite-common/wallet-utils';
+import { type TokenInfo } from '@trezor/blockchain-link-types';
+import { type BaseItemProps, VirtualizedList } from '@trezor/components';
+import { exhaustive } from '@trezor/type-utils';
+
+import { useAccountSearch, useSelector } from 'src/hooks/suite';
+import { useResponsiveContext } from 'src/support/suite/ResponsiveContext';
+import { selectDiscoveryOverallStatus } from 'src/utils/wallet/selectDiscoveryOverallStatus';
+
 import { AccountItemSkeleton } from './AccountItemSkeleton';
-import { AccountGroup } from './AccountGroup';
-import { AccountItem } from './AccountItem';
+import { AccountSection } from './AccountSection';
 import { AccountsMenuNotice } from './AccountsMenuNotice';
-import styled from 'styled-components';
-import { spacingsPx } from '@trezor/theme';
 
-const SkeletonContainer = styled.div`
-    margin: ${spacingsPx.xs};
-`;
+const SECTION_GAP = 4;
+const OVERSCAN_SECTION_COUNT = 8;
 
-interface AccountListProps {
-    onItemClick?: () => void;
-}
+// The list is bled into by the negative margins of grouped sections, so it carries the
+// horizontal padding they need to bleed into.
+const LIST_PADDING = { horizontal: 8, bottom: 20 } as const;
 
-export const AccountsList = ({ onItemClick }: AccountListProps) => {
-    const device = useSelector(selectDevice);
-    const accounts = useSelector(state => state.wallet.accounts);
-    const selectedAccount = useSelector(state => state.wallet.selectedAccount);
-    const coinjoinIsPreloading = useSelector(state => state.wallet.coinjoin.isPreloading);
-    const accountLabels = useSelector(selectAccountLabels);
+// Every section is measured once it mounts; this is only the starting guess used to size the
+// scrollbar for sections that have not been rendered yet. A plain account row is 58px tall.
+const ESTIMATED_SECTION_HEIGHT = 58;
 
-    const { discovery, getDiscoveryStatus } = useDiscovery();
+const SKELETON_ITEM_KEY = 'coinjoin-preloading-skeleton';
+
+type AccountsListItem = BaseItemProps &
+    (
+        | {
+              kind: 'account';
+              account: Account;
+              tokens: TokenInfo[];
+          }
+        | { kind: 'skeleton' }
+    );
+
+type AccountsListProps = {
+    scrollElementRef: RefObject<HTMLDivElement | null>;
+    scrollSentinels: ReactNode;
+};
+
+export const AccountsList = memo(({ scrollElementRef, scrollSentinels }: AccountsListProps) => {
+    const device = useSelector(selectSelectedDevice);
+    const baseAccounts = useSelector(selectAllAccountsToList);
+
+    const coinjoinIsPreloading = useSelector(selectCoinjoinIsPreloading);
+    const accountLegacyLabels = useSelector(selectAccountLabelsLegacy);
+
+    const accounts = useSelector(state =>
+        selectAccountsWithSuiteSyncLabel(
+            state,
+            baseAccounts,
+            device?.state?.staticSessionId ?? null,
+        ),
+    );
+    const params = useSelector(selectRouterParams) as RouteParams;
+
+    const { translationString } = useTranslation();
+    const { isSidebarCollapsed } = useResponsiveContext();
     const { coinFilter, searchString } = useAccountSearch();
-    const discoveryStatus = getDiscoveryStatus();
+    const discoveryStatus = useSelector(selectDiscoveryOverallStatus);
+    const discoveryInProgress = discoveryStatus?.status === 'loading';
+    const tokenDefinitions = useSelector(selectTokenDefinitions);
 
-    const discoveryInProgress = discoveryStatus && discoveryStatus.status === 'loading';
+    const filteredAccounts = useMemo(
+        () =>
+            accounts
+                .map(account => {
+                    const tokens = getTokens({
+                        tokens: account.tokens ?? [],
+                        symbol: account.symbol,
+                        tokenDefinitions: tokenDefinitions[account.symbol]?.coin,
+                    });
 
-    if (!device || !discovery) {
+                    return { account, tokens };
+                })
+                .filter(({ account, tokens }) => {
+                    const { key } = account;
+
+                    if (!searchString && !coinFilter) {
+                        return true;
+                    }
+
+                    const accountLabel =
+                        account.label ??
+                        (Object.hasOwn(accountLegacyLabels, key)
+                            ? accountLegacyLabels[key]
+                            : getDefaultAccountLabel(translationString, account)) ??
+                        '';
+
+                    // Mirror the account type badge, which is hidden for normal accounts.
+                    const accountTypeTranslationId =
+                        account.accountType === 'normal'
+                            ? null
+                            : getAccountTypeName({
+                                  path: account.path,
+                                  accountType: account.accountType,
+                                  networkType: account.networkType,
+                              });
+
+                    return accountSearchFn(account, searchString, {
+                        coinsFilter: coinFilter,
+                        accountLabel,
+                        searchableTokens: tokens.shownWithBalance,
+                        accountTypeName: accountTypeTranslationId
+                            ? translationString(accountTypeTranslationId)
+                            : undefined,
+                    });
+                }),
+        [
+            accounts,
+            searchString,
+            coinFilter,
+            accountLegacyLabels,
+            tokenDefinitions,
+            translationString,
+        ],
+    );
+
+    const isPreloadingSkeletonShown = coinjoinIsPreloading && !searchString && !coinFilter;
+
+    const items = useMemo((): AccountsListItem[] => {
+        const accountItems = filteredAccounts.map(({ account, tokens }): AccountsListItem => ({
+            kind: 'account',
+            account,
+            tokens: tokens.shownWithBalance,
+            height: ESTIMATED_SECTION_HEIGHT,
+        }));
+
+        if (isPreloadingSkeletonShown) {
+            return [...accountItems, { kind: 'skeleton', height: ESTIMATED_SECTION_HEIGHT }];
+        }
+
+        return accountItems;
+    }, [filteredAccounts, isPreloadingSkeletonShown]);
+
+    // Keying by account makes a measured section height survive searching and reordering.
+    const getItemKey = useCallback(
+        (item: AccountsListItem) =>
+            item.kind === 'account' ? item.account.key : SKELETON_ITEM_KEY,
+        [],
+    );
+
+    const renderItem = useCallback(
+        (item: AccountsListItem) => {
+            switch (item.kind) {
+                case 'account': {
+                    const { account, tokens } = item;
+                    const selected =
+                        account.symbol === params?.symbol &&
+                        account.accountType === params.accountType &&
+                        account.index === params.accountIndex;
+
+                    return <AccountSection account={account} tokens={tokens} selected={selected} />;
+                }
+                case 'skeleton':
+                    return <AccountItemSkeleton />;
+                default:
+                    return exhaustive(item);
+            }
+        },
+        [params],
+    );
+
+    if (!device) {
         return null;
     }
 
-    const failed = getFailedAccounts(discovery);
-
-    const list = sortByCoin(accounts.filter(a => a.deviceState === device.state).concat(failed));
-    const filteredAccounts =
-        searchString || coinFilter
-            ? list.filter(a => accountSearchFn(a, searchString, coinFilter, accountLabels[a.key]))
-            : list;
-
-    const filterAccountsByType = (type: Account['accountType']) =>
-        filteredAccounts.filter(a => a.accountType === type && (!a.empty || a.visible));
-
-    // always show first "normal" account even if they are empty
-    const normalAccounts = filteredAccounts.filter(
-        a => a.accountType === 'normal' && (a.index === 0 || !a.empty || a.visible),
-    );
-    const coinjoinAccounts = filterAccountsByType('coinjoin');
-    const taprootAccounts = filterAccountsByType('taproot');
-    const segwitAccounts = filterAccountsByType('segwit');
-    const legacyAccounts = filterAccountsByType('legacy');
-    const ledgerAccounts = filterAccountsByType('ledger');
-
-    const { params } = selectedAccount;
-
-    const keepOpen = (type: Account['accountType']) =>
-        params?.accountType === type || // selected account is from this group
-        (type === 'coinjoin' && coinjoinIsPreloading) || // coinjoin account is requested but not yet created
-        (!!searchString && searchString.length > 0) || // filter by search string is active
-        type === 'normal'; // always keep normal accounts open
-
-    const isSelected = (account: Account) =>
-        params &&
-        account.symbol === params.symbol &&
-        account.accountType === params.accountType &&
-        account.index === params.accountIndex;
-
-    const buildGroup = (type: Account['accountType'], accounts: Account[], hideLabel?: boolean) => {
-        const groupHasBalance = accounts.some(account => account.availableBalance !== '0');
-
-        if (
-            !accounts.length &&
-            type !== 'normal' &&
-            (type !== 'coinjoin' || !coinjoinIsPreloading)
-        ) {
-            // hide empty groups except normal and preloading coinjoin to show skeletons
-            return;
-        }
-
-        const isSkeletonShown =
-            discoveryInProgress || (type === 'coinjoin' && coinjoinIsPreloading);
-
+    if (items.length > 0) {
         return (
-            <AccountGroup
-                key={`${device.state}-${type}`}
-                type={type}
-                hideLabel={hideLabel}
-                hasBalance={groupHasBalance}
-                keepOpen={keepOpen(type)}
-            >
-                {accounts.map(account => {
-                    const selected = !!isSelected(account);
-
-                    return (
-                        <AccountItem
-                            key={`${account.descriptor}-${account.symbol}`}
-                            account={account}
-                            isSelected={selected}
-                            closeMenu={onItemClick}
-                            accountLabel={accountLabels[account.key]}
-                        />
-                    );
-                })}
-                {isSkeletonShown && <AccountItemSkeleton />}
-            </AccountGroup>
-        );
-    };
-
-    if (filteredAccounts.length > 0) {
-        return (
-            <>
-                {buildGroup('coinjoin', coinjoinAccounts)}
-                {buildGroup('normal', normalAccounts, coinjoinAccounts.length === null)}
-                {buildGroup('taproot', taprootAccounts)}
-                {buildGroup('segwit', segwitAccounts)}
-                {buildGroup('legacy', legacyAccounts)}
-                {buildGroup('ledger', ledgerAccounts)}
-            </>
+            <VirtualizedList
+                ref={scrollElementRef}
+                items={items}
+                renderItem={renderItem}
+                getItemKey={getItemKey}
+                scrollSentinels={scrollSentinels}
+                listHeight="100%"
+                listMinHeight={0}
+                padding={LIST_PADDING}
+                gap={SECTION_GAP}
+                overscan={OVERSCAN_SECTION_COUNT}
+                // A section is measured rather than sized, and both its height and the scroll
+                // position have to survive the list changing under an open sidebar.
+                resetItemHeightsOnItemsChange={false}
+                resetScrollOnItemsChange={false}
+                measureItems
+            />
         );
     }
 
     if (discoveryInProgress) {
-        return (
-            <SkeletonContainer>
-                <AccountItemSkeleton />
-            </SkeletonContainer>
-        );
+        return <AccountItemSkeleton />;
     }
+
+    if (isSidebarCollapsed) return <AccountsMenuNotice />;
+
+    if (!searchString) return null;
 
     return (
         <AccountsMenuNotice>
-            <Translation
-                id={!searchString ? 'TR_ACCOUNT_NO_ACCOUNTS' : 'TR_ACCOUNT_SEARCH_NO_RESULTS'}
-            />
+            <Translation id="TR_ACCOUNT_SEARCH_NO_RESULTS" />
         </AccountsMenuNotice>
     );
-};
+});

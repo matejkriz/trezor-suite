@@ -1,0 +1,366 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { promisify } from 'node:util';
+
+import {
+    comment,
+    commit,
+    exec,
+    getPackageDependencies,
+    getTrezorPackageDir,
+    getTrezorPackageRelativePath,
+    gettingNpmDistributionTags,
+} from './helpers';
+import { isPackageOnNpmRegistry } from './npm-registry.js';
+import { updateConnectChangelog } from './update-connect-changelog';
+
+const readFile = promisify(fs.readFile);
+const writeFile = promisify(fs.writeFile);
+
+const args = process.argv.slice(2);
+
+if (args.length < 1) {
+    throw new Error('Check npm dependencies requires 1 parameter: semver');
+}
+const [semver] = args;
+
+/**
+ *   The release version or type.  Can be one of the following:
+   - minor: Increase minor version (if version 9.5.0-beta.3 --> 9.5.0)
+   - patch: Increase patch version (if version 9.4.2-beta.3 --> 9.4.2)
+   - preminor: Increase preminor version, pre-release (if version 9.4.1 --> 9.5.0-beta.1)
+   - prepatch: Increase prepatch version, pre-release (if version 9.4.1 --> 9.4.2-beta.1)
+   - prerelease: Increase prerelease version (if version 9.4.1-beta.1 --> 9.4.1-beta.2)
+
+ */
+const allowedSemvers = ['patch', 'prepatch', 'minor', 'preminor', 'prerelease'];
+if (!semver) {
+    throw new Error('Check npm dependencies requires 1 parameter: semver');
+}
+if (!allowedSemvers.includes(semver)) {
+    throw new Error(`provided semver: ${semver} must be one of ${allowedSemvers.join(', ')}`);
+}
+
+const deploymentType = ['prepatch', 'preminor', 'prerelease'].includes(semver)
+    ? 'canary'
+    : 'stable';
+
+const ROOT = path.join(import.meta.dirname, '..', '..');
+
+const getGitCommitByPackageName = (packageName: string, maxCount = 10) =>
+    exec('git', [
+        'log',
+        '--oneline',
+        '--max-count',
+        `${maxCount}`,
+        '--pretty=tformat:"-   %s (%h)"',
+        '--',
+        `./${getTrezorPackageRelativePath(packageName)}`,
+    ]);
+
+const splitByNewlines = (input: string) => input.split('\n');
+
+const findIndexByCommit = (commitArr: string[], searchString: string) =>
+    commitArr.findIndex(commit => commit.includes(searchString));
+
+type ConnectVersionMatrix = {
+    package: string;
+    stable: string;
+    canary: string;
+};
+
+const tableToMarkdown = (table: ConnectVersionMatrix[], type: 'Package' | 'Deployment') => {
+    let markdown = `| ${type} | Stable | Canary |\n`;
+    markdown += '| :----: | :----: | :----:|\n';
+
+    table.forEach(row => {
+        markdown += `| ${row.package} | ${row.stable} | ${row.canary} |\n`;
+    });
+
+    return markdown;
+};
+
+const updateConnectChangelogFile = async (
+    connectChangelogPath: string,
+    stableVersion: string,
+    canaryVersion: string,
+) => {
+    const stable = stableVersion;
+    const canary = canaryVersion;
+
+    const changelogContent = await readFile(connectChangelogPath, 'utf-8');
+
+    const npmTable = [
+        { package: 'npm @trezor/connect', stable, canary },
+        { package: 'npm @trezor/connect-web', stable, canary },
+        {
+            package: 'npm @trezor/connect-webextension',
+            stable,
+            canary,
+        },
+        {
+            package: 'npm @trezor/connect-mobile',
+            stable,
+            canary,
+        },
+    ];
+
+    const connectExplorerTable = [{ package: 'connect.trezor.io/', stable, canary }];
+
+    const markdownNpmTable = tableToMarkdown(npmTable, 'Package');
+    const markdownConnectExplorerTable = tableToMarkdown(connectExplorerTable, 'Deployment');
+
+    const updatedContent = updateConnectChangelog({
+        changelog: changelogContent,
+        versionTable: markdownNpmTable,
+        deploymentTable: markdownConnectExplorerTable,
+        stableVersion,
+        canaryVersion,
+    });
+
+    await writeFile(connectChangelogPath, updatedContent, 'utf-8');
+};
+
+const getUnreservedNpmPackages = async (packageNames: string[]) => {
+    const packages = await Promise.all(
+        packageNames.map(async packageName => ({
+            packageName,
+            isReserved: await isPackageOnNpmRegistry(`@trezor/${packageName}`),
+        })),
+    );
+
+    return packages.filter(({ isReserved }) => !isReserved).map(({ packageName }) => packageName);
+};
+
+const bumpConnect = async () => {
+    try {
+        // connect-plugin-ethereum is deprecated in 10.x (its hashing logic was
+        // inlined into @trezor/connect). The 10.x release is a stub and the
+        // package source is frozen — no need to auto-bump it on every connect
+        // release. Keep it removed from this list unless the stub itself changes.
+        // TODO The same applies to connect-plugin-stellar.
+        const mainPackages = [
+            'connect-plugin-stellar',
+            'connect-webextension',
+            'connect-mobile',
+            'connect-web',
+            'connect',
+        ];
+
+        const results = await Promise.all(
+            mainPackages.map(async pkg => {
+                const result = await getPackageDependencies(pkg);
+                console.log(`${pkg} dependencies to update:`, result);
+
+                return result.update;
+            }),
+        );
+
+        // We remove from the list the `mainPackages` so they are added later on in correct order,
+        // so the commits for `mainPackages` are at the end of the changelog.
+        const connectDependencies = results.flat().filter(dep => !mainPackages.includes(dep));
+
+        // Remove connect since it is going to be bumped later using script packages/connect/script/bump-version.ts
+        const mainPackagesWithoutConnect = mainPackages.filter(pkg => pkg !== 'connect');
+
+        // We deduplicate and add the connect packages themselves to the list of packages to update.
+        const allUniquePackagesToUpdate = [
+            ...new Set([...connectDependencies, ...mainPackagesWithoutConnect]),
+        ];
+
+        console.log('allUniquePackagesToUpdate', allUniquePackagesToUpdate);
+
+        for (const packageName of allUniquePackagesToUpdate) {
+            const PACKAGE_PATH = getTrezorPackageDir(packageName);
+            const PACKAGE_JSON_PATH = path.join(PACKAGE_PATH, 'package.json');
+
+            // This uses dependency version-bump-prompt.
+            await exec('yarn', [
+                'bump',
+                semver,
+                `./${getTrezorPackageRelativePath(packageName)}/package.json`,
+            ]);
+
+            const rawPackageJSON = await readFile(PACKAGE_JSON_PATH, 'utf-8');
+            const packageJSON = JSON.parse(rawPackageJSON);
+            const { version } = packageJSON;
+
+            const packageGitLog = await getGitCommitByPackageName(packageName, 1000);
+
+            const commitsArr = packageGitLog.stdout.split('\n');
+
+            const newCommits: string[] = [];
+            for (const commit of commitsArr) {
+                // Here we check commits utils last stable release
+                if (commit.includes(`npm-release: @trezor/${packageName}`)) {
+                    break;
+                }
+                newCommits.push(commit.replaceAll('"', ''));
+            }
+
+            // In Connect dependencies packages we only update CHANGELOG when doing a stable release (patch or minor).
+            // We do that so we can generate the complete CHANGELOG automatically when doing stable release.
+            if (newCommits.length && deploymentType === 'stable') {
+                const CHANGELOG_PATH = path.join(PACKAGE_PATH, 'CHANGELOG.md');
+                if (!fs.existsSync(CHANGELOG_PATH)) {
+                    await writeFile(CHANGELOG_PATH, '');
+                }
+
+                let changelog = await readFile(CHANGELOG_PATH, 'utf-8');
+
+                changelog = `# ${version}\n\n${newCommits.join('\n')}\n\n${changelog}`;
+                await writeFile(CHANGELOG_PATH, changelog, 'utf-8');
+
+                await exec('yarn', ['prettier', '--write', CHANGELOG_PATH]);
+            }
+
+            await commit({
+                path: PACKAGE_PATH,
+                // We only use `npm-release` when doing stable release, so the part of the script above can check commits to include in CHANGELOG.
+                message: `npm-${deploymentType === 'canary' ? 'prerelease' : 'release'}: @trezor/${packageName} ${version}`,
+            });
+        }
+
+        const CONNECT_PACKAGE_PATH = getTrezorPackageDir('connect');
+        const CONNECT_PACKAGE_JSON_PATH = path.join(CONNECT_PACKAGE_PATH, 'package.json');
+        const CONNECT_CHANGELOG_PATH = path.join(CONNECT_PACKAGE_PATH, 'CHANGELOG.md');
+
+        const preBumpRawPackageJSON = await readFile(CONNECT_PACKAGE_JSON_PATH, 'utf-8');
+        const preBumpPackageJSON = JSON.parse(preBumpRawPackageJSON);
+        const { version: preBumpVersion } = preBumpPackageJSON;
+
+        // Uses script packages/connect/script/bump-version.ts to increase version in multiple files.
+        await exec('yarn', ['workspace', '@trezor/connect', `version:${semver}`]);
+
+        const rawPackageJSON = await readFile(CONNECT_PACKAGE_JSON_PATH, 'utf-8');
+        const packageJSON = JSON.parse(rawPackageJSON);
+        const { version } = packageJSON;
+
+        if (deploymentType === 'stable') {
+            await updateConnectChangelogFile(CONNECT_CHANGELOG_PATH, version, '-');
+        } else {
+            const distributionTags = await gettingNpmDistributionTags('@trezor/connect');
+            if (!distributionTags?.latest) {
+                throw new Error('Could not resolve the latest @trezor/connect version from NPM');
+            }
+            await updateConnectChangelogFile(
+                CONNECT_CHANGELOG_PATH,
+                distributionTags.latest,
+                version,
+            );
+        }
+
+        await exec('yarn', ['prettier', '--write', CONNECT_CHANGELOG_PATH]);
+
+        const commitMessage = `npm-release: @trezor/connect ${version}`;
+        const branchName = `bump-versions/connect-${version}`;
+
+        // Check if branch exists and if so, delete it.
+        const branchExists = (await exec('git', ['branch', '--list', branchName])).stdout;
+        if (branchExists) {
+            throw new Error(
+                `Branch ${branchName} already exists, delete it and call script again.`,
+            );
+        }
+
+        await exec('git', ['checkout', '-b', branchName]);
+
+        await commit({
+            path: ROOT,
+            message: commitMessage,
+        });
+
+        await exec('git', ['push', 'origin', branchName]);
+
+        const ghPrCreateResult = await exec('gh', [
+            'pr',
+            'create',
+            '--repo',
+            'trezor/trezor-suite',
+            '--title',
+            `${commitMessage}`,
+            '--body-file',
+            'scripts/templates/connect-bump-version.md',
+            '--label',
+            'no-project',
+            '--base',
+            'develop',
+            '--head',
+            branchName,
+        ]);
+
+        const prNumber = ghPrCreateResult.stdout
+            .replaceAll('\n', '')
+            .replace('https://github.com/trezor/trezor-suite/pull/', '');
+
+        const depsChecklist = allUniquePackagesToUpdate.reduce(
+            (acc, packageName) =>
+                `${acc}\n- [ ] [![NPM](https://img.shields.io/npm/v/@trezor/${packageName}.svg)](https://www.npmjs.org/package/@trezor/${packageName}) @trezor/${packageName}`,
+            '',
+        );
+
+        // The release workflow publishes over OIDC, which npm cannot set up for a package that does
+        // not exist yet. Warning here gives us time to reserve the names before the release runs.
+        const unreservedPackages = await getUnreservedNpmPackages(allUniquePackagesToUpdate);
+        const unreservedPackagesWarning = unreservedPackages.length
+            ? [
+                  '',
+                  '',
+                  '> [!WARNING]',
+                  '> These packages are not on the npm registry yet, so the release workflow cannot publish them.',
+                  '> Reserve each name locally before releasing (needs npm publish rights):',
+                  '>',
+                  ...unreservedPackages.map(
+                      packageName => `> - [ ] \`yarn reserve-npm-package ${packageName}\``,
+                  ),
+              ].join('\n')
+            : '';
+
+        if (depsChecklist) {
+            await comment({
+                prNumber,
+                body: `${depsChecklist}${unreservedPackagesWarning}`,
+            });
+        }
+
+        // Adding list of commits form the connect* packages to help creating and checking connect CHANGELOG.
+        const connectGitLog = await getGitCommitByPackageName('connect*', 1000);
+        const [_npmReleaseConnect, ...connectGitLogArr] = splitByNewlines(connectGitLog.stdout);
+        const connectGitLogIndex = findIndexByCommit(
+            connectGitLogArr,
+            `npm-release: @trezor/connect ${preBumpVersion}`,
+        );
+
+        // Creating a comment only if there are commits to add since last connect release.
+        if (connectGitLogIndex !== -1) {
+            connectGitLogArr.splice(
+                connectGitLogIndex,
+                connectGitLogArr.length - connectGitLogIndex,
+            );
+            // In array `connectGitLogArr` each item string contains " at the beginning and " at the end, let's remove those characters.
+            const cleanConnectGitLogArr = connectGitLogArr.map(line => line.slice(1, -1));
+            const connectGitLogText = cleanConnectGitLogArr.reduce(
+                (acc, line) => `${acc}\n${line}`,
+                '',
+            );
+
+            if (!connectGitLogText) {
+                console.info('no changelog for @trezor/connect');
+
+                return;
+            }
+
+            await comment({
+                prNumber,
+                body: connectGitLogText,
+            });
+        }
+    } catch (error) {
+        console.error('error:', error);
+        // Without this the workflow reports success even though the bump stopped half-way
+        // through, leaving some packages bumped and no release PR created.
+        process.exitCode = 1;
+    }
+};
+
+bumpConnect();

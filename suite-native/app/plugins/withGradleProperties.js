@@ -1,31 +1,22 @@
-/* eslint-disable @typescript-eslint/no-shadow */
 const { withGradleProperties } = require('expo/config-plugins');
 
-const newGraddleProperties = [
-    {
-        type: 'property',
-        key: 'FLIPPER_VERSION',
-        value: '0.246.0',
-    },
+// Increases Gradle JVM memory to prevent OOM errors during Detox CI builds
+const newGradleProperties = [
+    { type: 'property', key: 'org.gradle.jvmargs', value: '-Xmx4096m -XX:MaxMetaspaceSize=1024m' },
 ];
 
 module.exports = config =>
-    withGradleProperties(config, config => {
-        newGraddleProperties.map(gradleProperty => {
-            const isPropertyAlreadySet = config.modResults.some(
-                item => item.key === gradleProperty.key,
-            );
+    withGradleProperties(config, config2 => {
+        newGradleProperties.forEach(gradleProperty => {
+            const existingProp = config2.modResults.find(item => item.key === gradleProperty.key);
 
-            if (!isPropertyAlreadySet) {
-                // push empty line to separate properties
-                config.modResults.push({
-                    type: 'empty',
-                });
-                config.modResults.push(gradleProperty);
+            if (existingProp) {
+                existingProp.value = gradleProperty.value;
+            } else {
+                config2.modResults.push({ type: 'empty' });
+                config2.modResults.push(gradleProperty);
             }
-
-            return config.modResults;
         });
 
-        return config;
+        return config2;
     });

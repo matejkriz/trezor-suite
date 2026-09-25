@@ -1,8 +1,11 @@
+import { useLayoutEffect, useRef } from 'react';
+
 import { useTheme } from 'styled-components';
-import { useRef, useLayoutEffect } from 'react';
-import { FormattedCryptoAmount } from 'src/components/suite';
+
 import { useFormatters } from '@suite-common/formatters';
-import { NetworkSymbol } from 'src/types/wallet';
+import { type NetworkSymbol } from '@suite-common/wallet-config';
+
+import { FormattedCryptoAmount } from 'src/components/suite/FormattedCryptoAmount';
 
 interface CommonProps {
     setWidth: (n: number) => void;
@@ -21,7 +24,7 @@ export const GraphYAxisTick = ({
     localCurrency,
     symbol,
 }: GraphYAxisTickProps) => {
-    const { FiatAmountFormatter } = useFormatters();
+    const { BaseCurrencyAmountFormatter } = useFormatters();
 
     const theme = useTheme();
     const ref = useRef<SVGGElement>(null);
@@ -40,11 +43,11 @@ export const GraphYAxisTick = ({
                 y={0}
                 dy={2}
                 textAnchor="start"
-                fill={theme.TYPE_LIGHT_GREY}
+                fill={theme.contentSecondary}
                 style={{ fontVariantNumeric: 'tabular-nums' }}
             >
                 {localCurrency && (
-                    <FiatAmountFormatter
+                    <BaseCurrencyAmountFormatter
                         value={payload.value}
                         currency={localCurrency}
                         minimumFractionDigits={0}

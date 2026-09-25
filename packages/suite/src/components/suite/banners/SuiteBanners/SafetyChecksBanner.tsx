@@ -1,41 +1,49 @@
-import { Translation } from 'src/components/suite';
-import { useDispatch } from 'src/hooks/suite';
-import { goto } from 'src/actions/suite/routerActions';
-import { Banner } from '../Banner';
-import { SettingsAnchor } from 'src/constants/suite/anchors';
+import { Translation } from '@suite/intl';
+import { SettingsAnchor, gotoThunk } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { Banner } from '@trezor/components';
+import { XIcon } from '@trezor/icons';
 
-interface SafetyChecksBannerProps {
+type SafetyChecksBannerProps = {
     onDismiss?: () => void;
-}
+};
 
 export const SafetyChecksBanner = ({ onDismiss }: SafetyChecksBannerProps) => {
-    const dispatch = useDispatch();
-
-    const action = {
-        label: <Translation id="TR_SAFETY_CHECKS_BANNER_CHANGE" />,
-        onClick: () =>
-            dispatch(
-                goto('settings-device', {
-                    preserveParams: true,
-                    anchor: SettingsAnchor.SafetyChecks,
-                }),
-            ),
-        'data-test': '@banner/safety-checks/button',
-    };
+    const { dispatch } = useServices(injectDispatch);
 
     return (
         <Banner
-            variant="warning"
-            body={<Translation id="TR_SAFETY_CHECKS_DISABLED_WARNING" />}
-            action={action}
-            dismissal={
-                onDismiss
-                    ? {
-                          onClick: onDismiss,
-                          'data-test': '@banner/safety-checks/dismiss',
-                      }
-                    : undefined
+            data-testid="@banner/safety-checks"
+            icon
+            intent="warning"
+            rightContent={
+                <>
+                    <Banner.Button
+                        onClick={() =>
+                            dispatch(
+                                gotoThunk({
+                                    routeName: 'settings-device',
+                                    preserveParams: true,
+                                    anchor: SettingsAnchor.SafetyChecks,
+                                }),
+                            )
+                        }
+                        data-testid="@banner/safety-checks/button"
+                    >
+                        <Translation id="TR_SAFETY_CHECKS_BANNER_CHANGE" />
+                    </Banner.Button>
+                    {onDismiss && (
+                        <Banner.IconButton
+                            icon={XIcon}
+                            onClick={onDismiss}
+                            data-testid="@banner/safety-checks/dismiss"
+                            tooltip={{ content: <Translation id="TR_DISMISS" /> }}
+                        />
+                    )}
+                </>
             }
+            description={<Translation id="TR_SAFETY_CHECKS_DISABLED_WARNING" />}
         />
     );
 };

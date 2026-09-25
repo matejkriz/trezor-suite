@@ -1,3 +1,7 @@
+import { type JSX } from 'react';
+
+import { useShouldRedactNumbers } from '@suite-common/discreet-mode';
+
 export type DataContext = Record<string, unknown>;
 
 interface FormatDefinition<TInput, TOutput, TDataContext extends DataContext> {
@@ -6,6 +10,8 @@ interface FormatDefinition<TInput, TOutput, TDataContext extends DataContext> {
         value: TInput,
         /** Additional data context to be used by the formatter. */
         dataContext: Partial<TDataContext>,
+        /** Whether a component above has requested to redact the numbers for discreet mode */
+        shouldRedactNumbers?: boolean,
     ): TOutput;
 }
 
@@ -26,7 +32,7 @@ type FormatterProps<TInput, TDataContext extends DataContext> = {
 export interface Formatter<TInput, TOutput, TDataContext extends DataContext = DataContext> {
     /** Formats a value. */
     format: FormatMethod<TInput, TOutput, TDataContext>;
-    (props: FormatterProps<TInput, TDataContext>): JSX.Element | null;
+    (props: FormatterProps<TInput, TDataContext>): JSX.Element;
     /** Name of the formatter for easier debugging and profiling. */
     displayName?: string;
 }
@@ -35,16 +41,18 @@ export interface Formatter<TInput, TOutput, TDataContext extends DataContext = D
  * Creates a new formatter.
  *
  * @param format Function used to format the value.
+ * @param displayName
  */
 export const makeFormatter = <TInput, TOutput, TDataContext extends DataContext = DataContext>(
     format: FormatDefinition<TInput, TOutput, TDataContext>,
     displayName = 'Formatter',
 ): Formatter<TInput, TOutput, TDataContext> => {
-    const formatter: Formatter<TInput, TOutput, TDataContext> = props =>
-        <>{format(props.value, props)}</> ?? null;
-    formatter.displayName = displayName;
+    const FormatterComponent: Formatter<TInput, TOutput, TDataContext> = props => (
+        <>{format(props.value, props, useShouldRedactNumbers({ strict: false }))}</>
+    );
+    FormatterComponent.displayName = displayName;
 
-    formatter.format = (value, dataContext = {}) => format(value, dataContext);
+    FormatterComponent.format = (value, dataContext = {}) => format(value, dataContext);
 
-    return formatter;
+    return FormatterComponent;
 };

@@ -1,0 +1,78 @@
+import { type ReactNode } from 'react';
+
+import { Translation } from '@suite/intl';
+import { getDeviceInternalModel } from '@suite-common/suite-utils';
+import { IconButton, Row, TOOLTIP_DELAY_LONG } from '@trezor/components';
+import { CaretLeftIcon, XIcon } from '@trezor/icons';
+
+import { DeviceStatus } from 'src/components/suite/layouts/SuiteLayout/DeviceSelector/DeviceStatus';
+import { type ForegroundAppProps, type TrezorDevice } from 'src/types/suite';
+
+type DeviceHeaderProps = {
+    device: TrezorDevice;
+    onCancel?: ForegroundAppProps['onCancel'];
+    onBackButtonClick?: () => void;
+    isDeviceStatusVisible?: boolean;
+    actions?: ReactNode | null;
+};
+
+export const DeviceHeader = ({
+    onCancel,
+    device,
+    onBackButtonClick,
+    isDeviceStatusVisible = true,
+    actions,
+}: DeviceHeaderProps) => {
+    const deviceModelInternal = getDeviceInternalModel(device);
+
+    const isDefaultCancelVisible = !actions && actions !== null && onCancel;
+
+    if (
+        !onBackButtonClick &&
+        !actions &&
+        (actions === null || !onCancel) &&
+        !(isDeviceStatusVisible && device?.type === 'acquired')
+    ) {
+        return null;
+    }
+
+    return (
+        <Row gap={12}>
+            {onBackButtonClick && (
+                <IconButton
+                    icon={CaretLeftIcon}
+                    onClick={onBackButtonClick}
+                    intent="neutral"
+                    priority="secondary"
+                    data-testid="@switch-device/back-button"
+                    tooltip={{ content: <Translation id="TR_BACK" /> }}
+                />
+            )}
+
+            {deviceModelInternal && isDeviceStatusVisible && (
+                <DeviceStatus
+                    deviceModel={deviceModelInternal}
+                    device={device}
+                    forceConnectionInfo={true}
+                />
+            )}
+
+            <Row gap={4} margin={{ left: 'auto' }}>
+                {isDefaultCancelVisible && (
+                    <IconButton
+                        icon={XIcon}
+                        intent="neutral"
+                        priority="secondary"
+                        onClick={() => onCancel()}
+                        data-testid="@switch-device/close-button"
+                        tooltip={{
+                            delayShow: TOOLTIP_DELAY_LONG,
+                            content: <Translation id="TR_CLOSE" />,
+                        }}
+                    />
+                )}
+                {actions}
+            </Row>
+        </Row>
+    );
+};

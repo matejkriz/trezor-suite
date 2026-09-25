@@ -1,23 +1,25 @@
-import { Checkbox as CheckboxComponent } from '@trezor/components';
+import { Card, Checkbox as CheckboxComponent } from '@trezor/components';
 
-import type { Field } from '../../types';
-import { onFieldChange } from '../../actions/methodActions';
 import { Row } from './Row';
+import { type onFieldChange } from '../../actions/methodActions';
+import type { FieldBasic } from '../../types';
 
 interface CheckboxProps {
-    field: Field<boolean>;
+    field: FieldBasic<boolean>;
     onChange: typeof onFieldChange;
 }
 
 const Checkbox = ({ field, onChange, ...rest }: CheckboxProps) => (
     <Row>
-        <CheckboxComponent
-            onClick={_e => onChange(field, !field.value)}
-            isChecked={field.value}
-            {...rest}
-        >
-            {field.name}
-        </CheckboxComponent>
+        <Card paddingType="small">
+            <CheckboxComponent
+                onChange={() => onChange(field, !field.value)}
+                isChecked={field.value}
+                {...rest}
+            >
+                {field.name}
+            </CheckboxComponent>
+        </Card>
     </Row>
 );
 

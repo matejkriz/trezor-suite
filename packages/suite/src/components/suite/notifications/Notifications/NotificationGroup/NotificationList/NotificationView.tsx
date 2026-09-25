@@ -1,102 +1,97 @@
-import styled from 'styled-components';
+import { type ReactNode } from 'react';
 
+import { type ExtendedMessageDescriptor, Translation } from '@suite/intl';
 import type { NotificationEntry } from '@suite-common/toast-notifications';
-import { Button, Icon, ButtonProps, IconProps, Paragraph } from '@trezor/components';
-import { Translation, FormattedDateWithBullet } from 'src/components/suite';
-import { getNotificationIcon } from 'src/utils/suite/notification';
+import {
+    Button,
+    type ButtonProps,
+    Column,
+    Icon,
+    type IconComponent,
+    Paragraph,
+    Row,
+} from '@trezor/components';
+import { type ButtonPriority } from '@trezor/components/src/components/buttons/types';
+import { CaretRightIcon } from '@trezor/icons';
+
+import { FormattedDateWithBullet } from 'src/components/suite/FormattedDateWithBullet';
 import { useLayoutSize } from 'src/hooks/suite';
-import type { ExtendedMessageDescriptor, ToastNotificationVariant } from 'src/types/suite';
+import type { ToastNotificationVariant } from 'src/types/suite';
+import { getNotificationIcon } from 'src/utils/suite/notification';
 
-const TextP = styled(Paragraph)<{ $seen?: boolean }>`
-    opacity: ${({ $seen }) => ($seen ? 0.7 : 1)};
-`;
-
-const DateP = styled(TextP)`
-    display: flex;
-    flex-direction: column;
-    font-variant-numeric: tabular-nums;
-`;
-
-const Item = styled.div`
-    display: flex;
-    align-items: center;
-    padding: 16px 0;
-
-    & + & {
-        border-top: 1px solid ${({ theme }) => theme.STROKE_GREY};
-    }
-`;
-
-const Text = styled.div`
-    flex: 1;
-    padding: 0 16px;
-    white-space: break-spaces;
-`;
-
-const ActionButton = styled(Button)`
-    min-width: 80px;
-    align-self: center;
-`;
-
-const SeenWrapper = styled.span<{ $seen?: boolean }>`
-    margin-bottom: '4px';
-    opacity: ${({ $seen }) => ($seen ? 0.7 : 1)};
-`;
+export interface NotificationAction {
+    onClick: () => void;
+    label: ExtendedMessageDescriptor['id'];
+    position?: 'bottom' | 'right';
+    intent?: ButtonProps['intent'];
+    priority?: ButtonPriority;
+}
 
 export interface NotificationViewProps {
     notification: NotificationEntry;
     variant: ToastNotificationVariant;
-    icon?: IconProps['icon'] | JSX.Element;
+    icon?: IconComponent | ReactNode;
     message: ExtendedMessageDescriptor['id'];
     messageValues: ExtendedMessageDescriptor['values'];
-    action?: {
-        onClick: () => void;
-        label: ExtendedMessageDescriptor['id'];
-        position?: 'bottom' | 'right';
-        variant?: ButtonProps['variant'];
-    };
+    action?: NotificationAction | NotificationAction[];
 }
 
 export const NotificationView = ({
     message,
     messageValues,
-    action,
+    action: actionProp,
     icon,
     variant,
-    notification: { seen, id },
+    notification: { seen, id, type },
 }: NotificationViewProps) => {
-    const { isMobileLayout } = useLayoutSize();
-
+    const { isBelowTablet } = useLayoutSize();
     const defaultIcon = icon ?? getNotificationIcon(variant);
+    const isSeen = seen;
+    const colorProps = isSeen
+        ? { intent: 'neutral' as const, priority: 'secondary' as const }
+        : { intent: 'neutral' as const };
+
+    // NotificationView only supports a single action so even if an array is passed, only the first action is used
+    const action = Array.isArray(actionProp) ? actionProp[0] : actionProp;
 
     return (
-        <Item>
-            {defaultIcon && (
-                <SeenWrapper $seen={seen}>
-                    {typeof defaultIcon === 'string' ? (
-                        <Icon size={20} icon={defaultIcon} />
-                    ) : (
-                        defaultIcon
-                    )}
-                </SeenWrapper>
-            )}
-            <Text>
-                <TextP typographyStyle={seen ? 'hint' : 'callout'} $seen={seen}>
-                    <Translation id={message} values={messageValues} />
-                </TextP>
-                <DateP typographyStyle="label" $seen={seen}>
-                    <FormattedDateWithBullet value={id} />
-                </DateP>
-            </Text>
-
-            {action?.onClick &&
-                (isMobileLayout ? (
-                    <Icon icon="ARROW_RIGHT" onClick={action.onClick} size={18} />
+        <Row gap={12} data-testid={`@activity/list/item/${type}`}>
+            {defaultIcon &&
+                (typeof defaultIcon === 'function' ? (
+                    <Icon size={20} as={defaultIcon} {...colorProps} />
                 ) : (
-                    <ActionButton variant="tertiary" size="tiny" onClick={action.onClick}>
-                        <Translation id={action.label} />
-                    </ActionButton>
+                    defaultIcon
                 ))}
-        </Item>
+            <Column gap={4} margin={{ right: 'auto' }}>
+                <Paragraph
+                    typographyStyle={seen ? 'body-sm' : 'body-sm-strong'}
+                    intent="neutral"
+                    priority={isSeen ? 'secondary' : 'primary'}
+                >
+                    <Translation id={message} values={messageValues} />
+                </Paragraph>
+                <Paragraph
+                    typographyStyle="body-xs"
+                    intent="neutral"
+                    priority={isSeen ? 'secondary' : 'primary'}
+                >
+                    <FormattedDateWithBullet value={id} />
+                </Paragraph>
+            </Column>
+            {action?.onClick &&
+                (isBelowTablet ? (
+                    <Icon as={CaretRightIcon} onClick={action.onClick} size={18} />
+                ) : (
+                    <Button
+                        intent={action.intent ?? 'neutral'}
+                        priority={action.priority ?? 'secondary'}
+                        size="small"
+                        onClick={action.onClick}
+                        minWidth={80}
+                    >
+                        <Translation id={action.label} />
+                    </Button>
+                ))}
+        </Row>
     );
 };

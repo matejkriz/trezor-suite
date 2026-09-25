@@ -1,31 +1,44 @@
-import { TextProps } from '@suite-native/atoms';
-import { NetworkSymbol } from '@suite-common/wallet-config';
-import { FiatRatesLegacy } from '@trezor/blockchain-link';
-import { useFormatters } from '@suite-common/formatters';
+import { type NetworkSymbol } from '@suite-common/wallet-config';
+import { type TextProps } from '@suite-native/atoms';
 
-import { FormatterProps } from '../types';
-import { AmountText } from './AmountText';
 import { useFiatFromCryptoValue } from '../hooks/useFiatFromCryptoValue';
+import { type FormatterProps } from '../types';
+import { BaseCurrencyAmountFormatter } from './BaseCurrencyAmountFormatter';
 
-type CryptoToFiatAmountFormatterProps = FormatterProps<string | null> &
+type CryptoToFiatAmountFormatterProps = FormatterProps<string | number | null> &
     TextProps & {
-        network: NetworkSymbol;
-        customRates?: FiatRatesLegacy;
+        symbol: NetworkSymbol;
+        historicRate?: number;
+        useHistoricRate?: boolean;
+        isBalance?: boolean;
         isDiscreetText?: boolean;
+        isForcedDiscreetMode?: boolean;
+        isLoading?: boolean;
     };
 
 export const CryptoToFiatAmountFormatter = ({
     value,
-    network,
-    customRates,
-    isDiscreetText = true,
-    ...textProps
+    symbol,
+    historicRate,
+    useHistoricRate,
+    isBalance = false,
+    isLoading = false,
+    ...otherProps
 }: CryptoToFiatAmountFormatterProps) => {
-    const { FiatAmountFormatter } = useFormatters();
+    const fiatValue = useFiatFromCryptoValue({
+        symbol,
+        historicRate,
+        useHistoricRate,
+        isBalance,
+        cryptoValue: value ? value.toString() : null,
+    });
 
-    const fiatValue = useFiatFromCryptoValue({ cryptoValue: value, network, customRates });
-
-    const formattedFiatValue = FiatAmountFormatter.format(fiatValue ?? '0');
-
-    return <AmountText value={formattedFiatValue} isDiscreetText={isDiscreetText} {...textProps} />;
+    return (
+        <BaseCurrencyAmountFormatter
+            symbol={symbol}
+            value={fiatValue}
+            isLoading={isLoading}
+            {...otherProps}
+        />
+    );
 };

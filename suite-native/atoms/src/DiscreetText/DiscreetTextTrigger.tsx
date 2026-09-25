@@ -1,16 +1,20 @@
+import { type ReactNode } from 'react';
 import { Pressable } from 'react-native';
-import { ReactNode } from 'react';
 
-import { useDiscreetMode } from './useDiscreetMode';
+import { useDiscreetMode } from '@suite-common/discreet-mode';
 
-type DiscreetTextTriggerProps = { children: ReactNode };
+type DiscreetTextTriggerProps = { children: ReactNode; testID?: string };
 
-export const DiscreetTextTrigger = ({ children }: DiscreetTextTriggerProps) => {
+export const DiscreetTextTrigger = ({ children, testID }: DiscreetTextTriggerProps) => {
     const { isDiscreetMode, setIsDiscreetMode } = useDiscreetMode();
 
     const handlePress = () => {
         setIsDiscreetMode(!isDiscreetMode);
     };
 
-    return <Pressable onPress={handlePress}>{children}</Pressable>;
+    return (
+        <Pressable onPress={handlePress} testID={testID}>
+            {children}
+        </Pressable>
+    );
 };

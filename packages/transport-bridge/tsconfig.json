@@ -2,9 +2,13 @@
     "extends": "../../tsconfig.base.json",
     "compilerOptions": { "outDir": "libDev" },
     "references": [
+        { "path": "../components" },
+        { "path": "../eslint" },
         { "path": "../node-utils" },
         { "path": "../protocol" },
+        { "path": "../theme" },
         { "path": "../transport" },
+        { "path": "../transport-common" },
         { "path": "../utils" }
     ]
 }

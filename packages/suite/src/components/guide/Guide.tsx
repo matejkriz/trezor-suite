@@ -1,104 +1,90 @@
 import { useState } from 'react';
-import styled, { useTheme } from 'styled-components';
-import { analytics, EventType } from '@trezor/suite-analytics';
-import { spacingsPx, typography, zIndices } from '@trezor/theme';
-import { Translation } from 'src/components/suite';
+
+import { events, injectDesktopAnalytics } from '@suite/analytics';
+import { Translation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { Box, Column, IconCircle, useMediaQuery } from '@trezor/components';
+import { CommandIcon, LifebuoyIcon } from '@trezor/icons';
+
 import { setView } from 'src/actions/suite/guideActions';
-import { useDispatch, useSelector } from 'src/hooks/suite';
-import { Icon } from '@trezor/components';
 import {
-    GuideHeader,
-    GuideContent,
-    GuideViewWrapper,
     GuideCategories,
+    GuideContent,
+    GuideHeader,
     GuideSearch,
+    GuideSectionHeadline,
+    GuideViewWrapper,
 } from 'src/components/guide';
+import { useSelector } from 'src/hooks/suite';
+import { selectGuideIndexNode } from 'src/selectors/suite/guideSelectors';
 
-const FeedbackBorder = styled.div`
-    height: 1px;
-    background-color: ${({ theme }) => theme.borderElevation1};
-    margin: 0 ${spacingsPx.md};
-`;
-const FeedbackLinkWrapper = styled.div`
-    padding: ${spacingsPx.md};
-`;
-
-const FeedbackButton = styled.button`
-    display: flex;
-    align-items: center;
-    width: 100%;
-    border: 0;
-    border-radius: 4px;
-    cursor: pointer;
-    text-align: left;
-    padding: 11px;
-    background: none;
-    transition: ${({ theme }) =>
-        `background ${theme.HOVER_TRANSITION_TIME} ${theme.HOVER_TRANSITION_EFFECT}`};
-
-    /* speficy position and z-index so that GuideButton does not interfere */
-    position: relative;
-    z-index: ${zIndices.guide};
-
-    &:hover,
-    &:focus {
-        background: ${({ theme }) => theme.backgroundTertiaryPressedOnElevation1};
-    }
-
-    &:last-child {
-        left: auto;
-    }
-`;
-
-const FeedbackButtonLabel = styled.div`
-    padding: 0 9px;
-    ${typography.body}
-    width: 100%;
-    white-space: nowrap;
-`;
-
-const FeedbackButtonRightIcon = styled(Icon)`
-    margin-top: -1px;
-`;
+import { GuideItem } from './GuideItem';
 
 export const Guide = () => {
-    const theme = useTheme();
     const [searchActive, setSearchActive] = useState(false);
-    const indexNode = useSelector(state => state.guide.indexNode);
-    const dispatch = useDispatch();
-
+    const indexNode = useSelector(selectGuideIndexNode);
+    const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
     const handleFeedbackButtonClick = () => {
         dispatch(setView('SUPPORT_FEEDBACK_SELECTION'));
         analytics.report({
-            type: EventType.GuideFeedbackNavigation,
+            type: events.guideFeedbackNavigationEvent.name,
             payload: { type: 'overview' },
         });
     };
 
+    const handleShortcutsClick = () => {
+        dispatch(setView('KEYBOARD_SHORTCUTS'));
+    };
+
+    // Keyboard shortcuts are irrelevant on touch devices without a physical keyboard.
+    const isTouchDevice = useMediaQuery('(hover: none) and (pointer: coarse)');
+
     return (
         <GuideViewWrapper>
             <GuideHeader label={<Translation id="TR_GUIDE_VIEW_HEADLINE_LEARN_AND_DISCOVER" />} />
-            <GuideContent>
-                <GuideSearch pageRoot={indexNode} setSearchActive={setSearchActive} />
-                {!searchActive && <GuideCategories node={indexNode} />}
-            </GuideContent>
-            <FeedbackBorder />
-            <FeedbackLinkWrapper>
-                <FeedbackButton
-                    data-test="@guide/button-feedback"
-                    onClick={handleFeedbackButtonClick}
-                >
-                    <Icon icon="USERS" size={24} color={theme.iconOnTertiary} />
-                    <FeedbackButtonLabel>
-                        <Translation id="TR_GUIDE_SUPPORT_AND_FEEDBACK" />
-                    </FeedbackButtonLabel>
-                    <FeedbackButtonRightIcon
-                        icon="ARROW_RIGHT_CIRCLE"
-                        size={24}
-                        color={theme.iconPrimaryDefault}
-                    />
-                </FeedbackButton>
-            </FeedbackLinkWrapper>
+            <Column justifyContent="space-between" height="100%">
+                <GuideContent>
+                    <GuideSearch pageRoot={indexNode} setSearchActive={setSearchActive} />
+                    {!searchActive && (
+                        <>
+                            <Box>
+                                <GuideSectionHeadline id="TR_GUIDE_HELP_TITLE" />
+                                <Column gap={8}>
+                                    <GuideItem
+                                        onClick={handleFeedbackButtonClick}
+                                        data-testid="@guide/button-feedback"
+                                        icon={
+                                            <IconCircle
+                                                icon={LifebuoyIcon}
+                                                size={32}
+                                                intent="neutral"
+                                            />
+                                        }
+                                    >
+                                        <Translation id="TR_GUIDE_HELP_AND_FEEDBACK" />
+                                    </GuideItem>
+                                </Column>
+                            </Box>
+                            <Box margin={{ top: 16 }}>
+                                <GuideSectionHeadline id="TR_GUIDE_GUIDES_TITLE" />
+                                <GuideCategories node={indexNode} />
+                            </Box>
+                        </>
+                    )}
+                </GuideContent>
+                {!isTouchDevice && (
+                    <Box padding={16}>
+                        <GuideItem
+                            onClick={handleShortcutsClick}
+                            data-testid="@guide/button-shortcuts"
+                            icon={<IconCircle icon={CommandIcon} size={32} intent="neutral" />}
+                        >
+                            <Translation id="TR_GUIDE_KEYBOARD_SHORTCUTS" />
+                        </GuideItem>
+                    </Box>
+                )}
+            </Column>
         </GuideViewWrapper>
     );
 };

@@ -1,0 +1,53 @@
+const legacyResults = [
+    {
+        // Not supported in T1B1.
+        rules: ['1'],
+        success: false,
+    },
+];
+
+const rippleGetAddress: TestCase = {
+    method: 'rippleGetAddress',
+    setup: {
+        mnemonic: 'mnemonic_12',
+    },
+    tests: [
+        {
+            description: 'first account',
+            params: {
+                path: "m/44'/144'/0'/0/0",
+            },
+            result: {
+                address: 'rh5ZnEVySAy7oGd3nebT3wrohGDrsNS83E',
+            },
+        },
+        {
+            description: 'second account',
+            params: {
+                path: "m/44'/144'/1'/0/0",
+            },
+            result: {
+                address: 'rEpwmtmvx8gkMhX5NLdU3vutQt7dor4MZm',
+            },
+        },
+        // since 2.3.2 this test will return success, see common.setup emulator-allow-unsafe-paths
+        // {
+        //     description: 'Forbidden key path',
+        //     params: {
+        //         path: "m/44'/0'/1'",
+        //     },
+        //     result: false,
+        // },
+        {
+            description: "m/44'/144'/0'/0/1",
+            params: {
+                path: "m/44'/144'/0'/0/1",
+            },
+            result: {
+                address: 'rwrZ3agNYYJw4yi6v1r7Ui9AwX9KsWzghr',
+            },
+        },
+    ].map(fixture => ({ ...fixture, legacyResults })),
+};
+
+export default rippleGetAddress;

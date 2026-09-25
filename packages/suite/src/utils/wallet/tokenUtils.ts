@@ -1,12 +1,21 @@
-import BigNumber from 'bignumber.js';
-
-import { Account, Rate, TokenAddress, FiatRates } from '@suite-common/wallet-types';
-import { TokenInfo } from '@trezor/connect';
+import { type TranslationId } from '@suite/intl';
+import { type TokenDefinitionsState } from '@suite-common/token-definitions';
+import { type NetworkSymbol, type NetworkType } from '@suite-common/wallet-config';
+import { type GetTokensOutputType, getTokens } from '@suite-common/wallet-core';
+import {
+    type Account,
+    type Rate,
+    type RatesByKey,
+    type TokenAddress,
+} from '@suite-common/wallet-types';
 import { getFiatRateKey } from '@suite-common/wallet-utils';
-import { NetworkSymbol } from '@suite-common/wallet-config';
-import { FiatCurrencyCode } from '@suite-common/suite-config';
+import type { BaseCurrencyCode } from '@trezor/blockchain-link-types';
+import { type TokenInfo } from '@trezor/connect';
+import { BigNumber } from '@trezor/utils';
 
-interface TokensWithRates extends TokenInfo {
+export { getTokens, type GetTokensOutputType };
+
+export interface TokensWithRates extends TokenInfo {
     fiatValue: BigNumber;
     fiatRate?: Rate;
 }
@@ -21,23 +30,23 @@ export const sortTokensWithRates = (a: TokensWithRates, b: TokensWithRates) => {
         // If USD rate is equal or missing, sort by symbol length
         (a.symbol || '').length - (b.symbol || '').length ||
         // If symbol length is equal, sort by symbol name alphabetically
-        (a.symbol || '').localeCompare(b.symbol || '');
+        (a.symbol || '').localeCompare(b.symbol || '', undefined, { sensitivity: 'base' });
 
     return balanceSort;
 };
 
 export const enhanceTokensWithRates = (
     tokens: Account['tokens'],
-    fiatCurrency: FiatCurrencyCode,
+    baseCurrencyCode: BaseCurrencyCode,
     symbol: NetworkSymbol,
-    rates: FiatRates | undefined,
+    rates?: RatesByKey,
 ) => {
     if (!tokens?.length) return [];
 
     const tokensWithRates = tokens.map(token => {
         const tokenFiatRateKey = getFiatRateKey(
             symbol,
-            fiatCurrency,
+            baseCurrencyCode,
             token.contract as TokenAddress,
         );
         const fiatRate = rates?.[tokenFiatRateKey];
@@ -52,4 +61,41 @@ export const enhanceTokensWithRates = (
     });
 
     return tokensWithRates;
+};
+
+export type EnahncedTokenInfoWithFiat = ReturnType<typeof enhanceTokensWithRates>[number];
+
+export const hasVisibleTokens = (
+    symbol: NetworkSymbol,
+    tokens: TokenInfo[] | undefined,
+    tokenDefinitions: Partial<TokenDefinitionsState>,
+    isNft: boolean = false,
+): boolean => {
+    if (!tokens || tokens.length === 0) return false;
+
+    const coinDefinitions = tokenDefinitions?.[symbol]?.coin;
+    if (!coinDefinitions) return false;
+
+    const currentTokens = getTokens({
+        tokens,
+        symbol,
+        tokenDefinitions: coinDefinitions,
+        isNft,
+    });
+
+    const visibleTokenCount =
+        currentTokens.shownWithBalance.length + currentTokens.shownWithoutBalance.length;
+
+    return visibleTokenCount > 0;
+};
+
+export const getTokenAddressTranslationId = (networkType: NetworkType): TranslationId => {
+    switch (networkType) {
+        case 'solana':
+            return 'TR_TOKEN_ADDRESS';
+        case 'cardano':
+            return 'TR_POLICY_ID_ADDRESS';
+        default:
+            return 'TR_CONTRACT_ADDRESS';
+    }
 };

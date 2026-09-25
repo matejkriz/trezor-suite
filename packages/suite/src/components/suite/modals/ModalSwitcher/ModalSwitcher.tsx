@@ -1,19 +1,56 @@
+import {
+    TurnOnSuiteSyncModals,
+    selectShowEnableSuiteSyncModal,
+    updateShowEnableSuiteSyncModal,
+} from '@suite/suite-sync';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+
+import { ConnectionGlobalModalManager } from 'src/components/connection/ConnectionGlobalModalManager';
+import { ThpGlobalModalManager } from 'src/components/connection/thp/ThpGlobalModalManager';
+import { useSelector } from 'src/hooks/suite';
 import { usePreferredModal } from 'src/hooks/suite/usePreferredModal';
-import { ReduxModal } from '../ReduxModal/ReduxModal';
+
 import { ForegroundAppModal } from './ForegroundAppModal';
-import { DiscoveryLoader } from './DiscoveryLoader';
+import { WipedBleDeviceNeedsManualOsRemovalModalManager } from '../../bluetooth/WipedBleDeviceNeedsManualOsRemovalModalManager';
+import { ReduxModal } from '../ReduxModal/ReduxModal';
+
+type ModalParams = ReturnType<typeof usePreferredModal>;
+
+const Inner = ({ modal }: { modal: ModalParams }) => {
+    switch (modal.type) {
+        case 'redux-modal':
+            return <ReduxModal {...modal.payload} />;
+        default:
+            return null;
+    }
+};
 
 /** Displays whichever redux modal or foreground app should be displayed */
 export const ModalSwitcher = () => {
     const modal = usePreferredModal();
-    switch (modal.type) {
-        case 'foreground-app':
-            return <ForegroundAppModal {...modal.payload} />;
-        case 'redux-modal':
-            return <ReduxModal {...modal.payload} />;
-        case 'discovery-loading':
-            return <DiscoveryLoader />;
-        default:
-            return null;
+    const { dispatch } = useServices(injectDispatch);
+    const deviceStaticSessionId = useSelector(selectShowEnableSuiteSyncModal);
+
+    // For foreground apps, we have to NOT render the other modals.
+    // There may be conflicts: for example, Firmware Install / Upgrade flow
+    // handles the THP separately.
+    if (modal.type === 'foreground-app') {
+        return <ForegroundAppModal {...modal.payload} />;
     }
+
+    return (
+        <>
+            <WipedBleDeviceNeedsManualOsRemovalModalManager />
+            <ThpGlobalModalManager />
+            <TurnOnSuiteSyncModals
+                deviceStaticSessionId={deviceStaticSessionId}
+                onClose={() => {
+                    dispatch(updateShowEnableSuiteSyncModal({ deviceStaticSessionId: null }));
+                }}
+            />
+            <ConnectionGlobalModalManager />
+            <Inner modal={modal} />
+        </>
+    );
 };

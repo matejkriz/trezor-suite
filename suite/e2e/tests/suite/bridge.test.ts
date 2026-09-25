@@ -1,0 +1,24 @@
+import { TestStream } from '@trezor/e2e-utils';
+
+import { expect, test } from '../../support/fixtures';
+import { createTestAnnotation } from '../../support/reporters/annotations';
+
+test.describe('Bridge page', { tag: ['@webOnly', '@noDevice'] }, () => {
+    test.use({ startEmulator: false });
+
+    test(
+        'can use webusb',
+        { annotation: createTestAnnotation({ stream: TestStream.Connect }) },
+        async ({ url, page, analyticsSection }) => {
+            await analyticsSection.continueButton.click();
+
+            await page.goto(url + 'bridge');
+
+            // user may exit bridge page and use webusb
+            await page.getByTestId('@bridge/goto/wallet-index').click();
+
+            // connect device prompt with webusb enabled appears
+            await expect(page.getByTestId('@connect-device-prompt')).toBeVisible();
+        },
+    );
+});

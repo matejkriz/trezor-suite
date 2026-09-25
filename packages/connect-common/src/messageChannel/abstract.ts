@@ -3,18 +3,10 @@
  * this file is bundled into content script so be careful what you are importing not to bloat the bundle
  */
 
-import { Deferred, createDeferred } from '@trezor/utils';
-import { TypedEmitter } from '@trezor/utils';
-import { scheduleAction } from '@trezor/utils';
+import { type Deferred, TypedEmitter, createDeferred, scheduleAction } from '@trezor/utils';
 
-// TODO: so logger should be probably moved to connect common, or this file should be moved to connect
-// import type { Log } from '@trezor/connect/src/utils/debug';
-type Log = {
-    log: (...args: any[]) => void;
-    error: (...args: any[]) => void;
-    warn: (...args: any[]) => void;
-    debug: (...args: any[]) => void;
-};
+import type { Log } from '../utils/debug';
+import { createUUIDDeferredManager } from '../utils/deferred';
 
 export interface AbstractMessageChannelConstructorParams {
     sendFn: (message: any) => void;
@@ -24,12 +16,11 @@ export interface AbstractMessageChannelConstructorParams {
     };
     logger?: Log;
     lazyHandshake?: boolean;
-    legacyMode?: boolean;
 }
 
 export type Message<IncomingMessages extends { type: string }> = IncomingMessages & {
     channel: AbstractMessageChannelConstructorParams['channel'];
-    id: number;
+    id: string;
     success: boolean;
     payload: Extract<IncomingMessages, { type: IncomingMessages['type'] }> | undefined;
 };
@@ -44,13 +35,14 @@ export abstract class AbstractMessageChannel<
 > extends TypedEmitter<{
     message: Message<IncomingMessages>;
 }> {
-    protected messagePromises: Record<number, Deferred<any>> = {};
+    protected messages = createUUIDDeferredManager();
     /** queue of messages that were scheduled before handshake */
     protected messagesQueue: any[] = [];
-    protected messageID = 0;
 
     public isConnected = false;
+
     abstract connect(): void;
+
     abstract disconnect(): void;
 
     private readonly handshakeMaxRetries = 5;
@@ -58,7 +50,6 @@ export abstract class AbstractMessageChannel<
     private handshakeFinished: Deferred<void> | undefined;
 
     protected lazyHandshake?: boolean;
-    protected legacyMode?: boolean;
     protected logger?: Log;
 
     /**
@@ -75,13 +66,11 @@ export abstract class AbstractMessageChannel<
         channel,
         logger,
         lazyHandshake = false,
-        legacyMode = false,
     }: AbstractMessageChannelConstructorParams) {
         super();
         this.channel = channel;
         this.sendFn = sendFn;
         this.lazyHandshake = lazyHandshake;
-        this.legacyMode = legacyMode;
         this.logger = logger;
     }
 
@@ -91,13 +80,6 @@ export abstract class AbstractMessageChannel<
     public init() {
         if (!this.handshakeFinished) {
             this.handshakeFinished = createDeferred();
-            if (this.legacyMode) {
-                // Bypass handshake for communication with legacy components
-                // We add a delay for enough time for the other side to be ready
-                setTimeout(() => {
-                    this.handshakeFinished?.resolve();
-                }, 500);
-            }
             if (!this.lazyHandshake) {
                 // When `lazyHandshake` handshakeWithPeer will start when received channel-handshake-request.
                 this.handshakeWithPeer();
@@ -151,32 +133,17 @@ export abstract class AbstractMessageChannel<
     protected onMessage(_message: Message<IncomingMessages>) {
         // Older code used to send message as a data property of the message object.
         // This is a workaround to keep backward compatibility.
-        let message = _message;
-        if (
-            this.legacyMode &&
-            message.type === undefined &&
-            'data' in message &&
-            typeof message.data === 'object' &&
-            message.data !== null &&
-            'type' in message.data &&
-            typeof message.data.type === 'string'
-        ) {
-            // @ts-expect-error
-            message = message.data;
+        const message = _message;
+
+        const { channel, id, type, ...data } = message;
+
+        if (!channel?.peer || channel.peer !== this.channel.here) {
+            // To wrong peer
+            return;
         }
-
-        const { channel, id, type, payload, success } = message;
-
-        // Don't verify channel in legacy mode
-        if (!this.legacyMode) {
-            if (!channel?.peer || channel.peer !== this.channel.here) {
-                // To wrong peer
-                return;
-            }
-            if (!channel?.here || this.channel.peer !== channel.here) {
-                // From wrong peer
-                return;
-            }
+        if (!channel?.here || this.channel.peer !== channel.here) {
+            // From wrong peer
+            return;
         }
 
         if (type === 'channel-handshake-request') {
@@ -200,11 +167,9 @@ export abstract class AbstractMessageChannel<
             return;
         }
 
-        if (this.messagePromises[id]) {
-            this.messagePromises[id].resolve({ id, payload, success });
-            delete this.messagePromises[id];
-        }
-        const messagePromisesLength = Object.keys(this.messagePromises).length;
+        this.messages.resolve(id, { id, ...data });
+
+        const messagePromisesLength = this.messages.length();
         if (messagePromisesLength > 5) {
             this.logger?.warn(
                 `too many message promises (${messagePromisesLength}). this feels unexpected!`,
@@ -221,7 +186,7 @@ export abstract class AbstractMessageChannel<
         if (!usePromise) {
             try {
                 this.sendFn(message);
-            } catch (err) {
+            } catch {
                 if (useQueue) {
                     this.messagesQueue.push(message);
                 }
@@ -230,29 +195,38 @@ export abstract class AbstractMessageChannel<
             return;
         }
 
-        this.messageID++;
-        message.id = this.messageID;
-        this.messagePromises[message.id] = createDeferred();
+        const { promise, promiseId } = this.messages.create();
+        message.id = promiseId;
 
         try {
             this.sendFn(message);
-        } catch (err) {
+        } catch {
             if (useQueue) {
                 this.messagesQueue.push(message);
             }
         }
 
-        return this.messagePromises[message.id].promise;
+        return promise;
     }
 
-    resolveMessagePromises(resolvePayload: Record<string, any>) {
+    resolveMessagePromises(payload: Record<string, any>) {
         // This is used when we know that the connection has been interrupted but there might be something waiting for it.
-        Object.keys(this.messagePromises).forEach(id =>
-            this.messagePromises[id as any].resolve({
-                id,
-                payload: resolvePayload,
-            }),
-        );
+        this.messages.resolveAll(id => ({ id, payload }));
+    }
+
+    /**
+     * Clear any pending outgoing messages so that the next send is not
+     * blocked behind queued work.  Override in subclasses that serialise
+     * outgoing messages (e.g. via a send chain) to ensure urgent messages
+     * such as cancel/close are delivered without delay.
+     */
+    clearPendingSends(): void {
+        // No-op by default.
+    }
+
+    abortHandshake(reason?: string) {
+        this.handshakeFinished?.reject(new Error(reason ?? 'Handshake aborted'));
+        this.handshakeFinished = undefined;
     }
 
     clear() {

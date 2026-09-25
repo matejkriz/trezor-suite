@@ -1,24 +1,38 @@
+import { type Dispatch, type UnknownAction } from '@reduxjs/toolkit';
+import { type ThunkDispatch } from 'redux-thunk';
+
+import { openModal } from '@suite/modal';
+import { type SuiteSettingsRootState, selectIsEntropyCheckEnabled } from '@suite/settings';
 import {
-    selectDevices,
-    selectDevice,
-    deviceActions,
-    FIRMWARE_MODULE_PREFIX,
-} from '@suite-common/wallet-core';
-import * as deviceUtils from '@suite-common/suite-utils';
-import TrezorConnect from '@trezor/connect';
-import { analytics, EventType } from '@trezor/suite-analytics';
-import { notificationsActions } from '@suite-common/toast-notifications';
-
-import * as modalActions from 'src/actions/suite/modalActions';
-import * as routerActions from 'src/actions/suite/routerActions';
-import { Dispatch, GetState } from 'src/types/suite';
-import * as DEVICE from 'src/constants/suite/device';
+    type DeviceRootState,
+    selectSelectedDevice,
+    selectSimulatedEntropyCheckFail,
+} from '@suite-common/device';
+import { FIRMWARE_MODULE_PREFIX } from '@suite-common/firmware';
+import {
+    Feature,
+    type MessageSystemRootState,
+    selectIsFeatureDisabled,
+} from '@suite-common/message-system';
 import { createThunk } from '@suite-common/redux-utils';
+import { type ReportSecurityCheckDep } from '@suite-common/suite-types';
+import { notificationsActions } from '@suite-common/toast-notifications';
+import { processEntropyCheckResultThunk } from '@suite-common/wallet-core';
+import TrezorConnect from '@trezor/connect';
+import { type ERRORS } from '@trezor/connect-common/src/constants';
 
-export const applySettings =
+import {
+    DEFAULT_PASSPHRASE_PROTECTION,
+    DEFAULT_SKIP_BACKUP,
+    DEFAULT_STRENGTH,
+} from 'src/constants/suite/device';
+
+type ApplySettingsThunkState = DeviceRootState;
+
+export const applySettingsThunk =
     (params: Parameters<typeof TrezorConnect.applySettings>[0]) =>
-    async (dispatch: Dispatch, getState: GetState) => {
-        const device = selectDevice(getState());
+    async (dispatch: Dispatch<UnknownAction>, getState: () => ApplySettingsThunkState) => {
+        const device = selectSelectedDevice(getState());
         if (!device) return;
         const result = await TrezorConnect.applySettings({
             device: {
@@ -29,16 +43,18 @@ export const applySettings =
         if (result.success) {
             dispatch(notificationsActions.addToast({ type: 'settings-applied' }));
         } else {
-            dispatch(notificationsActions.addToast({ type: 'error', error: result.payload.error }));
+            dispatch(notificationsActions.addToast({ type: 'error', error: result.error.message }));
         }
 
         return result;
     };
 
-export const changePin =
+type ChangePinThunkState = DeviceRootState;
+
+export const changePinThunk =
     (params: Parameters<typeof TrezorConnect.changePin>[0] = {}, skipSuccessToast?: boolean) =>
-    async (dispatch: Dispatch, getState: GetState) => {
-        const device = selectDevice(getState());
+    async (dispatch: Dispatch<UnknownAction>, getState: () => ChangePinThunkState) => {
+        const device = selectSelectedDevice(getState());
 
         if (!device) return;
 
@@ -52,9 +68,9 @@ export const changePin =
             if (!skipSuccessToast) {
                 dispatch(notificationsActions.addToast({ type: 'pin-changed' }));
             }
-        } else if (result.payload.code === 'Failure_PinMismatch') {
-            dispatch(modalActions.openModal({ type: 'pin-mismatch' }));
-        } else if (result.payload.error.includes('string overflow')) {
+        } else if (result.error.code === 'Failure_PinMismatch') {
+            dispatch(openModal({ type: 'pin-mismatch' }));
+        } else if (result.error.message.includes('string overflow')) {
             // this is a workaround for FW < 1.10.0
             // translate generic error from the device if the entered PIN is longer than 9 digits
             dispatch(
@@ -64,14 +80,16 @@ export const changePin =
                 }),
             );
         } else {
-            dispatch(notificationsActions.addToast({ type: 'error', error: result.payload.error }));
+            dispatch(notificationsActions.addToast({ type: 'error', error: result.error.message }));
         }
     };
 
-export const changeWipeCode =
+type ChangeWipeCodeThunkState = DeviceRootState;
+
+export const changeWipeCodeThunk =
     ({ remove }: Parameters<typeof TrezorConnect.changeWipeCode>[0] = {}) =>
-    async (dispatch: Dispatch, getState: GetState) => {
-        const device = selectDevice(getState());
+    async (dispatch: Dispatch<UnknownAction>, getState: () => ChangeWipeCodeThunkState) => {
+        const device = selectSelectedDevice(getState());
 
         if (!device) return;
 
@@ -87,134 +105,136 @@ export const changeWipeCode =
                     type: remove ? 'wipe-code-removed' : 'wipe-code-changed',
                 }),
             );
-        } else if (result.payload.code === 'Failure_WipeCodeMismatch') {
-            dispatch(modalActions.openModal({ type: 'pin-mismatch' }));
+        } else if (result.error.code === 'Failure_WipeCodeMismatch') {
+            dispatch(openModal({ type: 'pin-mismatch' }));
         } else {
-            dispatch(notificationsActions.addToast({ type: 'error', error: result.payload.error }));
+            dispatch(notificationsActions.addToast({ type: 'error', error: result.error.message }));
         }
     };
 
-export const wipeDevice = () => async (dispatch: Dispatch, getState: GetState) => {
-    const device = selectDevice(getState());
-    if (!device) return;
-    const bootloaderMode = device.mode === 'bootloader';
-    const devices = selectDevices(getState());
-    // collect devices with old "device.id" to be removed (see description below)
-    const deviceInstances = deviceUtils.getDeviceInstances(device, devices);
+type ResetDeviceThunkState = DeviceRootState & SuiteSettingsRootState & MessageSystemRootState;
 
-    const result = await TrezorConnect.wipeDevice({
-        device: {
-            path: device.path,
-        },
-        // In bootloader mode we need the skip the final reload otherwise we never get the resolution
-        skipFinalReload: bootloaderMode,
-    });
+type ResetDeviceThunkDeps = { services: ReportSecurityCheckDep };
 
-    if (result.success) {
-        // Wiping a device triggers device.id change and this change is propagated to device reducer via @trezor/connect DEVICE.CHANGE event.
-        // Accounts data are related to the old device.id in order to properly clear reducers and indexed db
-        // we need to retrieve device objects BEFORE and AFTER the wipe process.
-        // and call SUITE.FORGET_DEVICE on ALL devices (with old and new device.id)
-        const state = getState();
-        const newDevice = selectDevice(getState());
-        const newDevices = selectDevices(getState());
-        deviceInstances.push(...deviceUtils.getDeviceInstances(newDevice!, newDevices));
-        deviceInstances.forEach(d => {
-            dispatch(deviceActions.forgetDevice(d));
-        });
-        dispatch(notificationsActions.addToast({ type: 'device-wiped' }));
-        analytics.report({
-            type: EventType.SettingsDeviceWipe,
-        });
-
-        // special case with webusb. device after wipe changes device_id. with webusb transport, device_id is used as path
-        // and thus as descriptor for webusb. So, after device is wiped, in the transport layer, device is still paired
-        // through old descriptor but suite already works with a new one. it kinda works but only until we try a new call,
-        // typically resetDevice when in onboarding - we get device disconnected error;
-        //
-        // edit 1: disconnecting the device wiped from bootloader mode is also necessary
-        // edit 2: encountered libusb error with bridge 2.0.27. so let's enforce disconnecting for all devices
-        dispatch(deviceActions.requestDeviceReconnect());
-        if (state.router.app === 'settings') {
-            // redirect to index to close the settings and show initial device setup
-            dispatch(routerActions.goto('suite-index'));
-        }
-    } else {
-        dispatch(notificationsActions.addToast({ type: 'error', error: result.payload.error }));
-    }
-};
-
-export const resetDevice =
+export const resetDeviceThunk =
     (params: Parameters<typeof TrezorConnect.resetDevice>[0] = {}) =>
-    async (dispatch: Dispatch, getState: GetState) => {
-        const device = selectDevice(getState());
+    async (
+        dispatch: ThunkDispatch<ResetDeviceThunkState, ResetDeviceThunkDeps, UnknownAction>,
+        getState: () => ResetDeviceThunkState,
+    ) => {
+        const device = selectSelectedDevice(getState());
+        const isEntropyCheckEnabledInSettings = selectIsEntropyCheckEnabled(getState());
+        const isEntropyCheckDisabledByMessageSystem = selectIsFeatureDisabled(
+            getState(),
+            Feature.entropyCheck,
+        );
 
-        if (!device || !device.features) return;
+        if (device?.status === 'used' || device?.status === 'occupied') {
+            const features = await TrezorConnect.getFeatures({ device: { path: device.path } });
+            if (!features.success) {
+                dispatch(
+                    notificationsActions.addToast({
+                        type: 'error',
+                        error: 'Device is unreadable',
+                    }),
+                );
+
+                return;
+            }
+            if (features.payload.initialized) {
+                // Note that user gets stuck on this page. It's a rare edge case; a solution would have its own drawbacks.
+                dispatch(
+                    notificationsActions.addToast({
+                        type: 'error',
+                        error: 'This device has already been initialized',
+                    }),
+                );
+
+                return;
+            }
+        }
+
+        if (!device?.features) return;
+
+        if (device.mode !== 'initialize') {
+            dispatch(
+                notificationsActions.addToast({
+                    type: 'error',
+                    error: 'Device is not in initialization mode.',
+                }),
+            );
+
+            return;
+        }
 
         const defaults = {
-            strength: DEVICE.DEFAULT_STRENGTH[device.features.internal_model],
-            label: DEVICE.DEFAULT_LABEL,
-            skip_backup: DEVICE.DEFAULT_SKIP_BACKUP,
-            passphrase_protection: DEVICE.DEFAULT_PASSPHRASE_PROTECTION,
+            strength: DEFAULT_STRENGTH[device.features.internal_model],
+            skip_backup: DEFAULT_SKIP_BACKUP,
+            passphrase_protection: DEFAULT_PASSPHRASE_PROTECTION,
         };
 
+        const isEntropyCheckEnabled =
+            isEntropyCheckEnabledInSettings && !isEntropyCheckDisabledByMessageSystem;
+        // Used only in tests! See deviceReducer for the property definition.
+        const simulatedFailResult = selectSimulatedEntropyCheckFail(getState());
+
         const result = await TrezorConnect.resetDevice({
+            ...defaults,
+            ...params,
             device: {
                 path: device.path,
             },
-            ...defaults,
-            ...params,
+            entropy_check: isEntropyCheckEnabled,
         });
 
-        if (result.success && DEVICE.DEFAULT_PASSPHRASE_PROTECTION) {
-            // We call resetDevice from onboarding (generating new seed)
-            // Uninitialized device has disabled passphrase protection thus useEmptyPassphrase is set to true.
-            // It means that when user finished the onboarding process a standard wallet is automatically
-            // discovered instead of asking for selecting between standard wallet and a passphrase.
-            // This action takes cares of setting useEmptyPassphrase to false (handled by deviceReducer).
-            dispatch(deviceActions.updatePassphraseMode({ device, hidden: true }));
-        }
+        if (isEntropyCheckEnabled) {
+            if (simulatedFailResult) {
+                dispatch(processEntropyCheckResultThunk({ device, result: simulatedFailResult }));
 
-        if (!result.success) {
-            dispatch(notificationsActions.addToast({ type: 'error', error: result.payload.error }));
+                return simulatedFailResult;
+            }
+            dispatch(processEntropyCheckResultThunk({ device, result }));
         }
 
         return result;
     };
 
-export const changeLanguage = createThunk(
-    `${FIRMWARE_MODULE_PREFIX}/update-firmware-language`,
-    async (params: Parameters<typeof TrezorConnect.changeLanguage>[0], { dispatch, getState }) => {
-        const device = selectDevice(getState());
+type ChangeLanguageThunkState = DeviceRootState;
 
-        if (!device) return;
+export const changeLanguageThunk = createThunk<
+    Awaited<ReturnType<typeof TrezorConnect.changeLanguage>> | undefined,
+    Parameters<typeof TrezorConnect.changeLanguage>[0],
+    { state: ChangeLanguageThunkState }
+>(`${FIRMWARE_MODULE_PREFIX}/update-firmware-language`, async (params, { dispatch, getState }) => {
+    const device = selectSelectedDevice(getState());
 
-        const result = await TrezorConnect.changeLanguage({
-            device: {
-                path: device.path,
-            },
-            ...params,
-        });
+    if (!device) return;
 
-        if (result.success) {
-            dispatch(notificationsActions.addToast({ type: 'firmware-language-changed' }));
+    const result = await TrezorConnect.changeLanguage({
+        device: {
+            path: device.path,
+        },
+        ...params,
+    });
+
+    if (result.success) {
+        dispatch(notificationsActions.addToast({ type: 'firmware-language-changed' }));
+    } else {
+        // Different errors for desktop/Chrome/Firefox
+        const isFetchError =
+            result.error.code === ('ENOTFOUND' as ERRORS.ErrorCode) ||
+            ['Failed to fetch', 'NetworkError when attempting to fetch resource.'].includes(
+                result.error.message,
+            );
+        if (isFetchError) {
+            dispatch(notificationsActions.addToast({ type: 'firmware-language-fetch-error' }));
         } else {
-            // Different errors for desktop/Chrome/Firefox
-            const isFetchError =
-                result.payload.code === 'ENOTFOUND' ||
-                ['Failed to fetch', 'NetworkError when attempting to fetch resource.'].includes(
-                    result.payload.error,
-                );
-            if (isFetchError) {
-                dispatch(notificationsActions.addToast({ type: 'firmware-language-fetch-error' }));
-            } else {
-                dispatch(
-                    notificationsActions.addToast({
-                        type: 'error',
-                        error: result.payload.error,
-                    }),
-                );
-            }
+            dispatch(
+                notificationsActions.addToast({
+                    type: 'error',
+                    error: result.error.message,
+                }),
+            );
         }
-    },
-);
+    }
+});

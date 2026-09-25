@@ -1,55 +1,44 @@
+import { useMemo } from 'react';
+
+import { type NetworkSymbol } from '@suite-common/wallet-config';
+import { selectBaseCurrency, selectFiatRatesByFiatRateKey } from '@suite-common/wallet-core';
+import { type RateTypeWithoutHistoric, type TokenAddress } from '@suite-common/wallet-types';
+import { type AmountUnit, getFiatRateKey, toFiatCurrency } from '@suite-common/wallet-utils';
+
 import { useSelector } from 'src/hooks/suite';
 
-import { Network } from 'src/types/wallet';
-import { getFiatRateKey, toFiatCurrency } from '@suite-common/wallet-utils';
-import { selectLocalCurrency } from 'src/reducers/wallet/settingsReducer';
-import { selectFiatRatesByFiatRateKey } from '@suite-common/wallet-core';
-import { TimestampedRates } from 'src/types/wallet/fiatRates';
-import { NetworkSymbol } from '@suite-common/wallet-config';
-import { TokenAddress } from '@suite-common/wallet-types';
-
 interface CommonOwnProps {
-    amount: string;
-    symbol: Network['symbol'] | string;
-    tokenAddress?: string;
-    fiatCurrency?: string;
+    amount: string | AmountUnit; // Todo: remove `string` only for back compatibility
+    symbol: NetworkSymbol;
+    tokenAddress?: TokenAddress;
+    rateType?: RateTypeWithoutHistoric;
 }
 
-interface DefaultSourceProps extends CommonOwnProps {
-    source?: never;
-    useCustomSource?: never;
+export interface UseFiatFromCryptoValueParams extends CommonOwnProps {
+    historicRate?: number;
+    useHistoricRate?: boolean;
 }
-
-interface CustomSourceProps extends CommonOwnProps {
-    source: TimestampedRates['rates'] | undefined | null;
-    useCustomSource?: boolean;
-}
-
-export type useFiatFromCryptoValueParams = DefaultSourceProps | CustomSourceProps;
 
 export const useFiatFromCryptoValue = ({
     amount,
     symbol,
     tokenAddress,
-    fiatCurrency,
-    useCustomSource,
-    source,
-}: useFiatFromCryptoValueParams) => {
-    const localCurrency = useSelector(selectLocalCurrency);
-    const fiatRateKey = getFiatRateKey(
-        symbol as NetworkSymbol,
-        localCurrency,
-        tokenAddress as TokenAddress,
+    historicRate,
+    useHistoricRate,
+    rateType,
+}: UseFiatFromCryptoValueParams) => {
+    const baseCurrencyCode = useSelector(selectBaseCurrency);
+    const fiatRateKey = getFiatRateKey(symbol, baseCurrencyCode, tokenAddress);
+
+    const currentRate = useSelector(state =>
+        selectFiatRatesByFiatRateKey(state, fiatRateKey, rateType),
     );
 
-    const currentRate = useSelector(state => selectFiatRatesByFiatRateKey(state, fiatRateKey));
+    const rate = useHistoricRate ? historicRate : currentRate?.rate;
+    const fiatAmount = useMemo(
+        () => (rate ? toFiatCurrency({ amount, rate }) : null),
+        [amount, rate],
+    );
 
-    const targetCurrency = fiatCurrency ?? localCurrency;
-
-    const ratesSource = useCustomSource ? source : { [localCurrency]: currentRate?.rate };
-    const fiatAmount: string | null = ratesSource
-        ? toFiatCurrency(amount, targetCurrency, ratesSource)
-        : null;
-
-    return { targetCurrency, fiatAmount, ratesSource, currentRate };
+    return { baseCurrencyCode, fiatAmount, rate, currentRate };
 };

@@ -1,94 +1,47 @@
 import { useEffect } from 'react';
+import { Freeze } from 'react-freeze';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import * as SplashScreen from 'expo-splash-screen';
-import * as Sentry from '@sentry/react-native';
 
-import TrezorConnect from '@trezor/connect';
-import { selectIsAppReady, selectIsConnectInitialized, StoreProvider } from '@suite-native/state';
 import { FormatterProvider } from '@suite-common/formatters';
-import { NavigationContainerWithAnalytics } from '@suite-native/navigation';
-import { FeatureMessageScreen, MessageSystemBannerRenderer } from '@suite-native/message-system';
+import { ReactNativeQueryProvider } from '@suite-common/react-query/src/components/ReactNativeQueryProvider';
+import { selectShouldUserBeAuthenticated } from '@suite-native/biometrics';
+import { useFormattersConfig } from '@suite-native/formatters-config';
 import { IntlProvider } from '@suite-native/intl';
-import { useTransactionCache } from '@suite-native/accounts';
-import { isDebugEnv } from '@suite-native/config';
+import { KillswitchMessageScreen } from '@suite-native/message-system';
+import { NavigationContainerWithAnalytics } from '@suite-native/navigation';
+import { reportStartupAppLoaded } from '@suite-native/sentry';
+import {
+    type NativeReduxStoreDep,
+    type NativeServices,
+    type StorePersistorDep,
+    StoreProvider,
+    selectIsAppReady,
+} from '@suite-native/state';
 
-import { RootStackNavigator } from './navigation/RootStackNavigator';
-import { StylesProvider } from './StylesProvider';
-import { useFormattersConfig } from './hooks/useFormattersConfig';
-import { applicationInit } from './initActions';
-import { useReportAppInitToAnalytics } from './hooks/useReportAppInitToAnalytics';
-import { SentryProvider } from './SentryProvider';
+import { BannersRenderer } from './BannersRenderer';
 import { ModalsRenderer } from './ModalsRenderer';
-
-if (__DEV__) {
-    require('./LogBox');
-}
-
-// Base time to measure app loading time.
-// The constant has to be placed at the beginning of this file to be initialized as soon as possible.
-// TODO: This method of measuring app loading time is not ideal, Should be substituted by some more sophisticated solution in the future.
-const APP_STARTED_TIMESTAMP = Date.now();
-
-// Keep the splash screen visible while we fetch resources
-SplashScreen.preventAutoHideAsync();
-
-// NOTE: This is a workaround wrapper for connect methods to prevent sending useEmptyPassphrase as undefined until we will implement passphrase behavior in mobile.
-type ConnectKey = keyof typeof TrezorConnect;
-const wrappedMethods = [
-    'getAccountInfo',
-    'blockchainEstimateFee',
-    'blockchainSetCustomBackend',
-    'blockchainSubscribeFiatRates',
-    'blockchainGetCurrentFiatRates',
-    'blockchainSubscribe',
-    'blockchainUnsubscribe',
-    'cardanoGetPublicKey',
-    'getDeviceState',
-    'cardanoGetAddress',
-    'getAddress',
-    'rippleGetAddress',
-    'ethereumGetAddress',
-    'solanaGetAddress',
-    'blockchainGetFiatRatesForTimestamps',
-    'getAccountDescriptor',
-    'blockchainGetAccountBalanceHistory',
-    'blockchainUnsubscribeFiatRates',
-];
-
-wrappedMethods.forEach(key => {
-    const original: any = TrezorConnect[key as ConnectKey];
-    if (!original) return;
-    (TrezorConnect[key as ConnectKey] as any) = async (params: any) => {
-        const result = await original({
-            ...params,
-            useEmptyPassphrase: true,
-        });
-
-        return result;
-    };
-});
+import { StylesProvider } from './StylesProvider';
+import { InitRosenitePlugin } from './devtools/InitRoseniteDevTools';
+import { useReportAppInitToAnalytics } from './hooks/useReportAppInitToAnalytics';
+import { RootStackNavigator } from './navigation/RootStackNavigator';
 
 const AppComponent = () => {
-    const dispatch = useDispatch();
     const formattersConfig = useFormattersConfig();
     const isAppReady = useSelector(selectIsAppReady);
-    const isConnectInitialized = useSelector(selectIsConnectInitialized);
+    const shouldUserBeAuthenticated = useSelector(selectShouldUserBeAuthenticated);
 
-    useReportAppInitToAnalytics(APP_STARTED_TIMESTAMP);
-    useTransactionCache();
-
-    useEffect(() => {
-        if (!isConnectInitialized) {
-            dispatch(applicationInit());
-        }
-    }, [dispatch, isConnectInitialized]);
+    useReportAppInitToAnalytics();
 
     useEffect(() => {
         if (isAppReady) {
-            SplashScreen.hideAsync();
+            // Report the first usable frame even if the native splash API fails to resolve.
+            void SplashScreen.hideAsync().then(reportStartupAppLoaded, reportStartupAppLoaded);
         }
     }, [isAppReady]);
 
@@ -96,31 +49,40 @@ const AppComponent = () => {
 
     return (
         <FormatterProvider config={formattersConfig}>
-            <MessageSystemBannerRenderer />
-            <RootStackNavigator />
+            {__DEV__ && <InitRosenitePlugin />}
+            <BannersRenderer />
+            <BottomSheetModalProvider>
+                <Freeze freeze={shouldUserBeAuthenticated}>
+                    <RootStackNavigator />
+                </Freeze>
+            </BottomSheetModalProvider>
             <ModalsRenderer />
             {/* NOTE: Rendered as last item so that it covers the whole app screen */}
-            <FeatureMessageScreen />
+            <KillswitchMessageScreen />
         </FormatterProvider>
     );
 };
 
-const PureApp = () => (
+type PureAppProps = {
+    services: NativeServices & NativeReduxStoreDep & StorePersistorDep;
+};
+
+export const PureApp = ({ services }: PureAppProps) => (
     <GestureHandlerRootView style={{ flex: 1 }}>
-        <IntlProvider>
-            <StoreProvider>
-                <SentryProvider>
-                    <SafeAreaProvider>
-                        <StylesProvider>
-                            <NavigationContainerWithAnalytics>
-                                <AppComponent />
-                            </NavigationContainerWithAnalytics>
-                        </StylesProvider>
-                    </SafeAreaProvider>
-                </SentryProvider>
-            </StoreProvider>
-        </IntlProvider>
+        <StoreProvider services={services}>
+            <ReactNativeQueryProvider>
+                <IntlProvider>
+                    <KeyboardProvider>
+                        <SafeAreaProvider>
+                            <StylesProvider>
+                                <NavigationContainerWithAnalytics>
+                                    <AppComponent />
+                                </NavigationContainerWithAnalytics>
+                            </StylesProvider>
+                        </SafeAreaProvider>
+                    </KeyboardProvider>
+                </IntlProvider>
+            </ReactNativeQueryProvider>
+        </StoreProvider>
     </GestureHandlerRootView>
 );
-
-export const App = isDebugEnv() ? PureApp : Sentry.wrap(PureApp);

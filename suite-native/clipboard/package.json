@@ -1,0 +1,22 @@
+{
+    "name": "@suite-native/clipboard",
+    "version": "1.0.0",
+    "private": true,
+    "license": "See LICENSE.md in repo root",
+    "sideEffects": false,
+    "main": "src/index",
+    "scripts": {
+        "depcheck": "yarn g:depcheck",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
+        "type-check": "yarn g:tsc --build"
+    },
+    "dependencies": {
+        "@expo/ui": "57.0.10",
+        "@suite-native/intl": "workspace:*",
+        "@suite-native/toasts": "workspace:*",
+        "expo-clipboard": "~57.0.1",
+        "expo-haptics": "~57.0.1",
+        "react": "19.2.3",
+        "react-native": "0.86.0"
+    }
+}

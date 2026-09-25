@@ -1,0 +1,34 @@
+import { Callout } from 'nextra/components';
+
+# Events
+
+<Callout type="warning">
+    In version 10 the event API (`on`, `off`, `removeAllListeners`) is available only in the
+    `@trezor/connect` package (in-process Core, used by Trezor Suite). The thin packages
+    `@trezor/connect-web`, `@trezor/connect-webextension` and `@trezor/connect-mobile` do not expose
+    it — the host Core does not forward events to them.
+</Callout>
+
+## Device events
+
+Once the user opens the popup page and grants permission for the hosting page to communicate with his Trezor device. TrezorConnect API will emit events related to this device.
+
+ES6
+
+```javascript
+import TrezorConnect, { DEVICE_EVENT, DEVICE } from '@trezor/connect';
+
+TrezorConnect.on(DEVICE_EVENT, event => {
+    if (event.type === DEVICE.CONNECT) {
+    } else if (event.type === DEVICE.DISCONNECT) {
+    }
+});
+```
+
+## List of published events
+
+There are more types of events. Apart from device events you may also decide to consume blockchain data available through BLOCKCHAIN_EVENT events.
+
+- [device events](https://github.com/trezor/trezor-suite/blob/develop/packages/connect-common/src/events/device.ts)
+- [blockchain events](https://github.com/trezor/trezor-suite/blob/develop/packages/connect-common/src/events/blockchain.ts)
+- [transport events](https://github.com/trezor/trezor-suite/blob/develop/packages/connect-common/src/events/transport.ts)

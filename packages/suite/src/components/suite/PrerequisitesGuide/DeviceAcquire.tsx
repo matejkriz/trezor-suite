@@ -1,61 +1,45 @@
-import { MouseEventHandler } from 'react';
+import { type MouseEventHandler } from 'react';
 
-import { acquireDevice } from '@suite-common/wallet-core';
-import { Button } from '@trezor/components';
-import { isDesktop } from '@trezor/env-utils';
+import { useDevice } from '@suite/device';
+import { Translation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { acquireDeviceThunk } from '@suite-common/device';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { Banner } from '@trezor/components';
 
-import { Translation, TroubleshootingTips } from 'src/components/suite';
-import { useDevice, useDispatch } from 'src/hooks/suite';
+import { TroubleshootingTips } from 'src/components/suite/troubleshooting/TroubleshootingTips';
+import {
+    TROUBLESHOOTING_TIP_CLOSE_ALL_TABS,
+    TROUBLESHOOTING_TIP_RECONNECT,
+} from 'src/components/suite/troubleshooting/tips';
 
 export const DeviceAcquire = () => {
     const { isLocked } = useDevice();
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
 
     const isDeviceLocked = isLocked();
 
     const handleClick: MouseEventHandler = e => {
         e.stopPropagation();
-        dispatch(acquireDevice());
+        dispatch(acquireDeviceThunk({}));
     };
 
     const ctaButton = (
-        <Button data-test="@device-acquire" isLoading={isDeviceLocked} onClick={handleClick}>
-            <Translation id="TR_ACQUIRE_DEVICE" />
-        </Button>
+        <Banner.Button
+            data-testid="@device-acquire"
+            isLoading={isDeviceLocked}
+            onClick={handleClick}
+            size="small"
+        >
+            <Translation id="TR_TRY_AGAIN" />
+        </Banner.Button>
     );
 
-    const tips = [
-        {
-            key: 'device-acquire',
-            heading: <Translation id="TR_TROUBLESHOOTING_CLOSE_TABS" />,
-            description: (
-                <Translation
-                    id={
-                        isDesktop()
-                            ? 'TR_TROUBLESHOOTING_CLOSE_TABS_DESCRIPTION_DESKTOP'
-                            : 'TR_TROUBLESHOOTING_CLOSE_TABS_DESCRIPTION'
-                    }
-                />
-            ),
-        },
-        {
-            key: 'device-reconnect',
-            heading: <Translation id="TR_RECONNECT_YOUR_DEVICE" />,
-            description: (
-                <Translation
-                    id={
-                        isDesktop()
-                            ? 'TR_RECONNECT_DEVICE_DESCRIPTION_DESKTOP'
-                            : 'TR_RECONNECT_DEVICE_DESCRIPTION'
-                    }
-                />
-            ),
-        },
-    ];
+    const tips = [TROUBLESHOOTING_TIP_CLOSE_ALL_TABS, TROUBLESHOOTING_TIP_RECONNECT];
 
     return (
         <TroubleshootingTips
-            label={<Translation id="TR_ACQUIRE_DEVICE_TITLE" />}
+            label={<Translation id="TR_NEEDS_ATTENTION_CONNECT_USB_OR_BLUETOOTH" />}
             cta={ctaButton}
             items={tips}
         />

@@ -1,59 +1,102 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 
-import { A } from '@mobily/ts-belt';
-import { useSetAtom } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 
-import { useGraphForSingleAccount, Graph, TimeSwitch } from '@suite-native/graph';
-import { VStack } from '@suite-native/atoms';
-import { selectFiatCurrency } from '@suite-native/module-settings';
-import { FiatGraphPointWithCryptoBalance } from '@suite-common/graph';
-
+import { useServices } from '@suite-common/dependency-injection';
+import { type FiatGraphPointWithCryptoBalance } from '@suite-common/graph';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { asNetworkSymbol } from '@suite-common/wallet-config';
+import { type AccountsRootState } from '@suite-common/wallet-core';
+import { type AccountKey, type TokenAddress } from '@suite-common/wallet-types';
 import {
-    AccountDetailGraphHeader,
-    referencePointAtom,
-    selectedPointAtom,
-} from './AccountDetailGraphHeader';
+    Graph,
+    type GraphSliceRootState,
+    accountDetailGraphAtoms,
+    getAccountGraphInstanceId,
+    resetGraphRuntimeState,
+    selectAccountGraphError,
+    selectAccountGraphIsLoading,
+    selectAccountGraphTimeframe,
+    selectIsHistoryEnabledAccountByAccountKey,
+    useGraphData,
+    useGraphGestureHandlers,
+} from '@suite-native/graph';
+
+import { AccountDetailGraphTimeSwitch } from './AccountDetailGraphTimeSwitch';
+import { selectAccountItemForGraph } from '../selectors';
 
 type AccountDetailGraphProps = {
-    accountKey: string;
+    accountKey: AccountKey;
+    tokenContract?: TokenAddress;
 };
 
-export const AccountDetailGraph = ({ accountKey }: AccountDetailGraphProps) => {
-    const fiatCurrency = useSelector(selectFiatCurrency);
-    const { graphPoints, graphEvents, error, isLoading, refetch, onSelectTimeFrame, timeframe } =
-        useGraphForSingleAccount({
-            accountKey,
-            fiatCurrency: fiatCurrency.label,
-        });
+export const AccountDetailGraph = ({ accountKey, tokenContract }: AccountDetailGraphProps) => {
+    const { dispatch } = useServices(injectDispatch);
+    const resetGraph = useSetAtom(accountDetailGraphAtoms.resetGraphAtom);
+    const graphInstanceId = getAccountGraphInstanceId({ accountKey, tokenContract });
 
-    const setSelectedPoint = useSetAtom(selectedPointAtom);
-    const setReferencePoint = useSetAtom(referencePointAtom);
-    const lastPoint = A.last(graphPoints);
-    const firstPoint = A.head(graphPoints);
+    const isHistoryEnabledAccount = useSelector((state: AccountsRootState) =>
+        selectIsHistoryEnabledAccountByAccountKey(state, accountKey),
+    );
+    const accountGraphTimeframe = useSelector((state: GraphSliceRootState) =>
+        selectAccountGraphTimeframe(state, accountKey, tokenContract),
+    );
+    const accountItem = useSelector((state: AccountsRootState) =>
+        selectAccountItemForGraph(state, accountKey, tokenContract),
+    );
+    const accounts = useMemo(() => (accountItem ? [accountItem] : undefined), [accountItem]);
 
-    const setInitialSelectedPoints = useCallback(() => {
-        if (lastPoint && firstPoint) {
-            setSelectedPoint(lastPoint);
-            setReferencePoint(firstPoint);
-        }
-    }, [lastPoint, firstPoint, setSelectedPoint, setReferencePoint]);
+    const { refetchGraph: refetchAccountGraph } = useGraphData({
+        instanceId: graphInstanceId,
+        accounts,
+        eventsAccount: accountItem,
+        timeframeHours: accountGraphTimeframe,
+        backendSymbol: accountItem?.symbol ?? asNetworkSymbol('btc'),
+    });
 
-    useEffect(setInitialSelectedPoints, [setInitialSelectedPoints]);
+    const graphPoints = useAtomValue(accountDetailGraphAtoms.graphPointsAtom);
+    const isLoading = useSelector((state: GraphSliceRootState) =>
+        selectAccountGraphIsLoading(state, accountKey, tokenContract),
+    );
+    const error = useSelector((state: GraphSliceRootState) =>
+        selectAccountGraphError(state, accountKey, tokenContract),
+    );
+    const graphEvents = useAtomValue(accountDetailGraphAtoms.graphEventsAtom);
+
+    const { setSelectedPoint, handleGestureEnd } = useGraphGestureHandlers(
+        accountDetailGraphAtoms.selectedPointAtom,
+    );
+
+    useEffect(
+        () => () => {
+            dispatch(resetGraphRuntimeState({ instanceId: graphInstanceId }));
+            resetGraph();
+        },
+        [dispatch, graphInstanceId, resetGraph],
+    );
+
+    const isTokenPriceUnavailable = !isLoading && (!!error || graphPoints.length <= 1);
+    const isGraphHidden = !!tokenContract && isTokenPriceUnavailable;
+
+    const handleTryAgain = useCallback(() => {
+        refetchAccountGraph({ forceRefetch: true });
+    }, [refetchAccountGraph]);
+
+    if (!isHistoryEnabledAccount || isGraphHidden) return null;
 
     return (
-        <VStack spacing="large">
-            <AccountDetailGraphHeader accountKey={accountKey} />
+        <>
             <Graph<FiatGraphPointWithCryptoBalance>
                 onPointSelected={setSelectedPoint}
-                onGestureEnd={setInitialSelectedPoints}
+                onGestureEnd={handleGestureEnd}
                 points={graphPoints}
                 loading={isLoading}
                 error={error}
-                onTryAgain={refetch}
+                onTryAgain={handleTryAgain}
                 events={graphEvents}
             />
-            <TimeSwitch selectedTimeFrame={timeframe} onSelectTimeFrame={onSelectTimeFrame} />
-        </VStack>
+            <AccountDetailGraphTimeSwitch accountKey={accountKey} tokenContract={tokenContract} />
+        </>
     );
 };

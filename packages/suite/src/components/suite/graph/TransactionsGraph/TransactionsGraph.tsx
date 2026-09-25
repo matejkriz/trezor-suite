@@ -1,51 +1,42 @@
 import { memo, useState } from 'react';
 
+import { Bar, CartesianGrid, Cell, ComposedChart, Line, Tooltip, XAxis, YAxis } from 'recharts';
 import styled, { useTheme } from 'styled-components';
-import { ComposedChart, Tooltip, Bar, YAxis, XAxis, Line, CartesianGrid, Cell } from 'recharts';
 
-import { variables, Icon } from '@trezor/components';
-import { zIndices } from '@trezor/theme';
+import { typography, zIndices } from '@trezor/theme';
 
-import { useGraph } from 'src/hooks/suite';
-import { Account } from 'src/types/wallet';
-import {
-    GraphRange,
-    AggregatedAccountHistory,
-    AggregatedDashboardHistory,
-} from 'src/types/wallet/graph';
-import { calcYDomain, calcFakeGraphDataForTimestamps, calcXDomain } from 'src/utils/wallet/graph';
-import { GraphSkeleton, GraphRangeSelector } from 'src/components/suite';
+import { GraphSkeleton } from 'src/components/suite/graph/GraphSkeleton';
+import type { TransactionsGraphProps } from 'src/components/suite/graph/types';
+import { calcFakeGraphDataForTimestamps, calcXDomain, calcYDomain } from 'src/utils/wallet/graph';
 
+import { GraphBar } from './GraphBar';
 import { GraphResponsiveContainer } from './GraphResponsiveContainer';
+import { GraphTooltipAccount } from './GraphTooltipAccount';
+import { GraphTooltipDashboard } from './GraphTooltipDashboard';
 import { GraphXAxisTick } from './GraphXAxisTick';
 import { GraphYAxisTick } from './GraphYAxisTick';
-import { GraphBar } from './GraphBar';
-import { GraphTooltipDashboard } from './GraphTooltipDashboard';
-import { GraphTooltipAccount } from './GraphTooltipAccount';
+import { useTransactionGraphUpdater } from './hooks/useTransactionGraphUpdater';
 
 const Wrapper = styled.div`
     display: flex;
     flex-direction: column;
     width: 100%;
-    font-size: ${variables.FONT_SIZE.TINY};
+    height: 100%;
+    ${typography['body-xs']}
     white-space: nowrap;
 
     /* little hack to remove first and last horizontal line from cartesian grid (lines that wrap the area of the chart) */
+
     .recharts-wrapper .recharts-cartesian-grid-horizontal line:first-child,
     .recharts-wrapper .recharts-cartesian-grid-horizontal line:last-child {
         stroke-opacity: 0;
     }
 
     /* hides circle dot in case only one month is displayed */
+
     .recharts-dot.recharts-line-dot {
         display: none;
     }
-`;
-
-const Toolbar = styled.div`
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
 `;
 
 const Description = styled.div`
@@ -53,46 +44,18 @@ const Description = styled.div`
     justify-content: center;
     align-items: center;
     text-align: center;
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
+    color: ${({ theme }) => theme.contentSecondary};
     flex: 1;
 `;
 
-interface CommonProps {
-    isLoading?: boolean;
-    selectedRange: GraphRange;
-    xTicks: number[];
-    localCurrency: string;
-    minMaxValues: [number, number];
-    hideToolbar?: boolean;
-    onRefresh?: () => void;
-}
-
-export interface CryptoGraphProps extends CommonProps {
-    variant: 'one-asset';
-    account: Account;
-    data: AggregatedAccountHistory[];
-    receivedValueFn: (data: AggregatedAccountHistory) => string | undefined;
-    sentValueFn: (data: AggregatedAccountHistory) => string | undefined;
-    balanceValueFn: (data: AggregatedAccountHistory) => string | undefined;
-}
-
-export interface FiatGraphProps extends CommonProps {
-    variant: 'all-assets';
-    data: AggregatedDashboardHistory[];
-    receivedValueFn: (data: AggregatedDashboardHistory) => string | undefined;
-    sentValueFn: (data: AggregatedDashboardHistory) => string | undefined;
-    balanceValueFn: (data: AggregatedDashboardHistory) => string | undefined;
-    account?: never;
-}
-
-export type TransactionsGraphProps = CryptoGraphProps | FiatGraphProps;
-
+/**
+ * !!! Do not use directly, instead use `TransactionsGraphLoader` to avoid bloating the main JS bundle.
+ */
 export const TransactionsGraph = memo(
     ({
         account,
         balanceValueFn,
         data,
-        hideToolbar,
         isLoading,
         localCurrency,
         minMaxValues,
@@ -104,15 +67,16 @@ export const TransactionsGraph = memo(
         xTicks,
     }: TransactionsGraphProps) => {
         const [maxYTickWidth, setMaxYTickWidth] = useState(20);
+        const [hovered, setHovered] = useState(-1);
 
         const theme = useTheme();
-        const { selectedView } = useGraph();
-        const yDomain = calcYDomain(
-            variant === 'all-assets' ? 'fiat' : 'crypto',
-            selectedView,
-            minMaxValues,
-            account?.formattedBalance,
-        );
+
+        useTransactionGraphUpdater({
+            accountKey: account?.key,
+            onRequestGraphUpdate: onRefresh,
+        });
+
+        const yDomain = calcYDomain(minMaxValues, account?.formattedBalance);
 
         const setWidth = (n: number) => {
             setMaxYTickWidth(prevValue => (prevValue > n ? prevValue : n));
@@ -126,8 +90,6 @@ export const TransactionsGraph = memo(
                 ? calcFakeGraphDataForTimestamps(xTicks, data, account.formattedBalance)
                 : calcFakeGraphDataForTimestamps(xTicks, data);
 
-        const hoveredIndex = -1;
-        const [hovered, setHovered] = useState(hoveredIndex);
         const isBarColored = (index: number) => [-1, index].includes(hovered);
 
         const tooltipContentProps = {
@@ -137,18 +99,17 @@ export const TransactionsGraph = memo(
             onShow: (index: number) => setHovered(index),
         };
 
+        // While there is data to show, the graph stays visible during a refetch instead of falling
+        // back to the skeleton. An empty interval (e.g. a day without transactions) is not a loading
+        // state — it renders as a graph with no bars, so the axes and the balance stay readable.
+        const isSkeletonShown = isLoading && !data?.length;
+
         return (
             <Wrapper>
-                {!hideToolbar && (
-                    <Toolbar>
-                        <GraphRangeSelector align="bottom-right" />
-                        {onRefresh && <Icon size={14} icon="REFRESH" onClick={onRefresh} />}
-                    </Toolbar>
-                )}
                 <Description>
-                    {isLoading && <GraphSkeleton animate />}
-
-                    {!isLoading && data && (
+                    {isSkeletonShown ? (
+                        <GraphSkeleton animate />
+                    ) : (
                         <GraphResponsiveContainer height="100%" width="100%">
                             <ComposedChart
                                 data={extendedDataForInterval}
@@ -162,7 +123,7 @@ export const TransactionsGraph = memo(
                                 }}
                                 onMouseLeave={() => setHovered(-1)}
                             >
-                                <CartesianGrid vertical={false} stroke={theme.STROKE_LIGHT_GREY} />
+                                <CartesianGrid vertical={false} stroke={theme.borderNeutral} />
 
                                 <XAxis
                                     // xAxisId="primary"
@@ -170,7 +131,7 @@ export const TransactionsGraph = memo(
                                     type="number"
                                     domain={calcXDomain(xTicks, data, selectedRange)}
                                     // width={10}
-                                    stroke={theme.STROKE_LIGHT_GREY}
+                                    stroke={theme.elementBorderFieldFocused}
                                     interval="preserveEnd"
                                     tick={<GraphXAxisTick selectedRange={selectedRange} />}
                                     ticks={xTicks}
@@ -181,9 +142,9 @@ export const TransactionsGraph = memo(
                                 <YAxis
                                     type="number"
                                     orientation="right"
-                                    scale={selectedView}
+                                    scale="linear"
                                     domain={yDomain}
-                                    allowDataOverflow={selectedView === 'log'}
+                                    allowDataOverflow={false}
                                     stroke="transparent"
                                     tick={
                                         variant === 'one-asset' ? (
@@ -203,7 +164,10 @@ export const TransactionsGraph = memo(
                                 <Tooltip
                                     position={{ y: 0, x: 0 }}
                                     wrapperStyle={{ zIndex: zIndices.tooltip }}
-                                    cursor={{ stroke: theme.BG_TOOLTIP, strokeWidth: 1 }}
+                                    cursor={{
+                                        stroke: theme.elementFillNeutralBold,
+                                        strokeWidth: 1,
+                                    }}
                                     content={
                                         variant === 'one-asset' ? (
                                             <GraphTooltipAccount
@@ -226,42 +190,13 @@ export const TransactionsGraph = memo(
                                 {variant === 'one-asset' && (
                                     <Line
                                         type="linear"
-                                        dataKey={(data: any) =>
-                                            selectedView === 'log'
-                                                ? Number(balanceValueFn(data)) || yDomain[0]
-                                                : Number(balanceValueFn(data))
-                                        }
-                                        stroke={theme.TYPE_ORANGE}
+                                        dataKey={(data: any) => Number(balanceValueFn(data))}
+                                        stroke={theme.borderWarning}
                                         dot={false}
                                         activeDot={false}
                                     />
                                 )}
-                                <defs>
-                                    <linearGradient
-                                        id="greenGradient"
-                                        x1="0"
-                                        y1="0"
-                                        x2="0"
-                                        y2="100%"
-                                        spreadMethod="reflect"
-                                    >
-                                        <stop offset="0" stopColor={theme.GRADIENT_GREEN_START} />
-                                        <stop offset="1" stopColor={theme.GRADIENT_GREEN_END} />
-                                    </linearGradient>
-                                </defs>
-                                <defs>
-                                    <linearGradient
-                                        id="redGradient"
-                                        x1="0"
-                                        y1="0"
-                                        x2="0"
-                                        y2="100%"
-                                        spreadMethod="reflect"
-                                    >
-                                        <stop offset="0" stopColor={theme.GRADIENT_RED_START} />
-                                        <stop offset="1" stopColor={theme.GRADIENT_RED_END} />
-                                    </linearGradient>
-                                </defs>
+
                                 <defs>
                                     <filter id="shadow" x="-2" y="-10" width="50" height="50">
                                         <feGaussianBlur in="SourceAlpha" stdDeviation="5" />
@@ -284,9 +219,7 @@ export const TransactionsGraph = memo(
                                             key={`cell-${entry}`}
                                             filter={isBarColored(index) ? 'url(#shadow)' : ''}
                                             fill={
-                                                isBarColored(index)
-                                                    ? 'url(#greenGradient)'
-                                                    : '#aeaeae'
+                                                isBarColored(index) ? theme.borderBrand : '#aeaeae'
                                             }
                                         />
                                     ))}
@@ -302,7 +235,7 @@ export const TransactionsGraph = memo(
                                             filter={isBarColored(index) ? 'url(#shadow)' : ''}
                                             fill={
                                                 isBarColored(index)
-                                                    ? 'url(#redGradient)'
+                                                    ? theme.borderCritical
                                                     : '#dfdfdf'
                                             }
                                         />
@@ -316,3 +249,5 @@ export const TransactionsGraph = memo(
         );
     },
 );
+
+TransactionsGraph.displayName = 'TransactionsGraph';

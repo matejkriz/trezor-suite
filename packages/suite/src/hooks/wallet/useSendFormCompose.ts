@@ -1,36 +1,48 @@
-import { useState, useRef, useEffect, useCallback, Dispatch, SetStateAction } from 'react';
-import { FieldPath, UseFormReturn } from 'react-hook-form';
-
 import {
-    FormState,
-    UseSendFormState,
-    SendContextValues,
-    ExcludedUtxos,
-    PrecomposedTransaction,
-    PrecomposedTransactionCardano,
-    PrecomposedLevels,
-    PrecomposedLevelsCardano,
-} from '@suite-common/wallet-types';
-import { useAsyncDebounce } from '@trezor/react-utils';
-import { isChanged } from '@suite-common/suite-utils';
-import { findComposeErrors } from '@suite-common/wallet-utils';
-import { FeeLevel } from '@trezor/connect';
-import { COMPOSE_ERROR_TYPES } from '@suite-common/wallet-constants';
+    type Dispatch,
+    type SetStateAction,
+    useCallback,
+    useEffect,
+    useRef,
+    useState,
+} from 'react';
+import { type FieldPath, type UseFormReturn } from 'react-hook-form';
 
-import { TranslationKey } from 'src/components/suite/Translation';
-import { useDispatch } from 'react-redux';
-import { composeSendFormTransactionThunk } from '../../actions/wallet/send/sendFormThunks';
-import { useTranslation } from '../suite';
+import { isFulfilled } from '@reduxjs/toolkit';
+
+import { type TranslationKey, isTranslationKey, useTranslation } from '@suite/intl';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { COMPOSE_ERROR_TYPES } from '@suite-common/wallet-constants';
+import { composeSendFormTransactionFeeLevelsThunk } from '@suite-common/wallet-core';
+import {
+    type ExcludedUtxos,
+    type FeeInfo,
+    type FormState,
+    type PrecomposedLevels,
+    type PrecomposedLevelsCardano,
+    type PrecomposedTransaction,
+    type PrecomposedTransactionCardano,
+} from '@suite-common/wallet-types';
+import { findComposeErrors } from '@suite-common/wallet-utils';
+import { type FeeLevel } from '@trezor/connect';
+import { useDebounce } from '@trezor/react-utils';
+import { isChanged } from '@trezor/utils';
+
+import { type SendContextValues, type UseSendFormState } from 'src/types/wallet/sendForm';
+
+import { useSolanaSubscribeBlocks } from './form/useSolanaSubscribeBlocks';
 
 type Props = UseFormReturn<FormState> & {
     state: UseSendFormState;
+    feeInfo: FeeInfo;
     excludedUtxos: ExcludedUtxos;
     account: UseSendFormState['account']; // account from the component props !== state.account
     updateContext: SendContextValues['updateContext'];
     setLoading: Dispatch<SetStateAction<boolean>>;
     setAmount: (index: number, amount: string) => void;
-    targetAnonymity?: number;
     prison?: Record<string, unknown>;
+    setShowReserveBanner: SendContextValues['setShowReserveBanner'];
 };
 
 // This hook should be used only as a sub-hook of `useSendForm`
@@ -41,53 +53,54 @@ export const useSendFormCompose = ({
     formState: { errors, isDirty },
     clearErrors,
     state,
+    feeInfo,
     account,
     excludedUtxos,
     updateContext,
     setLoading,
     setAmount,
     prison,
+    setShowReserveBanner,
 }: Props) => {
     const [composedLevels, setComposedLevels] =
         useState<SendContextValues['composedLevels']>(undefined);
     const [composeField, setComposeField] = useState<FieldPath<FormState> | undefined>(undefined);
     const [draftSaveRequest, setDraftSaveRequest] = useState(false);
 
-    const dispatch = useDispatch();
-
+    const { dispatch } = useServices(injectDispatch);
     const { translationString } = useTranslation();
 
     const composeRequestID = useRef(0); // compose ID, incremented with every compose request
 
-    const debounce = useAsyncDebounce();
+    const debounce = useDebounce();
 
     const composeDraft = useCallback(
-        async (formValues: FormState) => {
+        async (formState: FormState) => {
             // start composing without debounce
             setLoading(true);
             setComposedLevels(undefined);
 
             const result = await dispatch(
-                composeSendFormTransactionThunk({
-                    formValues,
-                    formState: {
+                composeSendFormTransactionFeeLevelsThunk({
+                    formState,
+                    composeContext: {
                         account,
                         network: state.network,
-                        feeInfo: state.feeInfo,
+                        feeInfo,
                         excludedUtxos,
                         prison,
                     },
                 }),
-            ).unwrap();
+            );
 
-            if (result) {
-                setComposedLevels(result);
+            if (isFulfilled(result)) {
+                setComposedLevels(result.payload);
             } else {
                 // undefined result will not be processed by useEffect below, reset loader
                 setLoading(false);
             }
         },
-        [account, dispatch, prison, excludedUtxos, setLoading, state.network, state.feeInfo],
+        [account, dispatch, prison, excludedUtxos, setLoading, state.network, feeInfo],
     );
 
     // Create a compose request
@@ -114,22 +127,22 @@ export const useSendFormCompose = ({
                     return Promise.resolve(undefined);
                 }
 
-                const values = getValues();
+                const formState = getValues();
                 // save draft (it could be changed later, after composing)
                 setDraftSaveRequest(true);
 
                 return dispatch(
-                    composeSendFormTransactionThunk({
-                        formValues: values,
-                        formState: {
+                    composeSendFormTransactionFeeLevelsThunk({
+                        formState,
+                        composeContext: {
                             account,
                             network: state.network,
-                            feeInfo: state.feeInfo,
+                            feeInfo,
                             excludedUtxos,
                             prison,
                         },
                     }),
-                ).unwrap();
+                );
             });
 
             // RACE-CONDITION NOTE:
@@ -137,9 +150,9 @@ export const useSendFormCompose = ({
             // therefore another debounce process was not called yet to interrupt current one
             // unexpected result: `updateComposedValues` is trying to work with updated/newer FormState
             if (resultID === composeRequestID.current) {
-                if (result) {
+                if (isFulfilled(result)) {
                     // set new composed transactions
-                    setComposedLevels(result);
+                    setComposedLevels(result.payload);
                 } else {
                     // result undefined: (FormState got errors or sendFormActions got errors)
                     // undefined result will not be processed by useEffect below, reset loader
@@ -156,7 +169,7 @@ export const useSendFormCompose = ({
             getValues,
             account,
             state.network,
-            state.feeInfo,
+            feeInfo,
             excludedUtxos,
             prison,
         ],
@@ -166,9 +179,10 @@ export const useSendFormCompose = ({
     const updateComposedValues = useCallback(
         (composed: PrecomposedTransaction | PrecomposedTransactionCardano) => {
             const values = getValues();
+            if (!composed) return;
             if (composed.type === 'error') {
                 const { error, errorMessage } = composed;
-                if (!errorMessage) {
+                if (!errorMessage || !isTranslationKey(errorMessage.id)) {
                     // composed tx doesn't have an errorMessage (Translation props)
                     // this error is unexpected and should be handled in sendFormActions
                     console.warn('Compose unexpected error', error);
@@ -217,7 +231,10 @@ export const useSendFormCompose = ({
             // set calculated and formatted "max" value to `Amount` input
             if (typeof setMaxOutputId === 'number' && composed.max) {
                 setAmount(setMaxOutputId, composed.max);
+                setShowReserveBanner(true);
                 setDraftSaveRequest(true);
+            } else {
+                setShowReserveBanner(false);
             }
             setLoading(false);
         },
@@ -231,6 +248,7 @@ export const useSendFormCompose = ({
             setValue,
             setLoading,
             translationString,
+            setShowReserveBanner,
         ],
     );
 
@@ -243,6 +261,9 @@ export const useSendFormCompose = ({
         const { selectedFee, setMaxOutputId } = values;
         let composed = composedLevels[selectedFee || 'normal'];
 
+        // composed transaction does not exists (not going to happen?)
+        if (!composed) return;
+
         // selectedFee was not set yet (no interaction with Fees) and default (normal) fee tx is not valid
         // OR setMax option was used
         // try to switch to nearest possible composed transaction
@@ -250,27 +271,26 @@ export const useSendFormCompose = ({
             !selectedFee || (typeof setMaxOutputId === 'number' && selectedFee !== 'custom');
         if (shouldSwitch && composed.type === 'error') {
             // find nearest possible tx
+            // eslint-disable-next-line no-restricted-syntax -- composedLevels is keyed by fee labels but typed as Record<string, …>, so assert the keys back to FeeLevel['label']
             const nearest = (Object.keys(composedLevels) as FeeLevel['label'][]).find(
-                key => composedLevels[key].type !== 'error',
+                key => composedLevels[key]?.type !== 'error',
             );
             // switch to it
-            if (nearest) {
-                composed = composedLevels[nearest];
+            const nearestComposed = nearest ? composedLevels[nearest] : undefined;
+            if (nearest && nearestComposed) {
+                composed = nearestComposed;
                 setValue('selectedFee', nearest);
                 if (nearest === 'custom') {
                     // @ts-expect-error: type = error already filtered above
-                    const { feePerByte, feeLimit } = composed;
+                    const { feePerByte, feeLimit, maxPriorityFeePerGas, maxFeePerGas } = composed;
                     setValue('feePerUnit', feePerByte);
                     setValue('feeLimit', feeLimit || '');
+                    setValue('maxPriorityFeePerGas', maxPriorityFeePerGas);
+                    setValue('maxFeePerGas', maxFeePerGas);
                 }
                 setDraftSaveRequest(true);
             }
             // or do nothing, use default composed tx
-        }
-
-        // composed transaction does not exists (not going to happen?)
-        if (!composed) {
-            return;
         }
 
         updateComposedValues(composed);
@@ -282,17 +302,23 @@ export const useSendFormCompose = ({
             if (!composedLevels) return;
             if (current === 'custom') {
                 // set custom level from previously selected level
-                const prevLevel = composedLevels[prev || 'normal'];
+                const prevLevel = composedLevels[prev || 'normal'] ?? composedLevels.normal;
                 const level = {
                     ...composedLevels,
                     custom: prevLevel,
                 } as
-                    | (PrecomposedLevels & { custom: PrecomposedTransaction })
-                    | (PrecomposedLevelsCardano & { custom: PrecomposedTransactionCardano });
+                    | (PrecomposedLevels & {
+                          custom: PrecomposedTransaction;
+                      })
+                    | (PrecomposedLevelsCardano & {
+                          custom: PrecomposedTransactionCardano;
+                      });
                 setComposedLevels(level);
             } else {
                 const currentLevel = composedLevels[current || 'normal'];
-                updateComposedValues(currentLevel);
+                if (currentLevel) {
+                    updateComposedValues(currentLevel);
+                }
             }
             setDraftSaveRequest(true);
         },
@@ -333,7 +359,7 @@ export const useSendFormCompose = ({
         updateContext({ account });
     }, [
         state.account,
-        state.feeInfo.dustLimit,
+        feeInfo.dustLimit,
         isDirty,
         account,
         clearErrors,
@@ -341,6 +367,9 @@ export const useSendFormCompose = ({
         updateContext,
         setLoading,
     ]);
+
+    // Subscribe to blocks for Solana, since they are not fetched globally
+    useSolanaSubscribeBlocks(state.account);
 
     return {
         composeDraft,

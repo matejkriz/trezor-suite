@@ -1,11 +1,17 @@
-import { Platform } from 'react-native';
+import { type PayloadAction, createSlice } from '@reduxjs/toolkit';
 
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { isIOs } from '@trezor/env-utils';
 
 export const FeatureFlag = {
-    IsDeviceConnectEnabled: 'isDeviceConnectEnabled',
-    IsPassphraseEnabled: 'isPassphraseEnabled',
+    AreDebugOnlyNetworksEnabled: 'areDebugOnlyNetworksEnabled',
+    AreExperimentalOnlyNetworksEnabled: 'areExperimentalOnlyNetworksEnabled',
+    IsCardanoSendEnabled: 'isCardanoSendEnabled',
+    IsDebugKeysAllowed: 'isDebugKeysAllowed',
+    IsTradingResidenceCheckEnabled: 'isTradingResidenceCheckEnabled',
+    IsTradingDebugEnabled: 'isTradingDebugEnabled',
+    IsN4w1BackupEnabled: 'isN4w1BackupEnabled',
 } as const;
+
 export type FeatureFlag = (typeof FeatureFlag)[keyof typeof FeatureFlag];
 
 export type FeatureFlagsState = Record<FeatureFlag, boolean>;
@@ -15,13 +21,28 @@ export type FeatureFlagsRootState = {
 };
 
 export const featureFlagsInitialState: FeatureFlagsState = {
-    [FeatureFlag.IsDeviceConnectEnabled]: Platform.OS === 'android',
-    [FeatureFlag.IsPassphraseEnabled]: false,
+    [FeatureFlag.AreDebugOnlyNetworksEnabled]:
+        process.env.EXPO_PUBLIC_FF_ARE_DEBUG_ONLY_NETWORKS_ENABLED === 'true',
+    [FeatureFlag.AreExperimentalOnlyNetworksEnabled]:
+        process.env.EXPO_PUBLIC_FF_ARE_EXPERIMENTAL_ONLY_NETWORKS_ENABLED === 'true',
+    [FeatureFlag.IsCardanoSendEnabled]:
+        process.env.EXPO_PUBLIC_FF_IS_CARDANO_SEND_ENABLED === 'true',
+    [FeatureFlag.IsDebugKeysAllowed]: process.env.EXPO_PUBLIC_FF_IS_DEBUG_KEYS_ALLOWED === 'true',
+    [FeatureFlag.IsTradingResidenceCheckEnabled]:
+        process.env.EXPO_PUBLIC_FF_IS_TRADING_RESIDENCE_CHECK_ENABLED === 'true' ||
+        (isIOs() && process.env.EXPO_PUBLIC_FF_IS_TRADING_RESIDENCE_CHECK_ENABLED !== 'false'),
+    [FeatureFlag.IsTradingDebugEnabled]:
+        process.env.EXPO_PUBLIC_FF_IS_TRADING_DEBUG_ENABLED === 'true',
+    [FeatureFlag.IsN4w1BackupEnabled]: process.env.EXPO_PUBLIC_FF_IS_N4W1_BACKUP_ENABLED === 'true',
 };
 
 export const featureFlagsPersistedKeys: Array<keyof FeatureFlagsState> = [
-    FeatureFlag.IsDeviceConnectEnabled,
-    FeatureFlag.IsPassphraseEnabled,
+    FeatureFlag.AreDebugOnlyNetworksEnabled,
+    FeatureFlag.AreExperimentalOnlyNetworksEnabled,
+    FeatureFlag.IsCardanoSendEnabled,
+    FeatureFlag.IsTradingResidenceCheckEnabled,
+    FeatureFlag.IsTradingDebugEnabled,
+    FeatureFlag.IsN4w1BackupEnabled,
 ];
 
 export const featureFlagsSlice = createSlice({
@@ -33,9 +54,6 @@ export const featureFlagsSlice = createSlice({
         },
     },
 });
-
-export const selectIsFeatureFlagEnabled = (state: FeatureFlagsRootState, key: FeatureFlag) =>
-    state.featureFlags[key];
 
 export const { toggleFeatureFlag } = featureFlagsSlice.actions;
 export const featureFlagsReducer = featureFlagsSlice.reducer;

@@ -1,0 +1,213 @@
+import { deviceActions } from '@suite-common/device';
+import { type TrezorDevice } from '@suite-common/suite-types';
+import { getBrowserName, getBrowserVersion, getOsVersion } from '@suite-common/suite-utils';
+import { accountsActions } from '@suite-common/wallet-core';
+import { type Account, type DiscoveryStatus } from '@suite-common/wallet-types';
+import { DEVICE } from '@trezor/connect';
+import {
+    getCommitHash,
+    getEnvironment,
+    getOsName,
+    getPlatformLanguages,
+    getScreenHeight,
+    getScreenWidth,
+    getSuiteVersion,
+    getWindowHeight,
+    getWindowWidth,
+    isCodesignBuild,
+} from '@trezor/env-utils';
+import { type DeepPartial } from '@trezor/type-utils';
+
+import { type LogEntry } from './types';
+
+export const REDACTED_REPLACEMENT = '[redacted]';
+
+export const startTime = new Date().toUTCString();
+
+export const prettifyLog = (json: Record<any, any>) => JSON.stringify(json, null, 2);
+
+// [typescript-performace]: Keep this explicit type to prevent TypeScript from expanding the
+// inferred type in the emitted declaration.
+type RedactedAccount = Omit<
+    DeepPartial<Account>,
+    | 'descriptor'
+    | 'deviceState'
+    | 'addresses'
+    | 'balance'
+    | 'availableBalance'
+    | 'formattedBalance'
+    | 'history'
+    | 'tokens'
+    | 'utxo'
+    | 'metadata'
+    | 'key'
+    | 'misc'
+> & {
+    descriptor: string;
+    deviceState: string;
+    addresses: string;
+    balance: string;
+    availableBalance: string;
+    formattedBalance: string;
+    history: string;
+    tokens: object[] | undefined;
+    utxo: string;
+    metadata: string;
+    key: string;
+    misc: object | undefined;
+};
+
+export const redactAccount = (
+    account: DeepPartial<Account> | undefined,
+): RedactedAccount | undefined => {
+    if (!account) return undefined;
+
+    return {
+        ...account,
+        descriptor: REDACTED_REPLACEMENT,
+        deviceState: REDACTED_REPLACEMENT,
+        addresses: REDACTED_REPLACEMENT,
+        balance: REDACTED_REPLACEMENT,
+        availableBalance: REDACTED_REPLACEMENT,
+        formattedBalance: REDACTED_REPLACEMENT,
+        history: REDACTED_REPLACEMENT,
+        tokens: account?.tokens?.map(t => ({
+            ...t,
+            balance: REDACTED_REPLACEMENT,
+        })),
+        utxo: REDACTED_REPLACEMENT,
+        metadata: REDACTED_REPLACEMENT,
+        key: REDACTED_REPLACEMENT,
+        misc: account.misc
+            ? {
+                  ...account.misc,
+                  staking:
+                      'staking' in account.misc
+                          ? {
+                                ...account.misc.staking,
+                                address: REDACTED_REPLACEMENT,
+                                rewards: REDACTED_REPLACEMENT,
+                                poolId: account.misc.staking?.poolId ? REDACTED_REPLACEMENT : null,
+                            }
+                          : undefined,
+              }
+            : undefined,
+    };
+};
+
+// [typescript-performace]: Keep this explicit type to prevent TypeScript from expanding the
+// inferred type in the emitted declaration.
+type RedactedDevice = Omit<
+    DeepPartial<TrezorDevice>,
+    'id' | 'label' | 'state' | 'firmwareReleaseConfigInfo' | 'features' | 'metadata'
+> & {
+    id: string;
+    label: string | undefined;
+    state: string;
+    firmwareReleaseConfigInfo: string | undefined;
+    features: object | undefined;
+    metadata: string | undefined;
+};
+
+export const redactDevice = (
+    device: DeepPartial<TrezorDevice> | undefined,
+): RedactedDevice | undefined => {
+    if (!device) return undefined;
+
+    return {
+        ...device,
+        id: REDACTED_REPLACEMENT,
+        label: device.label ? REDACTED_REPLACEMENT : undefined,
+        state: REDACTED_REPLACEMENT,
+        firmwareReleaseConfigInfo: device.firmwareReleaseConfigInfo
+            ? REDACTED_REPLACEMENT
+            : undefined,
+        features: device.features
+            ? {
+                  ...device.features,
+                  device_id: REDACTED_REPLACEMENT,
+                  session_id: device.features.session_id ? REDACTED_REPLACEMENT : undefined,
+                  label: device.features.label ? REDACTED_REPLACEMENT : undefined,
+              }
+            : undefined,
+        metadata: device.metadata ? REDACTED_REPLACEMENT : undefined,
+    };
+};
+
+type RedactedPassphraseDuplicateDiscoveryStatus = Omit<
+    Extract<DiscoveryStatus, { status: 'passphrase-duplicate' }>,
+    'duplicateDeviceStaticSessionId'
+> & {
+    duplicateDeviceStaticSessionId: string;
+};
+
+export type RedactedDiscoveryStatus =
+    | Exclude<DiscoveryStatus, { status: 'passphrase-duplicate' }>
+    | RedactedPassphraseDuplicateDiscoveryStatus;
+
+export const redactDiscovery = (
+    discovery: DiscoveryStatus | undefined,
+): RedactedDiscoveryStatus | undefined => {
+    if (discovery?.status !== 'passphrase-duplicate') {
+        return discovery;
+    }
+
+    return {
+        ...discovery,
+        duplicateDeviceStaticSessionId: REDACTED_REPLACEMENT,
+    };
+};
+
+export const redactAction = (action: LogEntry): LogEntry => {
+    if (accountsActions.updateSelectedAccount.match(action)) {
+        return {
+            ...action,
+            payload: {
+                ...action.payload,
+                account: redactAccount(action.payload?.account),
+                network: undefined,
+                discovery: undefined,
+            },
+        };
+    }
+
+    let payload: LogEntry['payload'];
+
+    switch (action.type) {
+        case accountsActions.createAccount.type:
+        case accountsActions.updateAccount.type:
+            payload = redactAccount(action.payload?.account);
+            break;
+        case DEVICE.CONNECT:
+        case DEVICE.DISCONNECT:
+        case deviceActions.updateSelectedDevice.type:
+        case deviceActions.setRememberDevice.type:
+            payload = redactDevice(action.payload);
+            break;
+        default:
+            return action;
+    }
+
+    return {
+        ...action,
+        payload,
+    };
+};
+
+export const getEnvironmentInfo = async () => ({
+    environment: getEnvironment(),
+    suiteVersion: getSuiteVersion(),
+    commitHash: getCommitHash(),
+    isDev: !isCodesignBuild(),
+    browserName: getBrowserName(),
+    browserVersion: getBrowserVersion(),
+    osName: getOsName(),
+    osVersion: await getOsVersion(),
+    windowWidth: getWindowWidth(),
+    windowHeight: getWindowHeight(),
+    screenWidth: getScreenWidth(),
+    screenHeight: getScreenHeight(),
+    platformLanguages: getPlatformLanguages().join(','),
+});
+
+export type LogsEnvironmentInfo = Awaited<ReturnType<typeof getEnvironmentInfo>>;

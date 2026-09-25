@@ -6,13 +6,50 @@
     "sideEffects": false,
     "main": "src/index",
     "scripts": {
+        "depcheck": "yarn g:depcheck",
+        "type-check": "yarn g:tsc --build",
+        "test-health": "tsx ./src/quarantineBot/index.ts",
+        "select-tests": "tsx ./src/testCoverage/selectTestsByChangedFiles.ts",
+        "build-coverage-map": "tsx ./src/testCoverage/buildCoverageMap.ts",
+        "seed-tests": "CURRENTS_PROJECT_ID=iBEsWE yarn pwc --config ./src/quarantineBot/seed/playwright.config.ts",
         "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
-        "type-check": "yarn g:tsc --build"
+        "analyze-tests": "tsx ./src/llmTestAnalyzer/index.ts",
+        "select-tests-llm": "tsx ./src/llmTestSelector/index.ts",
+        "llm-test-fixer:analyze": "tsx src/llmTestFixer/analyze.ts",
+        "llm-test-fixer:fix": "tsx src/llmTestFixer/fix.ts",
+        "llm-test-fixer:publish": "tsx src/llmTestFixer/publish.ts",
+        "llm-test-fixer:notify": "tsx src/llmTestFixer/notify.ts",
+        "llm-test-fixer:update-ledger": "tsx src/llmTestFixer/ledger.ts",
+        "llm-exploratory-tester:context": "tsx src/llmExploratoryTester/context.ts",
+        "llm-exploratory-tester:setup": "tsx src/llmExploratoryTester/setup.ts",
+        "llm-exploratory-tester:run": "tsx src/llmExploratoryTester/run.ts",
+        "llm-exploratory-tester": "yarn llm-exploratory-tester:context && yarn llm-exploratory-tester:setup && yarn llm-exploratory-tester:run",
+        "gh-pr-stats": "tsx ./src/ghPrStats/index.ts",
+        "github:create:project": "tsx src/githubReporter/scriptCreateProject.ts",
+        "reporter-watchdog:wipe": "tsx src/githubReporter/watchdog/wipe.ts",
+        "reporter-watchdog:verify": "tsx src/githubReporter/watchdog/verify.ts"
     },
     "dependencies": {
-        "events": "^3.3.0",
-        "express": "^4.18.2",
-        "uuid": "^9.0.1",
-        "ws": "^8.16.0"
+        "@octokit/rest": "^22.0.1",
+        "@trezor/node-utils": "workspace:*",
+        "@trezor/trezor-user-env-link": "workspace:*",
+        "@trezor/utils": "workspace:*",
+        "dotenv": "17.4.2",
+        "express": "^5.2.1",
+        "ws": "^8.20.0",
+        "zod": "4.3.6"
+    },
+    "devDependencies": {
+        "@anthropic-ai/claude-agent-sdk": "0.3.218",
+        "@anthropic-ai/claude-code": "2.1.218",
+        "@anthropic-ai/sdk": "0.117.1",
+        "@currents/mcp": "^2.3.3",
+        "@currents/playwright": "^2.5.0",
+        "@opencode-ai/sdk": "1.18.23",
+        "@playwright/test": "1.62.1",
+        "@trezor/eslint": "workspace:*",
+        "claude-pretty-printer": "1.5.0",
+        "opencode-ai": "1.18.23",
+        "tsx": "^4.21.0"
     }
 }

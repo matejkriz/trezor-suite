@@ -1,0 +1,134 @@
+import { Bundle } from '@trezor/connect-common/src/types';
+import { GetPublicKey } from '@trezor/connect-common/src/types/api/account/getPublicKey';
+
+import { ApiPlayground } from '../../../components/ApiPlayground';
+import { CommonParamsLink } from '../../../components/CommonParamsLink';
+import { Param } from '../../../components/Param';
+import { ParamsTable } from '../../../components/ParamsTable';
+import getPublicKey from '../../../data/methods/bitcoin/getPublicKey.ts';
+
+<ApiPlayground
+    options={[
+        { title: 'Export public key', legacyConfig: getPublicKey[0] },
+        { title: 'Export multiple public keys', legacyConfig: getPublicKey[1] },
+        { title: 'Advanced schema', method: 'getPublicKey', schema: GetPublicKey },
+        { title: 'Advanced bundle', method: 'getPublicKey', schema: Bundle(GetPublicKey) },
+    ]}
+/>
+
+export const paramDescriptions = {
+    path: 'minimum length is `1`. [read more](/details/path)',
+    coin: 'determines the network definition. Coin `shortcut` (a `CoinSymbol`, e.g. `btc`) is used — see [supported coins](/details/coins) for every accepted value. If `coin` is not set API will try to get network definition from `path`.',
+    scriptType: 'used to distinguish between various address formats (non-segwit, segwit, etc.).',
+    ignoreXpubMagic: 'ignore SLIP-0132 XPUB magic, use xpub/tpub prefix for all account types.',
+    ecdsaCurveName: 'ECDSA curve name to use',
+    crossChain:
+        'Advanced feature. Use it only if you are know what you are doing. Allows to generate address between chains. For example Bitcoin path on Litecoin network will display cross chain address in Litecoin format.',
+    suppressBackupWarning:
+        'By default, this method will emit an event to show a warning if the wallet does not have a backup. This option suppresses the message.',
+    bundle: 'of Objects with `path`, `coin` and `crossChain` fields',
+};
+
+## Get public key
+
+Retrieves BIP32 extended public derived by given BIP32 path.
+User is presented with a description of the requested key and asked to confirm the export.
+
+```javascript
+const result = await TrezorConnect.getPublicKey(params);
+```
+
+### Params
+
+<CommonParamsLink />
+
+#### GetPublicKey
+
+<ParamsTable schema={GetPublicKey} descriptions={paramDescriptions} />
+
+#### Bundle(GetPublicKey)
+
+<Param name="bundle" type="`Array` of Objects with above schema" />
+
+### Example
+
+Return public key of fifth bitcoin account:
+
+```javascript
+TrezorConnect.getPublicKey({
+    path: "m/49'/0'/4'",
+    coin: 'btc',
+});
+```
+
+Return a bundle of public keys for multiple bitcoin accounts:
+
+```javascript
+TrezorConnect.getPublicKey({
+    bundle: [
+        { path: "m/49'/0'/0'" }, // account 1
+        { path: "m/49'/0'/1'" }, // account 2
+        { path: "m/49'/0'/2'" }, // account 3
+    ],
+});
+```
+
+### Result
+
+[HDNodeResponse type](https://github.com/trezor/trezor-suite/blob/develop/packages/connect-common/src/types/api/account/getPublicKey.ts)
+
+Result with only one public key
+
+```javascript
+{
+    success: true,
+    payload: {
+        path: Array<number>,          // hardended path
+        serializedPath: string,       // serialized path
+        xpub: string,                 // xpub in legacy format
+        xpubSegwit?: string,          // optional for segwit accounts: xpub in segwit format (SLIP-132)
+        chainCode: string,            // BIP-32 serialization format
+        childNum: number,             // BIP-32 serialization format
+        publicKey: string,            // BIP-32 serialization format
+        fingerprint: number,          // BIP-32 serialization format
+        depth: number,                // BIP-32 serialization format
+        descriptor?: string,          // BIP-380 descriptor. Not available for model One
+        displayablePublicKey: string, // canonical user-facing form: xpubSegwit ?? xpub (SLIP-132 form matching the requested scriptType — e.g. ypub/zpub for SegWit, tr(...) descriptor for Taproot)
+    }
+}
+```
+
+> **`displayablePublicKey` vs. firmware display.** For legacy and SegWit
+> accounts the field is byte-identical to what the device shows when
+> `showOnTrezor: true`. For Taproot the device renders the bare account-level
+> descriptor with `h`-notation (e.g. `tr([fp/86h/0h/0h]xpub…)`), whereas
+> `displayablePublicKey` is the BIP-389 multipath descriptor with
+> `'`-notation and trailing `/<0;1>/*` (e.g. `tr([fp/86'/0'/0']xpub…/<0;1>/*)`).
+> Both describe the same key; the multipath form is what host-side wallets need
+> to derive both external and change addresses.
+
+[Read more about BIP32 serialization format](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#Serialization_format)
+
+Result with bundle of public keys
+
+```javascript
+{
+    success: true,
+    payload: [
+        { path, serializedPath, xpub, xpubSegwit?, chainCode, childNum, publicKey, fingerprint, depth, descriptor, displayablePublicKey }, // account 1
+        { path, serializedPath, xpub, xpubSegwit?, chainCode, childNum, publicKey, fingerprint, depth, descriptor, displayablePublicKey }, // account 2
+        { path, serializedPath, xpub, xpubSegwit?, chainCode, childNum, publicKey, fingerprint, depth, descriptor, displayablePublicKey }  // account 3
+    ]
+}
+```
+
+Error
+
+```javascript
+{
+    success: false,
+    error: {
+        message: string // error message
+    }
+}
+```

@@ -22,6 +22,11 @@ export interface GetFiatRatesTickersListParams {
     token?: string;
 }
 
+export interface PrivatePendingParams {
+    nonces?: number[]; // EVM: nonces of the wallet's in-flight (locally pending) txs
+    txids?: string[]; // EVM: their tx hashes; blockbook fetch-backs each to cache+serve the body
+}
+
 export interface EstimateFeeParams {
     blocks?: number[];
     specific?: {
@@ -31,8 +36,15 @@ export interface EstimateFeeParams {
         to?: string; // eth to
         data?: string; // eth tx data, sol tx message
         value?: string; // eth tx amount
-        isCreatingAccount?: boolean; // sol account creation
+        newAccountProgramName?: 'staking' | 'spl-token' | 'spl-token-2022'; // program name of the Solana account that is being created, default: 'spl-token'
+        privatePending?: PrivatePendingParams; // blockbook only (EVM), wallet's in-flight (locally pending) txs
     };
+}
+
+export interface RpcCallParams {
+    from: string;
+    to: string;
+    data: string;
 }
 
 export interface AccountInfoParams {
@@ -41,13 +53,18 @@ export interface AccountInfoParams {
     tokens?: 'nonzero' | 'used' | 'derived'; // blockbook only, default: 'derived' - show all derived addresses, 'used' - show only used addresses, 'nonzero' - show only address with balance
     page?: number; // blockbook only, page index
     pageSize?: number; // how many transactions on page
+    pageCursor?: string; // stellar only, cursor for pagination
     from?: number; // from block
     to?: number; // to block
     contractFilter?: string; // blockbook only, ethereum token filter
-    gap?: number; // blockbook only, derived addresses gap
-    // since ripple-lib cannot use pages "marker" is used as first unknown point in history (block and sequence of transaction)
+    gap?: number; // derived addresses gap
+    // since xrpl.js cannot use pages "marker" is used as first unknown point in history (block and sequence of transaction)
     marker?: {
         ledger: number;
         seq: number;
     };
+    tokenAccountsPubKeys?: string[]; // solana only, token accounts to fetch txids for
+    protocols?: 'erc4626'[]; // protocols to include in the response (e.g. 'erc4626')
+    confirmedNonce?: boolean; // blockbook only (EVM), additionally fetch the confirmed (mined-only) nonce
+    privatePending?: PrivatePendingParams; // blockbook only (EVM), wallet's in-flight (locally pending) txs
 }

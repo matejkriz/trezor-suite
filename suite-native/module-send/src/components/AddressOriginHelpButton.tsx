@@ -1,0 +1,41 @@
+import { Text } from '@suite-native/atoms';
+import { Translation } from '@suite-native/intl';
+
+import { AddressReviewHelpSheet } from './AddressReviewHelpSheet';
+import { AddressReviewSheetSection } from './AddressReviewSheetSection';
+
+export const AddressOriginHelpButton = () => (
+    <AddressReviewHelpSheet
+        title={
+            <Text variant="headline-sm">
+                <Translation id="moduleSend.review.address.originBottomSheet.title" />
+            </Text>
+        }
+        subtitle={
+            <Text>
+                <Translation id="moduleSend.review.address.originBottomSheet.subtitle" />
+            </Text>
+        }
+        body={
+            <>
+                <AddressReviewSheetSection
+                    title={
+                        <Translation id="moduleSend.review.address.originBottomSheet.exchange.header" />
+                    }
+                    content={
+                        <Translation id="moduleSend.review.address.originBottomSheet.exchange.body" />
+                    }
+                />
+
+                <AddressReviewSheetSection
+                    title={
+                        <Translation id="moduleSend.review.address.originBottomSheet.person.header" />
+                    }
+                    content={
+                        <Translation id="moduleSend.review.address.originBottomSheet.person.body" />
+                    }
+                />
+            </>
+        }
+    ></AddressReviewHelpSheet>
+);

@@ -1,43 +1,39 @@
 import styled, { css } from 'styled-components';
 
-import {
-    selectDevice,
-    selectDevices,
-    selectAccountByKey,
-    selectDeviceThunk,
-} from '@suite-common/wallet-core';
-import { ProgressPie, variables } from '@trezor/components';
-import { WalletParams } from '@suite-common/wallet-types';
+import { selectRoundsDurationInHours, selectSessionProgressByAccountKey } from '@suite/coinjoin';
+import { type CoinjoinSession } from '@suite/coinjoin';
+import { Translation } from '@suite/intl';
+import { gotoThunk, selectRouterParams } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { selectDeviceThunk, selectDevices, selectSelectedDevice } from '@suite-common/device';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { selectAccountByKey } from '@suite-common/wallet-core';
+import { type AccountKey, type WalletParams } from '@suite-common/wallet-types';
+import { ProgressPie } from '@trezor/components';
+import { typography } from '@trezor/theme';
 
-import { useDispatch } from 'src/hooks/suite';
-import { CoinjoinSession } from 'src/types/wallet/coinjoin';
+import { CountdownTimer } from 'src/components/suite/CountdownTimer';
+import { WalletLabeling } from 'src/components/suite/labeling/WalletLabeling';
 import { ROUND_PHASE_MESSAGES } from 'src/constants/suite/coinjoin';
-import { goto } from 'src/actions/suite/routerActions';
-import { useSelector } from 'src/hooks/suite/useSelector';
-import { selectRouterParams } from 'src/reducers/suite/routerReducer';
-import {
-    selectSessionProgressByAccountKey,
-    selectRoundsDurationInHours,
-} from 'src/reducers/wallet/coinjoinReducer';
-import { CountdownTimer, Translation, WalletLabeling } from 'src/components/suite';
+import { useSelector } from 'src/hooks/suite';
 
 const SPACING = 6;
 
 const ViewText = styled.div`
     margin-left: auto;
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
+    color: ${({ theme }) => theme.contentSecondary};
     transition: transform 0.15s ease-in-out;
 `;
 
 const Container = styled.div<{ $isClickable: boolean }>`
     display: flex;
+    align-self: stretch;
     align-items: center;
     height: 28px;
     padding: 0 ${SPACING}px;
-    background: ${({ theme }) => theme.backgroundSurfaceElevationNegative};
-    border-bottom: 1px solid ${({ theme }) => theme.borderElevation1};
-    font-size: ${variables.FONT_SIZE.TINY};
-    font-weight: ${variables.FONT_WEIGHT.MEDIUM};
+    background: ${({ theme }) => theme.surfaceFillSunken};
+    border-bottom: 1px solid ${({ theme }) => theme.borderNeutral};
+    ${typography['body-xs']}
     transition: background 0.15s;
     ${({ $isClickable, theme }) =>
         $isClickable &&
@@ -45,7 +41,7 @@ const Container = styled.div<{ $isClickable: boolean }>`
             cursor: pointer;
 
             &:hover {
-                background: ${theme.BG_WHITE_ALT_HOVER};
+                background: ${theme.surfaceFillPage};
                 ${ViewText} {
                     text-decoration: underline;
                     transform: translateX(-4px);
@@ -54,16 +50,12 @@ const Container = styled.div<{ $isClickable: boolean }>`
         `}
 `;
 
-const StyledProgressPie = styled(ProgressPie)`
-    margin-right: ${SPACING}px;
-`;
-
 const StatusText = styled.span`
-    color: ${({ theme }) => theme.TYPE_GREEN};
+    color: ${({ theme }) => theme.contentBrand};
 `;
 
 const Note = styled.span`
-    color: ${({ theme }) => theme.TYPE_LIGHT_GREY};
+    color: ${({ theme }) => theme.contentSecondary};
 `;
 
 const Separator = styled.span`
@@ -71,7 +63,7 @@ const Separator = styled.span`
 `;
 
 interface CoinjoinStatusBarProps {
-    accountKey: string;
+    accountKey: AccountKey;
     session: CoinjoinSession;
     isSingle: boolean;
 }
@@ -79,14 +71,14 @@ interface CoinjoinStatusBarProps {
 export const CoinjoinStatusBar = ({ accountKey, session, isSingle }: CoinjoinStatusBarProps) => {
     const devices = useSelector(selectDevices);
     const relatedAccount = useSelector(state => selectAccountByKey(state, accountKey));
-    const selectedDevice = useSelector(selectDevice);
+    const selectedDevice = useSelector(selectSelectedDevice);
     const routerParams = useSelector(selectRouterParams);
     const sessionProgress = useSelector(state =>
         selectSessionProgressByAccountKey(state, accountKey),
     );
     const roundsDurationInHours = useSelector(selectRoundsDurationInHours);
 
-    const dispatch = useDispatch();
+    const { dispatch } = useServices(injectDispatch);
 
     if (!relatedAccount) {
         return null;
@@ -94,8 +86,10 @@ export const CoinjoinStatusBar = ({ accountKey, session, isSingle }: CoinjoinSta
 
     const { symbol, index, accountType, deviceState } = relatedAccount;
 
-    const relatedDevice = devices.find(device => device.state === relatedAccount?.deviceState);
-    const isOnSelectedDevice = selectedDevice?.state === deviceState;
+    const relatedDevice = devices.find(
+        device => device.state?.staticSessionId === relatedAccount?.deviceState,
+    );
+    const isOnSelectedDevice = selectedDevice?.state?.staticSessionId === deviceState;
 
     if (!relatedDevice) {
         return null;
@@ -103,11 +97,12 @@ export const CoinjoinStatusBar = ({ accountKey, session, isSingle }: CoinjoinSta
 
     const handleViewAccount = () => {
         if (!isOnSelectedDevice) {
-            dispatch(selectDeviceThunk(relatedDevice));
+            dispatch(selectDeviceThunk({ device: relatedDevice }));
         }
 
         dispatch(
-            goto('wallet-index', {
+            gotoThunk({
+                routeName: 'wallet-index',
                 params: {
                     symbol,
                     accountIndex: index,
@@ -146,7 +141,7 @@ export const CoinjoinStatusBar = ({ accountKey, session, isSingle }: CoinjoinSta
             onClick={isStatusBarClickable ? handleViewAccount : undefined}
             $isClickable={isStatusBarClickable}
         >
-            <StyledProgressPie valueInPercents={sessionProgress} />
+            <ProgressPie valueInPercents={sessionProgress} margin={{ right: 8 }} />
 
             <StatusText>
                 {getSessionStatusMessage()}

@@ -1,6 +1,9 @@
-import { goto } from 'src/actions/suite/routerActions';
-import { useDevice, useDispatch } from 'src/hooks/suite';
-import { Translation } from 'src/components/suite';
+import { Translation } from '@suite/intl';
+import { gotoThunk } from '@suite/router';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { CloudIcon, GearIcon } from '@trezor/icons';
+
 import { AccountExceptionLayout } from 'src/components/wallet';
 
 /**
@@ -8,25 +11,20 @@ import { AccountExceptionLayout } from 'src/components/wallet';
  * see: @wallet-actions/selectedAccountActions
  */
 export const DiscoveryEmpty = () => {
-    const dispatch = useDispatch();
-    const { device, isLocked } = useDevice();
+    const { dispatch } = useServices(injectDispatch);
 
-    const isDeviceLocked = isLocked();
-    const isDisabled = !device || !device.connected || device.authFailed || device.authConfirm;
-
-    const goToCoinsSettings = () => dispatch(goto('settings-coins'));
+    const goToCoinsSettings = () => dispatch(gotoThunk({ routeName: 'settings-coins' }));
 
     return (
         <AccountExceptionLayout
             title={<Translation id="TR_ACCOUNT_EXCEPTION_DISCOVERY_EMPTY" />}
-            image="CLOUDY"
+            icon={CloudIcon}
+            iconVariant="info"
             description={<Translation id="TR_ACCOUNT_EXCEPTION_DISCOVERY_EMPTY_DESC" />}
             actions={[
                 {
                     key: '1',
-                    isLoading: isDeviceLocked,
-                    isDisabled,
-                    icon: 'SETTINGS',
+                    iconLeft: GearIcon,
                     onClick: goToCoinsSettings,
                     children: <Translation id="TR_COIN_SETTINGS" />,
                 },

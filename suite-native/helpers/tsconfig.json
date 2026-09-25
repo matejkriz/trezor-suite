@@ -2,7 +2,19 @@
     "extends": "../../tsconfig.base.json",
     "compilerOptions": { "outDir": "libDev" },
     "references": [
-        { "path": "../toasts" },
-        { "path": "../../packages/connect" }
+        {
+            "path": "../../suite-common/wallet-config"
+        },
+        {
+            "path": "../../suite-common/wallet-core"
+        },
+        { "path": "../../packages/connect" },
+        {
+            "path": "../../packages/styles-native"
+        },
+        { "path": "../../packages/theme" },
+        { "path": "../../packages/utils" },
+        { "path": "../test-utils" },
+        { "path": "../test-utils-store" }
     ]
 }

@@ -1,12 +1,16 @@
 import { useMemo } from 'react';
+
 import styled, { useTheme } from 'styled-components';
 
-import { selectHasAccountTransactions } from '@suite-common/wallet-core';
-import { Card } from '@trezor/components';
+import { selectHasAnonymitySetError } from '@suite/coinjoin';
+import { selectHasAccountTransactionHistory } from '@suite-common/wallet-core';
+import { type AccountKey } from '@suite-common/wallet-types';
+import { Card, Column } from '@trezor/components';
+
 import { useSelector } from 'src/hooks/suite';
-import { selectHasAnonymitySetError } from 'src/reducers/wallet/coinjoinReducer';
+
 import { BalancePrivacyBreakdown } from './BalancePrivacyBreakdown/BalancePrivacyBreakdown';
-import { CoinjoinBalanceError, CoinjoinBalanceErrorProps } from './CoinjoinBalanceError';
+import { CoinjoinBalanceError, type CoinjoinBalanceErrorProps } from './CoinjoinBalanceError';
 import { CoinjoinStatusWheel } from './CoinjoinStatusWheel/CoinjoinStatusWheel';
 
 export const Container = styled.div`
@@ -14,23 +18,24 @@ export const Container = styled.div`
     justify-content: space-between;
     gap: 8px;
     width: 100%;
-    height: 160px;
+    height: 200px;
     align-items: center;
-`;
 
-const LeftSideContainer = styled(Card)`
-    width: 100%;
-    height: 100%;
-    justify-content: center;
+    & > :last-child {
+        width: initial;
+        height: 100%;
+    }
 `;
 
 interface CoinjoinBalanceSectionProps {
-    accountKey: string;
+    accountKey: AccountKey;
 }
 
 export const CoinjoinBalanceSection = ({ accountKey }: CoinjoinBalanceSectionProps) => {
     const hasAnonymitySetError = useSelector(selectHasAnonymitySetError);
-    const hasTransactions = useSelector(state => selectHasAccountTransactions(state, accountKey));
+    const hasAccountTransactionHistory = useSelector(state =>
+        selectHasAccountTransactionHistory(state, accountKey),
+    );
 
     const theme = useTheme();
 
@@ -39,27 +44,29 @@ export const CoinjoinBalanceSection = ({ accountKey }: CoinjoinBalanceSectionPro
             return {
                 headingId: 'TR_ERROR',
                 messageId: 'TR_ANONYMITY_SET_ERROR',
-                headingColor: theme.TYPE_RED,
+                headingColor: theme.contentCritical,
             };
         }
 
-        if (!hasTransactions) {
+        if (!hasAccountTransactionHistory) {
             return {
                 headingId: 'TR_EMPTY_ACCOUNT_TITLE',
                 messageId: 'TR_EMPTY_COINJOIN_ACCOUNT_SUBTITLE',
             };
         }
-    }, [theme, hasAnonymitySetError, hasTransactions]);
+    }, [theme, hasAnonymitySetError, hasAccountTransactionHistory]);
 
     return (
         <Container>
-            <LeftSideContainer>
-                {errorMessageConfig ? (
-                    <CoinjoinBalanceError {...errorMessageConfig} />
-                ) : (
-                    <BalancePrivacyBreakdown />
-                )}
-            </LeftSideContainer>
+            <Card width="100%" height="100%">
+                <Column justifyContent="center" alignItems="center" flex="1">
+                    {errorMessageConfig ? (
+                        <CoinjoinBalanceError {...errorMessageConfig} />
+                    ) : (
+                        <BalancePrivacyBreakdown />
+                    )}
+                </Column>
+            </Card>
 
             <CoinjoinStatusWheel accountKey={accountKey} />
         </Container>

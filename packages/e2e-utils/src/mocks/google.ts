@@ -1,8 +1,6 @@
 /* eslint-disable no-console */
 
-import express, { Express } from 'express';
-import { v4 as uuidv4 } from 'uuid';
-
+import express, { type Express } from 'express';
 const BOUNDARY = '---------314159265358979323846';
 const port = 30001;
 
@@ -50,6 +48,19 @@ export class GoogleMock {
         const app = express();
 
         app.use((req, res, next) => {
+            if (req.method === 'OPTIONS') {
+                res.setHeader('Access-Control-Allow-Origin', '*');
+                res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PATCH');
+                res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+                res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+                return res.status(200).end();
+            }
+
+            // Handle normal requests
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PATCH');
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
             this.requests.push(req.url);
 
             if (this.nextResponse.length) {
@@ -99,7 +110,7 @@ export class GoogleMock {
                 if (!file) throw new Error('no such file exists');
                 file.data = data;
             } else {
-                const file = new GoogleFile(uuidv4(), json.name, data);
+                const file = new GoogleFile(crypto.randomUUID(), json.name, data);
                 this.files[file.name] = file;
             }
         };
@@ -137,7 +148,7 @@ export class GoogleMock {
 
         app.get('/drive/v3/files/:id', express.json(), (req, res) => {
             const { id } = req.params;
-            console.log('[mockGoogleDrive]: get', req.params.id);
+            console.log('[mockGoogleDrive]: get file by id', req.params.id);
             const file = Object.values(this.files).find(f => f.id === id);
             if (file) {
                 return res.send(file.data);
@@ -152,6 +163,7 @@ export class GoogleMock {
         });
 
         app.get('/drive/v3/files', express.json(), (_req, res) => {
+            console.log('[mockGoogleDrive]: get files');
             res.json({
                 files: Object.values(this.files),
             });
@@ -176,21 +188,36 @@ export class GoogleMock {
 
         console.log('[mockGoogleDrive]: start');
 
-        return new Promise(resolve => {
-            // @ts-expect-error
-            this.app.listen(port, server => {
-                console.log(`[mockGoogleDrive] listening at http://localhost:${port}`);
+        return new Promise<void>(resolve => {
+            const server = this.app!.listen(port, () => {
+                console.log(`[mockGoogleDrive]: listening at http://localhost:${port}`);
                 this.running = true;
                 this.server = server;
-                resolve(undefined);
+                resolve();
             });
         });
     }
 
-    stop() {
-        console.log('[mockGoogleDrive]: start');
+    async stop() {
+        console.log('[mockGoogleDrive]: stop');
         if (this.server) {
-            this.server.close();
+            await new Promise<void>((resolve, reject) => {
+                this.server.close((err: Error | undefined) => {
+                    if (err) {
+                        console.error('[mockGoogleDrive]: Error stopping server', err);
+
+                        return reject(err);
+                    }
+                    console.log('[mockGoogleDrive]: Server stopped successfully');
+                    this.running = false;
+                    this.server = null;
+                    resolve();
+                });
+
+                this.server.closeAllConnections();
+            });
+        } else {
+            console.log('[mockGoogleDrive]: Server is not running');
         }
     }
 
@@ -222,7 +249,7 @@ export class GoogleMock {
                 content.toString('hex'),
             );
         } else {
-            const file = new GoogleFile(uuidv4(), name, content.toString('hex'));
+            const file = new GoogleFile(crypto.randomUUID(), name, content.toString('hex'));
             this.files[file.name] = file;
         }
     }

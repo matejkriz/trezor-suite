@@ -1,0 +1,11 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": { "outDir": "libDev" },
+    "references": [
+        { "path": "../connect" },
+        { "path": "../transport" },
+        { "path": "../transport-bluetooth" },
+        { "path": "../transport-common" },
+        { "path": "../requirements" }
+    ]
+}

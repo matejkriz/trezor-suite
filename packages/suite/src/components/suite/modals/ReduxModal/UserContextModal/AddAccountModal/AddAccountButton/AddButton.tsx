@@ -1,28 +1,18 @@
-import { ReactNode } from 'react';
-import { TooltipButton, ButtonProps } from '@trezor/components';
-import { Translation } from 'src/components/suite';
-import { Network } from '@suite-common/wallet-config';
+import { type ReactNode } from 'react';
 
-interface AddButtonProps extends Omit<ButtonProps, 'children'> {
+import { Translation } from '@suite/intl';
+import { type Network } from '@suite-common/wallet-config';
+import { type ButtonProps, Modal, Tooltip } from '@trezor/components';
+
+type AddButtonProps = Partial<ButtonProps> & {
     disabledMessage: ReactNode;
-    handleClick: () => void;
     networkName: Network['name'];
-}
+};
 
-export const AddButton = ({
-    disabledMessage,
-    handleClick,
-    networkName,
-    ...buttonProps
-}: AddButtonProps) => (
-    <TooltipButton
-        tooltipContent={disabledMessage}
-        isDisabled={!!disabledMessage}
-        size="small"
-        onClick={handleClick}
-        data-test="@add-account"
-        {...buttonProps}
-    >
-        <Translation id="TR_ADD_NETWORK_ACCOUNT" values={{ network: networkName }} />
-    </TooltipButton>
+export const AddButton = ({ disabledMessage, networkName, ...buttonProps }: AddButtonProps) => (
+    <Tooltip tooltipMaxWidth={285} content={disabledMessage}>
+        <Modal.Button isDisabled={!!disabledMessage} data-testid="@add-account" {...buttonProps}>
+            <Translation id="TR_ADD_NETWORK_ACCOUNT" values={{ network: networkName }} />
+        </Modal.Button>
+    </Tooltip>
 );

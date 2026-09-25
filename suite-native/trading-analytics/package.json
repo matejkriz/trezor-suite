@@ -1,0 +1,30 @@
+{
+    "name": "@suite-native/trading-analytics",
+    "version": "1.0.0",
+    "private": true,
+    "license": "See LICENSE.md in repo root",
+    "sideEffects": false,
+    "main": "src/index",
+    "scripts": {
+        "depcheck": "yarn g:depcheck",
+        "lint:js": "yarn g:eslint '**/*.{ts,tsx,js}'",
+        "lint:js:fix": "yarn lint:js --fix",
+        "type-check": "yarn g:tsc --build",
+        "test:unit": "yarn g:jest:native",
+        "test:unit:watch": "yarn g:jest --watch"
+    },
+    "dependencies": {
+        "@suite-common/dependency-injection": "workspace:*",
+        "@suite-common/trading": "workspace:*",
+        "@suite-native/analytics": "workspace:*",
+        "@suite-native/trading-atoms": "workspace:*",
+        "react": "19.2.3",
+        "react-redux": "9.3.0"
+    },
+    "devDependencies": {
+        "@suite-native/test-utils": "workspace:*",
+        "@suite-native/test-utils-store": "workspace:*",
+        "@suite-native/trading-fixtures": "workspace:*",
+        "@types/invity-api": "^1.1.22"
+    }
+}

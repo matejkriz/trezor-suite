@@ -1,0 +1,1 @@
+../../../skills/typescript/SKILL.md
