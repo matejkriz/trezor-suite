@@ -5,13 +5,12 @@ import { webHidTransportFactory } from '@ledgerhq/device-transport-kit-web-hid';
 import { type LedgerDevice, createLedgerBitcoinServiceForTransport } from '@suite-common/ledger';
 import { Button, Column, H3, Modal, Row, Spinner, Text } from '@trezor/components';
 
+import { getLedgerConnectionErrorMessage } from './getLedgerConnectionErrorMessage';
+
 type LedgerConnectionModalProps = {
     onCancel: () => void;
     onBack: () => void;
 };
-
-const getErrorMessage = (error: unknown) =>
-    error instanceof Error ? error.message : 'Ledger connection failed';
 
 export const LedgerConnectionModal = ({ onCancel, onBack }: LedgerConnectionModalProps) => {
     const [service] = useState(() =>
@@ -23,6 +22,8 @@ export const LedgerConnectionModal = ({ onCancel, onBack }: LedgerConnectionModa
     const [address, setAddress] = useState<string>();
     const [isAddressVerified, setIsAddressVerified] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string>();
+    const isWebHIDAvailable =
+        typeof navigator !== 'undefined' && 'hid' in navigator && !!navigator.hid;
 
     useEffect(
         () => () => {
@@ -40,6 +41,7 @@ export const LedgerConnectionModal = ({ onCancel, onBack }: LedgerConnectionModa
         try {
             service.startDiscovery(
                 device => {
+                    setIsScanning(false);
                     setDevices(current =>
                         current.some(knownDevice => knownDevice.id === device.id)
                             ? current
@@ -48,12 +50,12 @@ export const LedgerConnectionModal = ({ onCancel, onBack }: LedgerConnectionModa
                 },
                 error => {
                     setIsScanning(false);
-                    setErrorMessage(getErrorMessage(error));
+                    setErrorMessage(getLedgerConnectionErrorMessage(error));
                 },
             );
         } catch (error) {
             setIsScanning(false);
-            setErrorMessage(getErrorMessage(error));
+            setErrorMessage(getLedgerConnectionErrorMessage(error));
         }
     };
 
@@ -65,10 +67,10 @@ export const LedgerConnectionModal = ({ onCancel, onBack }: LedgerConnectionModa
             await service.connect(device);
             const account = await service.getAccount(0);
             setAddress(account.address);
-            setIsScanning(false);
         } catch (error) {
-            setErrorMessage(getErrorMessage(error));
+            setErrorMessage(getLedgerConnectionErrorMessage(error));
         } finally {
+            setIsScanning(false);
             setIsBusy(false);
         }
     };
@@ -86,7 +88,7 @@ export const LedgerConnectionModal = ({ onCancel, onBack }: LedgerConnectionModa
             }
             setIsAddressVerified(true);
         } catch (error) {
-            setErrorMessage(getErrorMessage(error));
+            setErrorMessage(getLedgerConnectionErrorMessage(error));
         } finally {
             setIsBusy(false);
         }
@@ -96,7 +98,7 @@ export const LedgerConnectionModal = ({ onCancel, onBack }: LedgerConnectionModa
         <Modal
             data-testid="@suite/ledger-connection-modal"
             heading="Connect Ledger"
-            description="Unlock your Ledger and open the Bitcoin app."
+            description="Connect your Ledger by USB, unlock it, and open the Bitcoin app."
             width={480}
             onCancel={onCancel}
             onBackClick={onBack}
@@ -116,13 +118,24 @@ export const LedgerConnectionModal = ({ onCancel, onBack }: LedgerConnectionModa
                     </>
                 ) : (
                     <>
-                        <Button onClick={startScanning} isDisabled={isScanning || isBusy}>
+                        <Button
+                            onClick={startScanning}
+                            isDisabled={!isWebHIDAvailable || isScanning || isBusy}
+                        >
                             Scan for Ledger devices
                         </Button>
+                        {!isWebHIDAvailable && (
+                            <Text intent="critical">
+                                USB connection to Ledger requires WebHID. Open Suite in Chrome or
+                                Edge, or use the desktop app.
+                            </Text>
+                        )}
                         {isScanning && devices.length === 0 && (
                             <Row gap={8} alignItems="center">
                                 <Spinner size={16} />
-                                <Text>Choose your Ledger in the USB device picker.</Text>
+                                <Text>
+                                    Choose your Ledger in the browser&apos;s USB device picker.
+                                </Text>
                             </Row>
                         )}
                         {devices.map(device => (
