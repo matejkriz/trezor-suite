@@ -10,15 +10,18 @@ import {
 import { createSliceWithExtraDeps } from '@suite-common/redux-utils';
 
 type ConnectionMode = 'cable' | 'bluetooth';
+type ConnectionModalType = 'trezor' | 'ledger';
 
 export type DesktopDeviceState = DeviceReducerState & {
     isConnectionModalOpen: boolean;
+    connectionModalType: ConnectionModalType;
     defaultConnectionMode: ConnectionMode;
 };
 
 export const initialState: DesktopDeviceState = {
     ...commonInitialState,
     isConnectionModalOpen: false,
+    connectionModalType: 'trezor',
     defaultConnectionMode: 'cable',
 };
 
@@ -32,9 +35,18 @@ const deviceSlice = createSliceWithExtraDeps({
     reducers: {
         toggleConnectionModal: (state: DesktopDeviceState) => {
             state.isConnectionModalOpen = !state.isConnectionModalOpen;
+            state.connectionModalType = 'trezor';
         },
         setConnectionModal: (state: DesktopDeviceState, { payload }: PayloadAction<boolean>) => {
             state.isConnectionModalOpen = payload;
+            state.connectionModalType = 'trezor';
+        },
+        openConnectionModal: (
+            state: DesktopDeviceState,
+            { payload }: PayloadAction<ConnectionModalType>,
+        ) => {
+            state.isConnectionModalOpen = true;
+            state.connectionModalType = payload;
         },
         setConnectionMode: (
             state: DesktopDeviceState,
@@ -60,6 +72,7 @@ const deviceSlice = createSliceWithExtraDeps({
     },
 });
 
-export const { toggleConnectionModal, setConnectionModal, setConnectionMode } = deviceSlice.actions;
+export const { toggleConnectionModal, setConnectionModal, openConnectionModal, setConnectionMode } =
+    deviceSlice.actions;
 export const desktopDeviceActions = deviceSlice.actions;
 export const prepareDesktopDeviceReducer = deviceSlice.prepareReducer;

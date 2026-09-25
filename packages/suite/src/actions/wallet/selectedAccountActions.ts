@@ -9,7 +9,13 @@ import {
     selectRouterApp,
     selectRouterParams,
 } from '@suite/router';
-import { type DeviceRootState, deviceActions, selectSelectedDevice } from '@suite-common/device';
+import {
+    type DeviceRootState,
+    deviceActions,
+    selectActiveWalletStaticSessionId,
+    selectSelectedDevice,
+    selectSelectedExternalWallet,
+} from '@suite-common/device';
 import { getNetwork } from '@suite-common/wallet-config';
 import {
     type DiscoveryRootState,
@@ -42,16 +48,18 @@ type SelectedAccountState = DeviceRootState &
 // move to selector!!!!
 export const getAccountState = (state: SelectedAccountState): SelectedAccountStatus => {
     const device = selectSelectedDevice(state);
+    const externalWallet = selectSelectedExternalWallet(state);
+    const activeWalletStaticSessionId = selectActiveWalletStaticSessionId(state);
 
     // waiting for device
-    if (!device) {
+    if (!device && !externalWallet) {
         return {
             status: 'loading',
             loader: 'waiting-for-device',
         };
     }
 
-    if (!device.state) {
+    if (device && !device.state) {
         return {
             status: 'loading',
             loader: 'auth',
@@ -113,7 +121,7 @@ export const getAccountState = (state: SelectedAccountState): SelectedAccountSta
     }
 
     // get selected account
-    const account = getSelectedAccount(device.state.staticSessionId, state.wallet.accounts, params);
+    const account = getSelectedAccount(activeWalletStaticSessionId, state.wallet.accounts, params);
     // account does exist
     if (account?.visible) {
         if (account.backendType === 'coinjoin') {
@@ -180,6 +188,8 @@ export const getAccountState = (state: SelectedAccountState): SelectedAccountSta
 const actions = new Set<UnknownAction['type']>([
     routerLocationChange.type,
     deviceActions.selectDevice.type,
+    deviceActions.connectExternalWallet.type,
+    deviceActions.selectExternalWallet.type,
     deviceActions.updateSelectedDevice.type,
     metadataActions.setAccountAdd.type,
     accountsActions.createAccount.type,

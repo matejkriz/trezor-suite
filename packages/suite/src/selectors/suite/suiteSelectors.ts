@@ -1,5 +1,9 @@
 import { type RouterRootState, selectRouter } from '@suite/router';
-import { type DeviceRootState, selectSelectedDevice } from '@suite-common/device';
+import {
+    type DeviceRootState,
+    selectSelectedDevice,
+    selectSelectedExternalWallet,
+} from '@suite-common/device';
 import { returnStableArrayIfEmpty } from '@suite-common/redux-utils';
 import { type TransportInfo } from '@trezor/connect';
 
@@ -39,6 +43,8 @@ export const selectTransportOfType = (type: TransportInfo['type']) => (state: Su
 export const selectPrerequisite = (
     state: SuiteRootState & RouterRootState & DeviceRootState,
 ): PrerequisiteType | null => {
+    if (selectSelectedExternalWallet(state)) return null;
+
     const { transport } = state.suite;
     const device = selectSelectedDevice(state);
     const router = selectRouter(state);

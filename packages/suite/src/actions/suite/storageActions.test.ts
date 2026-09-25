@@ -20,7 +20,11 @@ import { type SuiteSyncOwnerSerialized } from '@suite-common/suite-sync-storage'
 import { mockSuiteDevice } from '@suite-common/suite-types/mocks';
 import { createTestStore, testMocks, wireEnabledNetworksMock } from '@suite-common/test-utils';
 import { asNetworkSymbol } from '@suite-common/wallet-config';
-import { changeCoinVisibilityThunk, transactionsActions } from '@suite-common/wallet-core';
+import {
+    accountsActions,
+    changeCoinVisibilityThunk,
+    transactionsActions,
+} from '@suite-common/wallet-core';
 import * as discoveryActions from '@suite-common/wallet-core';
 import { asAccountDescriptor } from '@suite-common/wallet-types';
 import { mockAccountKey, mockWalletAccount } from '@suite-common/wallet-types/mocks';
@@ -65,6 +69,7 @@ const deviceReducer = prepareDesktopDeviceReducer({
         setDeviceMetadataReducer: mockReducer(),
         storageLoadDevices: (state, { payload }) => {
             state.devices = payload.devices;
+            state.externalWallets = payload.suiteSettings?.externalWallets;
         },
     },
 });
@@ -294,6 +299,36 @@ describe('Storage actions', () => {
         global.fetch = f;
     });
 
+    it('restores remembered Ledger wallets as disconnected with their Bitcoin accounts', async () => {
+        const wallet = {
+            id: 'ledgerwallet',
+            provider: 'ledger' as const,
+            label: 'Ledger Flex',
+            staticSessionId: 'ledgerwallet@ledger:0' as const,
+            connected: true,
+        };
+        const account = mockWalletAccount({
+            deviceState: wallet.staticSessionId,
+            symbol: btcSymbol,
+            descriptor: asAccountDescriptor('zpubaccount'),
+        });
+        const store = mockStore(db, getInitialState({ wallet: { accounts: [account] } }));
+
+        store.dispatch(deviceActions.connectExternalWallet(wallet));
+        store.dispatch(accountsActions.changeAccountVisibility(account, false));
+        await store.dispatch(storageActions.saveSuiteSettingsThunk());
+
+        const restoredStore = mockStore(db, getInitialState());
+        restoredStore.dispatch((await preloadStore())!);
+
+        expect(restoredStore.getState().device.externalWallets).toEqual([
+            { ...wallet, connected: false },
+        ]);
+        expect(restoredStore.getState().wallet.accounts).toContainEqual(
+            expect.objectContaining({ deviceState: wallet.staticSessionId, visible: false }),
+        );
+    });
+
     it('should store, override and remove send form', async () => {
         let store = mockStore(db, getInitialState());
 
@@ -322,6 +357,7 @@ describe('Storage actions', () => {
                 device: {
                     devices: [dev1, dev2, dev2Instance1],
                     isConnectionModalOpen: false,
+                    connectionModalType: 'trezor',
                     defaultConnectionMode: 'cable',
                 },
                 wallet: {
@@ -413,6 +449,7 @@ describe('Storage actions', () => {
                 device: {
                     devices: [dev1, dev2],
                     isConnectionModalOpen: false,
+                    connectionModalType: 'trezor',
                     defaultConnectionMode: 'cable',
                 },
                 wallet: {
@@ -456,6 +493,7 @@ describe('Storage actions', () => {
                 device: {
                     devices: [dev1Connected],
                     isConnectionModalOpen: false,
+                    connectionModalType: 'trezor',
                     defaultConnectionMode: 'cable',
                 },
                 wallet: {
@@ -494,6 +532,7 @@ describe('Storage actions', () => {
                 device: {
                     devices: [dev1],
                     isConnectionModalOpen: false,
+                    connectionModalType: 'trezor',
                     defaultConnectionMode: 'cable',
                 },
                 wallet: {

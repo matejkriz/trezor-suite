@@ -10,6 +10,7 @@ import type { SuiteSettingsState } from '@suite/settings';
 import { type DesktopSuiteSyncState } from '@suite/suite-sync';
 import { type AnalyticsState } from '@suite-common/analytics-redux';
 import { type AppRememberedPermission } from '@suite-common/connect-popup/src/connectPopupTypes';
+import type { ExternalWallet } from '@suite-common/device';
 import type { DiscreetModeState } from '@suite-common/discreet-mode';
 import { type FeatureFeedbackState } from '@suite-common/feedback';
 import type { MessageState } from '@suite-common/message-system';
@@ -106,6 +107,7 @@ export interface SuiteDBSchema extends DBSchema {
             flags: FlagsState;
             evmSettings: SuiteState['evmSettings'];
             seenDisconnectNotificationForDeviceIds: SuiteState['seenDisconnectNotificationForDeviceIds'];
+            externalWallets?: ExternalWallet[];
         };
     };
     historicRates: {

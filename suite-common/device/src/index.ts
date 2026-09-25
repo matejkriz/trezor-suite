@@ -5,6 +5,7 @@ export type * from './deviceDeps';
 export * from './deviceReducer';
 export * from './deviceSelectors';
 export * from './deviceUtils';
+export type * from './externalWalletTypes';
 export * from './selectDeviceThunk';
 export * from './sortDevices';
 export * from './usePinHook';

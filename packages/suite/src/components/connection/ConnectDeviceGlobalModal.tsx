@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 
 import { events, injectDesktopAnalytics } from '@suite/analytics';
 import { selectIsManualPairingRequired, selectIsUnpairingDevice } from '@suite/bluetooth';
+import { selectConnectionModalType } from '@suite/device';
 import { Translation } from '@suite/intl';
 import { selectAdapterStatus, selectIsDeviceOsUnpairingRequired } from '@suite-common/bluetooth';
 import { useServices } from '@suite-common/dependency-injection';
@@ -202,8 +203,8 @@ const ViaCableCard = ({ onClick }: ConnectionModeCardProps) => (
 
 export const ConnectDeviceGlobalModal = ({ onCancel }: { onCancel: () => void }) => {
     const { analytics } = useServices(injectDesktopAnalytics);
+    const connectionModalType = useSelector(selectConnectionModalType);
     const [isModeSelected, setIsModeSelected] = useState(false);
-    const [isLedgerMode, setIsLedgerMode] = useState(false);
     const isWebUsbTransport = useSelector(selectHasTransportOfType('WebUsbTransport'));
     const {
         toggleBluetoothMode,
@@ -226,8 +227,8 @@ export const ConnectDeviceGlobalModal = ({ onCancel }: { onCancel: () => void })
 
     const bluetoothAdapterStatus = useSelector(selectAdapterStatus);
 
-    if (isLedgerMode) {
-        return <LedgerConnectionModal onCancel={onCancel} onBack={() => setIsLedgerMode(false)} />;
+    if (connectionModalType === 'ledger') {
+        return <LedgerConnectionModal onCancel={onCancel} onBack={onCancel} />;
     }
 
     if (wasBluetoothDeviceWiped?.isRequired || isUnpairingDevice) return null;
@@ -335,12 +336,6 @@ export const ConnectDeviceGlobalModal = ({ onCancel }: { onCancel: () => void })
                         <Divider margin={0} />
                     </Row>
                     <ViaCableCard onClick={() => setIsModeSelected(true)} />
-                    <Card onClick={() => setIsLedgerMode(true)} paddingType="large">
-                        <Column alignItems="center" gap={8}>
-                            <H3>Ledger</H3>
-                            <Text>Bitcoin via USB</Text>
-                        </Column>
-                    </Card>
                 </Column>
             </Modal>
         );
@@ -358,9 +353,6 @@ export const ConnectDeviceGlobalModal = ({ onCancel }: { onCancel: () => void })
             >
                 <ConnectModalContent isBluetoothMode={false}>
                     {isWebUsbTransport && <WebUsbButton intent="brand" size="medium" />}
-                    <Button onClick={() => setIsLedgerMode(true)} priority="secondary">
-                        Connect Ledger Bitcoin
-                    </Button>
                 </ConnectModalContent>
             </Modal.ModalBase>
         </Modal.Backdrop>

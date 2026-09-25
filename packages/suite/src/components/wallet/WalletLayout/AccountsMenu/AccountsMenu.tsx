@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 
 import { Translation } from '@suite/intl';
-import { selectSelectedDevice } from '@suite-common/device';
+import { selectSelectedDevice, selectSelectedExternalWallet } from '@suite-common/device';
 import { Column, useScrollShadow } from '@trezor/components';
 
 import { useSelector } from 'src/hooks/suite';
@@ -15,6 +15,7 @@ import { AccountsMenuNotice } from './AccountsMenuNotice';
 
 export const AccountsMenu = () => {
     const device = useSelector(selectSelectedDevice);
+    const externalWallet = useSelector(selectSelectedExternalWallet);
     const discoveryStatus = useSelector(selectDiscoveryOverallStatus);
     const { scrollElementRef, ScrollSentinels, ShadowTop, ShadowBottom, ShadowContainer } =
         useScrollShadow({
@@ -32,7 +33,7 @@ export const AccountsMenu = () => {
         return null;
     }
 
-    if (!device) {
+    if (!device && !externalWallet) {
         if (isSidebarCollapsed) return null;
 
         return (

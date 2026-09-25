@@ -4,7 +4,7 @@ import styled, { css } from 'styled-components';
 
 import { Translation } from '@suite/intl';
 import { useServices } from '@suite-common/dependency-injection';
-import { selectSelectedDevice } from '@suite-common/device';
+import { selectSelectedDevice, selectSelectedExternalWallet } from '@suite-common/device';
 import { injectDispatch } from '@suite-common/redux-utils';
 import { Box, Icon, Row, ShortcutBadge, TOOLTIP_DELAY_LONG, Tooltip } from '@trezor/components';
 import { commonFocusStyles, focusStyleTransition } from '@trezor/components/src/utils/utils';
@@ -87,6 +87,7 @@ const RecentlyConnectedDeviceTooltipContent = () => {
 
 export const DeviceSelector = () => {
     const selectedDevice = useSelector(selectSelectedDevice);
+    const selectedExternalWallet = useSelector(selectSelectedExternalWallet);
     const recentlyConnectedDevice = useSelector(selectRecentlyConnectedDevice);
     const { dispatch } = useServices(injectDispatch);
 
@@ -130,7 +131,7 @@ export const DeviceSelector = () => {
                         </Box>
 
                         <ExpandedSidebarOnly>
-                            {selectedDevice?.state && (
+                            {(selectedDevice?.state || selectedExternalWallet) && (
                                 <CaretContainer>
                                     <Icon size={20} as={CaretCircleDownIcon} />
                                 </CaretContainer>

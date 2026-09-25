@@ -6,8 +6,31 @@ import { portfolioTrackerDevice } from './deviceConstants';
 import { deviceReducerInitialState } from './deviceReducer';
 import {
     selectDeviceModelWithFlagshipFallback,
+    selectIsAnyDeviceSelected,
     selectIsDeviceAuthenticityCheckSupported,
 } from './deviceSelectors';
+
+describe(selectIsAnyDeviceSelected.name, () => {
+    it('includes a selected external wallet', () => {
+        const state = {
+            device: {
+                ...deviceReducerInitialState,
+                selectedExternalWalletId: 'ledger1',
+                externalWallets: [
+                    {
+                        id: 'ledger1',
+                        provider: 'ledger' as const,
+                        label: 'Ledger',
+                        staticSessionId: 'ledger1@ledger:0' as const,
+                        connected: true,
+                    },
+                ],
+            },
+        };
+
+        expect(selectIsAnyDeviceSelected(state)).toBe(true);
+    });
+});
 
 describe(selectIsDeviceAuthenticityCheckSupported.name, () => {
     it('returns true for supported Trezor Safe devices', () => {

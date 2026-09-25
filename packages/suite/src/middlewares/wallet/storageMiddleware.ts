@@ -25,6 +25,7 @@ import {
     selectDeviceByState,
     selectDeviceByStaticSessionId,
     selectDevices,
+    selectExternalWallets,
     selectSelectedDevice,
 } from '@suite-common/device';
 import { discreetModeActions } from '@suite-common/discreet-mode';
@@ -365,6 +366,45 @@ export const prepareStorageMiddleware = createMiddlewareWithExtraDeps<
         }
     });
 
+    if (
+        isAnyOf(
+            accountsActions.createAccount,
+            accountsActions.changeAccountVisibility,
+            accountsActions.updateAccount,
+        )(action)
+    ) {
+        const state = api.getState();
+        const account = selectAccountByKey(state, action.payload.account.key);
+        if (
+            account &&
+            isAccountSuccessful(account) &&
+            selectExternalWallets(state).some(
+                wallet => wallet.staticSessionId === account.deviceState,
+            )
+        ) {
+            storageActions.saveAccounts(api.extra.services, [account]);
+        }
+    }
+
+    if (
+        isAnyOf(
+            receiveActions.showAddress,
+            receiveActions.touchAddress,
+            receiveActions.setCurrentFreshAddress,
+        )(action)
+    ) {
+        const state = api.getState();
+        const account = selectAccountByKey(state, action.payload.accountKey);
+        if (
+            account &&
+            selectExternalWallets(state).some(
+                wallet => wallet.staticSessionId === account.deviceState,
+            )
+        ) {
+            api.dispatch(storageActions.saveAccountReceiveThunk(account.key));
+        }
+    }
+
     if (accountsActions.removeAccount.match(action)) {
         action.payload.forEach(
             storageActions.removeAccountWithDependencies({
@@ -576,6 +616,8 @@ export const prepareStorageMiddleware = createMiddlewareWithExtraDeps<
             suiteSettingsActions.setIsCoinsFilterVisible,
             closeEvmExplanationBanner,
             confirmEvmExplanationModal,
+            deviceActions.connectExternalWallet,
+            deviceActions.disconnectExternalWallet,
         )(action)
     ) {
         api.dispatch(storageActions.saveSuiteSettingsThunk());

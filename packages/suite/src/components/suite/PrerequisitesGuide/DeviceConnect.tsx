@@ -1,5 +1,5 @@
 import { events, injectDesktopAnalytics } from '@suite/analytics';
-import { toggleConnectionModal } from '@suite/device';
+import { openConnectionModal, toggleConnectionModal } from '@suite/device';
 import { Translation } from '@suite/intl';
 import { useServices } from '@suite-common/dependency-injection';
 import { injectDispatch } from '@suite-common/redux-utils';
@@ -19,9 +19,17 @@ export const DeviceConnect = () => {
     };
 
     return (
-        <Column alignItems="center" margin={{ bottom: 40 }}>
+        <Column alignItems="center" gap={12} margin={{ bottom: 40 }}>
             <Button minWidth={240} size="large" onClick={handleConnect}>
                 <Translation id="TR_CONNECT" />
+            </Button>
+            <Button
+                minWidth={240}
+                size="large"
+                priority="secondary"
+                onClick={() => dispatch(openConnectionModal('ledger'))}
+            >
+                Connect Ledger
             </Button>
         </Column>
     );

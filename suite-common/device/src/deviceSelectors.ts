@@ -50,9 +50,20 @@ export const selectDevicesCount = (state: DeviceRootState) => state.device?.devi
 
 export const selectSelectedDevice = (state: DeviceRootState) => state.device.selectedDevice;
 
+export const selectExternalWallets = (state: DeviceRootState) => state.device.externalWallets ?? [];
+
+export const selectSelectedExternalWallet = (state: DeviceRootState) =>
+    selectExternalWallets(state).find(
+        wallet => wallet.id === state.device.selectedExternalWalletId,
+    );
+
+export const selectActiveWalletStaticSessionId = (state: DeviceRootState) =>
+    selectSelectedExternalWallet(state)?.staticSessionId ??
+    selectSelectedDevice(state)?.state?.staticSessionId;
+
 export const selectIsAnyDeviceSelected = createMemoizedSelector(
-    [selectSelectedDevice],
-    device => !!device,
+    [selectSelectedDevice, selectSelectedExternalWallet],
+    (device, externalWallet) => !!device || !!externalWallet,
 );
 
 // Use in tests only! See deviceReducer for the property definition.

@@ -9,6 +9,7 @@ import { type AccountsRootState } from './accountsReducer';
 import {
     selectAddressByNetworkAndPath,
     selectDeviceAccountKeyForNetworkSymbolAndAccountTypeWithIndex,
+    selectDeviceAccounts,
     selectVisibleDeviceAccountsMap,
 } from './accountsSelectors';
 
@@ -139,6 +140,28 @@ const getStateWithSelectedDevice = (
 });
 
 describe('accountsSelectors', () => {
+    it('selects Bitcoin accounts owned by the active Ledger wallet', () => {
+        const state: AccountsRootState & DeviceRootState = {
+            ...mockState,
+            device: {
+                ...mockState.device,
+                selectedDevice: undefined,
+                externalWallets: [
+                    {
+                        id: 'ledger-wallet',
+                        provider: 'ledger',
+                        label: 'Ledger Flex',
+                        staticSessionId: BTC_DEVICE_SSID,
+                        connected: true,
+                    },
+                ],
+                selectedExternalWalletId: 'ledger-wallet',
+            },
+        };
+
+        expect(selectDeviceAccounts(state)).toEqual([mockState.wallet.accounts[0]]);
+    });
+
     describe(selectAddressByNetworkAndPath.name, () => {
         it('returns unused address for BTC', () => {
             const result = selectAddressByNetworkAndPath(

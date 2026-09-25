@@ -9,11 +9,14 @@ import { Translation } from '@suite/intl';
 import { ContextMessage } from '@suite/message-system';
 import { isRecoveryInProgress } from '@suite/recovery';
 import { useServices } from '@suite-common/dependency-injection';
-import { selectIsDeviceAuthenticityCheckSupported } from '@suite-common/device';
+import {
+    selectIsDeviceAuthenticityCheckSupported,
+    selectSelectedExternalWallet,
+} from '@suite-common/device';
 import { Context } from '@suite-common/message-system';
 import { injectDispatch } from '@suite-common/redux-utils';
 import { getIsDeviceRemembered } from '@suite-common/suite-utils';
-import { Banner } from '@trezor/components';
+import { Banner, Text } from '@trezor/components';
 import { isBitcoinOnlyDevice } from '@trezor/device-utils';
 import {
     GhostIcon,
@@ -89,6 +92,15 @@ export const SettingsDevice = () => {
     const bitcoinOnlyDevice = isBitcoinOnlyDevice(device);
     const shouldShowNoDeviceEshopBanner = useSelector(selectShouldShowNoDeviceEshopSettingsBanner);
     const supportsDeviceAuthentication = useSelector(selectIsDeviceAuthenticityCheckSupported);
+    const selectedExternalWallet = useSelector(selectSelectedExternalWallet);
+
+    if (selectedExternalWallet) {
+        return (
+            <SettingsLayout>
+                <Text>Manage Ledger device settings on your Ledger.</Text>
+            </SettingsLayout>
+        );
+    }
 
     if (noTransportAvailable || deviceSettingsUnavailable(device)) {
         return (

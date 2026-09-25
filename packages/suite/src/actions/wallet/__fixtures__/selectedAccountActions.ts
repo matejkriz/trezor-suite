@@ -46,6 +46,40 @@ type SelectedAccountFixture = {
 
 const selectedAccountFixtures: SelectedAccountFixture[] = [
     {
+        description: 'Selected Ledger wallet loads its Bitcoin account',
+        initialState: {
+            device: {
+                externalWallets: [
+                    {
+                        id: 'ledger-wallet',
+                        provider: 'ledger',
+                        label: 'Ledger Flex',
+                        staticSessionId: DEVICE_STATE,
+                        connected: true,
+                    },
+                ],
+                selectedExternalWalletId: 'ledger-wallet',
+            },
+            router: { app: 'wallet', params: walletParams },
+            wallet: {
+                accounts: [
+                    mockWalletAccount({
+                        symbol: asNetworkSymbol('btc'),
+                        visible: true,
+                        deviceState: DEVICE_STATE,
+                    }),
+                ],
+                settings: { enabledNetworks: ['btc'] },
+            },
+        },
+        action: { type: routerLocationChange.type },
+        result: {
+            status: 'loaded',
+            network: { symbol: 'btc' },
+            params: walletParams,
+        },
+    },
+    {
         description: 'Action ignored',
         initialState: {},
         action: {
