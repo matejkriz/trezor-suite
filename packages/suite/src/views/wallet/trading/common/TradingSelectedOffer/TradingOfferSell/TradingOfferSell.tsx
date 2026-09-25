@@ -2,7 +2,6 @@ import { Fragment, type JSX } from 'react';
 
 import styled from 'styled-components';
 
-import { useDevice } from '@suite/device';
 import {
     selectTradingComposedTransactionInfo,
     selectTradingSellActiveTrade,
@@ -25,6 +24,7 @@ import {
     type TradingSelectedOfferStepperItemProps,
 } from 'src/views/wallet/trading/common/TradingSelectedOffer/TradingSelectedOfferStepper';
 import { TradingWrapper } from 'src/views/wallet/trading/common/TradingWrapper';
+import { useIsTradingWalletConnected } from 'src/views/wallet/trading/common/useIsTradingWalletConnected';
 
 const Wrapper = styled.div`
     ${TradingWrapper}
@@ -38,11 +38,10 @@ export const TradingOfferSell = () => {
     const quotesRequest = useSelector(selectTradingSellQuotesRequest);
     const { composed } = useSelector(selectTradingComposedTransactionInfo);
     const trade = useSelector(selectTradingSellActiveTrade);
-    const { device } = useDevice();
+    const isWalletConnected = useIsTradingWalletConnected();
 
     const sendAccount = accounts.find(account => account.key === trade?.sendAccountKey);
     const selectedTrade = trade?.data ?? selectedQuote;
-    const isDeviceDisconnected = !device?.connected;
 
     if (!selectedTrade) return null;
 
@@ -74,7 +73,7 @@ export const TradingOfferSell = () => {
 
     return (
         <Column gap={16}>
-            {isDeviceDisconnected && <ConnectDeviceGenericPromo />}
+            {!isWalletConnected && <ConnectDeviceGenericPromo />}
 
             <Wrapper data-testid="@trading/selected-offer">
                 <Card>

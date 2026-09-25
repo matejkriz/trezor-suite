@@ -1,4 +1,4 @@
-import { selectSelectedDevice } from '@suite-common/device';
+import { selectSelectedDevice, selectSelectedExternalWallet } from '@suite-common/device';
 import { createThunk } from '@suite-common/redux-utils';
 import { type OpenModalDep } from '@suite-common/suite-types';
 import {
@@ -39,9 +39,11 @@ export const verifyAddressThunk = createThunk<
     `${TRADING_THUNK_PREFIX}/verifyAddress`,
     async ({ account, address, path }, { dispatch, getState, extra }) => {
         const device = selectSelectedDevice(getState());
+        const externalWallet = selectSelectedExternalWallet(getState());
         const activeSection = selectTradingActiveSection(getState());
 
-        if (!device) return;
+        if (!device && !externalWallet) return;
+        if (externalWallet && account.deviceState !== externalWallet.staticSessionId) return;
 
         const accountAddress = getUnusedAddressFromAccount(account);
         address = address ?? accountAddress.address;
@@ -58,10 +60,12 @@ export const verifyAddressThunk = createThunk<
         }
 
         const addressDisplayType = selectAddressDisplayType(getState());
-        const { connected, available } = device;
+        const isConnectedAndAvailable = device
+            ? device.connected && device.available
+            : externalWallet?.connected;
 
         // Show warning when device is not connected
-        if (!connected || !available) {
+        if (!isConnectedAndAvailable) {
             dispatch(
                 extra.actions.openModal({
                     type: 'unverified-address-proceed',

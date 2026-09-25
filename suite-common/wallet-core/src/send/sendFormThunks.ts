@@ -3,7 +3,11 @@ import { isRejected } from '@reduxjs/toolkit';
 
 import { type AnalyticsDep } from '@suite-common/analytics';
 import { Calldata } from '@suite-common/calldata';
-import { type DeviceRootState, selectSelectedDevice } from '@suite-common/device';
+import {
+    type DeviceRootState,
+    selectSelectedDevice,
+    selectSelectedExternalWallet,
+} from '@suite-common/device';
 import {
     type ActionsFromAsyncThunk,
     type WithServices,
@@ -30,6 +34,7 @@ import {
     asAmountSubunit,
     convertAmountSubunitsToUnits,
     convertAmountUnitsToSubunits,
+    datetimeToLocktime,
     formatNetworkAmount,
     getAccountDecimals,
     getEvmTransactionTextSignature,
@@ -88,6 +93,10 @@ import {
     type SignTransactionError,
     type SignTransactionTimeoutError,
 } from './sendFormTypes';
+import {
+    type LedgerBitcoinSigner,
+    signLedgerBitcoinTransaction,
+} from './signLedgerBitcoinTransaction';
 import { accountsActions } from '../accounts/accountsActions';
 import { type AccountsRootState } from '../accounts/accountsReducer';
 import { selectAccountByKey } from '../accounts/accountsSelectors';
@@ -679,19 +688,69 @@ export type SignTransactionThunkState = AccountsRootState &
     TransactionsRootState &
     WalletSettingsRootState;
 
+type SignTransactionThunkDeps = WithServices<{ ledgerBitcoinService: LedgerBitcoinSigner }>;
+
 export const signTransactionThunk = createThunk<
     { serializedTx: string; signedTx?: BlockbookTransaction },
     SignTransactionThunkParams,
     {
         rejectValue: SignTransactionError | SignTransactionTimeoutError | undefined;
         state: SignTransactionThunkState;
+        extra: SignTransactionThunkDeps;
     }
 >(
     `${SEND_MODULE_PREFIX}/signTransactionThunk`,
     async (
         { formState, precomposedTransaction, selectedAccount, paymentRequests },
-        { dispatch, rejectWithValue, getState },
+        { dispatch, rejectWithValue, getState, extra },
     ) => {
+        const externalWallet = selectSelectedExternalWallet(getState());
+
+        if (externalWallet) {
+            if (
+                !externalWallet.connected ||
+                selectedAccount.deviceState !== externalWallet.staticSessionId ||
+                selectedAccount.symbol !== 'btc' ||
+                precomposedTransaction.type !== 'final' ||
+                isCardanoTx(selectedAccount, precomposedTransaction) ||
+                paymentRequests?.length ||
+                formState.rbfParams
+            ) {
+                return rejectWithValue({
+                    error: 'sign-transaction-failed',
+                    message: 'Unsupported Ledger Bitcoin transaction.',
+                });
+            }
+
+            try {
+                let locktime: number | undefined;
+                if (formState.bitcoinLocktimeBlockHeight) {
+                    locktime = new BigNumber(formState.bitcoinLocktimeBlockHeight).toNumber();
+                } else if (formState.bitcoinLocktimeDatetime) {
+                    locktime = datetimeToLocktime(formState.bitcoinLocktimeDatetime);
+                }
+                const serializedTx = await signLedgerBitcoinTransaction({
+                    account: selectedAccount,
+                    transaction: precomposedTransaction,
+                    signer: extra.services.ledgerBitcoinService,
+                    locktime,
+                });
+
+                dispatch(
+                    sendFormActions.storeSignedTransaction({
+                        serializedTx: { tx: serializedTx, symbol: selectedAccount.symbol },
+                    }),
+                );
+
+                return { serializedTx };
+            } catch (error) {
+                return rejectWithValue({
+                    error: 'sign-transaction-failed',
+                    message: error instanceof Error ? error.message : 'Ledger signing failed.',
+                });
+            }
+        }
+
         const device = selectSelectedDevice(getState());
 
         if (!device || precomposedTransaction?.type !== 'final')
@@ -804,7 +863,8 @@ export const enhancePrecomposedTransactionThunk = createThunk<
     ) => {
         const device = selectSelectedDevice(getState());
         const selectedAccountNetwork = getNetwork(selectedAccount.symbol);
-        if (!device) return rejectWithValue('Device not found');
+        if (!device && !selectSelectedExternalWallet(getState()))
+            return rejectWithValue('Device not found');
 
         const createRbfEnhancedTransaction = (): GeneralPrecomposedTransactionFinal => {
             if (!isCardanoTx(selectedAccount, precomposedTransaction) && formValues.rbfParams) {

@@ -2,9 +2,15 @@ import { useWatch } from 'react-hook-form';
 
 import styled from 'styled-components';
 
-import { setConnectionModal, setConnectionMode, useDevice } from '@suite/device';
+import {
+    openConnectionModal,
+    setConnectionModal,
+    setConnectionMode,
+    useDevice,
+} from '@suite/device';
 import { Translation } from '@suite/intl';
 import { useServices } from '@suite-common/dependency-injection';
+import { selectSelectedExternalWallet } from '@suite-common/device';
 import { injectDispatch } from '@suite-common/redux-utils';
 import { selectAreFeesLoading } from '@suite-common/wallet-core';
 import { isLowAnonymityWarning } from '@suite-common/wallet-utils';
@@ -32,6 +38,7 @@ const Container = styled.div`
 
 export const ReviewButton = () => {
     const { device, isLocked } = useDevice();
+    const externalWallet = useSelector(selectSelectedExternalWallet);
     const { dispatch } = useServices(injectDispatch);
     const {
         account: { networkType, symbol },
@@ -54,7 +61,8 @@ export const ReviewButton = () => {
     const areFeesLoading = useSelector(state => selectAreFeesLoading(state, symbol));
     const isLoading = isSendFormLoading || areFeesLoading;
 
-    const isDeviceConnected = device?.connected && device?.available;
+    const isDeviceConnected =
+        (device?.connected && device?.available) || !!externalWallet?.connected;
 
     const options = useWatch({
         name: 'options',
@@ -103,6 +111,11 @@ export const ReviewButton = () => {
 
     const handleButtonReviewClick = () => {
         if (!isDeviceConnected) {
+            if (externalWallet) {
+                dispatch(openConnectionModal('ledger'));
+
+                return;
+            }
             if (device?.descriptor?.apiType === 'bluetooth') {
                 dispatch(setConnectionMode('bluetooth'));
             }

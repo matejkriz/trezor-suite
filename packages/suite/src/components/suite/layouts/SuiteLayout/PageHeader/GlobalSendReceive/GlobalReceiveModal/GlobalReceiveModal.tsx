@@ -7,6 +7,10 @@ import { events, injectDesktopAnalytics } from '@suite/analytics';
 import { selectIsDebugModeActive } from '@suite/debug';
 import { useDevice } from '@suite/device';
 import { useServices } from '@suite-common/dependency-injection';
+import {
+    selectActiveWalletStaticSessionId,
+    selectSelectedExternalWallet,
+} from '@suite-common/device';
 import { selectSupportedNetworkSymbols } from '@suite-common/networks';
 import { type TradingAssetOption } from '@suite-common/trading';
 import { selectAccounts, selectEnabledNetworks } from '@suite-common/wallet-core';
@@ -33,6 +37,8 @@ type GlobalReceiveModalProps = {
 export const GlobalReceiveModal = ({ onCancel, onSubmit }: GlobalReceiveModalProps) => {
     const { analytics } = useServices(injectDesktopAnalytics);
     const { device } = useDevice();
+    const activeWalletStaticSessionId = useSelector(selectActiveWalletStaticSessionId);
+    const externalWallet = useSelector(selectSelectedExternalWallet);
     const { isDiscoveryRunning } = useDiscovery();
     const accountModal = useModal();
     const [activeTab, setActiveTab] = useState<GlobalReceiveTab>('assets');
@@ -46,13 +52,26 @@ export const GlobalReceiveModal = ({ onCancel, onSubmit }: GlobalReceiveModalPro
     const isDebug = useSelector(selectIsDebugModeActive);
     const filledSearch = useSelector(globalSendReceiveFiltersSelectors.filledSearch);
 
-    const { assets, balances, networks, catalogStatus, retry } = useGlobalReceiveAssets();
+    const {
+        assets: catalogAssets,
+        balances,
+        networks,
+        catalogStatus,
+        retry,
+    } = useGlobalReceiveAssets();
+    const assets = useMemo(
+        () =>
+            externalWallet
+                ? catalogAssets.filter(asset => asset.networkSymbol === 'btc')
+                : catalogAssets,
+        [catalogAssets, externalWallet],
+    );
 
     const selectedAsset = useMemo(
         () => assets.find(asset => asset.id === selectedAssetCryptoId),
         [assets, selectedAssetCryptoId],
     );
-    const staticSessionId = device?.state?.staticSessionId;
+    const staticSessionId = activeWalletStaticSessionId;
     const selectedAssetAccounts = useMemo(() => {
         if (!selectedAsset || !staticSessionId) {
             return [];

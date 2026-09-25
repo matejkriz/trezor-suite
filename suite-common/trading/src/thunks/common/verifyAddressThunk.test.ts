@@ -9,7 +9,7 @@ import {
     confirmAddressOnDeviceThunk,
     prepareWalletSettingsReducer,
 } from '@suite-common/wallet-core';
-import { type Account } from '@suite-common/wallet-types';
+import { type Account, createAccountKey } from '@suite-common/wallet-types';
 
 import type { LogErrorThunkProps } from './logErrorThunk';
 import { accounts } from '../../reducers/__fixtures__/account';
@@ -31,13 +31,13 @@ const verifyAddressThunkDeps = {
     },
 };
 
-const createMockStore = () =>
+const createMockStore = (deviceState = deviceInitialState, accountState = accounts) =>
     createTestStore({
         extra: verifyAddressThunkDeps,
         reducer: combineReducers({
-            device: () => deviceInitialState,
+            device: () => deviceState,
             wallet: combineReducers({
-                accounts: () => accounts,
+                accounts: () => accountState,
                 settings: walletSettingsReducer,
                 trading: tradingReducer,
             }),
@@ -69,6 +69,62 @@ jest.mock('../common/logErrorThunk', () => ({
 describe('verifyAddressThunk', () => {
     afterEach(() => {
         jest.clearAllMocks();
+    });
+
+    it('verifies a Bitcoin address when the selected Ledger is connected', async () => {
+        const staticSessionId = 'ledgerwallet@ledger:0';
+        const originalAccount = accounts[0];
+        if (!originalAccount) throw new Error('Missing test fixture');
+        const account: Account = {
+            ...originalAccount,
+            deviceState: staticSessionId,
+            key: createAccountKey({
+                accountDescriptor: originalAccount.descriptor,
+                networkSymbol: originalAccount.symbol,
+                deviceStaticSessionId: staticSessionId,
+            }),
+        };
+        const store = createMockStore(
+            {
+                ...deviceInitialState,
+                selectedExternalWalletId: 'ledgerwallet',
+                externalWallets: [
+                    {
+                        id: 'ledgerwallet',
+                        provider: 'ledger',
+                        label: 'Ledger',
+                        staticSessionId,
+                        connected: true,
+                    },
+                ],
+            },
+            [account],
+        );
+        const firstUnused = account.addresses?.unused[0];
+        if (!firstUnused) throw new Error('Missing Bitcoin receive address fixture');
+
+        (selectSelectedDevice as jest.Mock).mockReturnValue(undefined);
+        (confirmAddressOnDeviceThunk as unknown as jest.Mock).mockImplementation(
+            createThunk('@suite/device/confirmAddressOnDeviceThunk', () => ({
+                success: true,
+                payload: { address: firstUnused.address, path: firstUnused.path },
+            })),
+        );
+
+        await store.dispatch(
+            tradingThunks.verifyAddressThunk({
+                account,
+                address: firstUnused.address,
+                path: firstUnused.path,
+            }),
+        );
+
+        expect(confirmAddressOnDeviceThunk).toHaveBeenCalledWith(
+            expect.objectContaining({ accountKey: account.key, addressPath: firstUnused.path }),
+        );
+        expect(store.getState().wallet.trading.verifiedAddress).toEqual(
+            expect.objectContaining({ address: firstUnused.address }),
+        );
     });
 
     it('should save verified address', async () => {

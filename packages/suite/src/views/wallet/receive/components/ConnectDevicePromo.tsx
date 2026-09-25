@@ -1,9 +1,10 @@
 import { type JSX } from 'react';
 
 import { Translation } from '@suite/intl';
-import { selectSelectedDevice } from '@suite-common/device';
+import { selectSelectedDevice, selectSelectedExternalWallet } from '@suite-common/device';
 import { DEFAULT_FLAGSHIP_MODEL } from '@suite-common/suite-constants';
 import { Banner } from '@trezor/components';
+import { CableUsbCIcon } from '@trezor/icons';
 import { mapTrezorModelToIcon } from '@trezor/product-components';
 
 import { useSelector } from 'src/hooks/suite';
@@ -29,9 +30,20 @@ const ConnectDevicePromo = ({ title, description }: ConnectDevicePromoProps) => 
     );
 };
 
-export const ConnectDeviceGenericPromo = () => (
-    <ConnectDevicePromo
-        title={<Translation id="TR_CONNECT_DEVICE_GENERIC_PROMO_TITLE" />}
-        description={<Translation id="TR_CONNECT_DEVICE_GENERIC_PROMO_DESCRIPTION" />}
-    />
-);
+export const ConnectDeviceGenericPromo = () => {
+    const externalWallet = useSelector(selectSelectedExternalWallet);
+
+    return externalWallet ? (
+        <Banner
+            intent="warning"
+            icon={CableUsbCIcon}
+            title="Connect Ledger"
+            description="Connect and unlock your Ledger to continue."
+        />
+    ) : (
+        <ConnectDevicePromo
+            title={<Translation id="TR_CONNECT_DEVICE_GENERIC_PROMO_TITLE" />}
+            description={<Translation id="TR_CONNECT_DEVICE_GENERIC_PROMO_DESCRIPTION" />}
+        />
+    );
+};

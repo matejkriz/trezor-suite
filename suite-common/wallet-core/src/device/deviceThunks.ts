@@ -19,6 +19,7 @@ import {
     selectNewlyConnectedDeviceThunk,
     selectPhysicalDeviceWallets,
     selectSelectedDevice,
+    selectSelectedExternalWallet,
     shouldDeviceBeRemembered,
     sortDevices,
 } from '@suite-common/device';
@@ -26,6 +27,7 @@ import {
     type FirmwareRootState,
     selectIsFirmwareInstallationRunning,
 } from '@suite-common/firmware';
+import { type LedgerBitcoinService, getLedgerBitcoinAccountPath } from '@suite-common/ledger';
 import {
     type PersistentDeviceDataRootState,
     persistentDeviceDataActions,
@@ -62,6 +64,7 @@ import TrezorConnect, {
     type Device,
     asBluetoothDeviceId,
 } from '@trezor/connect';
+import { validatePath } from '@trezor/connect-common';
 import { exhaustive } from '@trezor/type-utils';
 import { isChanged } from '@trezor/utils';
 
@@ -245,6 +248,11 @@ export const createImportedDeviceThunk = createThunk<
     }
 });
 
+const ledgerAddressError: Awaited<ConnectResponse<Address | CardanoAddress>> = {
+    success: false,
+    error: { message: 'Ledger address verification failed.', code: 'Failure_UnknownCode' },
+};
+
 type ConfirmAddressOnDeviceThunk = {
     accountKey: AccountKey;
     addressPath: string;
@@ -254,18 +262,87 @@ type ConfirmAddressOnDeviceThunk = {
 
 export type ConfirmAddressOnDeviceThunkState = AccountsRootState & DeviceRootState;
 
+export type ConfirmAddressOnDeviceThunkDeps = WithServices<{
+    ledgerBitcoinService: Pick<LedgerBitcoinService, 'verifyAddress'>;
+}>;
+
 export const confirmAddressOnDeviceThunk = createThunk<
-    ConnectResponse<Address | CardanoAddress>,
+    Awaited<ConnectResponse<Address | CardanoAddress>>,
     ConfirmAddressOnDeviceThunk,
-    { state: ConfirmAddressOnDeviceThunkState }
+    { state: ConfirmAddressOnDeviceThunkState; extra: ConfirmAddressOnDeviceThunkDeps }
 >(
     `${DEVICE_MODULE_PREFIX}/confirmAddressOnDeviceThunk`,
     async (
         { accountKey, addressPath, chunkify, showOnTrezor = true },
-        { getState },
-    ): Promise<ConnectResponse<Address | CardanoAddress>> => {
-        const device = selectSelectedDevice(getState());
+        { getState, extra },
+    ): Promise<Awaited<ConnectResponse<Address | CardanoAddress>>> => {
         const account = selectAccountByKey(getState(), accountKey);
+        const externalWallet = selectSelectedExternalWallet(getState());
+
+        if (externalWallet) {
+            if (!account) return ledgerAddressError;
+
+            if (
+                !externalWallet.connected ||
+                account.deviceState !== externalWallet.staticSessionId ||
+                account.symbol !== 'btc' ||
+                account.networkType !== 'bitcoin' ||
+                account.accountType !== 'normal' ||
+                !Number.isSafeInteger(account.index) ||
+                account.index < 0 ||
+                account.index >= 0x80000000 ||
+                account.path !== `m/${getLedgerBitcoinAccountPath(account.index)}`
+            ) {
+                return ledgerAddressError;
+            }
+
+            let path: number[];
+            try {
+                path = validatePath(addressPath, 5);
+            } catch {
+                return ledgerAddressError;
+            }
+
+            const accountPath = validatePath(account.path, 3);
+            const addressIndex = path[4];
+            if (
+                path.length !== 5 ||
+                path[0] !== accountPath[0] ||
+                path[1] !== accountPath[1] ||
+                path[2] !== accountPath[2] ||
+                path[3] !== 0 ||
+                addressIndex === undefined ||
+                !Number.isSafeInteger(addressIndex) ||
+                addressIndex < 0 ||
+                addressIndex >= 0x80000000
+            ) {
+                return ledgerAddressError;
+            }
+
+            const knownAddress = [
+                ...(account.addresses?.used ?? []),
+                ...(account.addresses?.unused ?? []),
+            ].find(item => item.path === addressPath)?.address;
+            if (!knownAddress) return ledgerAddressError;
+
+            try {
+                const verifiedAddress = await extra.services.ledgerBitcoinService.verifyAddress(
+                    account.index,
+                    addressIndex,
+                );
+
+                if (verifiedAddress !== knownAddress) return ledgerAddressError;
+
+                return {
+                    success: true,
+                    payload: { address: verifiedAddress, path, serializedPath: addressPath },
+                };
+            } catch {
+                return ledgerAddressError;
+            }
+        }
+
+        const device = selectSelectedDevice(getState());
 
         if (!device || !account)
             return {

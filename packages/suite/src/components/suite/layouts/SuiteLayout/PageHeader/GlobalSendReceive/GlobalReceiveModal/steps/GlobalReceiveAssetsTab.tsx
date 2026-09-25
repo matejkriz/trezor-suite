@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux';
 
 import { useDevice } from '@suite/device';
 import { Translation, type TranslationKey } from '@suite/intl';
+import { selectSelectedExternalWallet } from '@suite-common/device';
 import { type TradeableAssetBalances, type TradingAssetOption } from '@suite-common/trading';
 import { Button, Column, H4, Link, Paragraph, Row, Skeleton } from '@trezor/components';
 
@@ -95,6 +96,7 @@ export const GlobalReceiveAssetsTab = ({
     );
 
     const { device } = useDevice();
+    const externalWallet = useSelector(selectSelectedExternalWallet);
     const { isDiscoveryRunning } = useDiscovery();
     const assetSearchIndex = useMemo(() => buildGlobalReceiveAssetSearchIndex(assets), [assets]);
     const assetSections = useMemo(
@@ -108,7 +110,10 @@ export const GlobalReceiveAssetsTab = ({
             }),
         [assetSearchIndex, assets, balances, search, selectedNetworkSymbol],
     );
-    const disabledMessage = getAssetDisabledMessage(device?.connected, isDiscoveryRunning);
+    const disabledMessage = getAssetDisabledMessage(
+        device?.connected || externalWallet?.connected,
+        isDiscoveryRunning,
+    );
     const isAssetListEmpty =
         assetSections.assetsWithBalance.length === 0 &&
         assetSections.assetsWithoutBalance.length === 0;

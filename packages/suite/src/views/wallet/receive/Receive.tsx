@@ -2,7 +2,7 @@ import { selectFullSelectedAccount } from '@suite/account';
 import { useDevice } from '@suite/device';
 import { ReceiveContent } from '@suite/receive';
 import { selectIsCoinjoinReceiveWarningHidden } from '@suite/settings';
-import { selectSelectedDevice } from '@suite-common/device';
+import { selectSelectedDevice, selectSelectedExternalWallet } from '@suite-common/device';
 import { Column } from '@trezor/components';
 
 import { FormattedCryptoAmount } from 'src/components/suite';
@@ -15,6 +15,7 @@ import { CoinjoinReceiveWarning } from './components/CoinjoinReceiveWarning';
 export const Receive = () => {
     const selectedAccount = useSelector(selectFullSelectedAccount);
     const device = useSelector(selectSelectedDevice);
+    const externalWallet = useSelector(selectSelectedExternalWallet);
     const isCoinjoinReceiveWarningHidden = useSelector(selectIsCoinjoinReceiveWarningHidden);
 
     const { account } = selectedAccount;
@@ -24,7 +25,7 @@ export const Receive = () => {
         return null;
     }
 
-    if (!device || selectedAccount.status !== 'loaded') {
+    if ((!device && !externalWallet) || selectedAccount.status !== 'loaded') {
         return <WalletLayout title="TR_NAV_RECEIVE" account={selectedAccount} />;
     }
 

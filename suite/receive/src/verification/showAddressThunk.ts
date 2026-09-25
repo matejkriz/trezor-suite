@@ -1,12 +1,13 @@
 import { type SelectedAccountRootState, selectSelectedAccount } from '@suite/account';
 import { type DesktopAnalyticsDep, events } from '@suite/analytics';
-import { setConnectionModal, setConnectionMode } from '@suite/device';
+import { openConnectionModal, setConnectionModal, setConnectionMode } from '@suite/device';
 import { closeModal, preserveModal, removePreserveModal } from '@suite/modal';
 import {
     type DeviceRootState,
     acquireDeviceThunk,
     selectIsDevicePinLocked,
     selectSelectedDevice,
+    selectSelectedExternalWallet,
 } from '@suite-common/device';
 import { type ReceiveRootState, selectCurrentFreshAddress } from '@suite-common/receive';
 import { type Dispatch, type WithServices } from '@suite-common/redux-utils';
@@ -33,9 +34,10 @@ export const showAddressThunk =
         extra: ShowAddressThunkDeps,
     ) => {
         const device = selectSelectedDevice(getState());
+        const externalWallet = selectSelectedExternalWallet(getState());
         const account = selectSelectedAccount(getState());
 
-        if (!device || !account) return;
+        if ((!device && !externalWallet) || !account) return;
 
         const currentFreshAddress = selectCurrentFreshAddress(getState(), account.key);
 
@@ -45,7 +47,13 @@ export const showAddressThunk =
         });
 
         // Verification cannot start without a device, so ask the user to connect one.
-        if (!device.connected || !device.available) {
+        if (externalWallet && !externalWallet.connected) {
+            dispatch(openConnectionModal('ledger'));
+
+            return;
+        }
+
+        if (device && (!device.connected || !device.available)) {
             if (device.descriptor?.apiType === 'bluetooth') {
                 dispatch(setConnectionMode('bluetooth'));
             }
@@ -59,7 +67,7 @@ export const showAddressThunk =
         // makes the device prompt for the PIN. It emits device-change before it resolves, so the
         // status below is already up to date; still locked means the user dismissed the prompt, and
         // acquireDeviceThunk has reported any real failure itself.
-        if (selectIsDevicePinLocked(getState())) {
+        if (device && selectIsDevicePinLocked(getState())) {
             await dispatch(acquireDeviceThunk({ requestedDevice: device }));
 
             if (selectIsDevicePinLocked(getState())) return;
@@ -90,10 +98,12 @@ export const showAddressThunk =
             // address modal afterwards.
             dispatch(closeModal());
 
-            extra.services.analytics.report({
-                type: events.createReceiveAddressConfirmOnTrezorEvent.name,
-                payload: { assetSymbol: account.symbol },
-            });
+            if (device) {
+                extra.services.analytics.report({
+                    type: events.createReceiveAddressConfirmOnTrezorEvent.name,
+                    payload: { assetSymbol: account.symbol },
+                });
+            }
         } else {
             dispatch(closeModal());
             if (

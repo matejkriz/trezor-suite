@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
 
 import { Translation } from '@suite/intl';
 import { useServices } from '@suite-common/dependency-injection';
-import { selectSelectedDevice } from '@suite-common/device';
+import { selectActiveWalletStaticSessionId } from '@suite-common/device';
 import { injectDispatch } from '@suite-common/redux-utils';
 import { sendFormActions } from '@suite-common/wallet-core';
 import { type Account } from '@suite-common/wallet-types';
@@ -49,12 +49,12 @@ export function GlobalSendModal({ onCancel, onSubmit }: GlobalSendModalProps) {
     const networkSymbolFilter = useSelector(globalSendReceiveFiltersSelectors.selectNetworkSymbol);
     const searchFilter = useSelector(globalSendReceiveFiltersSelectors.selectSearch);
     const { expandedGroupKeys, toggleGroup } = useExpandableGroups();
-    const device = useSelector(selectSelectedDevice);
+    const activeWalletStaticSessionId = useSelector(selectActiveWalletStaticSessionId);
 
     const accountsWithTokens = useAccountWithTokensOptions({
         networkSymbolFilter,
         expandedHiddenTokensGroups: expandedGroupKeys,
-        staticSessionId: device?.state?.staticSessionId ?? null,
+        staticSessionId: activeWalletStaticSessionId ?? null,
     });
 
     const filteredAccountsWithTokens = useFilterAccountsWithTokens(
