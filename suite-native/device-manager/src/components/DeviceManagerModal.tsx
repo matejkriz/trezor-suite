@@ -58,6 +58,11 @@ const deviceSwitchWrapperStyle = prepareNativeStyle<{ insets: EdgeInsets }>(
     }),
 );
 
+const footerWrapperStyle = prepareNativeStyle(() => ({
+    position: 'relative',
+    zIndex: 21,
+}));
+
 export const DeviceManagerModal = ({
     children,
     customSwitchRightView,
@@ -122,7 +127,11 @@ export const DeviceManagerModal = ({
                             <Animated.View entering={FadeIn}>{children}</Animated.View>
                         </Animated.View>
                     </Animated.View>
-                    {footer}
+                    {footer && (
+                        <Animated.View style={applyStyle(footerWrapperStyle)}>
+                            {footer}
+                        </Animated.View>
+                    )}
                 </Animated.View>
             </Pressable>
         </Modal>

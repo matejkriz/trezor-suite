@@ -20,7 +20,7 @@ import { injectDispatch } from '@suite-common/redux-utils';
 import { type TrezorDevice } from '@suite-common/suite-types';
 import { selectHasRunningDiscovery } from '@suite-common/wallet-core';
 import { events, injectNativeAnalytics } from '@suite-native/analytics';
-import { AnimatedVStack, Button, VStack } from '@suite-native/atoms';
+import { AnimatedVStack, Box, Button, VStack } from '@suite-native/atoms';
 import { selectShouldFactoryResetBeVisible } from '@suite-native/device';
 import {
     type AppTabsParamList,
@@ -52,6 +52,11 @@ const scrollViewStyle = prepareNativeStyle<{ maxHeight: number }>((utils, { maxH
     maxHeight,
     borderBottomLeftRadius: MANAGER_MODAL_BOTTOM_RADIUS,
     borderBottomRightRadius: MANAGER_MODAL_BOTTOM_RADIUS,
+}));
+
+const footerButtonSurfaceStyle = prepareNativeStyle(utils => ({
+    backgroundColor: utils.colors.surfaceFillRaised,
+    borderRadius: utils.borders.radii.r12,
 }));
 
 type NavigationProp = TabNavigationProp<AppTabsParamList, AppTabsRoutes.HomeStack>;
@@ -122,27 +127,32 @@ export const DeviceManagerContent = () => {
             footer={
                 isLedgerMode ? (
                     <VStack paddingHorizontal="sp16" paddingBottom="sp16">
-                        <Button
-                            intent="neutral"
-                            priority="secondary"
-                            onPress={() => setIsLedgerMode(false)}
-                        >
-                            Back to Trezor devices
-                        </Button>
+                        <Box style={applyStyle(footerButtonSurfaceStyle)}>
+                            <Button
+                                intent="neutral"
+                                priority="secondary"
+                                isFullWidth
+                                onPress={() => setIsLedgerMode(false)}
+                            >
+                                Back to Trezor devices
+                            </Button>
+                        </Box>
                     </VStack>
                 ) : (
                     <VStack spacing="sp12" paddingBottom="sp16">
                         <ConnectButton onSelectDevice={handleSelectDevice} />
                         <VStack paddingHorizontal="sp16">
-                            <Button
-                                intent="neutral"
-                                priority="secondary"
-                                isFullWidth
-                                isDisabled={hasRunningDiscovery}
-                                onPress={() => setIsLedgerMode(true)}
-                            >
-                                Connect Ledger Bitcoin via Bluetooth
-                            </Button>
+                            <Box style={applyStyle(footerButtonSurfaceStyle)}>
+                                <Button
+                                    intent="brand"
+                                    priority="primary"
+                                    isFullWidth
+                                    isDisabled={hasRunningDiscovery}
+                                    onPress={() => setIsLedgerMode(true)}
+                                >
+                                    Connect Ledger
+                                </Button>
+                            </Box>
                         </VStack>
                     </VStack>
                 )
