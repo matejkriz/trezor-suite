@@ -8,11 +8,8 @@ import { createPendingTransaction } from '@trezor/connect-core/src/bitcoin';
 import { BigNumber } from '@trezor/utils';
 import { Transaction } from '@trezor/utxo-lib';
 
-import {
-    type WalletDeviceOperations,
-    type WalletDeviceServiceDeps,
-} from './createWalletDeviceService';
 import { WalletDeviceActionError } from './walletDeviceError';
+import { type WalletDeviceOperations, type WalletDeviceServiceDeps } from './walletDeviceTypes';
 import { signLedgerBitcoinTransaction } from '../send/signLedgerBitcoinTransaction';
 
 type LedgerWalletDeviceOperationsDeps = WalletDeviceServiceDeps;

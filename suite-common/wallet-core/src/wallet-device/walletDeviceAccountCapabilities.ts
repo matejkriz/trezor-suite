@@ -3,7 +3,7 @@ import { type Account } from '@suite-common/wallet-types';
 import {
     type WalletDeviceAccountCapabilities,
     type WalletDeviceOperations,
-} from './createWalletDeviceService';
+} from './walletDeviceTypes';
 
 export const getWalletDeviceAccountCapabilities = (
     operations: WalletDeviceOperations | undefined,
