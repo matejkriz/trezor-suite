@@ -1,4 +1,8 @@
-import { DeviceManagementKitBuilder, type TransportFactory } from '@ledgerhq/device-management-kit';
+import {
+    DeviceManagementKitBuilder,
+    GoToDashboardDeviceAction,
+    type TransportFactory,
+} from '@ledgerhq/device-management-kit';
 import { SignerBtcBuilder } from '@ledgerhq/device-signer-kit-bitcoin';
 
 import { createLedgerBitcoinService } from './createLedgerBitcoinService';
@@ -12,6 +16,11 @@ export const createLedgerBitcoinServiceForTransport = (
 
     return createLedgerBitcoinService({
         dmk,
+        goToDashboard: sessionId =>
+            dmk.executeDeviceAction({
+                sessionId,
+                deviceAction: new GoToDashboardDeviceAction({ input: {} }),
+            }),
         listenToAvailableDevices:
             discoveryMode === 'available' ? () => dmk.listenToAvailableDevices({}) : undefined,
         createSigner: sessionId => new SignerBtcBuilder({ dmk, sessionId }).build(),

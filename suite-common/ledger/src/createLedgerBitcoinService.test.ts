@@ -7,8 +7,12 @@ import {
     DeviceStatus,
     type DiscoveredDevice,
 } from '@ledgerhq/device-management-kit';
-import { type SignerBtc } from '@ledgerhq/device-signer-kit-bitcoin';
-import { EMPTY, NEVER, Subject, of, throwError } from 'rxjs';
+import {
+    type GetExtendedPublicKeyDAReturnType,
+    type GetWalletAddressDAState,
+    type SignerBtc,
+} from '@ledgerhq/device-signer-kit-bitcoin';
+import { EMPTY, NEVER, type ObservedValueOf, Subject, of, throwError } from 'rxjs';
 
 import { createMockDeps } from '@suite-common/dependency-injection';
 
@@ -79,6 +83,11 @@ const createDeps = (
 
     return createMockDeps<LedgerBitcoinServiceDeps>({
         dmk: {
+            sendApdu: () =>
+                Promise.resolve({
+                    data: Buffer.from('My Ledger'),
+                    statusCode: Uint8Array.of(0x90, 0x00),
+                }),
             startDiscovering: () => of(device),
             listenToAvailableDevices: () => of([device]),
             stopDiscovering: () => Promise.resolve(),
@@ -87,6 +96,10 @@ const createDeps = (
             disconnect: () => Promise.resolve(),
             close: () => undefined,
         },
+        goToDashboard: () => ({
+            observable: of({ status: DeviceActionStatus.Completed, output: undefined }),
+            cancel: jest.fn(),
+        }),
         createSigner: () => signer,
         onDisconnect: jest.fn(),
     });
@@ -104,7 +117,7 @@ describe('createLedgerBitcoinService', () => {
             sessionStateType: DeviceSessionStateType.ReadyWithoutSecureChannel,
             deviceStatus: DeviceStatus.CONNECTED,
             deviceModelId: DeviceModelId.NANO_SP,
-            deviceName: 'My Ledger',
+            deviceName: 'Ledger Nano S Plus',
             firmwareVersion: { os: '1.2.3', mcu: '1.0', bootloader: '1.0' },
             currentApp: { name: 'Bitcoin', version: '2.4.0' },
             batteryStatus: { level: 90 },
@@ -120,6 +133,218 @@ describe('createLedgerBitcoinService', () => {
 
         sessionState.next({ deviceStatus: DeviceStatus.NOT_CONNECTED } as DeviceSessionState);
         expect(service.getDeviceInfo()).toBeUndefined();
+    });
+
+    it('derives accounts in Speculos without requiring an OS dashboard', async () => {
+        const deps = createDeps();
+        const service = createLedgerBitcoinService(deps);
+
+        await service.connect({ ...device, transport: 'SPECULOS_HTTP_TRANSPORT' });
+        await expect(service.getAccount(0)).resolves.toMatchObject({ descriptor });
+        expect(deps.goToDashboard).not.toHaveBeenCalled();
+        expect(deps.dmk.sendApdu).not.toHaveBeenCalled();
+    });
+
+    it('does not revive an aborted connection when DMK resolves it after a newer connection', async () => {
+        const deps = createDeps();
+        let finishOldConnection: (session: string) => void = () => undefined;
+        let markConnecting: () => void = () => undefined;
+        const connectingStarted = new Promise<void>(resolve => {
+            markConnecting = resolve;
+        });
+        deps.dmk.connect.mockImplementationOnce(() => {
+            markConnecting();
+
+            return new Promise(resolve => {
+                finishOldConnection = resolve;
+            });
+        });
+        deps.dmk.connect.mockResolvedValueOnce('new-session');
+        const service = createLedgerBitcoinService(deps);
+        const oldConnection = service.connect(device);
+        await connectingStarted;
+        const disconnecting = service.disconnect();
+        const newConnection = service.connect(device);
+
+        finishOldConnection('old-session');
+        await expect(oldConnection).rejects.toThrow('Ledger connection canceled');
+        await disconnecting;
+        await newConnection;
+        expect(deps.dmk.disconnect).toHaveBeenCalledWith({ sessionId: 'old-session' });
+        expect(deps.dmk.disconnect).not.toHaveBeenCalledWith({ sessionId: 'new-session' });
+        await expect(service.getAccount(0)).resolves.toMatchObject({ descriptor });
+    });
+
+    it('cancels the active signer action without disconnecting the session', async () => {
+        const deps = createDeps();
+        const actionState = new Subject<GetWalletAddressDAState>();
+        const cancel = jest.fn(() => actionState.next({ status: DeviceActionStatus.Stopped }));
+        const signer = deps.createSigner('session-1');
+        jest.mocked(signer.getWalletAddress).mockReturnValue({ observable: actionState, cancel });
+        const service = createLedgerBitcoinService(deps);
+        await service.connect(device);
+
+        const verification = service.verifyAddress(0, 0);
+        service.cancelAction();
+        await expect(verification).rejects.toMatchObject({ kind: 'cancelled' });
+        expect(cancel).toHaveBeenCalledTimes(1);
+        expect(deps.dmk.disconnect).not.toHaveBeenCalled();
+    });
+
+    it('keeps the newer acquisition when the old owner settles or cancels late', async () => {
+        const deps = createDeps();
+        let finishOldConnection: (session: string) => void = () => undefined;
+        let markConnecting: () => void = () => undefined;
+        const connectingStarted = new Promise<void>(resolve => {
+            markConnecting = resolve;
+        });
+        deps.dmk.connect.mockImplementationOnce(() => {
+            markConnecting();
+
+            return new Promise(resolve => {
+                finishOldConnection = resolve;
+            });
+        });
+        deps.dmk.connect.mockResolvedValueOnce('new-session');
+        const service = createLedgerBitcoinService(deps);
+        const oldConnection = service.connect(device, { owner: 'old-owner' });
+        await connectingStarted;
+        const newConnection = service.connect(device, { owner: 'new-owner' });
+
+        finishOldConnection('old-session');
+        await expect(oldConnection).rejects.toThrow('Ledger connection canceled');
+        await newConnection;
+        await service.disconnect({ owner: 'old-owner' });
+
+        expect(deps.dmk.disconnect).not.toHaveBeenCalledWith({ sessionId: 'new-session' });
+        expect(service.isConnectionOwner('new-owner')).toBe(true);
+        await expect(service.getAccount(0)).resolves.toMatchObject({ descriptor });
+    });
+
+    it('cleans an obsolete same-device session before reconnecting its shared physical link', async () => {
+        const deps = createDeps();
+        let finishOldConnection: () => void = () => undefined;
+        let markConnecting: () => void = () => undefined;
+        const connectingStarted = new Promise<void>(resolve => {
+            markConnecting = resolve;
+        });
+        const events: string[] = [];
+        const physicalSessions = new Set<string>();
+        deps.dmk.connect.mockImplementationOnce(() => {
+            markConnecting();
+
+            return new Promise<string>(resolve => {
+                finishOldConnection = () => {
+                    physicalSessions.add('old-session');
+                    events.push('connect-old');
+                    resolve('old-session');
+                };
+            });
+        });
+        deps.dmk.connect.mockImplementationOnce(() => {
+            physicalSessions.add('new-session');
+            events.push('connect-new');
+
+            return Promise.resolve('new-session');
+        });
+        deps.dmk.disconnect.mockImplementation(({ sessionId }) => {
+            events.push(`disconnect-${sessionId}`);
+            physicalSessions.clear();
+
+            return Promise.resolve();
+        });
+        const service = createLedgerBitcoinService(deps);
+        const oldConnection = service.connect(device, { owner: 'old-owner' });
+        const oldResult = oldConnection.catch((error: unknown) => error);
+        await connectingStarted;
+        const newConnection = service.connect(device, { owner: 'new-owner' });
+        await Promise.resolve();
+        finishOldConnection();
+        await expect(oldResult).resolves.toMatchObject({ message: 'Ledger connection canceled' });
+        await newConnection;
+
+        expect(physicalSessions.has('new-session')).toBe(true);
+        expect(events).toEqual(['connect-old', 'disconnect-old-session', 'connect-new']);
+        expect(service.isConnectionOwner('new-owner')).toBe(true);
+    });
+
+    it('invalidates acquisition ownership when the current session naturally disconnects', async () => {
+        const deps = createDeps();
+        const sessionState = new Subject<DeviceSessionState>();
+        deps.dmk.getDeviceSessionState.mockReturnValue(sessionState);
+        const service = createLedgerBitcoinService(deps);
+        await service.connect(device, { owner: 'acquisition' });
+        expect(service.isConnectionOwner('acquisition')).toBe(true);
+
+        sessionState.next({ deviceStatus: DeviceStatus.NOT_CONNECTED } as DeviceSessionState);
+
+        expect(service.isConnectionOwner('acquisition')).toBe(false);
+    });
+
+    it('allows replacement while an obsolete dashboard action has not settled', async () => {
+        const deps = createDeps();
+        const dashboardState = new Subject<
+            ObservedValueOf<ReturnType<LedgerBitcoinServiceDeps['goToDashboard']>['observable']>
+        >();
+        let markDashboardRequested: () => void = () => undefined;
+        const dashboardRequested = new Promise<void>(resolve => {
+            markDashboardRequested = resolve;
+        });
+        const cancelDashboard = jest.fn();
+        deps.goToDashboard.mockImplementationOnce(() => {
+            markDashboardRequested();
+
+            return { observable: dashboardState, cancel: cancelDashboard };
+        });
+        const service = createLedgerBitcoinService(deps);
+        const oldConnection = service.connect(device, { owner: 'old-owner' });
+        const oldResult = oldConnection.catch((error: unknown) => error);
+        await dashboardRequested;
+
+        await service.connect(device, { owner: 'new-owner' });
+
+        expect(cancelDashboard).toHaveBeenCalledTimes(1);
+        expect(service.isConnectionOwner('new-owner')).toBe(true);
+        dashboardState.next({ status: DeviceActionStatus.Stopped });
+        await expect(oldResult).resolves.toMatchObject({ kind: 'cancelled' });
+    });
+
+    it('does not continue old account work against a replacement connection', async () => {
+        const deps = createDeps();
+        const actionState = new Subject<
+            ObservedValueOf<GetExtendedPublicKeyDAReturnType['observable']>
+        >();
+        const signer = deps.createSigner('session-1');
+        jest.mocked(signer.getExtendedPublicKey).mockReturnValueOnce({
+            observable: actionState,
+            cancel: jest.fn(),
+        });
+        const service = createLedgerBitcoinService(deps);
+        await service.connect(device);
+        const oldAccount = service.getAccount(0);
+        await service.connect(device);
+
+        actionState.next({ status: DeviceActionStatus.Completed, output: { extendedPublicKey } });
+
+        await expect(oldAccount).rejects.toMatchObject({ kind: 'cancelled' });
+        expect(signer.getWalletAddress).not.toHaveBeenCalled();
+        expect(signer.getMasterFingerprint).not.toHaveBeenCalled();
+    });
+
+    it('preserves a caller timeout while stopping the SDK action', async () => {
+        const deps = createDeps();
+        const actionState = new Subject<GetWalletAddressDAState>();
+        const cancel = jest.fn(() => actionState.next({ status: DeviceActionStatus.Stopped }));
+        const signer = deps.createSigner('session-1');
+        jest.mocked(signer.getWalletAddress).mockReturnValue({ observable: actionState, cancel });
+        const service = createLedgerBitcoinService(deps);
+        await service.connect(device);
+
+        const verification = service.verifyAddress(0, 0);
+        service.cancelAction('timeout');
+        await expect(verification).rejects.toMatchObject({ kind: 'timeout' });
+        expect(cancel).toHaveBeenCalledTimes(1);
+        expect(deps.dmk.disconnect).not.toHaveBeenCalled();
     });
 
     it('clears the signer and reports a physically disconnected Ledger', async () => {
@@ -166,6 +391,18 @@ describe('createLedgerBitcoinService', () => {
         availableDevices.next([device]);
 
         expect(onDevices).not.toHaveBeenCalled();
+    });
+
+    it('stops the underlying available-device scan after its listener unsubscribes', async () => {
+        const deps = createDeps();
+        const service = createLedgerBitcoinService(deps);
+        const stopListening = service.listenToAvailableDevices(jest.fn(), jest.fn());
+        stopListening();
+
+        await service.stopDiscovery();
+        await service.stopDiscovery();
+
+        expect(deps.dmk.stopDiscovering).toHaveBeenCalledTimes(1);
     });
 
     it('uses the supplied device stream when transport discovery emits no devices', () => {
@@ -342,5 +579,40 @@ describe('createLedgerBitcoinService', () => {
         expect(onError).toHaveBeenCalledWith(scanError);
         expect(onDevice).toHaveBeenCalledWith(device);
         expect(deps.dmk.startDiscovering).toHaveBeenCalledTimes(2);
+    });
+
+    it('stops its underlying scan after the observable fails without stopping an unowned scan', async () => {
+        const deps = createDeps();
+        deps.dmk.startDiscovering.mockReturnValueOnce(throwError(() => new Error('Scan failed')));
+        const service = createLedgerBitcoinService(deps);
+        await service.stopDiscovery();
+        expect(deps.dmk.stopDiscovering).not.toHaveBeenCalled();
+
+        service.startDiscovery(jest.fn(), jest.fn());
+        await service.stopDiscovery();
+        await service.stopDiscovery();
+
+        expect(deps.dmk.stopDiscovering).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not stop a newer scan when the previous screen releases its handle', async () => {
+        const deps = createDeps();
+        const firstScan = new Subject<DiscoveredDevice>();
+        const secondScan = new Subject<DiscoveredDevice>();
+        deps.dmk.startDiscovering.mockReturnValueOnce(firstScan).mockReturnValueOnce(secondScan);
+        const service = createLedgerBitcoinService(deps);
+        const onFirstDevice = jest.fn();
+        const onSecondDevice = jest.fn();
+        const stopFirst = service.startDiscovery(onFirstDevice, jest.fn());
+        const stopSecond = service.startDiscovery(onSecondDevice, jest.fn());
+
+        await stopFirst();
+        secondScan.next(device);
+
+        expect(onSecondDevice).toHaveBeenCalledWith(device);
+        expect(onFirstDevice).not.toHaveBeenCalled();
+        expect(deps.dmk.stopDiscovering).not.toHaveBeenCalled();
+        await stopSecond();
+        expect(deps.dmk.stopDiscovering).toHaveBeenCalledTimes(1);
     });
 });

@@ -2,6 +2,8 @@ import type {
     DeviceManagementKit,
     DiscoveredDevice,
     ExecuteDeviceActionReturnType,
+    GoToDashboardDAError,
+    GoToDashboardDAIntermediateValue,
 } from '@ledgerhq/device-management-kit';
 import { DeviceStatus } from '@ledgerhq/device-management-kit';
 import {
@@ -15,7 +17,8 @@ import { type Observable, type Subscription, mergeMap } from 'rxjs';
 import { bip32, deriveAddresses, networks } from '@trezor/utxo-lib';
 
 import { getLedgerBitcoinAccountPath } from './ledgerBitcoinPath';
-import { runLedgerAction } from './runLedgerAction';
+import { readLedgerDeviceName } from './readLedgerDeviceName';
+import { LedgerActionError, runLedgerAction } from './runLedgerAction';
 
 const bitcoinNativeSegwitNetwork = {
     ...networks.bitcoin,
@@ -44,9 +47,17 @@ export type LedgerBitcoinServiceDeps = {
         | 'listenToAvailableDevices'
         | 'stopDiscovering'
         | 'connect'
+        | 'sendApdu'
         | 'getDeviceSessionState'
         | 'disconnect'
         | 'close'
+    >;
+    goToDashboard: (
+        sessionId: string,
+    ) => ExecuteDeviceActionReturnType<
+        void,
+        GoToDashboardDAError,
+        GoToDashboardDAIntermediateValue
     >;
     listenToAvailableDevices?: () => Observable<DiscoveredDevice[]>;
     createSigner: (
@@ -86,41 +97,72 @@ export type LedgerBitcoinService = {
     startDiscovery: (
         onDevice: (device: DiscoveredDevice) => void,
         onError: (error: unknown) => void,
-    ) => void;
+    ) => () => Promise<void>;
     stopDiscovery: () => Promise<void>;
-    connect: (device: DiscoveredDevice) => Promise<void>;
+    connect: (device: DiscoveredDevice, options?: { owner?: string }) => Promise<void>;
+    isConnectionOwner: (owner: string) => boolean;
     getDeviceInfo: () => LedgerDeviceInfo | undefined;
     getMasterFingerprint: () => Promise<string>;
     getAccount: (index: number) => Promise<LedgerBitcoinAccount>;
     verifyAddress: (index: number, addressIndex: number) => Promise<string>;
     signPsbt: (index: number, psbt: string) => Promise<SignPsbtDAOutput>;
     signTransaction: (index: number, psbt: string) => Promise<string>;
-    disconnect: () => Promise<void>;
+    cancelAction: (reason?: 'cancelled' | 'timeout') => void;
+    disconnect: (options?: { owner?: string }) => Promise<void>;
     dispose: () => Promise<void>;
+};
+
+type RunningAction = {
+    cancel: () => void;
+    cancelReason?: 'cancelled' | 'timeout';
 };
 
 export const createLedgerBitcoinService = (
     deps: LedgerBitcoinServiceDeps,
 ): LedgerBitcoinService => {
     let discoverySubscription: Subscription | undefined;
+    let isDiscoveryStarted = false;
+    let discoveryRevision = 0;
     let availableDevicesSubscription: Subscription | undefined;
     let sessionStateSubscription: Subscription | undefined;
     let sessionId: string | undefined;
+    let connectionRevision = 0;
+    let connectionOwner: string | undefined;
     let deviceInfo: LedgerDeviceInfo | undefined;
     let signer: ReturnType<LedgerBitcoinServiceDeps['createSigner']> | undefined;
-    let activeActionCancel: (() => void) | undefined;
+    let activeAction: RunningAction | undefined;
+    let physicalConnectionQueue = Promise.resolve();
 
-    const stopDiscovery = async () => {
-        if (!discoverySubscription) return;
+    const queuePhysicalConnection = <Result>(operation: () => Promise<Result>): Promise<Result> => {
+        const result = physicalConnectionQueue.then(operation);
+        physicalConnectionQueue = result.then(
+            () => undefined,
+            () => undefined,
+        );
 
-        discoverySubscription.unsubscribe();
-        discoverySubscription = undefined;
-        await deps.dmk.stopDiscovering();
+        return result;
     };
 
     const stopAvailableDevicesListening = () => {
         availableDevicesSubscription?.unsubscribe();
         availableDevicesSubscription = undefined;
+    };
+
+    const stopDiscovery = async () => {
+        discoveryRevision++;
+        if (!isDiscoveryStarted) return;
+
+        isDiscoveryStarted = false;
+        discoverySubscription?.unsubscribe();
+        discoverySubscription = undefined;
+        stopAvailableDevicesListening();
+        await deps.dmk.stopDiscovering();
+    };
+
+    const stopOwnedDiscovery = (revision: number) => {
+        if (revision !== discoveryRevision) return Promise.resolve();
+
+        return stopDiscovery();
     };
 
     const getSigner = () => {
@@ -132,8 +174,11 @@ export const createLedgerBitcoinService = (
     const clearSession = () => {
         if (!sessionId) return;
 
-        activeActionCancel?.();
-        activeActionCancel = undefined;
+        if (activeAction) {
+            activeAction.cancelReason = 'cancelled';
+            activeAction.cancel();
+            activeAction = undefined;
+        }
         sessionStateSubscription?.unsubscribe();
         sessionStateSubscription = undefined;
         sessionId = undefined;
@@ -145,14 +190,23 @@ export const createLedgerBitcoinService = (
     const runAction = async <Output, ActionError, IntermediateValue>(
         action: ExecuteDeviceActionReturnType<Output, ActionError, IntermediateValue>,
     ): Promise<Output> => {
-        if (activeActionCancel) throw new Error('Ledger action already in progress');
+        if (activeAction) throw new Error('Ledger action already in progress');
 
-        activeActionCancel = action.cancel;
+        const runningAction: RunningAction = { cancel: action.cancel };
+        const revision = connectionRevision;
+        activeAction = runningAction;
 
         try {
-            return await runLedgerAction(action);
+            const output = await runLedgerAction(action);
+            if (runningAction.cancelReason) throw new LedgerActionError(runningAction.cancelReason);
+            if (revision !== connectionRevision) throw new LedgerActionError('cancelled');
+
+            return output;
+        } catch (error) {
+            if (runningAction.cancelReason) throw new LedgerActionError(runningAction.cancelReason);
+            throw error;
         } finally {
-            if (activeActionCancel === action.cancel) activeActionCancel = undefined;
+            if (activeAction === runningAction) activeAction = undefined;
         }
     };
 
@@ -167,20 +221,31 @@ export const createLedgerBitcoinService = (
         return Array.from(masterFingerprint, byte => byte.toString(16).padStart(2, '0')).join('');
     };
 
-    const disconnect = async () => {
-        stopAvailableDevicesListening();
-        await stopDiscovery();
+    const disconnect: LedgerBitcoinService['disconnect'] = async (options = {}) => {
+        if (options.owner !== undefined && options.owner !== connectionOwner) return;
 
-        if (sessionId) {
-            const previousSessionId = sessionId;
-            clearSession();
-            await deps.dmk.disconnect({ sessionId: previousSessionId });
-        }
+        connectionRevision++;
+        connectionOwner = undefined;
+        stopAvailableDevicesListening();
+        const previousSessionId = sessionId;
+        clearSession();
+
+        await queuePhysicalConnection(async () => {
+            try {
+                await stopDiscovery();
+            } finally {
+                if (previousSessionId) {
+                    await deps.dmk.disconnect({ sessionId: previousSessionId });
+                }
+            }
+        });
     };
 
     return {
         listenToAvailableDevices(onDevices, onError) {
             stopAvailableDevicesListening();
+            const revision = ++discoveryRevision;
+            isDiscoveryStarted = true;
 
             const subscription = deps.dmk.listenToAvailableDevices({}).subscribe({
                 next: onDevices,
@@ -193,11 +258,15 @@ export const createLedgerBitcoinService = (
                 if (availableDevicesSubscription === subscription) {
                     availableDevicesSubscription = undefined;
                 }
+                void stopOwnedDiscovery(revision).catch(() => undefined);
             };
         },
         startDiscovery(onDevice, onError) {
-            if (discoverySubscription && !discoverySubscription.closed) return;
+            const revision = ++discoveryRevision;
+            discoverySubscription?.unsubscribe();
+            discoverySubscription = undefined;
 
+            isDiscoveryStarted = true;
             const devices$ = deps.listenToAvailableDevices
                 ? deps.listenToAvailableDevices().pipe(mergeMap(devices => devices))
                 : deps.dmk.startDiscovering({});
@@ -212,67 +281,115 @@ export const createLedgerBitcoinService = (
                 },
             });
             discoverySubscription = subscription.closed ? undefined : subscription;
+
+            return () => stopOwnedDiscovery(revision);
         },
         stopDiscovery,
-        async connect(device) {
+        async connect(device, options = {}) {
+            const revision = ++connectionRevision;
+            connectionOwner = options.owner;
             stopAvailableDevicesListening();
-            await stopDiscovery();
+            const previousSessionId = sessionId;
+            clearSession();
 
-            if (sessionId) {
-                const previousSessionId = sessionId;
-                clearSession();
-                await deps.dmk.disconnect({ sessionId: previousSessionId });
+            const connectedSessionId = await queuePhysicalConnection(async () => {
+                try {
+                    await stopDiscovery();
+                } finally {
+                    if (previousSessionId) {
+                        await deps.dmk.disconnect({ sessionId: previousSessionId });
+                    }
+                }
+
+                if (revision !== connectionRevision) throw new Error('Ledger connection canceled');
+                const newSessionId = await deps.dmk.connect({ device });
+                if (revision !== connectionRevision) {
+                    await deps.dmk.disconnect({ sessionId: newSessionId });
+                    throw new Error('Ledger connection canceled');
+                }
+                sessionId = newSessionId;
+                deviceInfo = { name: 'Ledger', model: device.deviceModel.name };
+                signer = deps.createSigner(sessionId);
+                const handleSessionEnd = () => {
+                    if (sessionId !== newSessionId) return;
+
+                    if (revision === connectionRevision) {
+                        connectionRevision++;
+                        connectionOwner = undefined;
+                    }
+                    clearSession();
+                };
+                const subscription = deps.dmk
+                    .getDeviceSessionState({
+                        sessionId: newSessionId,
+                    })
+                    .subscribe({
+                        next: state => {
+                            if (sessionId !== newSessionId) return;
+
+                            if (state.deviceStatus === DeviceStatus.NOT_CONNECTED) {
+                                handleSessionEnd();
+
+                                return;
+                            }
+
+                            const info = deviceInfo;
+                            if (!info) return;
+
+                            deviceInfo = {
+                                ...info,
+                                ...('firmwareVersion' in state && state.firmwareVersion
+                                    ? { osVersion: state.firmwareVersion.os }
+                                    : {}),
+                                ...('currentApp' in state && state.currentApp.name === 'Bitcoin'
+                                    ? { bitcoinAppVersion: state.currentApp.version }
+                                    : {}),
+                                ...('batteryStatus' in state && state.batteryStatus
+                                    ? { batteryLevel: state.batteryStatus.level }
+                                    : {}),
+                            };
+                        },
+                        error: handleSessionEnd,
+                        complete: handleSessionEnd,
+                    });
+                if (revision === connectionRevision && sessionId === newSessionId) {
+                    sessionStateSubscription = subscription.closed ? undefined : subscription;
+                } else {
+                    subscription.unsubscribe();
+                }
+
+                return newSessionId;
+            });
+            if (revision !== connectionRevision || sessionId !== connectedSessionId) {
+                throw new Error('Ledger connection canceled');
             }
 
-            sessionId = await deps.dmk.connect({ device });
-            deviceInfo = { name: device.name, model: device.deviceModel.name };
-            signer = deps.createSigner(sessionId);
-            const connectedSessionId = sessionId;
-            const subscription = deps.dmk
-                .getDeviceSessionState({
-                    sessionId: connectedSessionId,
-                })
-                .subscribe({
-                    next: state => {
-                        if (state.deviceStatus === DeviceStatus.NOT_CONNECTED) {
-                            clearSession();
-
-                            return;
-                        }
-
-                        const info = deviceInfo;
-                        if (!info) return;
-
-                        deviceInfo = {
-                            ...info,
-                            name: state.deviceName || info.name,
-                            ...('firmwareVersion' in state && state.firmwareVersion
-                                ? { osVersion: state.firmwareVersion.os }
-                                : {}),
-                            ...('currentApp' in state && state.currentApp.name === 'Bitcoin'
-                                ? { bitcoinAppVersion: state.currentApp.version }
-                                : {}),
-                            ...('batteryStatus' in state && state.batteryStatus
-                                ? { batteryLevel: state.batteryStatus.level }
-                                : {}),
-                        };
-                    },
-                    error: () => {
-                        if (sessionId === connectedSessionId) clearSession();
-                    },
-                    complete: () => {
-                        if (sessionId === connectedSessionId) clearSession();
-                    },
-                });
-            sessionStateSubscription = subscription.closed ? undefined : subscription;
+            // Speculos runs an application ELF without the device OS/dashboard.
+            if (device.transport !== 'SPECULOS_HTTP_TRANSPORT') {
+                await runAction(deps.goToDashboard(connectedSessionId));
+                if (revision !== connectionRevision) throw new Error('Ledger connection canceled');
+                const name = await readLedgerDeviceName(deps, connectedSessionId);
+                if (revision !== connectionRevision) throw new Error('Ledger connection canceled');
+                if (sessionId !== connectedSessionId || !deviceInfo) {
+                    throw new Error('Ledger disconnected while reading device information');
+                }
+                deviceInfo = { ...deviceInfo, name: name ?? 'Ledger' };
+            }
         },
+        isConnectionOwner: owner => owner === connectionOwner,
         getDeviceInfo: () => deviceInfo,
         async getAccount(index) {
             const bitcoinSigner = getSigner();
+            const revision = connectionRevision;
+            const ensureCurrentConnection = () => {
+                if (revision !== connectionRevision) throw new LedgerActionError('cancelled');
+            };
             const path = getLedgerBitcoinAccountPath(index);
             const wallet = new DefaultWallet(path, DefaultDescriptorTemplate.NATIVE_SEGWIT);
             const { extendedPublicKey } = await runAction(bitcoinSigner.getExtendedPublicKey(path));
+            ensureCurrentConnection();
             const { address } = await runAction(bitcoinSigner.getWalletAddress(wallet, 0));
+            ensureCurrentConnection();
             const descriptor = getNativeSegwitDescriptor(extendedPublicKey);
             const derivedAddress = deriveAddresses(descriptor, 'receive', 0, 1)[0]?.address;
 
@@ -281,6 +398,7 @@ export const createLedgerBitcoinService = (
             }
 
             const masterFingerprint = await getMasterFingerprint();
+            ensureCurrentConnection();
 
             return { path, extendedPublicKey, descriptor, masterFingerprint, address };
         },
@@ -326,6 +444,12 @@ export const createLedgerBitcoinService = (
             return serializedTransaction.slice(2);
         },
         disconnect,
+        cancelAction: (reason = 'cancelled') => {
+            if (!activeAction) return;
+
+            activeAction.cancelReason = reason;
+            activeAction.cancel();
+        },
         async dispose() {
             try {
                 await disconnect();

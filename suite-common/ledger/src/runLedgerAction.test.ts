@@ -41,6 +41,35 @@ describe('runLedgerAction', () => {
             cancel: jest.fn(),
         };
 
-        await expect(runLedgerAction(action)).rejects.toThrow('Ledger action stopped');
+        await expect(runLedgerAction(action)).rejects.toMatchObject({ kind: 'cancelled' });
+    });
+
+    it.each([
+        ['RefusedByUserDAError', 'rejected'],
+        ['SendApduTimeoutError', 'timeout'],
+        ['SendCommandTimeoutError', 'timeout'],
+    ])('classifies %s without exposing its original error', async (tag, kind) => {
+        const action = {
+            observable: of({
+                status: DeviceActionStatus.Error as const,
+                error: { _tag: tag, originalError: new Error('private-device-value') },
+            }),
+            cancel: jest.fn(),
+        };
+
+        await expect(runLedgerAction(action)).rejects.toMatchObject({ kind });
+        await expect(runLedgerAction(action)).rejects.not.toHaveProperty('originalError');
+    });
+
+    it('classifies Bitcoin app user rejection by its status code', async () => {
+        const action = {
+            observable: of({
+                status: DeviceActionStatus.Error as const,
+                error: { _tag: 'DeviceExchangeError', errorCode: '6985' },
+            }),
+            cancel: jest.fn(),
+        };
+
+        await expect(runLedgerAction(action)).rejects.toMatchObject({ kind: 'rejected' });
     });
 });
