@@ -238,21 +238,18 @@ export const __btcUnknownTxDebug__ = (
             addr => accountAddressPaths.has(getSerializedPath(addr)),
         );
 
-        const toReadable = (address_n: number[]) =>
-            `${address_n[address_n.length - 2] ? 'change' : 'receive'}/${address_n[address_n.length - 1]}`;
-
         if (unmatched.length) {
             // [btc-unknown-tx-debug] the selected account does not contain paths used by the tx inputs.
             // This can make Connect build a pending tx with wrong or empty vin addresses, which can then
             // classify the optimistic pending tx incorrectly before the backend response arrives.
             // Intentionally no paths / addresses / descriptor / txid: these reach Sentry and could
-            // deanonymize the user. accountType + symbol are low-cardinality, non-PII.
+            // deanonymize the user. Report only aggregate counts.
             console.error(`[btc-unknown-tx-debug-v2] ${description}`, {
                 knownUsedCount: addresses?.used.length,
                 knownUnusedCount: addresses?.unused.length,
                 knownChangeCount: addresses?.change.length,
-                matchedInputs: matched.map(toReadable),
-                unmatchedInputs: unmatched.map(toReadable),
+                matchedInputsCount: matched.length,
+                unmatchedInputsCount: unmatched.length,
             });
         }
     } catch {
