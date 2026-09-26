@@ -100,12 +100,42 @@ const createDeps = (
             observable: of({ status: DeviceActionStatus.Completed, output: undefined }),
             cancel: jest.fn(),
         }),
+        openAccountsDiscoveryApp: () => ({
+            observable: of({ status: DeviceActionStatus.Completed, output: undefined }),
+            cancel: jest.fn(),
+        }),
         createSigner: () => signer,
         onDisconnect: jest.fn(),
     });
 };
 
 describe('createLedgerBitcoinService', () => {
+    it('opens multi-network discovery without using the Bitcoin signer', async () => {
+        const deps = createDeps();
+        const service = createLedgerBitcoinService(deps);
+        await service.connect(device);
+        deps.dmk.sendApdu
+            .mockResolvedValueOnce({
+                data: Uint8Array.from([65, 68, 1, 0, 1, 0, 1, 3, 2, 3, 15]),
+                statusCode: Uint8Array.from([0x90, 0]),
+            })
+            .mockResolvedValueOnce({
+                data: new Uint8Array(),
+                statusCode: Uint8Array.from([0x90, 0]),
+            });
+
+        const discovery = await service.openAccountsDiscovery();
+
+        expect((await discovery.getInfo()).profiles).toEqual([3, 15]);
+        expect(deps.openAccountsDiscoveryApp).toHaveBeenCalledWith('session-1');
+        expect(
+            deps.createSigner.mock.results[0]?.value.getExtendedPublicKey,
+        ).not.toHaveBeenCalled();
+        await service.disconnect();
+        await expect(discovery.readPublicKeys([{ profile: 3, account: 0 }])).rejects.toThrow(
+            'connection',
+        );
+    });
     it('exposes device details reported by the connected Ledger session', async () => {
         const deps = createDeps();
         const sessionState = new Subject<DeviceSessionState>();

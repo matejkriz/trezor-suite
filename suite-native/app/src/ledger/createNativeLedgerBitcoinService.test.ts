@@ -27,6 +27,7 @@ const prepareTest = () => {
             getDeviceInfo: () => undefined,
             getMasterFingerprint: null,
             getAccount: null,
+            openAccountsDiscovery: null,
             verifyAddress: null,
             signPsbt: null,
             signTransaction: null,

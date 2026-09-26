@@ -4,6 +4,8 @@ import type {
     ExecuteDeviceActionReturnType,
     GoToDashboardDAError,
     GoToDashboardDAIntermediateValue,
+    OpenAppDAError,
+    OpenAppDAIntermediateValue,
 } from '@ledgerhq/device-management-kit';
 import { DeviceStatus } from '@ledgerhq/device-management-kit';
 import {
@@ -16,6 +18,10 @@ import { type Observable, type Subscription, mergeMap } from 'rxjs';
 
 import { bip32, deriveAddresses, networks } from '@trezor/utxo-lib';
 
+import {
+    type LedgerAccountsDiscoveryService,
+    createLedgerAccountsDiscoveryService,
+} from './createLedgerAccountsDiscoveryService';
 import { getLedgerBitcoinAccountPath } from './ledgerBitcoinPath';
 import { readLedgerDeviceName } from './readLedgerDeviceName';
 import { LedgerActionError, runLedgerAction } from './runLedgerAction';
@@ -59,6 +65,9 @@ export type LedgerBitcoinServiceDeps = {
         GoToDashboardDAError,
         GoToDashboardDAIntermediateValue
     >;
+    openAccountsDiscoveryApp: (
+        sessionId: string,
+    ) => ExecuteDeviceActionReturnType<void, OpenAppDAError, OpenAppDAIntermediateValue>;
     listenToAvailableDevices?: () => Observable<DiscoveredDevice[]>;
     createSigner: (
         sessionId: string,
@@ -104,6 +113,7 @@ export type LedgerBitcoinService = {
     getDeviceInfo: () => LedgerDeviceInfo | undefined;
     getMasterFingerprint: () => Promise<string>;
     getAccount: (index: number) => Promise<LedgerBitcoinAccount>;
+    openAccountsDiscovery: () => Promise<LedgerAccountsDiscoveryService>;
     verifyAddress: (index: number, addressIndex: number) => Promise<string>;
     signPsbt: (index: number, psbt: string) => Promise<SignPsbtDAOutput>;
     signTransaction: (index: number, psbt: string) => Promise<string>;
@@ -129,6 +139,7 @@ export const createLedgerBitcoinService = (
     let connectionRevision = 0;
     let connectionOwner: string | undefined;
     let deviceInfo: LedgerDeviceInfo | undefined;
+    let isEmulated = false;
     let signer: ReturnType<LedgerBitcoinServiceDeps['createSigner']> | undefined;
     let activeAction: RunningAction | undefined;
     let physicalConnectionQueue = Promise.resolve();
@@ -287,6 +298,7 @@ export const createLedgerBitcoinService = (
         stopDiscovery,
         async connect(device, options = {}) {
             const revision = ++connectionRevision;
+            isEmulated = device.transport === 'SPECULOS_HTTP_TRANSPORT';
             connectionOwner = options.owner;
             stopAvailableDevicesListening();
             const previousSessionId = sessionId;
@@ -378,6 +390,18 @@ export const createLedgerBitcoinService = (
         },
         isConnectionOwner: owner => owner === connectionOwner,
         getDeviceInfo: () => deviceInfo,
+        async openAccountsDiscovery() {
+            const connectedSessionId = sessionId;
+            const revision = connectionRevision;
+            if (!connectedSessionId) throw new Error('Ledger device is not connected');
+            if (!isEmulated) await runAction(deps.openAccountsDiscoveryApp(connectedSessionId));
+            if (revision !== connectionRevision) throw new LedgerActionError('cancelled');
+
+            return createLedgerAccountsDiscoveryService({
+                dmk: deps.dmk,
+                getSessionId: () => (revision === connectionRevision ? sessionId : undefined),
+            });
+        },
         async getAccount(index) {
             const bitcoinSigner = getSigner();
             const revision = connectionRevision;

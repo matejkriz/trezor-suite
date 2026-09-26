@@ -53,6 +53,7 @@ const prepareTest = () => {
                 listenToAvailableDevices: null,
                 startDiscovery: null,
                 getMasterFingerprint: null,
+                openAccountsDiscovery: null,
                 verifyAddress: null,
                 signPsbt: null,
                 signTransaction: null,

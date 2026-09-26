@@ -54,6 +54,7 @@ const renderScreen = async (
             isConnectionOwner: null,
             getDeviceInfo: null,
             getMasterFingerprint: null,
+            openAccountsDiscovery: null,
             getAccount: null,
             verifyAddress: null,
             signPsbt: null,

@@ -1,6 +1,7 @@
 import {
     DeviceManagementKitBuilder,
     GoToDashboardDeviceAction,
+    OpenAppDeviceAction,
     type TransportFactory,
 } from '@ledgerhq/device-management-kit';
 import { SignerBtcBuilder } from '@ledgerhq/device-signer-kit-bitcoin';
@@ -20,6 +21,11 @@ export const createLedgerBitcoinServiceForTransport = (
             dmk.executeDeviceAction({
                 sessionId,
                 deviceAction: new GoToDashboardDeviceAction({ input: {} }),
+            }),
+        openAccountsDiscoveryApp: sessionId =>
+            dmk.executeDeviceAction({
+                sessionId,
+                deviceAction: new OpenAppDeviceAction({ input: { appName: 'Accounts Discovery' } }),
             }),
         listenToAvailableDevices:
             discoveryMode === 'available' ? () => dmk.listenToAvailableDevices({}) : undefined,
