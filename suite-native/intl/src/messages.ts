@@ -527,6 +527,12 @@ export const messages = {
         discovering: 'Loading your Bitcoin accounts...',
         instructions:
             'Turn on Bluetooth on your Ledger and unlock it. Confirm opening the Bitcoin app when prompted.',
+        accountsDiscovery: 'Use Accounts Discovery',
+        accountsDiscoveryInstructions:
+            'Turn on Bluetooth and unlock your Ledger. Accounts Discovery must be installed. Confirm opening it and approve exporting public account data. Suite checks supported enabled networks. This app cannot sign transactions.',
+        accountsDiscoveryStatus: 'Discovering enabled networks...',
+        accountsDiscoveryError:
+            'Could not discover your Ledger accounts. Check that Accounts Discovery is installed and approve the public account export on your Ledger.',
         permission: 'Allow Bluetooth access to connect your Ledger.',
         permissionButton: 'Allow Bluetooth',
         blockedPermission: 'Enable Bluetooth access for Suite in system settings.',
@@ -2131,6 +2137,8 @@ export const messages = {
             errorMessage: 'Token not found.',
         },
         accountDetail: {
+            discoveryOnly:
+                'Public account discovery only. Sending and on-device address verification are unavailable for this account.',
             stablecoinYield: {
                 defiYieldInfoText:
                     'This token represents your position in the vault. It grows in value as yield accrues.',

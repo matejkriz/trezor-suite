@@ -17,7 +17,10 @@ export const ConnectLedgerScreen = () => {
     useInterceptNativeNavigation({ onPress: handleClose });
 
     return (
-        <Screen header={<ScreenHeader closeAction={handleClose} closeActionType="close" />}>
+        <Screen
+            header={<ScreenHeader closeAction={handleClose} closeActionType="close" />}
+            isScrollable
+        >
             <ConnectLedgerDeviceScreenContent onConnected={handleClose} />
         </Screen>
     );

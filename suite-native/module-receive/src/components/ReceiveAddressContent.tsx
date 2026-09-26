@@ -7,6 +7,11 @@ import { useServices } from '@suite-common/dependency-injection';
 import { selectIsPortfolioTrackerDevice } from '@suite-common/device';
 import { selectCurrentFreshAddress } from '@suite-common/receive';
 import { injectDispatch } from '@suite-common/redux-utils';
+import {
+    type AccountsRootState,
+    selectAccountByKey,
+    useWalletDeviceAccountCapabilities,
+} from '@suite-common/wallet-core';
 import { type AccountKey, type TokenAddress } from '@suite-common/wallet-types';
 import { ErrorMessage, ScreenFooterGradient, VStack } from '@suite-native/atoms';
 import { selectHasFirmwareAuthenticityCheckHardFailedForSelectedDevice } from '@suite-native/device';
@@ -56,6 +61,11 @@ export const ReceiveAddressContent = ({
         selectHasFirmwareAuthenticityCheckHardFailedForSelectedDevice,
     );
     const isPortfolioTrackerDevice = useSelector(selectIsPortfolioTrackerDevice);
+    const account = useSelector((state: AccountsRootState) =>
+        selectAccountByKey(state, accountKey),
+    );
+    const { canConfirmAddress } = useWalletDeviceAccountCapabilities(account);
+    const isDeviceVerificationEnabled = !isPortfolioTrackerDevice && canConfirmAddress;
     const hasInitializedCurrentFreshAddress = initializedAccountKey === accountKey;
 
     if (hasFirmwareAuthenticityCheckHardFailed) {
@@ -77,7 +87,7 @@ export const ReceiveAddressContent = ({
             accountKey={accountKey}
             address={currentFreshAddress.address}
             addressPath={currentFreshAddress.path}
-            isDeviceVerificationEnabled={!isPortfolioTrackerDevice}
+            isDeviceVerificationEnabled={isDeviceVerificationEnabled}
         >
             <Screen
                 header={
@@ -93,7 +103,7 @@ export const ReceiveAddressContent = ({
                         <VStack paddingHorizontal="sp16" paddingTop="sp8" paddingBottom="sp16">
                             <ReceiveAddressActions
                                 address={currentFreshAddress.address}
-                                isDeviceVerificationEnabled={!isPortfolioTrackerDevice}
+                                isDeviceVerificationEnabled={isDeviceVerificationEnabled}
                             />
                         </VStack>
                     </>

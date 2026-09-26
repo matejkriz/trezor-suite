@@ -3,11 +3,14 @@ import { Linking } from 'react-native';
 import { DeviceModel, DeviceModelId } from '@ledgerhq/device-management-kit';
 
 import { createMockDeps } from '@suite-common/dependency-injection';
+import { type LedgerSuiteDevice } from '@suite-common/device';
 import { type LedgerBitcoinServiceDep, type LedgerDevice } from '@suite-common/ledger';
+import { mockSuiteDevice } from '@suite-common/suite-types/mocks';
 import { connectLedgerBitcoinWalletThunk } from '@suite-common/wallet-core';
 import { type BluetoothPermissionStatus } from '@suite-native/bluetooth';
 import { getTranslation } from '@suite-native/intl';
 import { act, fireEvent, renderWithStoreProvider, waitFor } from '@suite-native/test-utils-store';
+import { type StaticSessionId } from '@trezor/connect';
 
 import { ConnectLedgerDeviceScreenContent } from './ConnectLedgerDeviceScreenContent';
 
@@ -44,6 +47,7 @@ const device: LedgerDevice = {
 const renderScreen = async (
     permissionStatus: BluetoothPermissionStatus = 'granted',
     expectedDeviceId?: string,
+    selectedDevice?: LedgerSuiteDevice,
 ) => {
     const deps = createMockDeps<LedgerBitcoinServiceDep>({
         ledgerBitcoinService: {
@@ -54,8 +58,8 @@ const renderScreen = async (
             isConnectionOwner: null,
             getDeviceInfo: null,
             getMasterFingerprint: null,
-            openAccountsDiscovery: null,
             getAccount: null,
+            openAccountsDiscovery: null,
             verifyAddress: null,
             signPsbt: null,
             signTransaction: null,
@@ -71,7 +75,10 @@ const renderScreen = async (
             expectedDeviceId={expectedDeviceId}
         />,
         {
-            preloadedState: { bluetooth: { permissionStatus } },
+            preloadedState: {
+                bluetooth: { permissionStatus },
+                device: { devices: [], selectedDevice },
+            },
             services: deps,
         },
     );
@@ -100,6 +107,7 @@ describe('ConnectLedgerDeviceScreenContent', () => {
             device,
             apiType: 'bluetooth',
             expectedDeviceId: undefined,
+            useAccountsDiscovery: false,
         });
         await waitFor(() => expect(mockGoBack).toHaveBeenCalledTimes(1));
         expect(service.connect).not.toHaveBeenCalled();
@@ -121,6 +129,57 @@ describe('ConnectLedgerDeviceScreenContent', () => {
             device,
             apiType: 'bluetooth',
             expectedDeviceId: 'remembered-ledger-wallet',
+            useAccountsDiscovery: false,
+        });
+    });
+
+    it('uses the installed Accounts Discovery app only after opting in', async () => {
+        const { service, getByTestId, getByText } = await renderScreen();
+
+        await fireEvent.press(getByTestId('@connect-ledger/accounts-discovery'));
+        expect(
+            getByText(getTranslation('moduleConnectLedger.accountsDiscoveryInstructions')),
+        ).toBeTruthy();
+        await act(() => service.startDiscovery.mock.calls[0]?.[0](device));
+        await fireEvent.press(getByTestId('@connect-ledger/device'));
+
+        expect(connectLedgerBitcoinWalletThunk).toHaveBeenCalledWith({
+            device,
+            apiType: 'bluetooth',
+            expectedDeviceId: undefined,
+            useAccountsDiscovery: true,
+        });
+    });
+
+    it('restores Accounts Discovery mode when reconnecting that remembered wallet', async () => {
+        const selectedDevice = mockSuiteDevice();
+        if (selectedDevice.type !== 'acquired') throw new Error('Expected acquired fixture');
+        const ledgerDevice: LedgerSuiteDevice = {
+            ...selectedDevice,
+            provider: 'ledger',
+            id: 'remembered-ledger-wallet',
+            state: {
+                staticSessionId: 'remembered-ledger-wallet' as StaticSessionId,
+            },
+            ledgerInfo: { model: 'Ledger Flex', accountsDiscoveryAppVersion: '1.0.0' },
+        };
+        const { service, getByText, getByTestId } = await renderScreen(
+            'granted',
+            ledgerDevice.id,
+            ledgerDevice,
+        );
+
+        expect(
+            getByText(getTranslation('moduleConnectLedger.accountsDiscoveryInstructions')),
+        ).toBeTruthy();
+        await act(() => service.startDiscovery.mock.calls[0]?.[0](device));
+        await fireEvent.press(getByTestId('@connect-ledger/device'));
+
+        expect(connectLedgerBitcoinWalletThunk).toHaveBeenCalledWith({
+            device,
+            apiType: 'bluetooth',
+            expectedDeviceId: ledgerDevice.id,
+            useAccountsDiscovery: true,
         });
     });
 

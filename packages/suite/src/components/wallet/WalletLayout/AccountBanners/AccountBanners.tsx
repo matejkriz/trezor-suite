@@ -6,8 +6,9 @@ import {
     isSupportedEthStakingNetworkSymbol,
     isSupportedSolStakingNetworkSymbol,
     isSupportedTronStakingNetworkSymbol,
+    useWalletDeviceAccountCapabilities,
 } from '@suite-common/wallet-core';
-import { Column } from '@trezor/components';
+import { Banner, Column } from '@trezor/components';
 
 import { useSelector } from 'src/hooks/suite';
 import { type Account } from 'src/types/wallet';
@@ -30,9 +31,18 @@ type AccountBannersProps = {
 
 export const AccountBanners = ({ account }: AccountBannersProps) => {
     const { route } = useSelector(selectRouter);
+    const { canSignTransaction } = useWalletDeviceAccountCapabilities(account);
 
     return (
         <Column gap={12}>
+            {account && !canSignTransaction && (
+                <Banner
+                    intent="info"
+                    icon
+                    title="Public account discovery only"
+                    description="Sending and on-device address verification are unavailable for this account."
+                />
+            )}
             {account?.symbol &&
                 isSupportedEthStakingNetworkSymbol(account.symbol) &&
                 route?.name === 'wallet-staking' && (
@@ -63,7 +73,7 @@ export const AccountBanners = ({ account }: AccountBannersProps) => {
             <TaprootBanner account={account} />
             <CardanoLegacyBanner account={account} />
             {account?.networkType === 'stellar' && <StellarLimitedHistoryBanner />}
-            {account?.symbol && <StakingBanner account={account} />}
+            {account?.symbol && canSignTransaction && <StakingBanner account={account} />}
             {account?.symbol && account?.accountType && (
                 <ContextMessage
                     context={[

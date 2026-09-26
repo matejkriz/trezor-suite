@@ -1,14 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useSelector } from 'react-redux';
 
 import { useFocusEffect } from '@react-navigation/native';
 import { FlashList } from '@shopify/flash-list';
 
 import { events as sharedEvents } from '@suite-common/analytics';
 import { useServices } from '@suite-common/dependency-injection';
+import { selectSelectedDevice } from '@suite-common/device';
 import { Context } from '@suite-common/message-system';
+import {
+    getWalletDeviceAccountCapabilities,
+    injectWalletDeviceService,
+    selectVisibleDeviceAccounts,
+} from '@suite-common/wallet-core';
+import { isStakingSymbol } from '@suite-common/wallet-utils';
 import { events, injectNativeAnalytics } from '@suite-native/analytics';
-import { VStack } from '@suite-native/atoms';
+import { BannerInline, VStack } from '@suite-native/atoms';
 import { DeviceManagerScreenHeader } from '@suite-native/device-manager';
+import { Translation } from '@suite-native/intl';
 import { ContextMessage } from '@suite-native/message-system';
 import { Screen } from '@suite-native/navigation';
 
@@ -298,8 +307,31 @@ const EarnScreenContent = () => {
     );
 };
 
-export const EarnScreen = () => (
-    <EarnPortfolioTrackerGuard>
-        <EarnScreenContent />
-    </EarnPortfolioTrackerGuard>
-);
+export const EarnScreen = () => {
+    const { walletDeviceService } = useServices(injectWalletDeviceService);
+    const device = useSelector(selectSelectedDevice);
+    const accounts = useSelector(selectVisibleDeviceAccounts);
+    const operations = device ? walletDeviceService.get(device) : undefined;
+    const hasSigningAccount = accounts.some(
+        account =>
+            (isStakingSymbol(account.symbol) || account.networkType === 'ethereum') &&
+            getWalletDeviceAccountCapabilities(operations, account).canSignTransaction,
+    );
+
+    if (operations?.getAccountCapabilities && !hasSigningAccount) {
+        return (
+            <Screen header={<DeviceManagerScreenHeader />}>
+                <BannerInline
+                    intent="info"
+                    title={<Translation id="moduleAccounts.accountDetail.discoveryOnly" />}
+                />
+            </Screen>
+        );
+    }
+
+    return (
+        <EarnPortfolioTrackerGuard>
+            <EarnScreenContent />
+        </EarnPortfolioTrackerGuard>
+    );
+};

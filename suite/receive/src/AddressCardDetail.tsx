@@ -6,7 +6,11 @@ import { Translation } from '@suite/intl';
 import { useServices } from '@suite-common/dependency-injection';
 import { type ReceiveRootState, selectCurrentFreshAddress } from '@suite-common/receive';
 import { injectDispatch } from '@suite-common/redux-utils';
-import { type AccountsRootState, selectAccountByKey } from '@suite-common/wallet-core';
+import {
+    type AccountsRootState,
+    selectAccountByKey,
+    useWalletDeviceAccountCapabilities,
+} from '@suite-common/wallet-core';
 import { type AccountKey } from '@suite-common/wallet-types';
 import { isUtxoBased } from '@suite-common/wallet-utils';
 import { Box, Button, Column, Grid, Row, Text, useMediaQuery } from '@trezor/components';
@@ -47,6 +51,7 @@ export const AddressCardDetail = ({
     );
     const isBelowTablet = useMediaQuery(belowBreakpoint(breakpoints.tablet));
     const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
+    const { canConfirmAddress } = useWalletDeviceAccountCapabilities(account);
 
     const handleCopy = () => {
         dispatch(copyAddressToClipboard(item.address));
@@ -141,18 +146,20 @@ export const AddressCardDetail = ({
                                 <Translation id="RECEIVE_SHARE" />
                             </Button>
                         )}
-                        <Button
-                            size="large"
-                            intent="neutral"
-                            priority="secondary"
-                            iconLeft={ShieldCheckIcon}
-                            isDisabled={disabled || isVerifyDisabled}
-                            isLoading={isVerifyLoading}
-                            data-testid="@wallet/receive/verify-address-button"
-                            onClick={() => onVerify(item.path)}
-                        >
-                            <Translation id="TR_VERIFY" />
-                        </Button>
+                        {canConfirmAddress && (
+                            <Button
+                                size="large"
+                                intent="neutral"
+                                priority="secondary"
+                                iconLeft={ShieldCheckIcon}
+                                isDisabled={disabled || isVerifyDisabled}
+                                isLoading={isVerifyLoading}
+                                data-testid="@wallet/receive/verify-address-button"
+                                onClick={() => onVerify(item.path)}
+                            >
+                                <Translation id="TR_VERIFY" />
+                            </Button>
+                        )}
                     </Row>
                 </Column>
                 <Box aspectRatio="1" width={qrCodeSize} maxWidth="100%">

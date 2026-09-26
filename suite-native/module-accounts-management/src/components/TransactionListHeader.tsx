@@ -9,6 +9,7 @@ import {
     selectAccountByKey,
     selectIsTestnetAccount,
     useDisplayBaseCurrency,
+    useWalletDeviceAccountCapabilities,
 } from '@suite-common/wallet-core';
 import { type AccountKey, type TokenAddress } from '@suite-common/wallet-types';
 import { Box, Text, VStack } from '@suite-native/atoms';
@@ -74,6 +75,7 @@ export const TransactionListHeader = memo(
             selectAccountByKey(state, accountKey),
         );
         const { shallDisplayBaseCurrency } = useDisplayBaseCurrency(account?.symbol);
+        const { canSignTransaction } = useWalletDeviceAccountCapabilities(account);
 
         const hasSelectedAssetTransactions = useSelector(
             (state: AccountsRootState & TransactionsRootState) =>
@@ -93,7 +95,8 @@ export const TransactionListHeader = memo(
         const isPriceCardDisplayed =
             shallDisplayBaseCurrency && !isUnrecognizedToken && hasSelectedAssetTransactions;
         const isStellarAccount = account.networkType === 'stellar';
-        const isStellarTokenActionsDisplayed = isStellarAccount && !isPortfolioTrackerDevice;
+        const isStellarTokenActionsDisplayed =
+            canSignTransaction && isStellarAccount && !isPortfolioTrackerDevice;
 
         return (
             <>
@@ -118,7 +121,7 @@ export const TransactionListHeader = memo(
                     {isPriceCardDisplayed && (
                         <AssetPriceCard accountKey={accountKey} tokenContract={tokenContract} />
                     )}
-                    {tokenContract && (
+                    {tokenContract && canSignTransaction && (
                         <YieldVaultBanner accountKey={accountKey} tokenContract={tokenContract} />
                     )}
                     {isStellarTokenActionsDisplayed && (

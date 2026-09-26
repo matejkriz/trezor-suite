@@ -9,7 +9,11 @@ import { type SelectIsLabelActionEnabledState, selectIsLabelActionEnabled } from
 import { useServices } from '@suite-common/dependency-injection';
 import { type ReceiveRootState, selectCurrentFreshAddress } from '@suite-common/receive';
 import { injectDispatch } from '@suite-common/redux-utils';
-import { type AccountsRootState, selectAccountByKey } from '@suite-common/wallet-core';
+import {
+    type AccountsRootState,
+    selectAccountByKey,
+    useWalletDeviceAccountCapabilities,
+} from '@suite-common/wallet-core';
 import { type AccountKey } from '@suite-common/wallet-types';
 import { IconButton, Row, Text } from '@trezor/components';
 import { CopyIcon, ShareNetworkIcon, ShieldCheckIcon } from '@trezor/icons';
@@ -103,6 +107,7 @@ export const AddressHistoryRow = ({
         selectCurrentFreshAddress(state, accountKey),
     );
     const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
+    const { canConfirmAddress } = useWalletDeviceAccountCapabilities(account);
 
     const handleCopy = () => {
         dispatch(copyAddressToClipboard(item.address));
@@ -166,17 +171,19 @@ export const AddressHistoryRow = ({
                                         onClick={handleShare}
                                     />
                                 )}
-                                <IconButton
-                                    size="small"
-                                    intent="neutral"
-                                    priority="secondary"
-                                    icon={ShieldCheckIcon}
-                                    isDisabled={disabled || isVerifyDisabled}
-                                    isLoading={isVerifyLoading}
-                                    tooltip={{ content: <Translation id="TR_VERIFY" /> }}
-                                    data-testid={`@wallet/receive/used-address/${item.pathIndex}/verify-button`}
-                                    onClick={() => onVerify(item.path)}
-                                />
+                                {canConfirmAddress && (
+                                    <IconButton
+                                        size="small"
+                                        intent="neutral"
+                                        priority="secondary"
+                                        icon={ShieldCheckIcon}
+                                        isDisabled={disabled || isVerifyDisabled}
+                                        isLoading={isVerifyLoading}
+                                        tooltip={{ content: <Translation id="TR_VERIFY" /> }}
+                                        data-testid={`@wallet/receive/used-address/${item.pathIndex}/verify-button`}
+                                        onClick={() => onVerify(item.path)}
+                                    />
+                                )}
                             </Row>
                         </Actions>
                     </Row>

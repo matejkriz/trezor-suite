@@ -3,6 +3,7 @@ import { useDevice } from '@suite/device';
 import { Translation } from '@suite/intl';
 import { selectRouterParams } from '@suite/router';
 import { isLedgerDevice } from '@suite-common/device';
+import { useWalletDeviceAccountCapabilities } from '@suite-common/wallet-core';
 import { Row } from '@trezor/components';
 import { ButtonGroup } from '@trezor/components/src/components/buttons/ButtonGroup/ButtonGroup';
 import { ArrowDownIcon, ArrowUpIcon } from '@trezor/icons';
@@ -21,6 +22,7 @@ export const HeaderActions = () => {
     const selectedAccount = useSelector(selectFullSelectedAccount);
     const routerParams = useSelector(selectRouterParams) as WalletParams;
     const { device } = useDevice();
+    const { canSignTransaction } = useWalletDeviceAccountCapabilities(selectedAccount.account);
 
     const accountType = selectedAccount.account?.accountType || routerParams?.accountType || '';
     const isTradingAvailable = !['coinjoin'].includes(accountType);
@@ -55,19 +57,21 @@ export const HeaderActions = () => {
                         <Translation id="TR_NAV_RECEIVE" />
                     </HeaderActionButton>
 
-                    <HeaderActionButton
-                        key="wallet-send"
-                        icon={ArrowUpIcon}
-                        onClick={() => {
-                            goToWithAnalytics({
-                                routeName: 'wallet-send',
-                                preserveParams: true,
-                            });
-                        }}
-                        data-testid="@wallet/menu/wallet-send"
-                    >
-                        <Translation id="TR_NAV_SEND" />
-                    </HeaderActionButton>
+                    {canSignTransaction && (
+                        <HeaderActionButton
+                            key="wallet-send"
+                            icon={ArrowUpIcon}
+                            onClick={() => {
+                                goToWithAnalytics({
+                                    routeName: 'wallet-send',
+                                    preserveParams: true,
+                                });
+                            }}
+                            data-testid="@wallet/menu/wallet-send"
+                        >
+                            <Translation id="TR_NAV_SEND" />
+                        </HeaderActionButton>
+                    )}
                 </ButtonGroup>
             </AppNavigationTooltip>
         </Row>

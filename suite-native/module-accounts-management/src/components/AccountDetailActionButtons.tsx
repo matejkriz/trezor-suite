@@ -4,10 +4,14 @@ import { useNavigation } from '@react-navigation/native';
 
 import { useServices } from '@suite-common/dependency-injection';
 import { selectIsPortfolioTrackerDevice } from '@suite-common/device';
-import { type AccountsRootState, selectAccountByKey } from '@suite-common/wallet-core';
+import {
+    type AccountsRootState,
+    selectAccountByKey,
+    useWalletDeviceAccountCapabilities,
+} from '@suite-common/wallet-core';
 import { type AccountKey, type TokenAddress } from '@suite-common/wallet-types';
 import { events, injectNativeAnalytics } from '@suite-native/analytics';
-import { Box, Button, HStack } from '@suite-native/atoms';
+import { BannerInline, Box, Button, HStack, VStack } from '@suite-native/atoms';
 import { selectHasFirmwareAuthenticityCheckHardFailedForSelectedDevice } from '@suite-native/device';
 import { type FeatureFlagsRootState } from '@suite-native/feature-flags';
 import { Translation } from '@suite-native/intl';
@@ -56,6 +60,7 @@ export const AccountDetailActionButtons = ({
         (state: AccountsRootState & TokensRootState) =>
             selectHasAccountOrTokenSpendableBalance(state, accountKey, tokenContract),
     );
+    const { canSignTransaction } = useWalletDeviceAccountCapabilities(account);
 
     if (!account) return null;
 
@@ -100,34 +105,45 @@ export const AccountDetailActionButtons = ({
 
     const isReceiveButtonDisplayed = !hasFirmwareAuthenticityCheckHardFailed;
     const isSendButtonDisplayed =
-        isNetworkSendFlowEnabled && !isPortfolioTrackerDevice && hasSelectedAssetSpendableBalance;
+        canSignTransaction &&
+        isNetworkSendFlowEnabled &&
+        !isPortfolioTrackerDevice &&
+        hasSelectedAssetSpendableBalance;
 
     if (!isReceiveButtonDisplayed && !isSendButtonDisplayed) return null;
 
     return (
-        <HStack flex={1} spacing="sp12">
-            {isReceiveButtonDisplayed && (
-                <Box flex={1}>
-                    <Button
-                        iconLeft="arrowLineDown"
-                        onPress={handleReceive}
-                        testID="@account-detail/receive-button"
-                    >
-                        <Translation id="transactions.receive" />
-                    </Button>
-                </Box>
+        <VStack spacing="sp12">
+            {!canSignTransaction && (
+                <BannerInline
+                    intent="info"
+                    title={<Translation id="moduleAccounts.accountDetail.discoveryOnly" />}
+                />
             )}
-            {isSendButtonDisplayed && (
-                <Box flex={1}>
-                    <Button
-                        iconLeft="arrowLineUp"
-                        onPress={handleSend}
-                        testID="@account-detail/send-button"
-                    >
-                        <Translation id="transactions.send" />
-                    </Button>
-                </Box>
-            )}
-        </HStack>
+            <HStack flex={1} spacing="sp12">
+                {isReceiveButtonDisplayed && (
+                    <Box flex={1}>
+                        <Button
+                            iconLeft="arrowLineDown"
+                            onPress={handleReceive}
+                            testID="@account-detail/receive-button"
+                        >
+                            <Translation id="transactions.receive" />
+                        </Button>
+                    </Box>
+                )}
+                {isSendButtonDisplayed && (
+                    <Box flex={1}>
+                        <Button
+                            iconLeft="arrowLineUp"
+                            onPress={handleSend}
+                            testID="@account-detail/send-button"
+                        >
+                            <Translation id="transactions.send" />
+                        </Button>
+                    </Box>
+                )}
+            </HStack>
+        </VStack>
     );
 };

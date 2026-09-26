@@ -1,4 +1,5 @@
 import { getDisplaySymbol, getNetworkDisplaySymbolName } from '@suite-common/wallet-config';
+import { useWalletDeviceAccountCapabilities } from '@suite-common/wallet-core';
 import { type Account, type TokenInfoBranded, type TokenSymbol } from '@suite-common/wallet-types';
 import { Box, Card, HStack, Text } from '@suite-native/atoms';
 import {
@@ -37,6 +38,7 @@ interface YourPositionCardProps {
 
 export const YourPositionCard = ({ account, token }: YourPositionCardProps) => {
     const { applyStyle } = useNativeStyles();
+    const { canSignTransaction } = useWalletDeviceAccountCapabilities(account);
 
     const { symbol } = account;
 
@@ -75,7 +77,7 @@ export const YourPositionCard = ({ account, token }: YourPositionCardProps) => {
                                 {tokenSymbol}
                             </Text>
 
-                            {yieldBadge && account && (
+                            {canSignTransaction && yieldBadge && account && (
                                 <YieldBadge
                                     apy={yieldBadge.apy}
                                     variant={yieldBadgeVariant}

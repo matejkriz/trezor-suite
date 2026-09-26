@@ -5,6 +5,7 @@ import { selectRouterParams } from '@suite/router';
 import { selectIsNftSectionEnabled } from '@suite/settings';
 import { useServices } from '@suite-common/dependency-injection';
 import { getNetworkOptional } from '@suite-common/wallet-config';
+import { useWalletDeviceAccountCapabilities } from '@suite-common/wallet-core';
 import { hasNetworkFeatures } from '@suite-common/wallet-utils';
 
 import { type NavigationItem, SubpageNavigation } from 'src/components/suite/layouts/SuiteLayout';
@@ -15,6 +16,7 @@ import { type WalletParams } from 'src/types/wallet';
 export const AccountNavigation = () => {
     const { analytics } = useServices(injectDesktopAnalytics);
     const account = useSelector(selectSelectedAccount);
+    const { canSignTransaction } = useWalletDeviceAccountCapabilities(account);
     const routerParams = useSelector(selectRouterParams) as WalletParams;
     const enabledNftSection = useSelector(selectIsNftSectionEnabled);
     const network = getNetworkOptional(routerParams?.symbol);
@@ -70,7 +72,7 @@ export const AccountNavigation = () => {
                 });
             },
             title: <Translation id="TR_NAV_STAKING" />,
-            isHidden: !hasNetworkFeatures(account, 'staking'),
+            isHidden: !canSignTransaction || !hasNetworkFeatures(account, 'staking'),
             'data-testid': '@wallet/menu/staking',
         },
         {
