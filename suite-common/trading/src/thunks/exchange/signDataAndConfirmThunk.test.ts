@@ -1,10 +1,15 @@
 import { combineReducers } from '@reduxjs/toolkit';
 import { type CryptoId } from 'invity-api';
 
+import { createMockDeps } from '@suite-common/dependency-injection';
 import { createThunk } from '@suite-common/redux-utils';
 import { mockActionType } from '@suite-common/redux-utils/mocks';
 import { type TrezorDevice } from '@suite-common/suite-types';
 import { createTestStore } from '@suite-common/test-utils';
+import {
+    type WalletDeviceOperations,
+    type WalletDeviceServiceDep,
+} from '@suite-common/wallet-core';
 import { type Account } from '@suite-common/wallet-types';
 import TrezorConnect from '@trezor/connect';
 
@@ -39,7 +44,10 @@ describe('signDataAndConfirmThunk', () => {
     tradeApi.setServersEnvironment = () => {};
     tradeApi.createApiKey = () => {};
 
-    const getMocks = (initialExchangeState?: Partial<TradingExchangeState>) => {
+    const getMocks = (
+        initialExchangeState?: Partial<TradingExchangeState>,
+        getAccountCapabilities?: WalletDeviceOperations['getAccountCapabilities'],
+    ) => {
         const quoteNotTyped = MIN_MAX_QUOTES_OK[0];
         if (!quoteNotTyped) throw new Error('Missing test fixture');
         const quote = {
@@ -49,8 +57,21 @@ describe('signDataAndConfirmThunk', () => {
             receiveAddress: 'receiveAddress',
             orderId: 'orderId',
         };
+        const operations = createMockDeps<WalletDeviceOperations>({
+            confirmAddress: null,
+            signTransaction: null,
+            getAccountCapabilities,
+        });
         const store = createTestStore({
-            extra: undefined,
+            extra: {
+                services: createMockDeps<WalletDeviceServiceDep>({
+                    walletDeviceService: {
+                        get: () => operations,
+                        cancelAction: null,
+                        disconnect: null,
+                    },
+                }),
+            },
             reducer: combineReducers({
                 wallet: combineReducers({
                     trading: tradingReducer,
@@ -90,6 +111,48 @@ describe('signDataAndConfirmThunk', () => {
             mockNextStep,
         };
     };
+
+    it('rejects a public discovery account before opening a signing modal or contacting Connect', async () => {
+        const {
+            store,
+            returnUrl,
+            device,
+            account,
+            mockProcessResponseData,
+            mockNextStep,
+            mockTriggerAnalyticsTradeConfirmation,
+        } = getMocks(
+            {
+                selectedQuote: {
+                    signData: { type: 'eip712-typed-data', data: {} },
+                },
+            },
+            () => ({ canSignTransaction: false, canConfirmAddress: false }),
+        );
+        TrezorConnect.ethereumSignTypedData = jest.fn().mockResolvedValue({
+            success: true,
+            payload: { signature: 'test-signature' },
+        });
+
+        const result = await store.dispatch(
+            exchangeThunks.signDataAndConfirmThunk({
+                account,
+                returnUrl,
+                device,
+                nextStep: mockNextStep,
+                triggerAnalyticsTradeConfirmation: mockTriggerAnalyticsTradeConfirmation,
+                processResponseData: mockProcessResponseData,
+            }),
+        );
+
+        expect(result.payload).toEqual({
+            type: 'sign-tx-error',
+            error: { id: 'TR_TRADING_CANNOT_SEND_TRANSACTION' },
+        });
+        expect(TrezorConnect.ethereumSignTypedData).not.toHaveBeenCalled();
+        expect(store.getState().wallet.trading.modalAccountKey).toBeUndefined();
+        expect(store.getState().wallet.trading.trades).toEqual([]);
+    });
 
     it('should return error notification when signData in selectedQuote is not filled', async () => {
         const {

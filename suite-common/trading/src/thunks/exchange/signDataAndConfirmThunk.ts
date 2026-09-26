@@ -1,7 +1,11 @@
 import { type ExchangeTrade } from 'invity-api';
 
-import { createThunk } from '@suite-common/redux-utils';
+import { type WithServices, createThunk } from '@suite-common/redux-utils';
 import { type TrezorDevice } from '@suite-common/suite-types';
+import {
+    type WalletDeviceServiceDep,
+    getWalletDeviceAccountCapabilities,
+} from '@suite-common/wallet-core';
 import { type Account } from '@suite-common/wallet-types';
 import TrezorConnect, {
     type EthereumSignTypedDataMessage,
@@ -36,12 +40,15 @@ const signDataRejectedValue: TradingSendRejectedProps = {
 
 type SignDataAndConfirmThunkState = TradingRootState;
 
+export type SignDataAndConfirmThunkDeps = WithServices<WalletDeviceServiceDep>;
+
 export const signDataAndConfirmThunk = createThunk<
     undefined,
     SignDataAndConfirmThunkProps,
     {
         rejectValue: TradingSendRejectedProps;
         state: SignDataAndConfirmThunkState;
+        extra: SignDataAndConfirmThunkDeps;
     }
 >(
     `${TRADING_EXCHANGE_THUNK_PREFIX}/signDataAndConfirm`,
@@ -54,7 +61,7 @@ export const signDataAndConfirmThunk = createThunk<
             processResponseData,
             nextStep,
         },
-        { dispatch, getState, rejectWithValue },
+        { dispatch, getState, extra, rejectWithValue },
     ) => {
         const selectedQuote = selectTradingExchangeSelectedQuote(getState());
         const sendAccountKey = selectTradingExchangeAccountKey(getState());
@@ -82,6 +89,11 @@ export const signDataAndConfirmThunk = createThunk<
                 }),
             );
 
+            return rejectWithValue(signDataRejectedValue);
+        }
+
+        const operations = device ? extra.services.walletDeviceService.get(device) : undefined;
+        if (!getWalletDeviceAccountCapabilities(operations, account).canSignTransaction) {
             return rejectWithValue(signDataRejectedValue);
         }
 
