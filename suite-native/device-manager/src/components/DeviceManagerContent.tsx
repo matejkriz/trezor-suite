@@ -33,6 +33,10 @@ import {
     type TabToStackCompositeNavigationProp,
     checkIsRouteAnyOf,
 } from '@suite-native/navigation';
+import {
+    type SettingsSliceRootState,
+    selectIsExperimentalFeatureEnabled,
+} from '@suite-native/settings';
 import { hasBitcoinOnlyFirmware } from '@trezor/device-utils';
 import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
 
@@ -79,6 +83,9 @@ export const DeviceManagerContent = () => {
     const isDeviceConnected = useSelector(selectIsDeviceConnected);
     const isDeviceInitialized = useSelector(selectIsDeviceInitialized);
     const deviceStaticSessionId = useSelector(selectDeviceStaticSessionId);
+    const isLedgerEnabled = useSelector((state: SettingsSliceRootState) =>
+        selectIsExperimentalFeatureEnabled(state, 'ledger'),
+    );
 
     const navigation = useNavigation<NavigationProp>();
     const currentRoute = useRoute();
@@ -137,19 +144,21 @@ export const DeviceManagerContent = () => {
             footer={
                 <VStack spacing="sp12" paddingBottom="sp16">
                     <ConnectButton onSelectDevice={handleSelectDevice} />
-                    <VStack paddingHorizontal="sp16">
-                        <Box style={applyStyle(footerButtonSurfaceStyle)}>
-                            <Button
-                                intent="neutral"
-                                priority="secondary"
-                                isFullWidth
-                                isDisabled={hasRunningDiscovery}
-                                onPress={handleConnectLedger}
-                            >
-                                <Translation id="moduleConnectLedger.button" />
-                            </Button>
-                        </Box>
-                    </VStack>
+                    {isLedgerEnabled && (
+                        <VStack paddingHorizontal="sp16">
+                            <Box style={applyStyle(footerButtonSurfaceStyle)}>
+                                <Button
+                                    intent="neutral"
+                                    priority="secondary"
+                                    isFullWidth
+                                    isDisabled={hasRunningDiscovery}
+                                    onPress={handleConnectLedger}
+                                >
+                                    <Translation id="moduleConnectLedger.button" />
+                                </Button>
+                            </Box>
+                        </VStack>
+                    )}
                 </VStack>
             }
             customSwitchRightView={

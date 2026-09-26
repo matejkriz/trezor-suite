@@ -1637,6 +1637,11 @@ export const messages = {
         experimental: {
             title: 'Experimental',
             subtitle: 'For experienced users only. Use at your own risk.',
+            ledger: {
+                title: 'Ledger support',
+                description:
+                    'Connect a Ledger hardware wallet via Bluetooth. Bitcoin accounts only.',
+            },
             slip24: {
                 title: 'SLIP-24 (clear signing)',
                 description:

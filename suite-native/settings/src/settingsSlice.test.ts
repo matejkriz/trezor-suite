@@ -1,5 +1,6 @@
 import {
     type AppSettingsState,
+    type ExperimentalFeature,
     appSettingsReducer,
     selectIsExperimentalFeatureEnabled,
     toggleExperimentalFeature,
@@ -15,21 +16,20 @@ describe('appSettingsSlice experimental features', () => {
 
         expect(state.experimentalFeatures).toEqual([]);
         expect(selectIsExperimentalFeatureEnabled(asRootState(state), 'slip24')).toBe(false);
+        expect(selectIsExperimentalFeatureEnabled(asRootState(state), 'ledger')).toBe(false);
     });
 
-    it('should enable and disable an experimental feature', () => {
+    it.each<ExperimentalFeature>(['slip24', 'ledger'])('should enable and disable %s', feature => {
         const enabledState = appSettingsReducer(
             getInitialState(),
-            toggleExperimentalFeature('slip24'),
+            toggleExperimentalFeature(feature),
         );
 
-        expect(selectIsExperimentalFeatureEnabled(asRootState(enabledState), 'slip24')).toBe(true);
+        expect(selectIsExperimentalFeatureEnabled(asRootState(enabledState), feature)).toBe(true);
 
-        const disabledState = appSettingsReducer(enabledState, toggleExperimentalFeature('slip24'));
+        const disabledState = appSettingsReducer(enabledState, toggleExperimentalFeature(feature));
 
-        expect(selectIsExperimentalFeatureEnabled(asRootState(disabledState), 'slip24')).toBe(
-            false,
-        );
+        expect(selectIsExperimentalFeatureEnabled(asRootState(disabledState), feature)).toBe(false);
     });
 
     it('should not affect other experimental features', () => {

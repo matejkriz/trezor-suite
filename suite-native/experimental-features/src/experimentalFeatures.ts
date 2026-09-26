@@ -17,6 +17,11 @@ export const EXPERIMENTAL_FEATURES: Partial<
         titleKey: 'moduleSettings.experimental.slip24.title',
         descriptionKey: 'moduleSettings.experimental.slip24.description',
     },
+    ledger: {
+        icon: 'bluetooth',
+        titleKey: 'moduleSettings.experimental.ledger.title',
+        descriptionKey: 'moduleSettings.experimental.ledger.description',
+    },
 };
 
 /** Titles for post-usage feedback (e.g. after Suite Sync labeling actions). */
@@ -26,5 +31,8 @@ export const FEEDBACK_FEATURE_CONFIGS: Record<ExperimentalFeature, { titleKey: T
     },
     slip24: {
         titleKey: 'moduleSettings.experimental.slip24.title',
+    },
+    ledger: {
+        titleKey: 'moduleSettings.experimental.ledger.title',
     },
 };
