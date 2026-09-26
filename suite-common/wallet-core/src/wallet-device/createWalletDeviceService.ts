@@ -31,8 +31,14 @@ export type SignWalletDeviceTransactionParams = {
     paymentRequests?: PROTO.PaymentRequest[];
 };
 
+export type WalletDeviceAccountCapabilities = {
+    canSignTransaction: boolean;
+    canConfirmAddress: boolean;
+};
+
 /** @serviceContract */
 export type WalletDeviceOperations = {
+    getAccountCapabilities?: (account: Account) => WalletDeviceAccountCapabilities;
     confirmAddress: (
         params: ConfirmWalletDeviceAddressParams,
     ) => Promise<Awaited<ConnectResponse<Address | CardanoAddress>>>;

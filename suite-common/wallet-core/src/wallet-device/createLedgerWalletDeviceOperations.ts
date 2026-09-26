@@ -1,6 +1,7 @@
 import { deviceActions } from '@suite-common/device';
 import { LedgerActionError, getLedgerBitcoinAccountPath } from '@suite-common/ledger';
 import { type ButtonRequest, type TrezorDevice } from '@suite-common/suite-types';
+import { type Account } from '@suite-common/wallet-types';
 import { datetimeToLocktime, isCardanoTx } from '@suite-common/wallet-utils';
 import { validatePath } from '@trezor/connect-common';
 import { createPendingTransaction } from '@trezor/connect-core/src/bitcoin';
@@ -15,6 +16,15 @@ import { WalletDeviceActionError } from './walletDeviceError';
 import { signLedgerBitcoinTransaction } from '../send/signLedgerBitcoinTransaction';
 
 type LedgerWalletDeviceOperationsDeps = WalletDeviceServiceDeps;
+
+const isSupportedBitcoinAccount = (account: Account): boolean =>
+    account.symbol === 'btc' &&
+    account.networkType === 'bitcoin' &&
+    account.accountType === 'normal' &&
+    Number.isSafeInteger(account.index) &&
+    account.index >= 0 &&
+    account.index < 0x80000000 &&
+    account.path === `m/${getLedgerBitcoinAccountPath(account.index)}`;
 
 const addressError = {
     success: false as const,
@@ -62,17 +72,16 @@ export const createLedgerWalletDeviceOperations = (
     };
 
     return {
+        getAccountCapabilities: account => {
+            const isSupported = isSupportedBitcoinAccount(account);
+
+            return { canSignTransaction: isSupported, canConfirmAddress: isSupported };
+        },
         async confirmAddress({ account, addressPath }) {
             if (
                 !device.connected ||
                 account.deviceState !== device.state?.staticSessionId ||
-                account.symbol !== 'btc' ||
-                account.networkType !== 'bitcoin' ||
-                account.accountType !== 'normal' ||
-                !Number.isSafeInteger(account.index) ||
-                account.index < 0 ||
-                account.index >= 0x80000000 ||
-                account.path !== `m/${getLedgerBitcoinAccountPath(account.index)}`
+                !isSupportedBitcoinAccount(account)
             ) {
                 return addressError;
             }
@@ -138,7 +147,7 @@ export const createLedgerWalletDeviceOperations = (
             if (
                 !device.connected ||
                 selectedAccount.deviceState !== device.state?.staticSessionId ||
-                selectedAccount.symbol !== 'btc' ||
+                !isSupportedBitcoinAccount(selectedAccount) ||
                 precomposedTransaction.type !== 'final' ||
                 isCardanoTx(selectedAccount, precomposedTransaction) ||
                 paymentRequests?.length ||

@@ -3,10 +3,12 @@ import {
     type LedgerDevice,
     getLedgerWalletIdentity,
 } from '@suite-common/ledger';
+import { asNetworkSymbol } from '@suite-common/wallet-config';
 import { type AccountInfo } from '@trezor/connect';
-import { type Bip43Path } from '@trezor/crypto-utils';
 
 import { type LedgerWalletIdentity } from './createLedgerSuiteDevice';
+import { type DiscoveredLedgerNetworkAccount } from './discoverLedgerAccounts';
+import { type DiscoveredLedgerWallet } from './ledgerWalletTypes';
 
 const MAX_ACCOUNTS = 10;
 
@@ -26,23 +28,11 @@ type DiscoverLedgerBitcoinWalletOptions = {
     owner?: string;
 };
 
-type DiscoveredLedgerAccount = {
-    index: number;
-    path: Bip43Path;
-    accountInfo: AccountInfo;
-    visible: boolean;
-};
-
-export type DiscoveredLedgerBitcoinWallet = {
-    wallet: LedgerWalletIdentity;
-    accounts: DiscoveredLedgerAccount[];
-};
-
 export const discoverLedgerBitcoinWallet = async (
     deps: DiscoverLedgerBitcoinWalletDeps,
     device: LedgerDevice,
     options: DiscoverLedgerBitcoinWalletOptions = {},
-): Promise<DiscoveredLedgerBitcoinWallet> => {
+): Promise<DiscoveredLedgerWallet> => {
     const ensureNotAborted = () => {
         if (options.signal?.aborted) throw new Error('Ledger connection canceled');
     };
@@ -57,7 +47,7 @@ export const discoverLedgerBitcoinWallet = async (
     await deps.ledgerBitcoinService.connect(device, { owner: options.owner });
     ensureCurrentConnection();
 
-    const accounts: DiscoveredLedgerAccount[] = [];
+    const accounts: DiscoveredLedgerNetworkAccount[] = [];
     let wallet: LedgerWalletIdentity | undefined;
 
     for (let index = 0; index < MAX_ACCOUNTS; index++) {
@@ -89,6 +79,8 @@ export const discoverLedgerBitcoinWallet = async (
         }
 
         accounts.push({
+            symbol: asNetworkSymbol('btc'),
+            accountType: 'normal',
             index,
             path,
             accountInfo: response.payload,

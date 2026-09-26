@@ -39,14 +39,21 @@ Discovery stops each network/profile at its first unused account (up to ten
 accounts per profile by default). Reconnect with this option after changing the
 enabled networks. Existing Bitcoin-only connection remains the default.
 
-The app supports public data for 27 of the 28 Suite network symbols; Cardano is omitted,
-including Ledger Live paths for ETH, TRX and SOL. Cardano and Bitcoin CoinJoin are
-omitted. BIP86 public keys can be exported, but Suite Taproot discovery is skipped
+The app supports public data for 27 of the 28 Suite network symbols, including
+Ledger Live paths for ETH, TRX and SOL. Cardano and Bitcoin CoinJoin are omitted.
+BIP86 public keys can be exported, but Suite Taproot discovery is skipped
 until an actual master fingerprint is available; no placeholder is used. The
 special debug legacy EVM testnet path `44'/1'/0'/0/i` is not implemented.
 Only Bitcoin BIP84 signing and device address verification are currently wired to
 Suite's Ledger signer; accounts on other paths/networks are for discovery and
 account viewing. The discovery app itself never signs.
+
+Backend failures are isolated per network so the other networks can finish.
+Suite currently shows the discovery as completed without listing those skipped
+networks; a completed session therefore does not guarantee that every enabled
+network was fetched successfully. Reconnect to retry after resolving a backend
+failure. Send and device address verification are hidden for accounts unsupported
+by the injected Ledger signer; receiving addresses can still be copied or shared.
 
 Start the Flex emulator as documented in the firmware README, then run:
 

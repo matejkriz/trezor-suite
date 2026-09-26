@@ -2,8 +2,15 @@ import { createMockDeps } from '@suite-common/dependency-injection';
 import { deviceActions, prepareDeviceReducer } from '@suite-common/device';
 import { mockActionType, mockReducer } from '@suite-common/redux-utils/mocks';
 import { asNetworkSymbol } from '@suite-common/wallet-config';
-import { type FormState, type PrecomposedTransactionFinal } from '@suite-common/wallet-types';
-import { mockWalletAccount } from '@suite-common/wallet-types/mocks';
+import {
+    type Account,
+    type FormState,
+    type PrecomposedTransactionFinal,
+} from '@suite-common/wallet-types';
+import {
+    mockWalletAccount,
+    networkSpecificDefaultEthereum,
+} from '@suite-common/wallet-types/mocks';
 
 import {
     type WalletDeviceServiceDeps,
@@ -85,6 +92,67 @@ describe('Ledger wallet operations connection ownership', () => {
 
             return signer.signTransaction(0, 'test-psbt');
         });
+    });
+
+    it('advertises signing and address confirmation for its supported Bitcoin account', async () => {
+        const { operations, deps } = prepareTest();
+
+        expect(operations.getAccountCapabilities?.(account)).toEqual({
+            canSignTransaction: true,
+            canConfirmAddress: true,
+        });
+        await expect(operations.confirmAddress({ account, addressPath })).resolves.toMatchObject({
+            success: true,
+        });
+        await expect(operations.signTransaction(signParams)).resolves.toMatchObject({
+            serializedTx: '01000000',
+        });
+        expect(deps.ledgerBitcoinService.verifyAddress).toHaveBeenCalledTimes(1);
+        expect(deps.ledgerBitcoinService.signTransaction).toHaveBeenCalledTimes(1);
+    });
+
+    it.each<Account>([
+        mockWalletAccount({
+            symbol: asNetworkSymbol('eth'),
+            accountType: 'normal',
+            index: 0,
+            deviceState: account.deviceState,
+            path: "m/44'/60'/0'/0/0",
+        }),
+        mockWalletAccount(
+            {
+                symbol: asNetworkSymbol('btc'),
+                accountType: 'normal',
+                index: 0,
+                deviceState: account.deviceState,
+                path: "m/84'/0'/0'",
+            },
+            networkSpecificDefaultEthereum,
+        ),
+        { ...account, accountType: 'legacy', path: "m/44'/0'/0'" },
+        { ...account, accountType: 'segwit', path: "m/49'/0'/0'" },
+        { ...account, path: "m/84'/1'/0'" },
+        { ...account, index: -1 },
+        { ...account, index: 0.5 },
+        { ...account, index: 0x80000000 },
+        { ...account, symbol: asNetworkSymbol('test') },
+    ])('refuses all operations on an unsupported account %#', async unsupportedAccount => {
+        const { operations, deps } = prepareTest();
+
+        expect(operations.getAccountCapabilities?.(unsupportedAccount)).toEqual({
+            canSignTransaction: false,
+            canConfirmAddress: false,
+        });
+        await expect(
+            operations.confirmAddress({ account: unsupportedAccount, addressPath }),
+        ).resolves.toMatchObject({ success: false });
+        await expect(
+            operations.signTransaction({ ...signParams, selectedAccount: unsupportedAccount }),
+        ).rejects.toThrow('Unsupported device Bitcoin transaction');
+        expect(deps.ledgerBitcoinService.verifyAddress).not.toHaveBeenCalled();
+        expect(deps.ledgerBitcoinService.getAccount).not.toHaveBeenCalled();
+        expect(deps.ledgerBitcoinService.signTransaction).not.toHaveBeenCalled();
+        expect(deps.dispatch).not.toHaveBeenCalled();
     });
 
     it('refuses an old operations object after reconnecting the same wallet', async () => {

@@ -10,6 +10,7 @@ export type LedgerSuiteDevice = Omit<AcquiredDevice, 'id' | 'state'> & {
         osVersion?: string;
         bitcoinAppVersion?: string;
         batteryLevel?: number;
+        accountsDiscoveryAppVersion?: string;
     };
 };
 

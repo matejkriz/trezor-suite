@@ -1,4 +1,4 @@
-import { getSupportedNetworks } from '@suite-common/wallet-config';
+import { asNetworkSymbol, getSupportedNetworks } from '@suite-common/wallet-config';
 import { DeviceModelInternal, hasBitcoinOnlyFirmware } from '@trezor/device-utils';
 
 import { createLedgerSuiteDevice } from './createLedgerSuiteDevice';
@@ -67,6 +67,22 @@ describe(createLedgerSuiteDevice.name, () => {
             batteryLevel: deviceInfo.batteryLevel,
         });
         expect(device.features.label).toBe('My Ledger');
+    });
+
+    it('preserves custom app metadata and enables only discovered network capabilities', () => {
+        const device = createLedgerSuiteDevice({
+            ...wallet,
+            supportedNetworks: [asNetworkSymbol('btc'), asNetworkSymbol('eth')],
+            accountsDiscoveryAppVersion: '0.1.0',
+        });
+
+        expect(device.unavailableCapabilities.btc).toBeUndefined();
+        expect(device.unavailableCapabilities.eth).toBeUndefined();
+        expect(device.unavailableCapabilities.ada).toBe('no-support');
+        expect(device.unavailableCapabilities['settings.firmwareUpdate']).toBe('no-support');
+        expect(device.unavailableCapabilities['settings.authenticity']).toBe('no-support');
+        expect(device.ledgerInfo?.accountsDiscoveryAppVersion).toBe('0.1.0');
+        expect(hasBitcoinOnlyFirmware(device)).toBe(false);
     });
 
     it('uses the native Bluetooth transport and disables unsupported device settings', () => {

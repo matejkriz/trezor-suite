@@ -1,21 +1,31 @@
 import { type DeviceRootState, type LedgerSuiteDevice, deviceActions } from '@suite-common/device';
 import { type LedgerBitcoinServiceDep, type LedgerDevice } from '@suite-common/ledger';
 import { type WithServices, createThunk } from '@suite-common/redux-utils';
+import { asNetworkSymbol } from '@suite-common/wallet-config';
 import TrezorConnect from '@trezor/connect';
+import { asCoinSymbol } from '@trezor/connect-common';
 
-import { addDiscoveredLedgerBitcoinWallet } from './addDiscoveredLedgerBitcoinWallet';
+import { addDiscoveredLedgerWallet } from './addDiscoveredLedgerWallet';
 import { discoverLedgerBitcoinWallet } from './discoverLedgerBitcoinWallet';
+import { discoverLedgerWalletWithAccountsApp } from './discoverLedgerWalletWithAccountsApp';
 import { type AccountsRootState } from '../accounts/accountsReducer';
 import { selectAccounts } from '../accounts/accountsSelectors';
 import { discoveryActions } from '../discovery/discoveryActions';
+import {
+    type WalletSettingsRootState,
+    selectEnabledNetworks,
+} from '../settings/walletSettingsReducer';
 
 type ConnectLedgerBitcoinWalletParams = {
     device: LedgerDevice;
     apiType?: 'usb' | 'bluetooth';
     expectedDeviceId?: string;
+    useAccountsDiscovery?: boolean;
 };
 
-export type ConnectLedgerBitcoinWalletThunkState = DeviceRootState & AccountsRootState;
+export type ConnectLedgerBitcoinWalletThunkState = DeviceRootState &
+    AccountsRootState &
+    WalletSettingsRootState;
 
 export type ConnectLedgerBitcoinWalletThunkDeps = WithServices<LedgerBitcoinServiceDep>;
 
@@ -30,7 +40,7 @@ export const connectLedgerBitcoinWalletThunk = createThunk<
 >(
     '@common/wallet-core/ledger/connectBitcoinWallet',
     async (
-        { device, apiType = 'usb', expectedDeviceId },
+        { device, apiType = 'usb', expectedDeviceId, useAccountsDiscovery = false },
         { dispatch, getState, extra, signal, requestId, rejectWithValue },
     ) => {
         let isAcquisitionCommitted = false;
@@ -46,22 +56,41 @@ export const connectLedgerBitcoinWalletThunk = createThunk<
         signal.addEventListener('abort', handleAbort, { once: true });
 
         try {
-            const discovered = await discoverLedgerBitcoinWallet(
-                {
-                    ledgerBitcoinService: extra.services.ledgerBitcoinService,
-                    getAccountInfo: descriptor =>
-                        TrezorConnect.getAccountInfo({
-                            coin: 'btc',
-                            descriptor,
-                            details: 'txs',
-                            page: 1,
-                            pageSize: 25,
-                            suppressBackupWarning: true,
-                        }),
-                },
-                device,
-                { signal, owner: requestId },
-            );
+            const getAccountInfo = (coin: string, descriptor: string) =>
+                TrezorConnect.getAccountInfo({
+                    coin: asCoinSymbol(coin),
+                    descriptor,
+                    details: 'txs',
+                    page: 1,
+                    pageSize: 25,
+                    suppressBackupWarning: true,
+                });
+            const enabledNetworks = selectEnabledNetworks(getState());
+            const discovered = useAccountsDiscovery
+                ? await discoverLedgerWalletWithAccountsApp(
+                      {
+                          ledgerBitcoinService: extra.services.ledgerBitcoinService,
+                          getAccountInfo: ({ symbol, descriptor }) =>
+                              getAccountInfo(symbol, descriptor),
+                      },
+                      device,
+                      {
+                          signal,
+                          owner: requestId,
+                          networkSymbols:
+                              enabledNetworks.length > 0
+                                  ? enabledNetworks
+                                  : [asNetworkSymbol('btc'), asNetworkSymbol('eth')],
+                      },
+                  )
+                : await discoverLedgerBitcoinWallet(
+                      {
+                          ledgerBitcoinService: extra.services.ledgerBitcoinService,
+                          getAccountInfo: descriptor => getAccountInfo('btc', descriptor),
+                      },
+                      device,
+                      { signal, owner: requestId },
+                  );
 
             if (
                 signal.aborted ||
@@ -77,7 +106,7 @@ export const connectLedgerBitcoinWalletThunk = createThunk<
             }
 
             isAcquisitionCommitted = true;
-            const connectedDevice = addDiscoveredLedgerBitcoinWallet(
+            const connectedDevice = addDiscoveredLedgerWallet(
                 dispatch,
                 selectAccounts(getState()),
                 discovered,

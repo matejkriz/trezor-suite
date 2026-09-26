@@ -154,4 +154,6 @@ export * from './yield/yieldTypes';
 export { useResolveNamedAddress } from './named-address/useResolveNamedAddress';
 
 export * from './wallet-device/createWalletDeviceService';
+export { getWalletDeviceAccountCapabilities } from './wallet-device/walletDeviceAccountCapabilities';
 export * from './wallet-device/walletDeviceThunks';
+export { useWalletDeviceAccountCapabilities } from './wallet-device/useWalletDeviceAccountCapabilities';

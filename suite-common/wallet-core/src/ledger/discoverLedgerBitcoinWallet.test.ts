@@ -58,6 +58,8 @@ describe('discoverLedgerBitcoinWallet', () => {
         expect(result.wallet.deviceInfo).toEqual(service.getDeviceInfo());
         expect(result.accounts).toEqual([
             {
+                symbol: 'btc',
+                accountType: 'normal',
                 index: 0,
                 path: "m/84'/0'/0'",
                 accountInfo: accountInfo(0, true),

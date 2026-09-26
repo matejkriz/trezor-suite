@@ -1,6 +1,10 @@
 import { type LedgerSuiteDevice } from '@suite-common/device';
 import { type LedgerDeviceInfo } from '@suite-common/ledger';
-import { getSupportedNetworks } from '@suite-common/wallet-config';
+import {
+    type NetworkSymbol,
+    asNetworkSymbol,
+    getSupportedNetworks,
+} from '@suite-common/wallet-config';
 import { type StaticSessionId, type UnavailableCapabilities } from '@trezor/connect';
 import { asDeviceUniquePath } from '@trezor/connect-common';
 import { DeviceModelInternal, FirmwareType } from '@trezor/device-utils';
@@ -11,6 +15,8 @@ export type LedgerWalletIdentity = {
     staticSessionId: StaticSessionId;
     sessionId?: string;
     deviceInfo?: LedgerDeviceInfo;
+    supportedNetworks?: NetworkSymbol[];
+    accountsDiscoveryAppVersion?: string;
 };
 
 const unsupportedCapabilities = [
@@ -52,20 +58,29 @@ const unsupportedCapabilities = [
     'firmwareHashCheck',
 ] as const;
 
-const unavailableCapabilities: UnavailableCapabilities = {
-    ...Object.fromEntries(
-        getSupportedNetworks()
-            .filter(symbol => symbol !== 'btc')
-            .map(symbol => [symbol, 'no-support'] as const),
-    ),
-    ...Object.fromEntries(unsupportedCapabilities.map(capability => [capability, 'no-support'])),
-};
-
 export const createLedgerSuiteDevice = (
-    { id, label, staticSessionId, sessionId, deviceInfo }: LedgerWalletIdentity,
+    {
+        id,
+        label,
+        staticSessionId,
+        sessionId,
+        deviceInfo,
+        supportedNetworks = [asNetworkSymbol('btc')],
+        accountsDiscoveryAppVersion,
+    }: LedgerWalletIdentity,
     apiType: 'usb' | 'bluetooth' = 'usb',
 ): LedgerSuiteDevice => {
     const now = Date.now();
+    const unavailableCapabilities: UnavailableCapabilities = {
+        ...Object.fromEntries(
+            getSupportedNetworks()
+                .filter(symbol => !supportedNetworks.includes(symbol))
+                .map(symbol => [symbol, 'no-support'] as const),
+        ),
+        ...Object.fromEntries(
+            unsupportedCapabilities.map(capability => [capability, 'no-support']),
+        ),
+    };
 
     return {
         provider: 'ledger',
@@ -73,20 +88,24 @@ export const createLedgerSuiteDevice = (
         id,
         name: label,
         label,
-        ledgerInfo: deviceInfo
-            ? {
-                  model: deviceInfo.model,
-                  osVersion: deviceInfo.osVersion,
-                  bitcoinAppVersion: deviceInfo.bitcoinAppVersion,
-                  batteryLevel: deviceInfo.batteryLevel,
-              }
-            : undefined,
+        ledgerInfo:
+            deviceInfo || accountsDiscoveryAppVersion
+                ? {
+                      model: deviceInfo?.model ?? 'Ledger',
+                      osVersion: deviceInfo?.osVersion,
+                      bitcoinAppVersion: deviceInfo?.bitcoinAppVersion,
+                      batteryLevel: deviceInfo?.batteryLevel,
+                      ...(accountsDiscoveryAppVersion ? { accountsDiscoveryAppVersion } : {}),
+                  }
+                : undefined,
         path: asDeviceUniquePath(`ledger:${id}`),
         descriptor: { apiType, id },
         status: 'available',
         mode: 'normal',
         firmware: 'unknown',
-        firmwareType: FirmwareType.BitcoinOnly,
+        firmwareType: supportedNetworks.some(symbol => symbol !== 'btc')
+            ? FirmwareType.Universal
+            : FirmwareType.BitcoinOnly,
         state: { staticSessionId, sessionId },
         features: {
             vendor: 'Ledger',

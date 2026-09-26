@@ -4,10 +4,10 @@ import { asAccountDescriptor } from '@suite-common/wallet-types';
 import { mockWalletAccount } from '@suite-common/wallet-types/mocks';
 import { type AccountInfo } from '@trezor/connect';
 
-import { addDiscoveredLedgerBitcoinWallet } from './addDiscoveredLedgerBitcoinWallet';
+import { addDiscoveredLedgerWallet } from './addDiscoveredLedgerWallet';
 import { accountsActions } from '../accounts/accountsActions';
 
-describe('addDiscoveredLedgerBitcoinWallet', () => {
+describe('addDiscoveredLedgerWallet', () => {
     it('adds a selected Ledger wallet and its Bitcoin account to Suite', () => {
         const dispatch = jest.fn();
         const accountInfo = {
@@ -23,9 +23,18 @@ describe('addDiscoveredLedgerBitcoinWallet', () => {
             staticSessionId: 'ledgerwallet@ledger:0' as const,
         };
 
-        addDiscoveredLedgerBitcoinWallet(dispatch, [], {
+        addDiscoveredLedgerWallet(dispatch, [], {
             wallet,
-            accounts: [{ index: 0, path: "m/84'/0'/0'", accountInfo, visible: true }],
+            accounts: [
+                {
+                    symbol: asNetworkSymbol('btc'),
+                    accountType: 'normal',
+                    index: 0,
+                    path: "m/84'/0'/0'",
+                    accountInfo,
+                    visible: true,
+                },
+            ],
         });
 
         expect(dispatch.mock.calls[0]?.[0]).toMatchObject({
@@ -55,6 +64,63 @@ describe('addDiscoveredLedgerBitcoinWallet', () => {
         expect(dispatch).toHaveBeenCalledTimes(2);
     });
 
+    it('inserts BTC and ETH into ordinary accounts with their own types and derivation paths', () => {
+        const dispatch = jest.fn();
+        const wallet = {
+            id: 'ledgerwallet',
+            label: 'My wallet',
+            staticSessionId: 'ledgerwallet@ledger:0' as const,
+            supportedNetworks: [asNetworkSymbol('btc'), asNetworkSymbol('eth')],
+            accountsDiscoveryAppVersion: '0.1.0',
+        };
+        addDiscoveredLedgerWallet(dispatch, [], {
+            wallet,
+            accounts: [
+                {
+                    symbol: asNetworkSymbol('btc'),
+                    accountType: 'legacy',
+                    index: 0,
+                    path: "m/44'/0'/0'",
+                    visible: false,
+                    accountInfo: {
+                        descriptor: 'xpubfixture',
+                        empty: true,
+                        balance: '0',
+                        availableBalance: '0',
+                        history: { total: 0, unconfirmed: 0 },
+                    },
+                },
+                {
+                    symbol: asNetworkSymbol('eth'),
+                    accountType: 'normal',
+                    index: 0,
+                    path: "m/44'/60'/0'/0/0",
+                    visible: true,
+                    accountInfo: {
+                        descriptor: '0x1234567890abcdef1234567890abcdef12345678',
+                        empty: true,
+                        balance: '0',
+                        availableBalance: '0',
+                        history: { total: 0, unconfirmed: 0 },
+                    },
+                },
+            ],
+        });
+        expect(dispatch.mock.calls[1][0].payload.account).toMatchObject({
+            symbol: 'btc',
+            accountType: 'legacy',
+            visible: false,
+        });
+        expect(dispatch.mock.calls[2][0].payload.account).toMatchObject({
+            symbol: 'eth',
+            accountType: 'normal',
+            path: "m/44'/60'/0'/0/0",
+            visible: true,
+            networkType: 'ethereum',
+        });
+        expect(dispatch.mock.calls[0][0].payload.unavailableCapabilities.eth).toBeUndefined();
+    });
+
     it('refreshes an existing account without discarding its custom label or metadata', () => {
         const dispatch = jest.fn();
         const wallet = {
@@ -80,9 +146,18 @@ describe('addDiscoveredLedgerBitcoinWallet', () => {
             visible: true,
         });
 
-        addDiscoveredLedgerBitcoinWallet(dispatch, [existingAccount], {
+        addDiscoveredLedgerWallet(dispatch, [existingAccount], {
             wallet,
-            accounts: [{ index: 0, path: "m/84'/0'/0'", accountInfo, visible: true }],
+            accounts: [
+                {
+                    symbol: asNetworkSymbol('btc'),
+                    accountType: 'normal',
+                    index: 0,
+                    path: "m/84'/0'/0'",
+                    accountInfo,
+                    visible: true,
+                },
+            ],
         });
 
         expect(dispatch.mock.calls[1]?.[0]).toMatchObject({
