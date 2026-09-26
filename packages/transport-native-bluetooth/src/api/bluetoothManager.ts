@@ -75,6 +75,10 @@ class BluetoothManager {
     private nearbyDevicesRemovalId: TimerId | null = null;
     private connectedDevices: Record<DeviceId, BleDeviceWithMetadata> = {};
     private readBuffer = readMessageBuffer();
+    private deviceScanSuspensions = 0;
+    private pendingDeviceScanStop = Promise.resolve();
+    private isDeviceScanRequested = false;
+    private deviceScanErrorHandler?: (error: BleError) => void;
 
     private getBleManager() {
         // this ensures that Bluetooth permission is not auto-requested at iOS app startup
@@ -145,6 +149,10 @@ class BluetoothManager {
     };
 
     public startDeviceScan = (errorHandler?: (error: BleError) => void) => {
+        this.isDeviceScanRequested = true;
+        this.deviceScanErrorHandler = errorHandler;
+        if (this.deviceScanSuspensions > 0) return;
+
         this.getBleManager().startDeviceScan(
             [TrezorService.uuid],
             { allowDuplicates: true }, // ensures we get frequent scan updates even on iOS
@@ -182,8 +190,39 @@ class BluetoothManager {
     };
 
     public stopDeviceScan = () => {
+        this.isDeviceScanRequested = false;
         this.stopStaleNearbyDevicesRemoval();
+        if (this.deviceScanSuspensions > 0) return;
+
         this.getBleManager().stopDeviceScan();
+    };
+
+    public suspendDeviceScan = async (): Promise<() => void> => {
+        this.deviceScanSuspensions++;
+        if (this.deviceScanSuspensions === 1) {
+            this.stopStaleNearbyDevicesRemoval();
+            this.pendingDeviceScanStop = this.bleManager?.stopDeviceScan() ?? Promise.resolve();
+        }
+
+        let isResumed = false;
+
+        const resume = () => {
+            if (isResumed) return;
+            isResumed = true;
+            this.deviceScanSuspensions--;
+            if (this.deviceScanSuspensions === 0 && this.isDeviceScanRequested) {
+                this.startDeviceScan(this.deviceScanErrorHandler);
+            }
+        };
+
+        try {
+            await this.pendingDeviceScanStop;
+        } catch (error) {
+            resume();
+            throw error;
+        }
+
+        return resume;
     };
 
     private startStaleNearbyDevicesRemoval = () => {
