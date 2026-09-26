@@ -1,0 +1,22 @@
+[package]
+name = "accounts-discovery"
+version = "0.1.0"
+authors = ["Trezor Suite contributors"]
+edition = "2021"
+license-file = "../../LICENSE.md"
+
+[dependencies]
+ledger_device_sdk = { version = "=1.37.0", features = ["io_new"] }
+
+[features]
+default = []
+
+[package.metadata.ledger]
+curve = ["secp256k1", "ed25519"]
+flags = "0"
+path = ["44'/0'", "49'/0'", "84'/0'", "86'/0'", "44'/1'", "49'/1'", "84'/1'", "86'/1'", "44'/2'", "49'/2'", "84'/2'", "44'/3'", "44'/145'", "44'/133'", "44'/60'", "44'/61'", "44'/144'", "44'/195'", "44'/501'", "44'/148'"]
+name = "Accounts Discovery"
+flex = { icon = "icons/accounts_40.gif" }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("flex"))'] }
