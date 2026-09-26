@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { isDevelopOrDebugEnv } from '@suite-native/config';
 import { BootloaderModeScreen } from '@suite-native/device-bootloader-mode';
+import { ConnectLedgerScreen } from '@suite-native/device-manager';
 import { AccountsImportStackNavigator } from '@suite-native/module-accounts-import';
 import {
     AccountAssetsScreen,
@@ -325,6 +326,10 @@ export const RootStackNavigator = () => {
 
             {/* Navigation flows that start by push from bottom animation on the first screen of its stack. */}
             <RootStack.Group screenOptions={{ animation: 'slide_from_bottom' }}>
+                <RootStack.Screen
+                    name={RootStackRoutes.ConnectLedger}
+                    component={ConnectLedgerScreen}
+                />
                 <RootStack.Screen
                     name={RootStackRoutes.DeviceOnboardingStack}
                     component={DeviceOnboardingStackNavigator}

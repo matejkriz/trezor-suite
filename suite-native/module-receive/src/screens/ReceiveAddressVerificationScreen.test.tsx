@@ -3,14 +3,19 @@ import { Text } from 'react-native';
 
 import { useRoute } from '@react-navigation/native';
 
+import { deviceReducerInitialState } from '@suite-common/device';
 import { mockAccountKey } from '@suite-common/wallet-types/mocks';
 import { ReceiveAddressVerificationSource } from '@suite-native/navigation';
-import { act, renderWithBasicProvider } from '@suite-native/test-utils';
+import { act, renderWithStoreProvider } from '@suite-native/test-utils-store';
 
 import { ReceiveAddressVerificationScreen } from './ReceiveAddressVerificationScreen';
 
 const mockVerifyAddressOnDevice = jest.fn();
 const mockUseFocusEffect = jest.fn();
+const renderScreen = () =>
+    renderWithStoreProvider(<ReceiveAddressVerificationScreen />, {
+        preloadedState: { device: deviceReducerInitialState },
+    });
 let handleScreenFocus = () => {};
 
 jest.mock('../hooks/useReceiveAddressVerification', () => ({
@@ -59,13 +64,13 @@ describe('ReceiveAddressVerificationScreen', () => {
     });
 
     it('displays pasted address verification instructions', async () => {
-        const { getByText } = await renderWithBasicProvider(<ReceiveAddressVerificationScreen />);
+        const { getByText } = await renderScreen();
 
         expect(getByText('moduleReceive.addressVerificationScreen.pastedTitle')).toBeTruthy();
     });
 
     it('starts address verification only once when focused repeatedly', async () => {
-        await renderWithBasicProvider(<ReceiveAddressVerificationScreen />);
+        await renderScreen();
 
         await act(handleScreenFocus);
         await act(handleScreenFocus);
@@ -82,7 +87,7 @@ describe('ReceiveAddressVerificationScreen', () => {
             },
         } as never);
 
-        const { getByText } = await renderWithBasicProvider(<ReceiveAddressVerificationScreen />);
+        const { getByText } = await renderScreen();
 
         expect(getByText('moduleReceive.addressVerificationScreen.sharedTitle')).toBeTruthy();
     });

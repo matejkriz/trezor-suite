@@ -4,9 +4,9 @@ import {
     selectDeviceLabel,
     selectDeviceModel,
     selectDeviceName,
+    selectDeviceSettingsCapabilities,
     selectIsDeviceInitialized,
 } from '@suite-common/device';
-import { SUPPORTS_DEVICE_AUTHENTICITY_CHECK } from '@suite-common/suite-constants';
 import { TitledSection, VStack } from '@suite-native/atoms';
 import { Translation } from '@suite-native/intl';
 import { Screen, ScreenHeader, useNavigateToInitialScreen } from '@suite-native/navigation';
@@ -29,6 +29,11 @@ export const DeviceSettingsScreen = () => {
     const deviceName = useSelector(selectDeviceName);
     const deviceLabel = useSelector(selectDeviceLabel);
     const isDeviceInitialized = useSelector(selectIsDeviceInitialized);
+    const capabilities = useSelector(selectDeviceSettingsCapabilities);
+    const hasSecuritySettings =
+        (isDeviceInitialized &&
+            (capabilities.pin || capabilities.backup || capabilities.passphrase)) ||
+        capabilities.authenticity;
 
     if (!deviceModel || !deviceName) {
         return null;
@@ -43,21 +48,28 @@ export const DeviceSettingsScreen = () => {
                 <TitledSection
                     title={<Translation id="moduleDeviceSettings.sectionTitles.general" />}
                 >
-                    <DeviceFirmwareCard />
+                    {capabilities.firmwareUpdate && <DeviceFirmwareCard />}
                     <DeviceConnectionCard />
                 </TitledSection>
-                <TitledSection
-                    title={<Translation id="moduleDeviceSettings.sectionTitles.security" />}
-                >
-                    {isDeviceInitialized && <DevicePinProtectionCard />}
-                    {isDeviceInitialized && <BackupAndPassphraseCard />}
-                    {SUPPORTS_DEVICE_AUTHENTICITY_CHECK[deviceModel] && <DeviceAuthenticityCard />}
-                </TitledSection>
-                <TitledSection
-                    title={<Translation id="moduleDeviceSettings.sectionTitles.dangerZone" />}
-                >
-                    <WipeDeviceCard />
-                </TitledSection>
+                {hasSecuritySettings && (
+                    <TitledSection
+                        title={<Translation id="moduleDeviceSettings.sectionTitles.security" />}
+                    >
+                        {isDeviceInitialized && capabilities.pin && <DevicePinProtectionCard />}
+                        {isDeviceInitialized &&
+                            (capabilities.backup || capabilities.passphrase) && (
+                                <BackupAndPassphraseCard />
+                            )}
+                        {capabilities.authenticity && <DeviceAuthenticityCard />}
+                    </TitledSection>
+                )}
+                {capabilities.wipe && (
+                    <TitledSection
+                        title={<Translation id="moduleDeviceSettings.sectionTitles.dangerZone" />}
+                    >
+                        <WipeDeviceCard />
+                    </TitledSection>
+                )}
             </VStack>
         </Screen>
     );

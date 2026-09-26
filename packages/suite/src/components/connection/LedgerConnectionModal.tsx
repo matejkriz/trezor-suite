@@ -1,18 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useServices } from '@suite-common/dependency-injection';
 import { selectSelectedDevice } from '@suite-common/device';
-import { type LedgerDevice } from '@suite-common/ledger';
+import { type LedgerDevice, injectLedgerBitcoinService } from '@suite-common/ledger';
 import { injectDispatch } from '@suite-common/redux-utils';
-import { selectAccounts } from '@suite-common/wallet-core';
+import { connectLedgerBitcoinWalletThunk } from '@suite-common/wallet-core';
 import { Button, Column, H3, Modal, Row, Spinner, Text } from '@trezor/components';
-import TrezorConnect from '@trezor/connect';
 
-import { addDiscoveredLedgerBitcoinWallet } from 'src/actions/ledger/addDiscoveredLedgerBitcoinWallet';
-import { discoverLedgerBitcoinWallet } from 'src/actions/ledger/discoverLedgerBitcoinWallet';
 import { redirectAfterWalletSelectedThunk } from 'src/actions/wallet/addWalletThunk';
 import { useSelector } from 'src/hooks/suite';
-import { injectLedgerBitcoinService } from 'src/support/ledger/injectLedgerBitcoinService';
 
 import { LedgerConnectionIllustration } from './LedgerConnectionIllustration';
 import { getLedgerConnectionErrorMessage } from './getLedgerConnectionErrorMessage';
@@ -23,30 +19,35 @@ type LedgerConnectionModalProps = {
 };
 
 export const LedgerConnectionModal = ({ onCancel, onBack }: LedgerConnectionModalProps) => {
-    const { ledgerBitcoinService: service, dispatch } = useServices(
+    const { ledgerBitcoinService, dispatch } = useServices(
         injectLedgerBitcoinService,
         injectDispatch,
     );
     const selectedDevice = useSelector(selectSelectedDevice);
-    const existingAccounts = useSelector(selectAccounts);
     const [devices, setDevices] = useState<LedgerDevice[]>([]);
     const [isScanning, setIsScanning] = useState(false);
     const [isBusy, setIsBusy] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string>();
+    const isActive = useRef(true);
+    const abortConnection = useRef<(() => void) | undefined>(undefined);
+    const stopScanning = useRef<(() => Promise<void>) | undefined>(undefined);
     const isWebHIDAvailable =
         typeof navigator !== 'undefined' && 'hid' in navigator && !!navigator.hid;
 
     useEffect(() => {
-        const stopListening = service.listenToAvailableDevices(
+        isActive.current = true;
+        const stopListening = ledgerBitcoinService.listenToAvailableDevices(
             availableDevices => setDevices(availableDevices),
             error => setErrorMessage(getLedgerConnectionErrorMessage(error)),
         );
 
         return () => {
+            isActive.current = false;
+            abortConnection.current?.();
             stopListening();
-            void service.stopDiscovery().catch(() => undefined);
+            void stopScanning.current?.().catch(() => undefined);
         };
-    }, [service]);
+    }, [ledgerBitcoinService]);
 
     const startScanning = () => {
         setDevices([]);
@@ -54,7 +55,7 @@ export const LedgerConnectionModal = ({ onCancel, onBack }: LedgerConnectionModa
         setIsScanning(true);
 
         try {
-            service.startDiscovery(
+            stopScanning.current = ledgerBitcoinService.startDiscovery(
                 device => {
                     setIsScanning(false);
                     setDevices(current =>
@@ -75,35 +76,30 @@ export const LedgerConnectionModal = ({ onCancel, onBack }: LedgerConnectionModa
     };
 
     const connect = async (device: LedgerDevice) => {
+        if (abortConnection.current) return;
+
         setIsBusy(true);
         setErrorMessage(undefined);
+        const connection = dispatch(connectLedgerBitcoinWalletThunk({ device }));
+        abortConnection.current = connection.abort;
 
         try {
-            const discovered = await discoverLedgerBitcoinWallet(
-                {
-                    ledgerBitcoinService: service,
-                    getAccountInfo: descriptor =>
-                        TrezorConnect.getAccountInfo({
-                            coin: 'btc',
-                            descriptor,
-                            details: 'txs',
-                            page: 1,
-                            pageSize: 25,
-                            suppressBackupWarning: true,
-                        }),
-                },
-                device,
-            );
-            addDiscoveredLedgerBitcoinWallet(dispatch, existingAccounts, discovered);
+            const connectedDevice = await connection.unwrap();
+            abortConnection.current = undefined;
+            if (!isActive.current) return;
+
             onCancel();
-            if (selectedDevice?.id !== discovered.wallet.id) {
+            if (selectedDevice?.id !== connectedDevice.id) {
                 dispatch(redirectAfterWalletSelectedThunk({ forceDeviceDashboard: true }));
             }
         } catch (error) {
-            setErrorMessage(getLedgerConnectionErrorMessage(error));
+            if (isActive.current) setErrorMessage(getLedgerConnectionErrorMessage(error));
         } finally {
-            setIsScanning(false);
-            setIsBusy(false);
+            abortConnection.current = undefined;
+            if (isActive.current) {
+                setIsScanning(false);
+                setIsBusy(false);
+            }
         }
     };
 
@@ -114,6 +110,16 @@ export const LedgerConnectionModal = ({ onCancel, onBack }: LedgerConnectionModa
                 width={400}
                 onCancel={onCancel}
                 onBackClick={onBack}
+                bottomContent={
+                    <Column width="100%">
+                        <Button
+                            onClick={startScanning}
+                            isDisabled={!isWebHIDAvailable || isScanning || isBusy}
+                        >
+                            Choose Ledger
+                        </Button>
+                    </Column>
+                }
             >
                 <Column alignItems="center" gap={24} overflow="hidden">
                     <H3 typographyStyle="headline-md" align="center" textWrap="balance">
@@ -125,15 +131,10 @@ export const LedgerConnectionModal = ({ onCancel, onBack }: LedgerConnectionModa
                     </Row>
                     <LedgerConnectionIllustration />
                     <Text align="center">
-                        Connect your Ledger by USB, unlock it, and open the Bitcoin app.
+                        Connect your Ledger by USB and unlock it. Confirm opening the Bitcoin app
+                        when prompted.
                     </Text>
                     <Column gap={12} width="100%">
-                        <Button
-                            onClick={startScanning}
-                            isDisabled={!isWebHIDAvailable || isScanning || isBusy}
-                        >
-                            Choose Ledger
-                        </Button>
                         {!isWebHIDAvailable && (
                             <Text intent="critical">
                                 USB connection to Ledger requires WebHID. Open Suite in Chrome or

@@ -3,7 +3,7 @@ import { isRejected } from '@reduxjs/toolkit';
 
 import { type AnalyticsDep } from '@suite-common/analytics';
 import { Calldata } from '@suite-common/calldata';
-import { type DeviceRootState, isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
+import { type DeviceRootState, selectSelectedDevice } from '@suite-common/device';
 import {
     type ActionsFromAsyncThunk,
     type WithServices,
@@ -30,7 +30,6 @@ import {
     asAmountSubunit,
     convertAmountSubunitsToUnits,
     convertAmountUnitsToSubunits,
-    datetimeToLocktime,
     formatNetworkAmount,
     getAccountDecimals,
     getEvmTransactionTextSignature,
@@ -89,10 +88,6 @@ import {
     type SignTransactionError,
     type SignTransactionTimeoutError,
 } from './sendFormTypes';
-import {
-    type LedgerBitcoinSigner,
-    signLedgerBitcoinTransaction,
-} from './signLedgerBitcoinTransaction';
 import { accountsActions } from '../accounts/accountsActions';
 import { type AccountsRootState } from '../accounts/accountsReducer';
 import { selectAccountByKey } from '../accounts/accountsSelectors';
@@ -115,6 +110,8 @@ import {
     addFakePendingTronSendTxThunk,
     addFakePendingTxThunk,
 } from '../transactions/transactionsThunks';
+import { type WalletDeviceServiceDep } from '../wallet-device/createWalletDeviceService';
+import { WalletDeviceActionError } from '../wallet-device/walletDeviceError';
 import {
     composeTronTransactionFeeLevelsThunk,
     signTronSendFormTransactionThunk,
@@ -265,11 +262,11 @@ export const composeSendFormTransactionFeeLevelsThunk = createThunk<
     },
 );
 
-export type CancelSignSendFormTransactionThunkState = SendRootState;
+export type CancelSignSendFormTransactionThunkState = SendRootState & DeviceRootState;
 
 export type CancelSignSendFormTransactionThunkDeps = {
     actions: OnModalCancelDep;
-};
+} & WithServices<WalletDeviceServiceDep>;
 
 export const cancelSignSendFormTransactionThunk = createThunk<
     void,
@@ -281,15 +278,18 @@ export const cancelSignSendFormTransactionThunk = createThunk<
     }
 >(
     `${SEND_MODULE_PREFIX}/cancelSignSendFormTransactionThunk`,
-    (_, { dispatch, getState, extra, rejectWithValue }) => {
+    async (_, { dispatch, getState, extra, rejectWithValue }) => {
         const {
             actions: { onModalCancel },
         } = extra;
         const serializedTx = selectSendSerializedTx(getState());
         dispatch(sendFormActions.discardTransaction());
-        // if transaction is not signed yet interrupt signing in TrezorConnect
+        // If the transaction is not signed yet, interrupt its device action.
         if (!serializedTx) {
-            TrezorConnect.cancel({ reason: 'tx-cancelled' });
+            await extra.services.walletDeviceService.cancelAction({
+                device: selectSelectedDevice(getState()),
+                reason: { reason: 'tx-cancelled' },
+            });
 
             return;
         }
@@ -684,7 +684,7 @@ export type SignTransactionThunkState = AccountsRootState &
     TransactionsRootState &
     WalletSettingsRootState;
 
-type SignTransactionThunkDeps = WithServices<{ ledgerBitcoinService: LedgerBitcoinSigner }>;
+export type SignTransactionThunkDeps = WithServices<WalletDeviceServiceDep>;
 
 export const signTransactionThunk = createThunk<
     { serializedTx: string; signedTx?: BlockbookTransaction },
@@ -702,56 +702,52 @@ export const signTransactionThunk = createThunk<
     ) => {
         const device = selectSelectedDevice(getState());
 
-        if (isLedgerDevice(device)) {
-            if (
-                !device.connected ||
-                selectedAccount.deviceState !== device.state?.staticSessionId ||
-                selectedAccount.symbol !== 'btc' ||
-                precomposedTransaction.type !== 'final' ||
-                isCardanoTx(selectedAccount, precomposedTransaction) ||
-                paymentRequests?.length ||
-                formState.rbfParams
-            ) {
-                return rejectWithValue({
-                    error: 'sign-transaction-failed',
-                    message: 'Unsupported Ledger Bitcoin transaction.',
-                });
-            }
-
-            try {
-                let locktime: number | undefined;
-                if (formState.bitcoinLocktimeBlockHeight) {
-                    locktime = new BigNumber(formState.bitcoinLocktimeBlockHeight).toNumber();
-                } else if (formState.bitcoinLocktimeDatetime) {
-                    locktime = datetimeToLocktime(formState.bitcoinLocktimeDatetime);
-                }
-                const serializedTx = await signLedgerBitcoinTransaction({
-                    account: selectedAccount,
-                    transaction: precomposedTransaction,
-                    signer: extra.services.ledgerBitcoinService,
-                    locktime,
-                });
-
-                dispatch(
-                    sendFormActions.storeSignedTransaction({
-                        serializedTx: { tx: serializedTx, symbol: selectedAccount.symbol },
-                    }),
-                );
-
-                return { serializedTx };
-            } catch (error) {
-                return rejectWithValue({
-                    error: 'sign-transaction-failed',
-                    message: error instanceof Error ? error.message : 'Ledger signing failed.',
-                });
-            }
-        }
-
         if (!device || precomposedTransaction?.type !== 'final')
             return rejectWithValue({
                 error: 'sign-transaction-failed',
                 message: 'Invalid input data.',
             });
+
+        const operations = extra.services.walletDeviceService.get(device);
+        if (operations) {
+            try {
+                const result = await operations.signTransaction({
+                    formState,
+                    precomposedTransaction,
+                    selectedAccount,
+                    paymentRequests,
+                });
+                dispatch(
+                    sendFormActions.storeSignedTransaction({
+                        serializedTx: { tx: result.serializedTx, symbol: selectedAccount.symbol },
+                        signedTx: result.signedTx,
+                    }),
+                );
+
+                return result;
+            } catch (error) {
+                if (error instanceof WalletDeviceActionError) {
+                    if (error.kind === 'timeout') {
+                        return rejectWithValue({
+                            error: 'sign-transaction-timeout',
+                            message: 'Signing process timed out.',
+                        });
+                    }
+
+                    return rejectWithValue({
+                        error: 'sign-transaction-failed',
+                        errorCode:
+                            error.kind === 'rejected' ? 'Failure_ActionCancelled' : 'Method_Cancel',
+                        message: 'User canceled the signing process.',
+                    });
+                }
+
+                return rejectWithValue({
+                    error: 'sign-transaction-failed',
+                    message: 'Device transaction signing failed.',
+                });
+            }
+        }
 
         let response: CoinSpecificSignResponse | undefined;
 

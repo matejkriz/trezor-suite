@@ -23,6 +23,7 @@ import { asNetworkSymbol } from '@suite-common/wallet-config';
 import {
     accountsActions,
     changeCoinVisibilityThunk,
+    createLedgerSuiteDevice,
     transactionsActions,
 } from '@suite-common/wallet-core';
 import * as discoveryActions from '@suite-common/wallet-core';
@@ -47,7 +48,6 @@ import {
 } from 'src/reducers/wallet';
 import graphReducer from 'src/reducers/wallet/graphReducer';
 import { type Db } from 'src/storage/createDb';
-import { createLedgerSuiteDevice } from 'src/support/ledger/createLedgerSuiteDevice';
 import { type PreloadStore, createPreloadStore } from 'src/support/suite/createPreloadStore';
 import { type AcquiredDevice, type AppState } from 'src/types/suite';
 

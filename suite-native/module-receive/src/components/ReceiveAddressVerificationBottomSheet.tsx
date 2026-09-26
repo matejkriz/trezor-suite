@@ -1,3 +1,6 @@
+import { useSelector } from 'react-redux';
+
+import { selectDeviceBrandName } from '@suite-common/device';
 import {
     BottomSheetModal,
     type BottomSheetModalRef,
@@ -24,6 +27,11 @@ export const ReceiveAddressVerificationBottomSheet = ({
     onSkipVerification,
 }: ReceiveAddressVerificationBottomSheetProps) => {
     const isSharedAddress = source === ReceiveAddressVerificationSource.Shared;
+    const deviceName = useSelector(selectDeviceBrandName);
+    const isTrezor = deviceName === 'Trezor';
+    const sharedSubtitle = isTrezor
+        ? 'moduleReceive.addressSharedBottomSheet.subtitle'
+        : 'moduleReceive.addressSharedBottomSheet.deviceSubtitle';
 
     return (
         <BottomSheetModal ref={ref}>
@@ -42,9 +50,10 @@ export const ReceiveAddressVerificationBottomSheet = ({
                         <Translation
                             id={
                                 isSharedAddress
-                                    ? 'moduleReceive.addressSharedBottomSheet.subtitle'
+                                    ? sharedSubtitle
                                     : 'moduleReceive.addressCopiedBottomSheet.subtitle'
                             }
+                            values={{ deviceName }}
                         />
                     </Text>
                 </VStack>
@@ -54,7 +63,14 @@ export const ReceiveAddressVerificationBottomSheet = ({
                             <Translation id="moduleReceive.addressCopiedBottomSheet.steps.pasteAddress" />
                         </IconListTextItem>
                         <IconListTextItem icon={2}>
-                            <Translation id="moduleReceive.addressCopiedBottomSheet.steps.verifyAddress" />
+                            <Translation
+                                id={
+                                    isTrezor
+                                        ? 'moduleReceive.addressCopiedBottomSheet.steps.verifyAddress'
+                                        : 'moduleReceive.addressCopiedBottomSheet.steps.verifyAddressOnDevice'
+                                }
+                                values={{ deviceName }}
+                            />
                         </IconListTextItem>
                     </IconList>
                 )}
@@ -64,7 +80,14 @@ export const ReceiveAddressVerificationBottomSheet = ({
                         onPress={onVerifyAddress}
                         isFullWidth
                     >
-                        <Translation id="moduleReceive.addressCopiedBottomSheet.buttons.verifyOnTrezor" />
+                        <Translation
+                            id={
+                                isTrezor
+                                    ? 'moduleReceive.addressCopiedBottomSheet.buttons.verifyOnTrezor'
+                                    : 'moduleReceive.addressCopiedBottomSheet.buttons.verifyOnDevice'
+                            }
+                            values={{ deviceName }}
+                        />
                     </Button>
                     <Button
                         intent="neutral"

@@ -1,4 +1,4 @@
-import { createLedgerSuiteDevice } from 'src/support/ledger/createLedgerSuiteDevice';
+import { createLedgerSuiteDevice } from '@suite-common/wallet-core';
 
 import { type LegacyExternalWallet } from './legacyExternalWallet';
 

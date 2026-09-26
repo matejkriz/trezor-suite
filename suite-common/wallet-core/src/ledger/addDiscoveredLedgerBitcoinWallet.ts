@@ -2,12 +2,11 @@ import { type Dispatch } from '@reduxjs/toolkit';
 
 import { deviceActions } from '@suite-common/device';
 import { asNetworkSymbol } from '@suite-common/wallet-config';
-import { accountsActions } from '@suite-common/wallet-core';
 import { type Account } from '@suite-common/wallet-types';
 
-import { createLedgerSuiteDevice } from 'src/support/ledger/createLedgerSuiteDevice';
-
+import { createLedgerSuiteDevice } from './createLedgerSuiteDevice';
 import { type DiscoveredLedgerBitcoinWallet } from './discoverLedgerBitcoinWallet';
+import { accountsActions } from '../accounts/accountsActions';
 
 const bitcoinSymbol = asNetworkSymbol('btc');
 
@@ -15,11 +14,11 @@ export const addDiscoveredLedgerBitcoinWallet = (
     dispatch: Dispatch,
     existingAccounts: Account[],
     { wallet, accounts }: DiscoveredLedgerBitcoinWallet,
+    apiType: 'usb' | 'bluetooth' = 'usb',
 ) => {
-    const device = createLedgerSuiteDevice(wallet);
-    dispatch(deviceActions.connectLedgerDevice(device));
+    const device = createLedgerSuiteDevice(wallet, apiType);
 
-    accounts.forEach(({ index, path, accountInfo, visible }) => {
+    const accountActions = accounts.map(({ index, path, accountInfo, visible }) => {
         const existingAccount = existingAccounts.find(
             account =>
                 account.deviceState === wallet.staticSessionId &&
@@ -30,24 +29,25 @@ export const addDiscoveredLedgerBitcoinWallet = (
         );
 
         if (existingAccount) {
-            dispatch(accountsActions.updateAccount(existingAccount, accountInfo));
-
-            return;
+            return accountsActions.updateAccount(existingAccount, accountInfo);
         }
 
-        dispatch(
-            accountsActions.createAccount(
-                {
-                    deviceState: wallet.staticSessionId,
-                    symbol: bitcoinSymbol,
-                    index,
-                    accountType: 'normal',
-                    path,
-                    accountInfo,
-                    visible,
-                },
-                [bitcoinSymbol],
-            ),
+        return accountsActions.createAccount(
+            {
+                deviceState: wallet.staticSessionId,
+                symbol: bitcoinSymbol,
+                index,
+                accountType: 'normal',
+                path,
+                accountInfo,
+                visible,
+            },
+            [bitcoinSymbol],
         );
     });
+
+    dispatch(deviceActions.connectLedgerDevice(device));
+    accountActions.forEach(action => dispatch(action));
+
+    return device;
 };

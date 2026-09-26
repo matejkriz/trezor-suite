@@ -1,5 +1,7 @@
 import { type UnknownAction } from '@reduxjs/toolkit';
 
+import { deviceActions } from '@suite-common/device';
+import { mockSuiteDevice } from '@suite-common/suite-types/mocks';
 import { createTestStore } from '@suite-common/test-utils';
 import {
     checkIsActiveRouteAnyOf,
@@ -7,6 +9,7 @@ import {
     checkIsHomeStackFocused,
     navigationContainerRef,
 } from '@suite-native/navigation';
+import { DeviceModelInternal } from '@trezor/device-utils';
 
 import {
     deviceConnectAuthorizedFixtures,
@@ -154,6 +157,40 @@ describe('deviceConnectionMiddleware', () => {
         beforeEach(() => {
             jest.clearAllMocks();
             jest.mocked(checkIsActiveRouteAnyOf).mockReturnValue(false);
+        });
+
+        it('does not run unavailable Trezor security checks on a remembered Ledger', () => {
+            const compromisedFixture = deviceConnectCompromisedFixtures[0];
+            if (!compromisedFixture) throw new Error('Missing compromised-device fixture');
+            const device = {
+                ...mockSuiteDevice(
+                    {
+                        unavailableCapabilities: {
+                            'settings.authenticity': 'no-support',
+                            entropyCheck: 'no-support',
+                            deviceIdCheck: 'no-support',
+                            deviceInvariabilityCheck: 'no-support',
+                            firmwareRevisionCheck: 'no-support',
+                        },
+                    },
+                    { internal_model: DeviceModelInternal.UNKNOWN },
+                ),
+                provider: 'ledger' as const,
+            };
+
+            createMockStoreAndDispatch(
+                {
+                    ...compromisedFixture.initialState,
+                    device: {
+                        ...compromisedFixture.initialState.device,
+                        selectedDevice: device,
+                        devices: [device],
+                    },
+                },
+                deviceActions.connectDevice({ device }),
+            );
+
+            expect(navigationContainerRef.navigate).not.toHaveBeenCalled();
         });
 
         describe('when navigation should be blocked', () => {

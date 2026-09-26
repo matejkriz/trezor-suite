@@ -1,13 +1,15 @@
 import { createMockDeps } from '@suite-common/dependency-injection';
+import { LedgerActionError } from '@suite-common/ledger';
 import { mockSuiteDevice } from '@suite-common/suite-types/mocks';
 import { createTestStore } from '@suite-common/test-utils';
 import { asNetworkSymbol } from '@suite-common/wallet-config';
 import { mockWalletAccount } from '@suite-common/wallet-types/mocks';
 
+import { confirmAddressOnDeviceThunk } from './device/deviceThunks';
 import {
-    type ConfirmAddressOnDeviceThunkDeps,
-    confirmAddressOnDeviceThunk,
-} from './device/deviceThunks';
+    type WalletDeviceServiceDeps,
+    createWalletDeviceService,
+} from './wallet-device/createWalletDeviceService';
 
 const staticSessionId = 'ledgerwallet@ledger:0' as const;
 const address = 'bc1qtestledgeraddress';
@@ -28,15 +30,19 @@ const account = mockWalletAccount({
 });
 
 const createStore = ({ connected = true, returnedAddress = address, accountIndex = 0 } = {}) => {
-    const deps = createMockDeps<ConfirmAddressOnDeviceThunkDeps>({
-        services: {
-            ledgerBitcoinService: {
-                verifyAddress: () => Promise.resolve(returnedAddress),
-            },
+    const deps = createMockDeps<WalletDeviceServiceDeps>({
+        ledgerBitcoinService: {
+            isConnectionOwner: () => true,
+            verifyAddress: () => Promise.resolve(returnedAddress),
+            getAccount: null,
+            signTransaction: null,
+            cancelAction: null,
+            disconnect: null,
         },
+        dispatch: action => action,
     });
     const store = createTestStore({
-        extra: deps,
+        extra: { services: { walletDeviceService: createWalletDeviceService(deps) } },
         preloadedState: {
             device: {
                 selectedDevice: {
@@ -44,7 +50,7 @@ const createStore = ({ connected = true, returnedAddress = address, accountIndex
                         id: 'ledgerwallet',
                         connected,
                         available: connected,
-                        state: { staticSessionId },
+                        state: { staticSessionId, sessionId: 'acquisition-a' },
                     }),
                     provider: 'ledger',
                 },
@@ -72,7 +78,7 @@ describe('confirmAddressOnDeviceThunk for Ledger', () => {
             success: true,
             payload: expect.objectContaining({ address, serializedPath: addressPath }),
         });
-        expect(deps.services.ledgerBitcoinService.verifyAddress).toHaveBeenCalledWith(0, 5);
+        expect(deps.ledgerBitcoinService.verifyAddress).toHaveBeenCalledWith(0, 5);
     });
 
     it('rejects an address that differs from the backend account', async () => {
@@ -83,6 +89,29 @@ describe('confirmAddressOnDeviceThunk for Ledger', () => {
         );
 
         expect(result.payload).toEqual({ success: false, error: expect.any(Object) });
+    });
+
+    it.each([
+        ['cancelled', 'Method_Cancel'],
+        ['timeout', 'Method_Cancel'],
+        ['rejected', 'Failure_ActionCancelled'],
+    ] as const)('preserves %s semantics for the common native receive flow', async (kind, code) => {
+        const { store, deps } = createStore();
+        deps.ledgerBitcoinService.verifyAddress.mockRejectedValueOnce(new LedgerActionError(kind));
+
+        const result = await store.dispatch(
+            confirmAddressOnDeviceThunk({ accountKey: account.key, addressPath, chunkify: false }),
+        );
+
+        expect(result.payload).toEqual({
+            success: false,
+            error: { code, message: 'Device address verification canceled.' },
+        });
+        expect(deps.dispatch.mock.calls.flat()).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({ type: '@suite/device/removeButtonRequests' }),
+            ]),
+        );
     });
 
     it('rejects a path outside the selected Ledger account without contacting the device', async () => {
@@ -97,7 +126,7 @@ describe('confirmAddressOnDeviceThunk for Ledger', () => {
         );
 
         expect(result.payload).toEqual({ success: false, error: expect.any(Object) });
-        expect(deps.services.ledgerBitcoinService.verifyAddress).not.toHaveBeenCalled();
+        expect(deps.ledgerBitcoinService.verifyAddress).not.toHaveBeenCalled();
     });
 
     it('rejects confirmation while Ledger is disconnected', async () => {
@@ -108,7 +137,7 @@ describe('confirmAddressOnDeviceThunk for Ledger', () => {
         );
 
         expect(result.payload).toEqual({ success: false, error: expect.any(Object) });
-        expect(deps.services.ledgerBitcoinService.verifyAddress).not.toHaveBeenCalled();
+        expect(deps.ledgerBitcoinService.verifyAddress).not.toHaveBeenCalled();
     });
 
     it('rejects an invalid account index as a normal confirmation failure', async () => {
@@ -120,6 +149,6 @@ describe('confirmAddressOnDeviceThunk for Ledger', () => {
 
         expect(result.type).toBe(confirmAddressOnDeviceThunk.fulfilled.type);
         expect(result.payload).toEqual({ success: false, error: expect.any(Object) });
-        expect(deps.services.ledgerBitcoinService.verifyAddress).not.toHaveBeenCalled();
+        expect(deps.ledgerBitcoinService.verifyAddress).not.toHaveBeenCalled();
     });
 });

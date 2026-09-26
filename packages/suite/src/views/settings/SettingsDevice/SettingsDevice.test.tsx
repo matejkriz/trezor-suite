@@ -3,8 +3,8 @@ import { type ReactNode } from 'react';
 import '@suite-common/test-utils/globalOverrides';
 
 import { createTestCompositionRoot, screen } from '@suite-common/test-utils';
+import { createLedgerSuiteDevice } from '@suite-common/wallet-core';
 
-import { createLedgerSuiteDevice } from 'src/support/ledger/createLedgerSuiteDevice';
 import { renderWithProviders } from 'src/support/test-utils/hooksHelper';
 
 import { SettingsDevice } from './SettingsDevice';

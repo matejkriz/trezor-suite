@@ -2,9 +2,10 @@ import { useState } from 'react';
 
 import { unpairCurrentBondThunk } from '@suite/bluetooth';
 import { gotoThunk } from '@suite/router';
-import { useServices } from '@suite-common/dependency-injection';
+import { selectSelectedDevice } from '@suite-common/device';
+import { disconnectWalletDeviceThunk } from '@suite-common/wallet-core';
 
-import { injectLedgerBitcoinService } from 'src/support/ledger/injectLedgerBitcoinService';
+import { useSelector } from 'src/hooks/suite';
 
 import { ConfirmationModal } from './ConfirmationModal';
 import { OsAndTrezorCleanupModal } from './OsAndTrezorCleanupModal';
@@ -38,13 +39,13 @@ export const ImmediateForgetFlow = ({ onCancel }: ForgetFlowProps) => {
 };
 
 export const LedgerForgetFlow = ({ onCancel }: ForgetFlowProps) => {
-    const { ledgerBitcoinService } = useServices(injectLedgerBitcoinService);
+    const device = useSelector(selectSelectedDevice);
     const { dispatch, forgetDevice } = useForgetDevice();
 
     return (
         <ConfirmationModal
             onConfirm={async () => {
-                await ledgerBitcoinService.disconnect().catch(() => undefined);
+                if (device) await dispatch(disconnectWalletDeviceThunk({ device }));
                 await forgetDevice();
                 dispatch(gotoThunk({ routeName: 'suite-index' }));
                 onCancel();

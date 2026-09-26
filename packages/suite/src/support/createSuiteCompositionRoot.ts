@@ -35,7 +35,10 @@ import {
 } from '@suite-common/device';
 import { type CommonServices } from '@suite-common/extra-dependencies';
 import { FW_HASH_CHECK_DEFAULT_TIMEOUTS } from '@suite-common/firmware-authenticity';
-import { createLedgerBitcoinServiceForTransport } from '@suite-common/ledger';
+import {
+    type LedgerBitcoinServiceDep,
+    createLedgerBitcoinServiceForTransport,
+} from '@suite-common/ledger';
 import { createNetworksCompositionRoot } from '@suite-common/networks';
 import { type PlatformEncryptionDep } from '@suite-common/platform-encryption';
 import { createMigrateSuiteSyncLabelsForRbfTransactionCompositionRoot } from '@suite-common/suite-rbf-labels-migrations';
@@ -48,7 +51,11 @@ import {
 import { type GetBinFilesBaseUrlDep, type ReloadAppDep } from '@suite-common/suite-types';
 import { type ThpHostNameDep } from '@suite-common/thp';
 import { selectTradedAccountKeys } from '@suite-common/trading';
-import { selectAccountsByDeviceState } from '@suite-common/wallet-core';
+import {
+    type WalletDeviceServiceDep,
+    createWalletDeviceService,
+    selectAccountsByDeviceState,
+} from '@suite-common/wallet-core';
 import { type CreateLoggerDep, type GetTrezorConnectPrivilegedDep } from '@trezor/connect';
 import { isDesktop } from '@trezor/env-utils';
 
@@ -58,7 +65,6 @@ import { type DbDep } from 'src/storage/createDb';
 import { reportSecurityCheck } from 'src/utils/suite/sentry';
 
 import { createConnectInitHooks } from './createConnectInitHooks';
-import { type LedgerBitcoinServiceDep } from './ledger/injectLedgerBitcoinService';
 import { type AppState } from '../types/suite';
 
 const connectInitSettings: ConnectInitSettings = {
@@ -81,7 +87,8 @@ export type SuiteServices = CommonServices &
     SuiteRouterHistoryDep &
     TransportsDep &
     BluetoothDep &
-    LedgerBitcoinServiceDep;
+    LedgerBitcoinServiceDep &
+    WalletDeviceServiceDep;
 
 export type StoreAPIDep = Pick<SuiteReduxStore, 'getState' | 'dispatch'>;
 
@@ -193,6 +200,10 @@ export const createSuiteServicesCompositionRoot = (deps: SuiteAppDeps): SuiteSer
         platformEncryption: deps.platformEncryption,
         analytics,
         ledgerBitcoinService,
+        walletDeviceService: createWalletDeviceService({
+            ledgerBitcoinService,
+            dispatch: deps.dispatch,
+        }),
         bluetooth,
         suiteRouterHistory: createSuiteRouterHistory({
             history: deps.history,

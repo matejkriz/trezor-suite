@@ -1,5 +1,5 @@
 import { getSupportedNetworks } from '@suite-common/wallet-config';
-import { DeviceModelInternal } from '@trezor/device-utils';
+import { DeviceModelInternal, hasBitcoinOnlyFirmware } from '@trezor/device-utils';
 
 import { createLedgerSuiteDevice } from './createLedgerSuiteDevice';
 
@@ -8,6 +8,7 @@ describe(createLedgerSuiteDevice.name, () => {
         id: 'ledgerwallet',
         label: 'Ledger Flex',
         staticSessionId: 'ledgerwallet@ledger:0' as const,
+        sessionId: 'acquisition-a',
     };
 
     it('creates a remembered acquired device with its real name and wallet state', () => {
@@ -20,7 +21,7 @@ describe(createLedgerSuiteDevice.name, () => {
             connected: true,
             remember: true,
             name: wallet.label,
-            state: { staticSessionId: wallet.staticSessionId },
+            state: { staticSessionId: wallet.staticSessionId, sessionId: wallet.sessionId },
             features: {
                 label: wallet.label,
                 vendor: 'Ledger',
@@ -42,6 +43,7 @@ describe(createLedgerSuiteDevice.name, () => {
         expect(unavailableCapabilities.taproot).toBe('no-support');
         expect(unavailableCapabilities.evolu).toBe('no-support');
         expect(unavailableCapabilities.getFirmwareHash).toBe('no-support');
+        expect(hasBitcoinOnlyFirmware(createLedgerSuiteDevice(wallet))).toBe(true);
     });
 
     it('keeps details read from Ledger for Device settings', () => {
@@ -58,7 +60,29 @@ describe(createLedgerSuiteDevice.name, () => {
             deviceInfo,
         });
 
-        expect(device.ledgerInfo).toEqual(deviceInfo);
+        expect(device.ledgerInfo).toEqual({
+            model: deviceInfo.model,
+            osVersion: deviceInfo.osVersion,
+            bitcoinAppVersion: deviceInfo.bitcoinAppVersion,
+            batteryLevel: deviceInfo.batteryLevel,
+        });
         expect(device.features.label).toBe('My Ledger');
+    });
+
+    it('uses the native Bluetooth transport and disables unsupported device settings', () => {
+        const device = createLedgerSuiteDevice(wallet, 'bluetooth');
+
+        expect(device.descriptor.apiType).toBe('bluetooth');
+        for (const capability of [
+            'settings.rename',
+            'settings.pin',
+            'settings.backup',
+            'settings.passphrase',
+            'settings.firmwareUpdate',
+            'settings.wipe',
+            'settings.bluetoothPairing',
+        ] as const) {
+            expect(device.unavailableCapabilities[capability]).toBe('no-support');
+        }
     });
 });

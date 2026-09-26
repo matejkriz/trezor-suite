@@ -51,6 +51,10 @@ export const selectDevicesCount = (state: DeviceRootState) => state.device?.devi
 
 export const selectSelectedDevice = (state: DeviceRootState) => state.device.selectedDevice;
 
+export const selectDeviceBrandName = createMemoizedSelector([selectSelectedDevice], device =>
+    isLedgerDevice(device) ? 'Ledger' : 'Trezor',
+);
+
 export const selectActiveWalletStaticSessionId = (state: DeviceRootState) =>
     selectSelectedDevice(state)?.state?.staticSessionId;
 
@@ -381,12 +385,47 @@ export const selectDeviceModelWithFlagshipFallback = (
     state: DeviceRootState,
 ): DeviceModelInternal => getDeviceModelWithFlagshipFallback(selectSelectedDevice(state));
 
+const getIsDeviceAuthenticityCheckSupported = (device?: Device): boolean =>
+    !isLedgerDevice(device) &&
+    !!device &&
+    (device.id === PORTFOLIO_TRACKER_DEVICE_ID ||
+        SUPPORTS_DEVICE_AUTHENTICITY_CHECK[getDeviceInternalModel(device)]);
+
 export const selectIsDeviceAuthenticityCheckSupported = createMemoizedSelector(
-    [selectSelectedDevice, selectIsPortfolioTrackerDevice, selectDeviceModel],
-    (device, isPortfolioTrackerDevice, deviceModel) =>
-        !isLedgerDevice(device) &&
-        (isPortfolioTrackerDevice ||
-            (!!deviceModel && SUPPORTS_DEVICE_AUTHENTICITY_CHECK[deviceModel])),
+    [selectSelectedDevice],
+    getIsDeviceAuthenticityCheckSupported,
+);
+
+export type DeviceSettingsCapabilities = {
+    rename: boolean;
+    pin: boolean;
+    backup: boolean;
+    passphrase: boolean;
+    firmwareUpdate: boolean;
+    wipe: boolean;
+    authenticity: boolean;
+    bluetoothPairing: boolean;
+};
+
+export const getDeviceSettingsCapabilities = (device?: Device): DeviceSettingsCapabilities => {
+    const unavailable = device?.unavailableCapabilities;
+    const authenticity = getIsDeviceAuthenticityCheckSupported(device);
+
+    return {
+        rename: !unavailable?.['settings.rename'],
+        pin: !unavailable?.['settings.pin'],
+        backup: !unavailable?.['settings.backup'],
+        passphrase: !unavailable?.['settings.passphrase'],
+        firmwareUpdate: !unavailable?.['settings.firmwareUpdate'],
+        wipe: !unavailable?.['settings.wipe'],
+        authenticity: authenticity && !unavailable?.['settings.authenticity'],
+        bluetoothPairing: !unavailable?.['settings.bluetoothPairing'],
+    };
+};
+
+export const selectDeviceSettingsCapabilities = createMemoizedSelector(
+    [selectSelectedDevice],
+    getDeviceSettingsCapabilities,
 );
 
 export const selectFirmwareReleaseConfig = createMemoizedSelector(

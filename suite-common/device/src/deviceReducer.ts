@@ -596,9 +596,13 @@ export const prepareDeviceReducer = createReducerWithExtraDeps(
                 const device = state.devices.find(
                     item => isLedgerDevice(item) && item.id === payload,
                 );
-                if (device) device.connected = false;
+                if (device) {
+                    device.connected = false;
+                    device.buttonRequests = [];
+                }
                 if (isLedgerDevice(state.selectedDevice) && state.selectedDevice.id === payload) {
                     state.selectedDevice.connected = false;
+                    state.selectedDevice.buttonRequests = [];
                 }
             })
             .addCase(deviceActions.deviceChanged, (state, { payload }) => {

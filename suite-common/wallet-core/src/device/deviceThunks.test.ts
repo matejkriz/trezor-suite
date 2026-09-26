@@ -47,7 +47,7 @@ const extra: ForgetDevicePersistentDataThunkDeps = {
     },
 };
 
-const initStore = () =>
+const initStore = (preloadedState = forgetPersistentDataPreloadedStateFixture) =>
     createTestStore({
         extra,
         reducer: combineReducers({
@@ -56,10 +56,38 @@ const initStore = () =>
             thp: thpReducer,
             persistentDeviceData: persistentDeviceDataReducer,
         }),
-        preloadedState: forgetPersistentDataPreloadedStateFixture,
+        preloadedState,
     });
 
 describe(forgetDevicePersistentDataThunk.name, () => {
+    it('does not run Trezor OS pairing cleanup for a device without Bluetooth pairing support', async () => {
+        jest.mocked(extra.thunks.forgetBluetoothDevice).mockClear();
+        const fixture = forgetPersistentDataPreloadedStateFixture;
+        const store = initStore({
+            ...fixture,
+            device: {
+                ...fixture.device,
+                devices: fixture.device.devices.map(device => {
+                    if (device.type !== 'acquired') return device;
+
+                    return {
+                        ...device,
+                        unavailableCapabilities: {
+                            ...device.unavailableCapabilities,
+                            'settings.bluetoothPairing': 'no-support' as const,
+                        },
+                    };
+                }),
+            },
+        });
+
+        await store.dispatch(forgetDevicePersistentDataThunk({ deviceId: 'device-id-1' }));
+
+        expect(extra.thunks.forgetBluetoothDevice).not.toHaveBeenCalled();
+        expect(
+            store.getState().persistentDeviceData.devices.map(device => device.device_id),
+        ).not.toContain('device-id-1');
+    });
     it('forgets a single device data with Bluetooth and THP', async () => {
         const store = initStore();
         await store.dispatch(forgetDevicePersistentDataThunk({ deviceId: 'device-id-1' }));

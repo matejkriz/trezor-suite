@@ -30,6 +30,7 @@ import {
     type PushSendFormTransactionThunkDeps,
     type PushSendFormTransactionThunkState,
     type SignTransactionError,
+    type SignTransactionThunkDeps,
     type SignTransactionThunkState,
     type SignTransactionTimeoutError,
     composeAllowanceTransactionThunk,
@@ -445,12 +446,15 @@ export const composeEvmApprovalFeeLevelsThunk = createThunk<
 
 export type SignTradingTransactionThunkState = SignTransactionThunkState;
 
+export type SignTradingTransactionThunkDeps = SignTransactionThunkDeps;
+
 export const signTradingTransactionThunk = createThunk<
     BlockbookTransaction | undefined,
     TradingSignAndPushSendFormTransactionProps,
     {
         rejectValue: SignTransactionError | SignTransactionTimeoutError | undefined;
         state: SignTradingTransactionThunkState;
+        extra: SignTradingTransactionThunkDeps;
     }
 >(
     `${NATIVE_TRADING_EXCHANGE_THUNK_PREFIX}/signTransaction`,
@@ -497,6 +501,7 @@ export type SignAndPushSendFormTransactionThunkState = MevProtectionRootState &
     AddTransactionLabelingThunkState;
 
 export type SignAndPushSendFormTransactionThunkDeps = PushSendFormTransactionThunkDeps &
+    SignTradingTransactionThunkDeps &
     AddTransactionLabelingThunkDeps;
 
 export const signAndPushSendFormTransactionThunk = createThunk<

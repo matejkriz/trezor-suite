@@ -1,5 +1,5 @@
-import { type AcquiredDevice, type TrezorDevice } from '@suite-common/suite-types';
-import { type StaticSessionId } from '@trezor/connect';
+import { type AcquiredDevice } from '@suite-common/suite-types';
+import { type Device, type StaticSessionId } from '@trezor/connect';
 
 export type LedgerSuiteDevice = Omit<AcquiredDevice, 'id' | 'state'> & {
     provider: 'ledger';
@@ -13,5 +13,5 @@ export type LedgerSuiteDevice = Omit<AcquiredDevice, 'id' | 'state'> & {
     };
 };
 
-export const isLedgerDevice = (device?: TrezorDevice | null): device is LedgerSuiteDevice =>
+export const isLedgerDevice = (device?: Device | null): device is LedgerSuiteDevice =>
     device?.type === 'acquired' && 'provider' in device && device.provider === 'ledger';

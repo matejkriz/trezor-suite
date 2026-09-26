@@ -37,14 +37,17 @@ import {
     initPreloadedState,
     testMocks,
 } from '@suite-common/test-utils';
-import { type SendState } from '@suite-common/wallet-core';
+import {
+    type SendState,
+    type WalletDeviceServiceDep,
+    createLedgerSuiteDevice,
+} from '@suite-common/wallet-core';
 import { type FormState, type GetTradedAccountKeysDep } from '@suite-common/wallet-types';
 import { mockGetTradedAccountKeys } from '@suite-common/wallet-types/mocks';
 import { type PROTO } from '@trezor/connect';
 import { asProtocol } from '@trezor/network-module-suite-common-types';
 
 import { type ProtocolState } from 'src/reducers/suite/protocolReducer';
-import { createLedgerSuiteDevice } from 'src/support/ledger/createLedgerSuiteDevice';
 import {
     type UserAction,
     actionSequence,
@@ -102,11 +105,19 @@ type SendFormTestServices = SuiteRouterHistoryDep &
     GetIsWindowVisibleDep &
     GetTradedAccountKeysDep &
     MigrateSuiteSyncLabelsForRbfTransactionDep &
+    WalletDeviceServiceDep &
     SuiteSyncDep & {
         networks: AddressValidatorDep & GetNamedAddressSupportDep & NetworkModuleRepositoryDep;
     };
 
 const services: SendFormTestServices = {
+    walletDeviceService: {
+        get: () => undefined,
+        cancelAction: async ({ reason }) => {
+            await TrezorConnect.cancel(reason);
+        },
+        disconnect: () => Promise.resolve(),
+    },
     suiteRouterHistory: mockSuiteRouterHistory(),
     analytics: mockDesktopAnalytics(),
     getIsWindowVisible: mockGetIsWindowVisible(),

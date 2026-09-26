@@ -1,7 +1,10 @@
 import { mockActionType, mockReducer } from '@suite-common/redux-utils/mocks';
+import { mockSuiteDevice } from '@suite-common/suite-types/mocks';
 
 import fixtures from './__fixtures__/deviceReducer';
+import { deviceActions } from './deviceActions';
 import { prepareDeviceReducer } from './deviceReducer';
+import { type LedgerSuiteDevice } from './ledgerDevice';
 
 const deviceReducer = prepareDeviceReducer({
     actionTypes: {
@@ -17,6 +20,28 @@ const deviceReducer = prepareDeviceReducer({
 });
 
 type State = ReturnType<typeof deviceReducer>;
+
+describe('Ledger session lifecycle', () => {
+    it('removes pending button requests when the physical Ledger session ends', () => {
+        const device = {
+            ...mockSuiteDevice({
+                id: 'ledgerwallet',
+                connected: true,
+                state: { staticSessionId: 'ledgerwallet@ledger:0', sessionId: 'acquisition-a' },
+                buttonRequests: [{ code: 'ButtonRequest_Address' }],
+            }),
+            provider: 'ledger',
+        } as LedgerSuiteDevice;
+        const connectedState = deviceReducer(undefined, deviceActions.connectLedgerDevice(device));
+        const state = deviceReducer(
+            { ...connectedState, selectedDevice: { ...device } },
+            deviceActions.disconnectLedgerDevice(device.id),
+        );
+
+        expect(state.devices[0]).toMatchObject({ connected: false, buttonRequests: [] });
+        expect(state.selectedDevice).toMatchObject({ connected: false, buttonRequests: [] });
+    });
+});
 
 describe('DEVICE.CONNECT', () => {
     fixtures.connect.forEach(f => {

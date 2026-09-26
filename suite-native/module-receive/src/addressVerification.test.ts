@@ -7,7 +7,12 @@ jest.mock('@suite-native/device-mutex', () => ({
 }));
 
 const mockRequestPrioritizedDeviceAccess = jest.mocked(requestPrioritizedDeviceAccess);
-const confirmAddressOnDevice = jest.fn();
+const confirmAddressOnDevice = jest.fn(() =>
+    Promise.resolve({
+        success: true as const,
+        payload: { address: 'bc1qreceiveaddress', path: [], serializedPath: 'm' },
+    }),
+);
 
 describe('verifyReceiveAddress', () => {
     beforeEach(() => {

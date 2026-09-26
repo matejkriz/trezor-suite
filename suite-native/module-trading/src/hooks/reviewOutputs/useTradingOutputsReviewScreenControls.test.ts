@@ -24,7 +24,6 @@ import {
     type NativeSendRootState,
     prepareSendFormReducer,
 } from '@suite-native/transaction-management';
-import TrezorConnect from '@trezor/connect';
 
 import { useTradingOutputsReviewScreenControls } from './useTradingOutputsReviewScreenControls';
 import { type TradingExchangeSignAndSendTransactionProps } from '../exchange/useExchangeFlow';
@@ -34,6 +33,7 @@ type State = TradingRootState & AccountsRootState & SendRootState & NativeSendRo
 
 const mockReportToAnalytics = jest.fn();
 const mockResolveTransactionSendConsent = jest.fn();
+const mockCancelDeviceAction = jest.fn();
 
 const mockSignAndSendTransaction = jest.fn<Promise<boolean>, [TradingTransactionSignAndSendProps]>(
     () => Promise.resolve(true),
@@ -77,12 +77,13 @@ const mockUseTxValidityTimer = jest.fn(
 );
 let mockIsPastDeadline = false;
 
-jest.mock('@trezor/connect', () => ({
-    __esModule: true,
-    ...jest.requireActual('@trezor/connect'),
-    default: {
-        cancel: jest.fn(),
-    },
+jest.mock('@suite-common/wallet-core', () => ({
+    ...jest.requireActual('@suite-common/wallet-core'),
+    cancelDeviceActionThunk: jest
+        .requireActual('@reduxjs/toolkit')
+        .createAsyncThunk('@test/cancelDeviceAction', (params: unknown) =>
+            mockCancelDeviceAction(params),
+        ),
 }));
 
 jest.mock('@suite-native/confirm-on-trezor', () => ({
@@ -113,7 +114,6 @@ jest.mock('@suite-native/alerts', () => ({
 
 describe('useTradingOutputsReviewScreenControls', () => {
     let store: Store<State>;
-    const mockTrezorConnectCancel = TrezorConnect.cancel as jest.Mock;
 
     const reducer = {
         locale: localeReducer,
@@ -427,7 +427,7 @@ describe('useTradingOutputsReviewScreenControls', () => {
             });
 
             expect(mockResolveTransactionSendConsent).toHaveBeenCalledWith(false);
-            expect(mockTrezorConnectCancel).toHaveBeenCalledWith('tx-timeout');
+            expect(mockCancelDeviceAction).toHaveBeenCalledWith({ reason: 'tx-timeout' });
             expect(
                 mockUseConfirmOnTrezorController.revealConfirmOnTrezorSheet,
             ).toHaveBeenCalledTimes(1);

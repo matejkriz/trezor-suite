@@ -6,16 +6,24 @@ import {
 import { type AccountInfo } from '@trezor/connect';
 import { type Bip43Path } from '@trezor/crypto-utils';
 
-import { type LedgerWalletIdentity } from 'src/support/ledger/createLedgerSuiteDevice';
+import { type LedgerWalletIdentity } from './createLedgerSuiteDevice';
 
 const MAX_ACCOUNTS = 10;
 
 type GetAccountInfoResult =
     { success: true; payload: AccountInfo } | { success: false; error: { message: string } };
 
-type DiscoverLedgerBitcoinWalletDeps = {
-    ledgerBitcoinService: Pick<LedgerBitcoinService, 'connect' | 'getAccount' | 'getDeviceInfo'>;
+export type DiscoverLedgerBitcoinWalletDeps = {
+    ledgerBitcoinService: Pick<
+        LedgerBitcoinService,
+        'connect' | 'getAccount' | 'getDeviceInfo' | 'isConnectionOwner'
+    >;
     getAccountInfo: (descriptor: string) => Promise<GetAccountInfoResult>;
+};
+
+type DiscoverLedgerBitcoinWalletOptions = {
+    signal?: AbortSignal;
+    owner?: string;
 };
 
 type DiscoveredLedgerAccount = {
@@ -33,14 +41,28 @@ export type DiscoveredLedgerBitcoinWallet = {
 export const discoverLedgerBitcoinWallet = async (
     deps: DiscoverLedgerBitcoinWalletDeps,
     device: LedgerDevice,
+    options: DiscoverLedgerBitcoinWalletOptions = {},
 ): Promise<DiscoveredLedgerBitcoinWallet> => {
-    await deps.ledgerBitcoinService.connect(device);
+    const ensureNotAborted = () => {
+        if (options.signal?.aborted) throw new Error('Ledger connection canceled');
+    };
+    const ensureCurrentConnection = () => {
+        ensureNotAborted();
+        if (options.owner && !deps.ledgerBitcoinService.isConnectionOwner(options.owner)) {
+            throw new Error('Ledger connection canceled');
+        }
+    };
+
+    ensureNotAborted();
+    await deps.ledgerBitcoinService.connect(device, { owner: options.owner });
+    ensureCurrentConnection();
 
     const accounts: DiscoveredLedgerAccount[] = [];
     let wallet: LedgerWalletIdentity | undefined;
 
     for (let index = 0; index < MAX_ACCOUNTS; index++) {
         const ledgerAccount = await deps.ledgerBitcoinService.getAccount(index);
+        ensureCurrentConnection();
         const signerPath = `84'/0'/${index}'` as const;
         if (ledgerAccount.path !== signerPath) {
             throw new Error('Ledger returned an unexpected Bitcoin account path');
@@ -48,6 +70,7 @@ export const discoverLedgerBitcoinWallet = async (
         const path = `m/${signerPath}` as const;
 
         const response = await deps.getAccountInfo(ledgerAccount.descriptor);
+        ensureCurrentConnection();
         if (!response.success) throw new Error(response.error.message);
         if (response.payload.descriptor !== ledgerAccount.descriptor) {
             throw new Error('Bitcoin backend returned a different account descriptor');
@@ -58,8 +81,9 @@ export const discoverLedgerBitcoinWallet = async (
             const deviceInfo = deps.ledgerBitcoinService.getDeviceInfo();
             wallet = {
                 id,
-                label: deviceInfo?.name || device.name || 'Ledger',
+                label: deviceInfo?.name || 'Ledger',
                 staticSessionId: `${id}@ledger:0`,
+                sessionId: options.owner,
                 deviceInfo,
             };
         }

@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
+import { useSelector } from 'react-redux';
 
+import { selectDeviceBrandName } from '@suite-common/device';
 import { HStack, IconButton, Text } from '@suite-native/atoms';
 import { Translation } from '@suite-native/intl';
 import { ScreenHeader, type ScreenHeaderProps } from '@suite-native/navigation';
@@ -16,6 +18,7 @@ export const ConfirmOnTrezorHeader = ({
     closeActionType = 'back',
     isCloseButtonDisabled = false,
 }: ConfirmOnTrezorHeaderProps) => {
+    const deviceName = useSelector(selectDeviceBrandName);
     const backButtonProps = useMemo(
         () => (isCloseButtonDisabled ? { closeActionType: undefined, leftIcon: <></> } : {}),
         [isCloseButtonDisabled],
@@ -28,7 +31,14 @@ export const ConfirmOnTrezorHeader = ({
             customContent={
                 <HStack alignItems="center">
                     <Text variant="body-md-strong">
-                        <Translation id="device.continueOnTrezor.headerTitle" />
+                        <Translation
+                            id={
+                                deviceName === 'Trezor'
+                                    ? 'device.continueOnTrezor.headerTitle'
+                                    : 'device.continueOnDevice.headerTitle'
+                            }
+                            values={{ deviceName }}
+                        />
                     </Text>
                     <ConfirmOnTrezorIndicator />
                 </HStack>

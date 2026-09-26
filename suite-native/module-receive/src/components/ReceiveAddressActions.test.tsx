@@ -2,12 +2,13 @@ import { Share } from 'react-native';
 
 import { useNavigation } from '@react-navigation/native';
 
+import { deviceReducerInitialState } from '@suite-common/device';
 import { mockAccountKey } from '@suite-common/wallet-types/mocks';
 import { type NativeAnalyticsDep, events } from '@suite-native/analytics';
 import { mockNativeAnalytics } from '@suite-native/analytics/mocks';
 import { getTranslation } from '@suite-native/intl';
 import { ReceiveAddressVerificationSource, ReceiveStackRoutes } from '@suite-native/navigation';
-import { renderWithBasicProvider, userEvent, waitFor } from '@suite-native/test-utils';
+import { renderWithStoreProvider, userEvent, waitFor } from '@suite-native/test-utils-store';
 
 import { ReceiveAddressActions } from './ReceiveAddressActions';
 import { ReceiveAddressInteractionsProvider } from './ReceiveAddressInteractionsProvider';
@@ -46,7 +47,7 @@ describe('ReceiveAddressActions', () => {
     const mockUseNavigation = jest.mocked(useNavigation);
 
     const renderActions = async (isDeviceVerificationEnabled = true) =>
-        await renderWithBasicProvider(
+        await renderWithStoreProvider(
             <ReceiveAddressInteractionsProvider
                 accountKey={accountKey}
                 address={address}
@@ -58,7 +59,7 @@ describe('ReceiveAddressActions', () => {
                     isDeviceVerificationEnabled={isDeviceVerificationEnabled}
                 />
             </ReceiveAddressInteractionsProvider>,
-            { services },
+            { services, preloadedState: { device: deviceReducerInitialState } },
         );
 
     beforeEach(() => {

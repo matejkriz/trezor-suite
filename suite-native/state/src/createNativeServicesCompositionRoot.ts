@@ -7,10 +7,12 @@ import { createBip329CompositionRoot } from '@suite-common/bip329';
 import { delegatedIdentityKeyCompositionRoot } from '@suite-common/delegated-identity-key';
 import { asGetter, toGetter } from '@suite-common/dependency-injection';
 import { notImplementedGetter } from '@suite-common/extra-dependencies';
+import { type LedgerBitcoinServiceDep } from '@suite-common/ledger';
 import { createNetworksCompositionRoot } from '@suite-common/networks';
 import { createNativePlatformEncryption } from '@suite-common/platform-encryption-native';
 import { createMigrateSuiteSyncLabelsForRbfTransactionCompositionRoot } from '@suite-common/suite-rbf-labels-migrations';
 import { selectAllLabelsForAccount, selectIsSuiteSyncEnabled } from '@suite-common/suite-sync';
+import { createWalletDeviceService } from '@suite-common/wallet-core';
 import { analytics } from '@suite-native/analytics';
 import {
     rerunFwAuthenticityChecksThunk,
@@ -52,6 +54,7 @@ const transports = transportsPerDeviceType[deviceType];
 type NativeAppDeps = Pick<NativeReduxStore, 'getState' | 'dispatch'> &
     EnsureEncryptionKeyDep &
     NativeStorageDep &
+    LedgerBitcoinServiceDep &
     GetTrezorConnectPrivilegedDep;
 
 export const createNativeServicesCompositionRoot = (deps: NativeAppDeps): NativeServices => {
@@ -94,6 +97,11 @@ export const createNativeServicesCompositionRoot = (deps: NativeAppDeps): Native
     const logger = createLogger('native-transport');
 
     return {
+        ledgerBitcoinService: deps.ledgerBitcoinService,
+        walletDeviceService: createWalletDeviceService({
+            ledgerBitcoinService: deps.ledgerBitcoinService,
+            dispatch: deps.dispatch,
+        }),
         networks,
         suiteSync,
         bip329,

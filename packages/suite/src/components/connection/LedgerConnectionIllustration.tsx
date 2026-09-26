@@ -1,7 +1,7 @@
 import { AnimationCard } from './AnimationCard';
 
 export const LedgerConnectionIllustration = () => (
-    <AnimationCard aspectRatio="1 / 1" maxHeight="38vh">
+    <AnimationCard aspectRatio="1 / 1" maxHeight="24vh">
         <svg
             role="img"
             aria-label="Generic USB hardware wallet illustration"

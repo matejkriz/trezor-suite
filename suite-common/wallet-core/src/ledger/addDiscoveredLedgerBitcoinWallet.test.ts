@@ -1,11 +1,11 @@
 import { deviceActions } from '@suite-common/device';
 import { asNetworkSymbol } from '@suite-common/wallet-config';
-import { accountsActions } from '@suite-common/wallet-core';
 import { asAccountDescriptor } from '@suite-common/wallet-types';
 import { mockWalletAccount } from '@suite-common/wallet-types/mocks';
 import { type AccountInfo } from '@trezor/connect';
 
 import { addDiscoveredLedgerBitcoinWallet } from './addDiscoveredLedgerBitcoinWallet';
+import { accountsActions } from '../accounts/accountsActions';
 
 describe('addDiscoveredLedgerBitcoinWallet', () => {
     it('adds a selected Ledger wallet and its Bitcoin account to Suite', () => {

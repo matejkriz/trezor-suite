@@ -12,9 +12,6 @@
         {
             "path": "../../suite-common/redux-utils"
         },
-        {
-            "path": "../../suite-common/suite-constants"
-        },
         { "path": "../../suite-common/thp" },
         {
             "path": "../../suite-common/validators"
@@ -44,6 +41,10 @@
             "path": "../../packages/styles-native"
         },
         { "path": "../../packages/utils" },
+        {
+            "path": "../../suite-common/suite-types"
+        },
+        { "path": "../test-utils-store" },
         { "path": "../../packages/requirements" }
     ]
 }

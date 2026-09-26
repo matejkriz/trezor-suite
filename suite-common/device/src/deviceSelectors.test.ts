@@ -1,14 +1,101 @@
 import { DEFAULT_FLAGSHIP_MODEL } from '@suite-common/suite-constants';
 import { mockSuiteDevice } from '@suite-common/suite-types/mocks';
+import { type Device } from '@trezor/connect';
 import { DeviceModelInternal } from '@trezor/device-utils';
 
 import { portfolioTrackerDevice } from './deviceConstants';
 import { deviceReducerInitialState } from './deviceReducer';
 import {
+    getDeviceSettingsCapabilities,
+    selectDeviceBrandName,
     selectDeviceModelWithFlagshipFallback,
+    selectDeviceSettingsCapabilities,
     selectIsAnyDeviceSelected,
     selectIsDeviceAuthenticityCheckSupported,
 } from './deviceSelectors';
+
+describe('device settings capabilities', () => {
+    it('accepts a Connect device before wallet fields are populated', () => {
+        const device: Device = mockSuiteDevice(
+            { unavailableCapabilities: { 'settings.rename': 'no-support' } },
+            { internal_model: DeviceModelInternal.T3B1 },
+        );
+
+        expect(getDeviceSettingsCapabilities(device)).toMatchObject({
+            rename: false,
+            authenticity: true,
+        });
+    });
+
+    it('keeps Trezor management settings and honors model authenticity support', () => {
+        const state = {
+            device: {
+                ...deviceReducerInitialState,
+                selectedDevice: mockSuiteDevice({}, { internal_model: DeviceModelInternal.T2T1 }),
+            },
+        };
+
+        expect(selectDeviceSettingsCapabilities(state)).toEqual({
+            rename: true,
+            pin: true,
+            backup: true,
+            passphrase: true,
+            firmwareUpdate: true,
+            wipe: true,
+            authenticity: false,
+            bluetoothPairing: true,
+        });
+        expect(selectDeviceBrandName(state)).toBe('Trezor');
+    });
+
+    it('uses unavailable capabilities for external wallet settings', () => {
+        const state = {
+            device: {
+                ...deviceReducerInitialState,
+                selectedDevice: {
+                    ...mockSuiteDevice({
+                        unavailableCapabilities: {
+                            'settings.rename': 'no-support',
+                            'settings.pin': 'no-support',
+                            'settings.backup': 'no-support',
+                            'settings.passphrase': 'no-support',
+                            'settings.firmwareUpdate': 'no-support',
+                            'settings.wipe': 'no-support',
+                            'settings.bluetoothPairing': 'no-support',
+                        },
+                    }),
+                    provider: 'ledger' as const,
+                },
+            },
+        };
+
+        expect(selectDeviceSettingsCapabilities(state)).toEqual({
+            rename: false,
+            pin: false,
+            backup: false,
+            passphrase: false,
+            firmwareUpdate: false,
+            wipe: false,
+            authenticity: false,
+            bluetoothPairing: false,
+        });
+        expect(selectDeviceBrandName(state)).toBe('Ledger');
+    });
+
+    it('honors an explicit unavailable authenticity capability for a supported Trezor', () => {
+        const state = {
+            device: {
+                ...deviceReducerInitialState,
+                selectedDevice: mockSuiteDevice(
+                    { unavailableCapabilities: { 'settings.authenticity': 'no-support' } },
+                    { internal_model: DeviceModelInternal.T3B1 },
+                ),
+            },
+        };
+
+        expect(selectDeviceSettingsCapabilities(state).authenticity).toBe(false);
+    });
+});
 
 describe(selectIsAnyDeviceSelected.name, () => {
     it('includes a selected Ledger device', () => {
@@ -64,6 +151,20 @@ describe(selectIsDeviceAuthenticityCheckSupported.name, () => {
         };
 
         expect(selectIsDeviceAuthenticityCheckSupported(state)).toBe(false);
+    });
+
+    it('keeps authenticity checks for an unknown Trezor model', () => {
+        const state = {
+            device: {
+                ...deviceReducerInitialState,
+                selectedDevice: mockSuiteDevice(
+                    {},
+                    { internal_model: DeviceModelInternal.UNKNOWN },
+                ),
+            },
+        };
+
+        expect(selectIsDeviceAuthenticityCheckSupported(state)).toBe(true);
     });
 
     it('returns true for portfolio tracker device', () => {

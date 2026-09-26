@@ -3,12 +3,13 @@ import { type LedgerDeviceInfo } from '@suite-common/ledger';
 import { getSupportedNetworks } from '@suite-common/wallet-config';
 import { type StaticSessionId, type UnavailableCapabilities } from '@trezor/connect';
 import { asDeviceUniquePath } from '@trezor/connect-common';
-import { DeviceModelInternal } from '@trezor/device-utils';
+import { DeviceModelInternal, FirmwareType } from '@trezor/device-utils';
 
 export type LedgerWalletIdentity = {
     id: string;
     label: string;
     staticSessionId: StaticSessionId;
+    sessionId?: string;
     deviceInfo?: LedgerDeviceInfo;
 };
 
@@ -37,6 +38,18 @@ const unsupportedCapabilities = [
     'evmClearSigning',
     'legacy',
     'segwit',
+    'settings.rename',
+    'settings.pin',
+    'settings.backup',
+    'settings.passphrase',
+    'settings.firmwareUpdate',
+    'settings.wipe',
+    'settings.bluetoothPairing',
+    'settings.authenticity',
+    'deviceIdCheck',
+    'deviceInvariabilityCheck',
+    'firmwareRevisionCheck',
+    'firmwareHashCheck',
 ] as const;
 
 const unavailableCapabilities: UnavailableCapabilities = {
@@ -48,12 +61,10 @@ const unavailableCapabilities: UnavailableCapabilities = {
     ...Object.fromEntries(unsupportedCapabilities.map(capability => [capability, 'no-support'])),
 };
 
-export const createLedgerSuiteDevice = ({
-    id,
-    label,
-    staticSessionId,
-    deviceInfo,
-}: LedgerWalletIdentity): LedgerSuiteDevice => {
+export const createLedgerSuiteDevice = (
+    { id, label, staticSessionId, sessionId, deviceInfo }: LedgerWalletIdentity,
+    apiType: 'usb' | 'bluetooth' = 'usb',
+): LedgerSuiteDevice => {
     const now = Date.now();
 
     return {
@@ -62,13 +73,21 @@ export const createLedgerSuiteDevice = ({
         id,
         name: label,
         label,
-        ledgerInfo: deviceInfo,
+        ledgerInfo: deviceInfo
+            ? {
+                  model: deviceInfo.model,
+                  osVersion: deviceInfo.osVersion,
+                  bitcoinAppVersion: deviceInfo.bitcoinAppVersion,
+                  batteryLevel: deviceInfo.batteryLevel,
+              }
+            : undefined,
         path: asDeviceUniquePath(`ledger:${id}`),
-        descriptor: { apiType: 'usb', id },
+        descriptor: { apiType, id },
         status: 'available',
         mode: 'normal',
         firmware: 'unknown',
-        state: { staticSessionId },
+        firmwareType: FirmwareType.BitcoinOnly,
+        state: { staticSessionId, sessionId },
         features: {
             vendor: 'Ledger',
             model: 'Ledger',
@@ -83,6 +102,7 @@ export const createLedgerSuiteDevice = ({
             pin_protection: true,
             passphrase_protection: false,
             backup_availability: 'NotAvailable',
+            ...(deviceInfo?.batteryLevel !== undefined ? { soc: deviceInfo.batteryLevel } : {}),
             capabilities: ['Capability_Bitcoin_like'],
         },
         unavailableCapabilities,
