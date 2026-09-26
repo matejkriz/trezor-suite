@@ -1,6 +1,7 @@
 import { events, injectDesktopAnalytics } from '@suite/analytics';
 import { openConnectionModal, setConnectionMode, toggleConnectionModal } from '@suite/device';
 import { Translation } from '@suite/intl';
+import { selectHasExperimentalFeature } from '@suite/settings';
 import { bluetoothActions, selectAdapterStatus } from '@suite-common/bluetooth';
 import { useServices } from '@suite-common/dependency-injection';
 import { selectDevices } from '@suite-common/device';
@@ -19,6 +20,7 @@ export const SwitchDeviceContent = ({ cancelable, onCancel }: ForegroundAppProps
     const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
     const bluetoothAdapterStatus = useSelector(selectAdapterStatus);
     const devices = useSelector(selectDevices);
+    const isLedgerEnabled = useSelector(selectHasExperimentalFeature('ledger'));
 
     // exclude selectedDevice from list, because other devices could have a higher priority,
     // and we want to have selectedDevice on top
@@ -70,17 +72,19 @@ export const SwitchDeviceContent = ({ cancelable, onCancel }: ForegroundAppProps
             >
                 <Translation id="TR_CONNECT_DEVICE" />
             </Button>
-            <Button
-                intent="neutral"
-                priority="secondary"
-                iconLeft={CableUsbCIcon}
-                isFloating
-                width="100%"
-                size="large"
-                onClick={openLedgerConnectionModal}
-            >
-                Connect Ledger
-            </Button>
+            {isLedgerEnabled && (
+                <Button
+                    intent="neutral"
+                    priority="secondary"
+                    iconLeft={CableUsbCIcon}
+                    isFloating
+                    width="100%"
+                    size="large"
+                    onClick={openLedgerConnectionModal}
+                >
+                    Connect Ledger
+                </Button>
+            )}
         </Column>
     );
 };

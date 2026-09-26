@@ -6070,6 +6070,14 @@ export const messages = defineMessages({
         id: 'TR_TRON_TX_UNDELEGATE_RESOURCE',
         defaultMessage: 'Undelegate resource',
     },
+    TR_EXPERIMENTAL_LEDGER: {
+        id: 'TR_EXPERIMENTAL_LEDGER',
+        defaultMessage: 'Ledger support',
+    },
+    TR_EXPERIMENTAL_LEDGER_DESCRIPTION: {
+        id: 'TR_EXPERIMENTAL_LEDGER_DESCRIPTION',
+        defaultMessage: 'Connect a Ledger hardware wallet via USB to manage Bitcoin accounts.',
+    },
     TR_EXPERIMENTAL_GAP_LIMIT: {
         id: 'TR_EXPERIMENTAL_GAP_LIMIT',
         defaultMessage: 'Gap limit',

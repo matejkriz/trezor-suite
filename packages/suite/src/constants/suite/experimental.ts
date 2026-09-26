@@ -38,6 +38,10 @@ export type ExperimentalFeatureConfig = {
 };
 
 export const EXPERIMENTAL_FEATURES: Record<ExperimentalFeature, ExperimentalFeatureConfig> = {
+    ledger: {
+        title: { id: 'TR_EXPERIMENTAL_LEDGER' },
+        description: { id: 'TR_EXPERIMENTAL_LEDGER_DESCRIPTION' },
+    },
     'password-manager': {
         title: { id: 'TR_EXPERIMENTAL_PASSWORD_MANAGER' },
         description: { id: 'TR_EXPERIMENTAL_PASSWORD_MANAGER_DESCRIPTION' },

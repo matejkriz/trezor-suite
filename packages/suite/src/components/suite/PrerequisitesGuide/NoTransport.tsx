@@ -1,5 +1,6 @@
 import { selectIsDebugModeActive } from '@suite/debug';
 import { openConnectionModal } from '@suite/device';
+import { selectHasExperimentalFeature } from '@suite/settings';
 import { useServices } from '@suite-common/dependency-injection';
 import { injectDispatch } from '@suite-common/redux-utils';
 import { Button, Column } from '@trezor/components';
@@ -24,6 +25,7 @@ const tipItems: TroubleshootingTipsItem[] = [
 
 const Tips = ({ items }: { items: TroubleshootingTipsItem[] }) => {
     const { dispatch } = useServices(injectDispatch);
+    const isLedgerEnabled = useSelector(selectHasExperimentalFeature('ledger'));
 
     // No transport layer (bridge/webUSB) is available
     // On web it makes sense to
@@ -37,14 +39,16 @@ const Tips = ({ items }: { items: TroubleshootingTipsItem[] }) => {
                 items={items}
                 data-testid="@connect-device-prompt/bridge-not-running"
             />
-            <Button
-                minWidth={240}
-                size="large"
-                priority="secondary"
-                onClick={() => dispatch(openConnectionModal('ledger'))}
-            >
-                Connect Ledger
-            </Button>
+            {isLedgerEnabled && (
+                <Button
+                    minWidth={240}
+                    size="large"
+                    priority="secondary"
+                    onClick={() => dispatch(openConnectionModal('ledger'))}
+                >
+                    Connect Ledger
+                </Button>
+            )}
         </Column>
     );
 };
