@@ -55,6 +55,8 @@ const prepareTest = () => {
     });
     const deps = createMockDeps<WalletDeviceServiceDeps>({
         ledgerBitcoinService: {
+            getDeviceInfo: null,
+            openAccountsDiscovery: null,
             isConnectionOwner: candidate => candidate === owner,
             verifyAddress: () => Promise.resolve(address),
             getAccount: () =>

@@ -5,11 +5,13 @@ import { mockNetworksState } from '@suite-common/networks/mocks';
 import { mockActionType, mockReducer } from '@suite-common/redux-utils/mocks';
 import { asNetworkSymbol } from '@suite-common/wallet-config';
 import {
+    changeNetworks,
     createLedgerSuiteDevice,
     discoveryActions,
     prepareDiscoveryReducer,
     prepareWalletSettingsReducer,
     selectIsBitcoinEnabled,
+    startOrRestartDiscoveryThunk,
 } from '@suite-common/wallet-core';
 import { mockWalletAccount } from '@suite-common/wallet-types/mocks';
 import { createStaticReducer } from '@suite-native/test-utils-store';
@@ -28,8 +30,13 @@ jest.mock('@suite-common/token-definitions', () => ({
     periodicCheckTokenDefinitionsThunk: () => ({ type: 'test/check-token-definitions' }),
 }));
 
+jest.mock('@suite-common/wallet-core', () => ({
+    ...jest.requireActual('@suite-common/wallet-core'),
+    startOrRestartDiscoveryThunk: jest.fn(() => ({ type: 'test/start-device-discovery' })),
+}));
+
 describe('Ledger selection in native discovery', () => {
-    it('enables Bitcoin through regular selection without starting Trezor discovery', async () => {
+    it('enables Bitcoin and starts regular discovery when a supported Ethereum network is missing', async () => {
         const device = createLedgerSuiteDevice({
             id: 'ledger-wallet',
             label: 'My travel wallet',
@@ -52,7 +59,7 @@ describe('Ledger selection in native discovery', () => {
                     storageLoadDevices: mockReducer(),
                 },
             }),
-            networks: createStaticReducer(mockNetworksState([asNetworkSymbol('btc')])),
+            networks: createStaticReducer(mockNetworksState(['btc', 'eth'].map(asNetworkSymbol))),
             pendingCoinVisibility: pendingCoinVisibilitySlice.reducer,
             wallet: combineReducers({
                 accounts: createStaticReducer([account]),
@@ -85,6 +92,25 @@ describe('Ledger selection in native discovery', () => {
         expect(store.getState().device.selectedDevice?.id).toBe(device.id);
         expect(store.getState().wallet.accounts).toEqual([account]);
         expect(store.getState().wallet.discovery[device.path]?.status).toBe('complete');
+        expect(getAccountInfo).not.toHaveBeenCalled();
+        expect(startOrRestartDiscoveryThunk).not.toHaveBeenCalled();
+
+        const multiNetworkDevice = createLedgerSuiteDevice({
+            id: device.id,
+            label: device.label,
+            staticSessionId: device.state.staticSessionId,
+            supportedNetworks: ['btc', 'eth'].map(asNetworkSymbol),
+            accountsDiscoveryAppVersion: '0.1.0',
+        });
+        store.dispatch(deviceActions.connectLedgerDevice(multiNetworkDevice));
+        store.dispatch(
+            changeNetworks(
+                ['btc', 'eth'].map(asNetworkSymbol),
+                ['btc', 'eth'].map(asNetworkSymbol),
+            ),
+        );
+        store.dispatch(deviceActions.selectDevice(multiNetworkDevice));
+        expect(startOrRestartDiscoveryThunk).toHaveBeenCalledTimes(1);
         expect(getAccountInfo).not.toHaveBeenCalled();
 
         jest.restoreAllMocks();

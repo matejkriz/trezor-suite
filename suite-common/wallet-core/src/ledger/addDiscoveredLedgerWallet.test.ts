@@ -6,6 +6,7 @@ import { type AccountInfo } from '@trezor/connect';
 
 import { addDiscoveredLedgerWallet } from './addDiscoveredLedgerWallet';
 import { accountsActions } from '../accounts/accountsActions';
+import { discoveryActions } from '../discovery/discoveryActions';
 
 describe('addDiscoveredLedgerWallet', () => {
     it('adds a selected Ledger wallet and its Bitcoin account to Suite', () => {
@@ -38,6 +39,9 @@ describe('addDiscoveredLedgerWallet', () => {
         });
 
         expect(dispatch.mock.calls[0]?.[0]).toMatchObject({
+            type: discoveryActions.startDiscovery.type,
+        });
+        expect(dispatch.mock.calls[1]?.[0]).toMatchObject({
             type: deviceActions.connectLedgerDevice.type,
             payload: {
                 provider: 'ledger',
@@ -47,7 +51,7 @@ describe('addDiscoveredLedgerWallet', () => {
                 state: { staticSessionId: wallet.staticSessionId },
             },
         });
-        expect(dispatch.mock.calls[1]?.[0]).toMatchObject({
+        expect(dispatch.mock.calls[2]?.[0]).toMatchObject({
             type: accountsActions.createAccount.type,
             payload: {
                 account: {
@@ -61,7 +65,7 @@ describe('addDiscoveredLedgerWallet', () => {
                 },
             },
         });
-        expect(dispatch).toHaveBeenCalledTimes(2);
+        expect(dispatch).toHaveBeenCalledTimes(3);
     });
 
     it('inserts BTC and ETH into ordinary accounts with their own types and derivation paths', () => {
@@ -106,19 +110,19 @@ describe('addDiscoveredLedgerWallet', () => {
                 },
             ],
         });
-        expect(dispatch.mock.calls[1][0].payload.account).toMatchObject({
+        expect(dispatch.mock.calls[2][0].payload.account).toMatchObject({
             symbol: 'btc',
             accountType: 'legacy',
             visible: false,
         });
-        expect(dispatch.mock.calls[2][0].payload.account).toMatchObject({
+        expect(dispatch.mock.calls[3][0].payload.account).toMatchObject({
             symbol: 'eth',
             accountType: 'normal',
             path: "m/44'/60'/0'/0/0",
             visible: true,
             networkType: 'ethereum',
         });
-        expect(dispatch.mock.calls[0][0].payload.unavailableCapabilities.eth).toBeUndefined();
+        expect(dispatch.mock.calls[1][0].payload.unavailableCapabilities.eth).toBeUndefined();
     });
 
     it('refreshes an existing account without discarding its custom label or metadata', () => {
@@ -160,7 +164,7 @@ describe('addDiscoveredLedgerWallet', () => {
             ],
         });
 
-        expect(dispatch.mock.calls[1]?.[0]).toMatchObject({
+        expect(dispatch.mock.calls[2]?.[0]).toMatchObject({
             type: accountsActions.updateAccount.type,
             payload: {
                 account: {

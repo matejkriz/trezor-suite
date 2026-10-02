@@ -2,6 +2,7 @@ import { type Dispatch } from '@reduxjs/toolkit';
 
 import { type LedgerBitcoinService } from '@suite-common/ledger';
 import { type TrezorDevice } from '@suite-common/suite-types';
+import { type NetworkSymbol } from '@suite-common/wallet-config';
 import {
     type Account,
     type FormState,
@@ -11,11 +12,31 @@ import {
 import { type BlockbookTransaction } from '@trezor/blockchain-link-types';
 import type TrezorConnect from '@trezor/connect';
 import {
+    type AccountInfo,
     type Address,
     type CardanoAddress,
     type Response as ConnectResponse,
     type PROTO,
 } from '@trezor/connect';
+import { type Without } from '@trezor/type-utils';
+
+import { type CreateAccountActionProps } from '../accounts/accountsActions';
+
+export type WalletDeviceDiscoveredAccount = Without<CreateAccountActionProps, 'deviceState'>;
+
+export type WalletDeviceDiscoveryResult = {
+    accounts: WalletDeviceDiscoveredAccount[];
+    failedNetworks: NetworkSymbol[];
+};
+
+export type DiscoverWalletDeviceAccountsParams = {
+    networkSymbols: NetworkSymbol[];
+    signal: AbortSignal;
+    getAccountInfo: (params: {
+        symbol: NetworkSymbol;
+        descriptor: string;
+    }) => Promise<Awaited<ConnectResponse<AccountInfo>>>;
+};
 
 export type ConfirmWalletDeviceAddressParams = {
     account: Account;
@@ -36,6 +57,9 @@ export type WalletDeviceAccountCapabilities = {
 
 /** @serviceContract */
 export type WalletDeviceOperations = {
+    discoverAccounts: (
+        params: DiscoverWalletDeviceAccountsParams,
+    ) => Promise<WalletDeviceDiscoveryResult>;
     getAccountCapabilities?: (account: Account) => WalletDeviceAccountCapabilities;
     confirmAddress: (
         params: ConfirmWalletDeviceAddressParams,
@@ -59,6 +83,8 @@ export type WalletDeviceServiceDeps = {
         | 'cancelAction'
         | 'disconnect'
         | 'isConnectionOwner'
+        | 'getDeviceInfo'
+        | 'openAccountsDiscovery'
     >;
     dispatch: Dispatch;
 };

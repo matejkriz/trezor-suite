@@ -45,6 +45,7 @@ describe(useWalletDeviceAccountCapabilities.name, () => {
 
     it('uses the selected device adapter for public discovery accounts', () => {
         const operations = createMockDeps<WalletDeviceOperations>({
+            discoverAccounts: null,
             confirmAddress: null,
             signTransaction: null,
             getAccountCapabilities: () => ({

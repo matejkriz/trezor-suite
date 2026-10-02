@@ -49,7 +49,8 @@ app. Speculos has no OS app list, so the adapter probes the running ELF's metada
 Suite discovers enabled networks into its ordinary devices and accounts; if no
 networks are enabled, it starts with BTC and ETH.
 Discovery stops each network/profile at its first unused account (up to ten
-accounts per profile by default). Reconnect after changing the enabled networks.
+accounts per profile by default). Enabling networks uses the ordinary discovery
+flow; **Load networks** also retries discovery without reconnecting the device.
 
 The app supports public data for 27 of the 28 Suite network symbols, including
 Ledger Live paths for ETH, TRX and SOL. Cardano and Bitcoin CoinJoin are omitted.
@@ -61,9 +62,8 @@ Suite's Ledger signer; accounts on other paths/networks are for discovery and
 account viewing. The discovery app itself never signs.
 
 Backend failures are isolated per network so the other networks can finish.
-Suite currently shows the discovery as completed without listing those skipped
-networks; a completed session therefore does not guarantee that every enabled
-network was fetched successfully. Reconnect to retry after resolving a backend
+Suite keeps successful accounts and shows a discovery error when an enabled,
+supported network fails. Use **Load networks** to retry after resolving a backend
 failure. Send and device address verification are hidden for accounts unsupported
 by the injected Ledger signer; receiving addresses can still be copied or shared.
 

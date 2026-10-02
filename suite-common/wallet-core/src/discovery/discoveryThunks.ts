@@ -4,7 +4,6 @@ import { type AnalyticsDep } from '@suite-common/analytics';
 import {
     type DeviceRootState,
     deviceActions,
-    isLedgerDevice,
     selectDeviceByStaticSessionId,
     selectDevices,
     selectSelectedDevice,
@@ -47,6 +46,7 @@ import type { Bip43Path } from '@trezor/crypto-utils';
 import { DISCOVERY_MODULE_PREFIX, discoveryActions } from './discoveryActions';
 import { type DiscoveryRootState } from './discoveryReducer';
 import { isDiscoveryInProgress, selectDiscoveryByDevicePath } from './discoverySelectors';
+import { runWalletDeviceDiscoveryThunk } from './runWalletDeviceDiscoveryThunk';
 import { type CreateAccountActionProps, accountsActions } from '../accounts/accountsActions';
 import { selectAccountsByDeviceState } from '../accounts/accountsSelectors';
 import { reportAccountInfoThunk, reportWalletBalanceThunk } from '../accounts/accountsThunks';
@@ -59,6 +59,7 @@ import {
     type WalletSettingsRootState,
     selectIsDeviceAutoEjectEnabled,
 } from '../settings/walletSettingsReducer';
+import { type WalletDeviceServiceDep } from '../wallet-device/walletDeviceTypes';
 
 const USER_UI_CANCEL_CODE = 'USER_UI_CANCEL';
 const DEVICE_CANCELLATION_CODES = ['Method_Cancel', 'Failure_ActionCancelled'];
@@ -302,15 +303,21 @@ const completeDiscovery = (
     );
 };
 
-export const cancelDiscoveryThunk = createThunk<void, TrezorDevice, void>(
-    `${DISCOVERY_MODULE_PREFIX}/cancel`,
-    (device, { dispatch }) => {
-        // cancel with a custom error code so we can distinguish it from device cancellation
-        TrezorConnect.cancel({ reason: USER_UI_CANCEL_CODE });
+type CancelDiscoveryThunkDeps = WithServices<WalletDeviceServiceDep>;
 
-        dispatch(discoveryActions.updateDiscovery({ status: 'cancelled' }, device.path));
-    },
-);
+export const cancelDiscoveryThunk = createThunk<
+    void,
+    TrezorDevice,
+    { extra: CancelDiscoveryThunkDeps }
+>(`${DISCOVERY_MODULE_PREFIX}/cancel`, (device, { dispatch, extra }) => {
+    // cancel with a custom error code so we can distinguish it from device cancellation
+    void extra.services.walletDeviceService.cancelAction({
+        device,
+        reason: { reason: USER_UI_CANCEL_CODE },
+    });
+
+    dispatch(discoveryActions.updateDiscovery({ status: 'cancelled' }, device.path));
+});
 
 type RunDiscoveryParams = {
     device: TrezorDevice;
@@ -319,7 +326,9 @@ type RunDiscoveryParams = {
 
 export type RunDiscoveryThunkState = DiscoveryReportingThunkState;
 
-export type RunDiscoveryThunkDeps = WithServices<AnalyticsDep & GetTradedAccountKeysDep> & {
+export type RunDiscoveryThunkDeps = WithServices<
+    AnalyticsDep & GetTradedAccountKeysDep & WalletDeviceServiceDep
+> & {
     thunks: FetchAndSaveMetadataDep;
 };
 
@@ -329,8 +338,16 @@ export const runDiscoveryThunk = createThunk<
     { state: RunDiscoveryThunkState; extra: RunDiscoveryThunkDeps }
 >(
     `${DISCOVERY_MODULE_PREFIX}/run`,
-    async ({ device: passedDevice, callId }, { dispatch, getState, extra }): Promise<void> => {
-        if (isLedgerDevice(passedDevice)) return;
+    async (
+        { device: passedDevice, callId },
+        { dispatch, getState, extra, signal },
+    ): Promise<void> => {
+        if (extra.services.walletDeviceService.get(passedDevice)) {
+            assertDeviceIsAuthorized(passedDevice);
+            await dispatch(runWalletDeviceDiscoveryThunk(passedDevice, { signal }));
+
+            return;
+        }
         try {
             let device: TrezorDevice = passedDevice;
 
@@ -648,9 +665,7 @@ type StartDiscoveryThunkParams = {
 
 export type StartDiscoveryThunkState = RunDiscoveryThunkState;
 
-export type StartDiscoveryThunkDeps = WithServices<AnalyticsDep & GetTradedAccountKeysDep> & {
-    thunks: FetchAndSaveMetadataDep;
-};
+export type StartDiscoveryThunkDeps = RunDiscoveryThunkDeps;
 
 export const startDiscoveryThunk = createThunk<
     void,
@@ -658,11 +673,10 @@ export const startDiscoveryThunk = createThunk<
     { state: StartDiscoveryThunkState; extra: StartDiscoveryThunkDeps }
 >(
     `${DISCOVERY_MODULE_PREFIX}/start`,
-    (
+    async (
         { device, isAddingHiddenWallet, isAddingExistingWallet, useScopedCallIds },
-        { dispatch, getState },
-    ): void => {
-        if (isLedgerDevice(device)) return;
+        { dispatch, getState, signal },
+    ): Promise<void> => {
         const currentDiscovery = selectDiscoveryByDevicePath(getState(), device.path);
 
         if (isDiscoveryInProgress(currentDiscovery)) {
@@ -686,14 +700,16 @@ export const startDiscoveryThunk = createThunk<
         // - or adding an existing hidden wallet,
         // - or adding initially a hidden wallet set by settings
         if (!isAddingHiddenWallet || isAddingExistingWallet) {
-            dispatch(runDiscoveryThunk({ device }));
+            await dispatch(runDiscoveryThunk({ device }, { signal }));
         }
     },
 );
 
 export type RunAdditionalDiscoveryThunkState = RunDiscoveryThunkState;
 
-export type RunAdditionalDiscoveryThunkDeps = WithServices<AnalyticsDep & GetTradedAccountKeysDep>;
+export type RunAdditionalDiscoveryThunkDeps = WithServices<
+    AnalyticsDep & GetTradedAccountKeysDep & WalletDeviceServiceDep
+>;
 
 export const runAdditionalDiscoveryThunk = createThunk<
     void,
@@ -701,13 +717,11 @@ export const runAdditionalDiscoveryThunk = createThunk<
     { state: RunAdditionalDiscoveryThunkState; extra: RunAdditionalDiscoveryThunkDeps }
 >(
     `${DISCOVERY_MODULE_PREFIX}/runAdditional`,
-    async (staticSessionId, { dispatch, getState }): Promise<void> => {
+    async (staticSessionId, { dispatch, getState, extra, signal }): Promise<void> => {
         // todo: not now, but in the future, there could be more devices (wallets) sharing the same static session id, for example
         // an imported wallet + wallet on the physical device. So this should run for all the applicable devices/wallets
 
         const device = selectDeviceByStaticSessionId(getState(), staticSessionId);
-
-        if (isLedgerDevice(device)) return;
 
         assertDeviceIsAuthorized(device);
 
@@ -722,6 +736,12 @@ export const runAdditionalDiscoveryThunk = createThunk<
                 isAddingExistingWallet: false,
             }),
         );
+
+        if (extra.services.walletDeviceService.get(device)) {
+            await dispatch(runWalletDeviceDiscoveryThunk(device, { signal }));
+
+            return;
+        }
 
         // NOTE: prepare the device to the corresponding state eg. insert the passphrase
         const deviceStateResponse = await TrezorConnect.getDeviceState({
@@ -872,9 +892,7 @@ export const submitPassphraseThunk = createThunk<
 
 type StartOrRestartDiscoveryThunkState = RunDiscoveryThunkState;
 
-type StartOrRestartDiscoveryThunkDeps = WithServices<AnalyticsDep & GetTradedAccountKeysDep> & {
-    thunks: FetchAndSaveMetadataDep;
-};
+type StartOrRestartDiscoveryThunkDeps = RunDiscoveryThunkDeps;
 
 /**
  * Helper to restart discovery for currently selected device
@@ -883,24 +901,28 @@ export const startOrRestartDiscoveryThunk = createThunk<
     void,
     void,
     { state: StartOrRestartDiscoveryThunkState; extra: StartOrRestartDiscoveryThunkDeps }
->(`${DISCOVERY_MODULE_PREFIX}/restart`, (_, { dispatch, getState }) => {
+>(`${DISCOVERY_MODULE_PREFIX}/restart`, async (_, { dispatch, getState, signal }) => {
     const device = selectSelectedDevice(getState());
-    if (!device || isLedgerDevice(device)) return;
+    if (!device || isDiscoveryInProgress(selectDiscoveryByDevicePath(getState(), device.path)))
+        return;
     const staticSessionId = device.state?.staticSessionId;
     if (staticSessionId) {
         // we already have staticSessionId (=passphrase state), we probably failed during blockchain discovery
-        dispatch(runAdditionalDiscoveryThunk(staticSessionId));
+        await dispatch(runAdditionalDiscoveryThunk(staticSessionId, { signal }));
 
         return;
     }
 
     // if no staticSessionId available yet it means we failed sooner, for example during pin input
-    dispatch(
-        startDiscoveryThunk({
-            device,
-            isAddingExistingWallet: true,
-            isAddingHiddenWallet: false,
-        }),
+    await dispatch(
+        startDiscoveryThunk(
+            {
+                device,
+                isAddingExistingWallet: true,
+                isAddingHiddenWallet: false,
+            },
+            { signal },
+        ),
     );
 });
 

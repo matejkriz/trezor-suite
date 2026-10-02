@@ -10,6 +10,7 @@ const account = mockWalletAccount({ symbol: asNetworkSymbol('btc') });
 describe(getWalletDeviceAccountCapabilities.name, () => {
     it('preserves Trezor defaults and operations implementations without capability overrides', () => {
         const operations = createMockDeps<WalletDeviceOperations>({
+            discoverAccounts: null,
             confirmAddress: null,
             signTransaction: null,
         });
@@ -26,6 +27,7 @@ describe(getWalletDeviceAccountCapabilities.name, () => {
 
     it('disables operations when there is no account without calling a vendor implementation', () => {
         const operations = createMockDeps<WalletDeviceOperations>({
+            discoverAccounts: null,
             confirmAddress: null,
             signTransaction: null,
             getAccountCapabilities: () => ({ canSignTransaction: true, canConfirmAddress: true }),
@@ -40,6 +42,7 @@ describe(getWalletDeviceAccountCapabilities.name, () => {
 
     it('uses the injected operations capabilities without inspecting device vendors', () => {
         const operations = createMockDeps<WalletDeviceOperations>({
+            discoverAccounts: null,
             confirmAddress: null,
             signTransaction: null,
             getAccountCapabilities: () => ({ canSignTransaction: false, canConfirmAddress: true }),

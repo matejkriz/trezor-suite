@@ -28,6 +28,8 @@ const account = {
     networkType: 'bitcoin',
     deviceState: 'ledger-id@ledger:0',
     accountType: 'normal',
+    index: 0,
+    path: "m/84'/0'/0'",
 } as unknown as Account;
 const transaction = { type: 'final' } as PrecomposedTransactionFinal;
 const formState = {} as FormState;
@@ -35,6 +37,8 @@ const formState = {} as FormState;
 const createStore = () => {
     const deps = createMockDeps<WalletDeviceServiceDeps>({
         ledgerBitcoinService: {
+            getDeviceInfo: null,
+            openAccountsDiscovery: null,
             isConnectionOwner: () => true,
             getAccount: null,
             signTransaction: null,

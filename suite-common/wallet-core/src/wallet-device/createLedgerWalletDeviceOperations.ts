@@ -1,6 +1,11 @@
-import { deviceActions } from '@suite-common/device';
-import { LedgerActionError, getLedgerBitcoinAccountPath } from '@suite-common/ledger';
-import { type ButtonRequest, type TrezorDevice } from '@suite-common/suite-types';
+import { type LedgerSuiteDevice, deviceActions } from '@suite-common/device';
+import {
+    LedgerAccountsDiscoveryError,
+    LedgerActionError,
+    getLedgerBitcoinAccountPath,
+} from '@suite-common/ledger';
+import { type ButtonRequest } from '@suite-common/suite-types';
+import { asNetworkSymbol } from '@suite-common/wallet-config';
 import { type Account } from '@suite-common/wallet-types';
 import { datetimeToLocktime, isCardanoTx } from '@suite-common/wallet-utils';
 import { validatePath } from '@trezor/connect-common';
@@ -10,6 +15,8 @@ import { Transaction } from '@trezor/utxo-lib';
 
 import { WalletDeviceActionError } from './walletDeviceError';
 import { type WalletDeviceOperations, type WalletDeviceServiceDeps } from './walletDeviceTypes';
+import { discoverLedgerBitcoinWallet } from '../ledger/discoverLedgerBitcoinWallet';
+import { discoverLedgerWalletWithAccountsApp } from '../ledger/discoverLedgerWalletWithAccountsApp';
 import { signLedgerBitcoinTransaction } from '../send/signLedgerBitcoinTransaction';
 
 type LedgerWalletDeviceOperationsDeps = WalletDeviceServiceDeps;
@@ -30,7 +37,7 @@ const addressError = {
 
 export const createLedgerWalletDeviceOperations = (
     deps: LedgerWalletDeviceOperationsDeps,
-    device: TrezorDevice,
+    device: LedgerSuiteDevice,
 ): WalletDeviceOperations => {
     const owner = device.state?.sessionId;
     const ownsConnection = () =>
@@ -69,6 +76,41 @@ export const createLedgerWalletDeviceOperations = (
     };
 
     return {
+        discoverAccounts: ({ networkSymbols, signal, getAccountInfo }) =>
+            withCurrentConnection(async () => {
+                if (networkSymbols.length === 0) return { accounts: [], failedNetworks: [] };
+                const discovered = device.ledgerInfo?.accountsDiscoveryAppVersion
+                    ? await discoverLedgerWalletWithAccountsApp(
+                          { ledgerBitcoinService: deps.ledgerBitcoinService, getAccountInfo },
+                          { networkSymbols, signal, owner },
+                      )
+                    : await discoverLedgerBitcoinWallet(
+                          {
+                              ledgerBitcoinService: deps.ledgerBitcoinService,
+                              getAccountInfo: descriptor =>
+                                  getAccountInfo({ symbol: asNetworkSymbol('btc'), descriptor }),
+                          },
+                          { signal, owner },
+                      );
+                if (
+                    discovered.wallet.id !== device.id ||
+                    discovered.wallet.staticSessionId !== device.state.staticSessionId
+                ) {
+                    throw new Error('Device returned a different wallet');
+                }
+
+                return {
+                    accounts: discovered.accounts,
+                    failedNetworks: discovered.failedNetworks ?? [],
+                };
+            }).catch(error => {
+                if (error instanceof LedgerActionError)
+                    throw new WalletDeviceActionError(error.kind);
+                if (error instanceof LedgerAccountsDiscoveryError && error.code === 'rejected') {
+                    throw new WalletDeviceActionError('rejected');
+                }
+                throw error;
+            }),
         getAccountCapabilities: account => {
             const isSupported = isSupportedBitcoinAccount(account);
 

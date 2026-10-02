@@ -32,6 +32,8 @@ const account = mockWalletAccount({
 const createStore = ({ connected = true, returnedAddress = address, accountIndex = 0 } = {}) => {
     const deps = createMockDeps<WalletDeviceServiceDeps>({
         ledgerBitcoinService: {
+            getDeviceInfo: null,
+            openAccountsDiscovery: null,
             isConnectionOwner: () => true,
             verifyAddress: () => Promise.resolve(returnedAddress),
             getAccount: null,

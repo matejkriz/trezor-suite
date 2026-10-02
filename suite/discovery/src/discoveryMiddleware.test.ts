@@ -163,9 +163,9 @@ const createObserveSelectedDeviceFulfilledAction = (payload: {
 
 const fixtures: Fixture[] = [
     {
-        description: 'does not start Trezor discovery for a selected Ledger',
+        description: 'starts regular discovery for a selected Ledger with missing accounts',
         state: { router: { app: 'dashboard' } },
-        steps: [{ action: deviceActions.selectDevice(ledgerDevice), expectedCallCount: 0 }],
+        steps: [{ action: deviceActions.selectDevice(ledgerDevice), expectedCallCount: 1 }],
     },
     {
         description: 'starts discovery when device is selected',

@@ -43,6 +43,8 @@ const prepareTest = () => {
         services: {
             walletDeviceService: {
                 get: () => ({
+                    discoverAccounts: () =>
+                        Promise.reject(new Error('Unexpected discovery request')),
                     getAccountCapabilities: () => ({
                         canSignTransaction: false,
                         canConfirmAddress: false,

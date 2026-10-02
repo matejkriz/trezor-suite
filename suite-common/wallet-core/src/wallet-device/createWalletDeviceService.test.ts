@@ -17,6 +17,8 @@ describe('wallet device service', () => {
     it('resolves only the adapter for the selected vendor', () => {
         const deps = createMockDeps<WalletDeviceServiceDeps>({
             ledgerBitcoinService: {
+                getDeviceInfo: null,
+                openAccountsDiscovery: null,
                 isConnectionOwner: () => true,
                 cancelAction: () => undefined,
                 disconnect: () => Promise.resolve(),
@@ -35,6 +37,8 @@ describe('wallet device service', () => {
     it('cancels Ledger without canceling Trezor Connect', async () => {
         const deps = createMockDeps<WalletDeviceServiceDeps>({
             ledgerBitcoinService: {
+                getDeviceInfo: null,
+                openAccountsDiscovery: null,
                 isConnectionOwner: () => true,
                 cancelAction: () => undefined,
                 disconnect: () => Promise.resolve(),
@@ -58,6 +62,8 @@ describe('wallet device service', () => {
     it('preserves the reason when canceling Trezor', async () => {
         const deps = createMockDeps<WalletDeviceServiceDeps>({
             ledgerBitcoinService: {
+                getDeviceInfo: null,
+                openAccountsDiscovery: null,
                 isConnectionOwner: () => true,
                 cancelAction: () => undefined,
                 disconnect: () => Promise.resolve(),
@@ -86,6 +92,8 @@ describe('wallet device service', () => {
         async reason => {
             const deps = createMockDeps<WalletDeviceServiceDeps>({
                 ledgerBitcoinService: {
+                    getDeviceInfo: null,
+                    openAccountsDiscovery: null,
                     isConnectionOwner: () => true,
                     cancelAction: () => undefined,
                     disconnect: null,
@@ -105,6 +113,8 @@ describe('wallet device service', () => {
     it('disconnects the Ledger session through its injected transport', async () => {
         const deps = createMockDeps<WalletDeviceServiceDeps>({
             ledgerBitcoinService: {
+                getDeviceInfo: null,
+                openAccountsDiscovery: null,
                 isConnectionOwner: () => true,
                 cancelAction: () => undefined,
                 disconnect: () => Promise.resolve(),
@@ -134,6 +144,8 @@ describe('wallet device service', () => {
         async ({ device, ownsConnection }) => {
             const deps = createMockDeps<WalletDeviceServiceDeps>({
                 ledgerBitcoinService: {
+                    getDeviceInfo: null,
+                    openAccountsDiscovery: null,
                     isConnectionOwner: () => ownsConnection,
                     cancelAction: () => undefined,
                     disconnect: () => Promise.resolve(),

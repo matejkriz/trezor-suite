@@ -7,7 +7,7 @@ import {
 import { type LocksRootState } from '@suite/locks';
 import { type RouterRootState, routerAppChanged } from '@suite/router';
 import { connectPopupCallInnerThunk } from '@suite-common/connect-popup';
-import { deviceActions, isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
+import { deviceActions, selectSelectedDevice } from '@suite-common/device';
 import { createMiddlewareWithExtraDeps } from '@suite-common/redux-utils';
 import { type ThpRootState, selectThpAutoconnectStep, thpActions } from '@suite-common/thp';
 import {
@@ -40,7 +40,7 @@ export const prepareDiscoveryMiddleware = createMiddlewareWithExtraDeps<
     await next(action);
 
     const device = selectSelectedDevice(getState());
-    if (!device || isLedgerDevice(device)) return action;
+    if (!device) return action;
 
     const isObserveSelectedDeviceMatch = observeSelectedDeviceThunk.fulfilled.match(action);
     const { isDeviceBecomingAcquired, isDeviceBecomingConnected } = isObserveSelectedDeviceMatch

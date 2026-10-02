@@ -52,6 +52,7 @@ const components = Object.fromEntries(
 
 const createOperations = (canSignAccount: (account: Account) => boolean) =>
     createMockDeps<WalletDeviceOperations>({
+        discoverAccounts: null,
         confirmAddress: null,
         signTransaction: null,
         getAccountCapabilities: account => ({

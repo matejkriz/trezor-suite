@@ -1,8 +1,4 @@
-import {
-    type DeviceRootState,
-    isLedgerDevice,
-    selectHasOnlyPortfolioDevice,
-} from '@suite-common/device';
+import { type DeviceRootState, selectHasOnlyPortfolioDevice } from '@suite-common/device';
 import { type NetworksRootState } from '@suite-common/networks';
 import { type PersistentDeviceDataRootState } from '@suite-common/persistent-device-data';
 import { createWeakMapSelector, returnStableArrayIfEmpty } from '@suite-common/redux-utils';
@@ -201,7 +197,6 @@ export const selectShouldRediscover = (
     state: WalletCoreCompoundRootState,
     device: TrezorDevice,
 ) => {
-    if (isLedgerDevice(device)) return false;
     if (selectHasRunningDiscovery(state)) return false;
 
     const staticSessionId = device.state?.staticSessionId;

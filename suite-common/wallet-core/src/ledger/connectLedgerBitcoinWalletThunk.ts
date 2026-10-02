@@ -11,6 +11,7 @@ import { discoverLedgerWalletWithAccountsApp } from './discoverLedgerWalletWithA
 import { type AccountsRootState } from '../accounts/accountsReducer';
 import { selectAccounts } from '../accounts/accountsSelectors';
 import { discoveryActions } from '../discovery/discoveryActions';
+import { getWalletDeviceDiscoveryCompletionStatus } from '../discovery/runWalletDeviceDiscoveryThunk';
 import {
     type WalletSettingsRootState,
     selectEnabledNetworks,
@@ -116,9 +117,11 @@ export const connectLedgerBitcoinWalletThunk = createThunk<
                 discovered,
                 apiType,
             );
-            dispatch(discoveryActions.startDiscovery(connectedDevice.path));
             dispatch(
-                discoveryActions.updateDiscovery({ status: 'complete' }, connectedDevice.path),
+                discoveryActions.updateDiscovery(
+                    getWalletDeviceDiscoveryCompletionStatus(discovered.failedNetworks ?? []),
+                    connectedDevice.path,
+                ),
             );
             dispatch(deviceActions.selectDevice(connectedDevice));
 

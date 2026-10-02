@@ -17,6 +17,9 @@ export type {
     WalletDeviceServiceDeps,
     WalletDeviceService,
     WalletDeviceServiceDep,
+    DiscoverWalletDeviceAccountsParams,
+    WalletDeviceDiscoveryResult,
+    WalletDeviceDiscoveredAccount,
 } from './walletDeviceTypes';
 
 export const createWalletDeviceService = (deps: WalletDeviceServiceDeps): WalletDeviceService => ({
