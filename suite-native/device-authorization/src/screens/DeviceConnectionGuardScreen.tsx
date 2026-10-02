@@ -1,13 +1,13 @@
 import { useSelector } from 'react-redux';
 
-import { selectIsBluetoothSupportedByDevice } from '@suite-common/device';
-import { selectBluetoothPermissionStatus } from '@suite-native/bluetooth';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { cancelDeviceActionThunk } from '@suite-common/wallet-core';
 import {
-    ConnectAndUnlockDeviceScreenContent,
-    TurnOnAndUnlockDeviceScreenContent,
+    DeviceConnectionScreenContent,
+    selectIsDeviceConnectionScrollable,
 } from '@suite-native/device';
 import { Screen, useNavigateToInitialScreen } from '@suite-native/navigation';
-import TrezorConnect from '@trezor/connect';
 
 import { ConnectDeviceScreenHeader } from '../components/ConnectDeviceScreenHeader';
 import { useDeviceReadyEvents } from '../hooks/useDeviceReadyEvents';
@@ -20,12 +20,9 @@ type DeviceConnectionGuardScreenParams = {
 export const DeviceConnectionGuardScreen = ({ onCancel }: DeviceConnectionGuardScreenParams) => {
     const { emitDeviceNotReadyEvent } = useDeviceReadyEvents();
     const navigateToInitialScreen = useNavigateToInitialScreen();
+    const { dispatch } = useServices(injectDispatch);
 
-    const bluetoothPermissionStatus = useSelector(selectBluetoothPermissionStatus);
-    const isBluetoothSupportedByDevice = useSelector(selectIsBluetoothSupportedByDevice);
-
-    const isBluetoothVariantVisible =
-        bluetoothPermissionStatus === 'granted' && isBluetoothSupportedByDevice;
+    const isScrollable = useSelector(selectIsDeviceConnectionScrollable);
 
     const handleCancel = () => {
         emitDeviceNotReadyEvent();
@@ -35,20 +32,16 @@ export const DeviceConnectionGuardScreen = ({ onCancel }: DeviceConnectionGuardS
     useOnThpPairingCanceled(handleCancel);
 
     const defaultOnCancel = () => {
-        TrezorConnect.cancel();
+        void dispatch(cancelDeviceActionThunk({}));
         handleCancel();
     };
 
     return (
         <Screen
             header={<ConnectDeviceScreenHeader onCancel={onCancel ?? defaultOnCancel} />}
-            isScrollable={false}
+            isScrollable={isScrollable}
         >
-            {isBluetoothVariantVisible ? (
-                <TurnOnAndUnlockDeviceScreenContent />
-            ) : (
-                <ConnectAndUnlockDeviceScreenContent />
-            )}
+            <DeviceConnectionScreenContent />
         </Screen>
     );
 };

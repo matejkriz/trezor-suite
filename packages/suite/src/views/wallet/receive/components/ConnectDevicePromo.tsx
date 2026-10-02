@@ -1,37 +1,23 @@
-import { type JSX } from 'react';
-
 import { Translation } from '@suite/intl';
-import { selectSelectedDevice } from '@suite-common/device';
-import { DEFAULT_FLAGSHIP_MODEL } from '@suite-common/suite-constants';
+import { selectDeviceBrandName, selectSelectedDevice } from '@suite-common/device';
 import { Banner } from '@trezor/components';
-import { mapTrezorModelToIcon } from '@trezor/product-components';
 
+import { getDeviceIcon } from 'src/components/suite/DeviceImage';
 import { useSelector } from 'src/hooks/suite';
 
-type ConnectDevicePromoProps = {
-    title: JSX.Element | string;
-    description: JSX.Element | string;
-};
-
-const ConnectDevicePromo = ({ title, description }: ConnectDevicePromoProps) => {
-    const selectedDevice = useSelector(selectSelectedDevice);
-    const selectedDeviceModelInternal =
-        selectedDevice?.features?.internal_model || DEFAULT_FLAGSHIP_MODEL;
+export const ConnectDeviceGenericPromo = () => {
+    const device = useSelector(selectSelectedDevice);
+    const deviceBrand = useSelector(selectDeviceBrandName);
 
     return (
         <Banner
             intent="warning"
             data-testid="@warning/trezorNotConnected"
-            icon={mapTrezorModelToIcon[selectedDeviceModelInternal]}
-            title={title}
-            description={description}
+            icon={getDeviceIcon(device)}
+            title={<Translation id="TR_DEVICE_DISCONNECTED" values={{ deviceBrand }} />}
+            description={
+                <Translation id="TR_CONNECT_DEVICE_TO_CONTINUE" values={{ deviceBrand }} />
+            }
         />
     );
 };
-
-export const ConnectDeviceGenericPromo = () => (
-    <ConnectDevicePromo
-        title={<Translation id="TR_CONNECT_DEVICE_GENERIC_PROMO_TITLE" />}
-        description={<Translation id="TR_CONNECT_DEVICE_GENERIC_PROMO_DESCRIPTION" />}
-    />
-);

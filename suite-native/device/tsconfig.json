@@ -18,6 +18,7 @@
         {
             "path": "../../suite-common/firmware-authenticity"
         },
+        { "path": "../../suite-common/ledger" },
         {
             "path": "../../suite-common/message-system"
         },
@@ -86,7 +87,9 @@
         { "path": "../../packages/theme" },
         { "path": "../../packages/type-utils" },
         { "path": "../../packages/urls" },
-        { "path": "../../packages/utils" }
+        { "path": "../../packages/utils" },
+        { "path": "../test-utils" },
+        { "path": "../test-utils-store" }
     ],
     "include": [".", "**/*.json"]
 }

@@ -5,7 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 
 import { useServices } from '@suite-common/dependency-injection';
 import { injectDispatch } from '@suite-common/redux-utils';
-import { sendFormActions } from '@suite-common/wallet-core';
+import { cancelDeviceActionThunk, sendFormActions } from '@suite-common/wallet-core';
 import { type AccountKey } from '@suite-common/wallet-types';
 import { useConfirmOnTrezorController } from '@suite-native/confirm-on-trezor';
 import { type ExchangeFlowType } from '@suite-native/navigation';
@@ -19,7 +19,6 @@ import {
     selectIsTransactionAlreadySigned,
     useOutputsReviewBackInterceptor,
 } from '@suite-native/transaction-management';
-import TrezorConnect from '@trezor/connect';
 
 import { useTradingOutputsReviewErrorAlert } from './useTradingOutputsReviewErrorAlert';
 import { useTradingTxValidityTimer } from './useTradingTxValidityTimer';
@@ -71,10 +70,10 @@ export const useTradingOutputsReviewScreenControls = ({
     const onReviewCanceled = useCallback(() => {
         activeSigningAttemptIdRef.current += 1;
         resolveTransactionSendConsent(false);
-        TrezorConnect.cancel('tx-timeout');
+        void dispatch(cancelDeviceActionThunk({ reason: 'tx-timeout' }));
         navigation.popToTop();
         reportToAnalytics('sign-and-send', 'cancel');
-    }, [navigation, reportToAnalytics, resolveTransactionSendConsent]);
+    }, [dispatch, navigation, reportToAnalytics, resolveTransactionSendConsent]);
     useOutputsReviewBackInterceptor(onReviewCanceled);
 
     const nextStep: TradingTransactionSignAndSendProps['nextStep'] = useCallback(() => {
@@ -146,7 +145,7 @@ export const useTradingOutputsReviewScreenControls = ({
     const handleRetry = useCallback(async () => {
         activeSigningAttemptIdRef.current += 1;
         resolveTransactionSendConsent(false);
-        TrezorConnect.cancel('tx-timeout');
+        await dispatch(cancelDeviceActionThunk({ reason: 'tx-timeout' })).unwrap();
         dispatch(sendFormActions.clearSignedTransactionData());
         setIsBroadcasting(false);
         revealConfirmOnTrezorSheet();

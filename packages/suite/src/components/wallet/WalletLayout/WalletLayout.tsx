@@ -1,11 +1,13 @@
 import { type ReactNode, useRef } from 'react';
 
 import { type TranslationKey, useTranslation } from '@suite/intl';
+import { selectRouter } from '@suite/router';
+import { useWalletDeviceAccountCapabilities } from '@suite-common/wallet-core';
 import { Column, Skeleton } from '@trezor/components';
 import { type PrimitiveType, exhaustive } from '@trezor/type-utils';
 
 import { PageHeader } from 'src/components/suite/layouts/SuiteLayout';
-import { useLayout } from 'src/hooks/suite';
+import { useLayout, useSelector } from 'src/hooks/suite';
 import { AccountHeaderProvider } from 'src/support/suite/AccountHeaderProvider';
 import { type AppState } from 'src/types/suite';
 
@@ -80,6 +82,12 @@ export const WalletLayout = ({
     const { translationString } = useTranslation();
     const l10nTitle = translationString(title, titleValues);
     const balanceSectionRef = useRef<HTMLDivElement>(null);
+    const { route } = useSelector(selectRouter);
+    const { canSignTransaction } = useWalletDeviceAccountCapabilities(account.account);
+    const isUnsupportedSpendingRoute =
+        !!account.account &&
+        !canSignTransaction &&
+        (route?.name === 'wallet-send' || route?.name === 'wallet-staking');
 
     useLayout(
         l10nTitle,
@@ -90,7 +98,9 @@ export const WalletLayout = ({
         <AccountHeaderProvider balanceSectionRef={balanceSectionRef}>
             <Column gap={40}>
                 <AccountBanners account={account.account} />
-                <WalletBody account={account}>{children}</WalletBody>
+                {!isUnsupportedSpendingRoute && (
+                    <WalletBody account={account}>{children}</WalletBody>
+                )}
             </Column>
         </AccountHeaderProvider>
     );

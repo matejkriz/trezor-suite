@@ -12,6 +12,7 @@ import { exhaustive } from '@trezor/type-utils';
 
 import { createStorageIdFromDeviceStaticSessionId } from './storage/createStorageIdFromDeviceStaticSessionId';
 import { type SuiteSyncUncontrolledErrorHandlerDep } from './suiteSyncUncontrolledErrorHandler';
+import { isSuiteSyncSupportedByDevice } from './suiteSyncUtils';
 
 type GetSelectedDevice = () => TrezorDevice | undefined;
 
@@ -37,7 +38,7 @@ export const createSuiteSyncInternalErrorHandler =
         // Todo: ------ this shall be REFACTORED OUT! [https://github.com/trezor/trezor-suite/issues/27049] ------
         const device = deps.getSelectedDevice();
 
-        if (!device || !isTrezorDeviceWithState(device)) {
+        if (!device || !isTrezorDeviceWithState(device) || !isSuiteSyncSupportedByDevice(device)) {
             // Temporary, no better error
             deps.suiteSyncUncontrolledErrorHandler({
                 error: DeviceError('Device not found during handling SuiteSync internal error'),

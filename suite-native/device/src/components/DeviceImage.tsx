@@ -1,4 +1,4 @@
-import { Image } from '@suite-native/atoms';
+import { HardwareWalletSvg, Image } from '@suite-native/atoms';
 import { DeviceModelInternal } from '@trezor/device-utils';
 import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
 
@@ -13,6 +13,7 @@ const deviceImageMap: Record<DeviceModelInternal, string> = {
 };
 
 type DeviceImageSize = 'normal' | 'large';
+export type DeviceImageKind = 'trezor' | 'ledger';
 
 export const sizeToHeightMap = {
     normal: 151,
@@ -30,12 +31,28 @@ const imageStyle = prepareNativeStyle<{ size: DeviceImageSize; maxHeight?: numbe
 
 type DeviceImageProps = {
     deviceModel: DeviceModelInternal;
+    deviceImage?: DeviceImageKind;
     size?: DeviceImageSize;
     maxHeight?: number;
 };
 
-export const DeviceImage = ({ deviceModel, size = 'normal', maxHeight }: DeviceImageProps) => {
+export const DeviceImage = ({
+    deviceModel,
+    deviceImage = 'trezor',
+    size = 'normal',
+    maxHeight,
+}: DeviceImageProps) => {
     const { applyStyle } = useNativeStyles();
+
+    if (deviceImage === 'ledger') {
+        return (
+            <HardwareWalletSvg
+                width="100%"
+                height={Math.min(sizeToHeightMap[size], maxHeight ?? sizeToHeightMap[size])}
+                testID="@device/image"
+            />
+        );
+    }
 
     return (
         <Image

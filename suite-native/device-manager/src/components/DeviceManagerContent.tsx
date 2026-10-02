@@ -20,16 +20,23 @@ import { injectDispatch } from '@suite-common/redux-utils';
 import { type TrezorDevice } from '@suite-common/suite-types';
 import { selectHasRunningDiscovery } from '@suite-common/wallet-core';
 import { events, injectNativeAnalytics } from '@suite-native/analytics';
-import { AnimatedVStack, VStack } from '@suite-native/atoms';
+import { AnimatedVStack, Box, Button, VStack } from '@suite-native/atoms';
 import { selectShouldFactoryResetBeVisible } from '@suite-native/device';
+import { Translation } from '@suite-native/intl';
 import {
     type AppTabsParamList,
     AppTabsRoutes,
     EarnStackRoutes,
     HomeStackRoutes,
-    type TabNavigationProp,
+    type RootStackParamList,
+    RootStackRoutes,
+    type TabToStackCompositeNavigationProp,
     checkIsRouteAnyOf,
 } from '@suite-native/navigation';
+import {
+    type SettingsSliceRootState,
+    selectIsExperimentalFeatureEnabled,
+} from '@suite-native/settings';
 import { hasBitcoinOnlyFirmware } from '@trezor/device-utils';
 import { prepareNativeStyle, useNativeStyles } from '@trezor/styles-native';
 
@@ -53,7 +60,16 @@ const scrollViewStyle = prepareNativeStyle<{ maxHeight: number }>((utils, { maxH
     borderBottomRightRadius: MANAGER_MODAL_BOTTOM_RADIUS,
 }));
 
-type NavigationProp = TabNavigationProp<AppTabsParamList, AppTabsRoutes.HomeStack>;
+const footerButtonSurfaceStyle = prepareNativeStyle(utils => ({
+    backgroundColor: utils.colors.surfaceFillRaised,
+    borderRadius: utils.borders.radii.r12,
+}));
+
+type NavigationProp = TabToStackCompositeNavigationProp<
+    AppTabsParamList,
+    AppTabsRoutes.HomeStack,
+    RootStackParamList
+>;
 
 export const DeviceManagerContent = () => {
     const { applyStyle, utils } = useNativeStyles();
@@ -67,6 +83,9 @@ export const DeviceManagerContent = () => {
     const isDeviceConnected = useSelector(selectIsDeviceConnected);
     const isDeviceInitialized = useSelector(selectIsDeviceInitialized);
     const deviceStaticSessionId = useSelector(selectDeviceStaticSessionId);
+    const isLedgerEnabled = useSelector((state: SettingsSliceRootState) =>
+        selectIsExperimentalFeatureEnabled(state, 'ledger'),
+    );
 
     const navigation = useNavigation<NavigationProp>();
     const currentRoute = useRoute();
@@ -115,9 +134,33 @@ export const DeviceManagerContent = () => {
 
     const isDeviceListVisible = isChangeDeviceRequested || isPortfolioTrackerDevice;
 
+    const handleConnectLedger = () => {
+        setIsDeviceManagerVisible(false);
+        navigation.navigate(RootStackRoutes.ConnectLedger);
+    };
+
     return (
         <DeviceManagerModal
-            footer={<ConnectButton onSelectDevice={handleSelectDevice} />}
+            footer={
+                <VStack spacing="sp12" paddingBottom="sp16">
+                    <ConnectButton onSelectDevice={handleSelectDevice} />
+                    {isLedgerEnabled && (
+                        <VStack paddingHorizontal="sp16">
+                            <Box style={applyStyle(footerButtonSurfaceStyle)}>
+                                <Button
+                                    intent="neutral"
+                                    priority="secondary"
+                                    isFullWidth
+                                    isDisabled={hasRunningDiscovery}
+                                    onPress={handleConnectLedger}
+                                >
+                                    <Translation id="moduleConnectLedger.button" />
+                                </Button>
+                            </Box>
+                        </VStack>
+                    )}
+                </VStack>
+            }
             customSwitchRightView={
                 !isPortfolioTrackerDevice && (
                     <DevicesToggleButton
@@ -126,7 +169,9 @@ export const DeviceManagerContent = () => {
                     />
                 )
             }
-            onClose={() => setIsChangeDeviceRequested(false)}
+            onClose={() => {
+                setIsChangeDeviceRequested(false);
+            }}
         >
             <Animated.ScrollView
                 style={applyStyle(scrollViewStyle, { maxHeight: scrollViewMaxHeight })}

@@ -360,7 +360,7 @@ export const signAndPushSendFormTransactionThunk = createThunk<
         const result = pushResponse.payload;
         const { txid } = result.payload;
 
-        if (isBumpFeeRbf && device.state?.staticSessionId) {
+        if (isBumpFeeRbf && device?.state?.staticSessionId) {
             dispatch(
                 updateRbfLabelsThunk({
                     deviceStaticSessionId: device.state.staticSessionId,

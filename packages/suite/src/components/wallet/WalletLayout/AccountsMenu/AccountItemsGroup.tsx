@@ -3,7 +3,11 @@ import { useMemo } from 'react';
 import styled from 'styled-components';
 
 import { selectRouteName } from '@suite/router';
-import { selectBaseCurrency, selectCurrentFiatRates } from '@suite-common/wallet-core';
+import {
+    selectBaseCurrency,
+    selectCurrentFiatRates,
+    useWalletDeviceAccountCapabilities,
+} from '@suite-common/wallet-core';
 import {
     BASE_CURRENCY_ZERO,
     areTokenFiatRatesLoading,
@@ -62,6 +66,8 @@ export const AccountItemsGroup = ({
 }: AccountItemsGroupProps) => {
     const { isSidebarCollapsed } = useResponsiveContext();
     const stakingBalance = getAccountTotalStakingBalance(account);
+    const { canSignTransaction } = useWalletDeviceAccountCapabilities(account);
+    const isStakingDisplayed = showStaking && canSignTransaction;
 
     const routeName = useSelector(selectRouteName);
     const baseCurrencyCode = useSelector(selectBaseCurrency);
@@ -93,13 +99,13 @@ export const AccountItemsGroup = ({
                     isSelected={
                         selected &&
                         (routeName === 'wallet-index' ||
-                            (routeName === 'wallet-staking' && !showStaking))
+                            (routeName === 'wallet-staking' && !isStakingDisplayed))
                     }
                     formattedBalance={account.formattedBalance}
                     dataTestKey={dataTestKey}
                     onClick={onItemClick}
                 />
-                {showStaking && (
+                {isStakingDisplayed && (
                     <AccountItem
                         account={account}
                         forceOnlyItemClick={forceOnlyItemClick}

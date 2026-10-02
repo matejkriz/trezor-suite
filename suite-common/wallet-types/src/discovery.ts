@@ -8,6 +8,7 @@ type CommonDiscoveryStatus = {
     startTimestamp?: number;
     passphraseSubmitted?: boolean;
     useScopedCallIds?: boolean;
+    requestId?: string;
 };
 
 export type DiscoveryStatus = CommonDiscoveryStatus &

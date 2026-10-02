@@ -1,7 +1,7 @@
 import { events, injectDesktopAnalytics } from '@suite/analytics';
-import { useDevice } from '@suite/device';
 import { Translation } from '@suite/intl';
 import { useServices } from '@suite-common/dependency-injection';
+import { getDeviceBrandName, selectSelectedDevice } from '@suite-common/device';
 import {
     selectTradingSellActiveTrade,
     selectTradingSellInfo,
@@ -16,6 +16,7 @@ import { AccountLabeling } from 'src/components/suite/labeling/AccountLabeling';
 import { useSelector } from 'src/hooks/suite';
 import { useTradingSellTradeActions } from 'src/hooks/wallet/trading/useTradingSellTradeActions';
 import { useTradingWatchTrade } from 'src/hooks/wallet/trading/useTradingWatchTrade';
+import { useIsTradingWalletConnected } from 'src/views/wallet/trading/common/useIsTradingWalletConnected';
 
 const SELL_PROVIDER_CONFIRMATION_POLLING_INTERVAL_SECONDS = 10;
 
@@ -23,7 +24,8 @@ export const TradingSelectedOfferSellTransaction = () => {
     const { analytics } = useServices(injectDesktopAnalytics);
     const { handleClick, disabled } = useAsyncClickHandler();
     const isDiscoveryRunning = useSelector(selectHasRunningDiscovery);
-    const { device } = useDevice();
+    const isWalletConnected = useIsTradingWalletConnected();
+    const device = useSelector(selectSelectedDevice);
     const { account, sendTransaction } = useTradingSellTradeActions();
     const sellInfo = useSelector(selectTradingSellInfo);
     const isLoading = useSelector(selectTradingSellIsLoading);
@@ -146,14 +148,17 @@ export const TradingSelectedOfferSellTransaction = () => {
                     isDisabled={
                         isLoading ||
                         !account ||
-                        !device?.connected ||
+                        !isWalletConnected ||
                         isDiscoveryRunning ||
                         disabled
                     }
                     onClick={handleSendAndConfirmClick}
                     data-testid="@trading/offer/confirm-on-trezor-and-send"
                 >
-                    <Translation id="TR_SELL_CONFIRM_ON_TREZOR_SEND" />
+                    <Translation
+                        id="TR_CONFIRM_ON_DEVICE_AND_SEND"
+                        values={{ deviceBrand: getDeviceBrandName(device) }}
+                    />
                 </Button>
             </Column>
         </Column>

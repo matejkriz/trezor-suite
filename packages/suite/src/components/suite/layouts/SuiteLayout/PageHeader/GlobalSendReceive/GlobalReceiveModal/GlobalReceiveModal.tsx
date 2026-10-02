@@ -7,6 +7,10 @@ import { events, injectDesktopAnalytics } from '@suite/analytics';
 import { selectIsDebugModeActive } from '@suite/debug';
 import { useDevice } from '@suite/device';
 import { useServices } from '@suite-common/dependency-injection';
+import {
+    getDeviceOperationCapabilities,
+    selectActiveWalletStaticSessionId,
+} from '@suite-common/device';
 import { selectSupportedNetworkSymbols } from '@suite-common/networks';
 import { type TradingAssetOption } from '@suite-common/trading';
 import { selectAccounts, selectEnabledNetworks } from '@suite-common/wallet-core';
@@ -33,6 +37,7 @@ type GlobalReceiveModalProps = {
 export const GlobalReceiveModal = ({ onCancel, onSubmit }: GlobalReceiveModalProps) => {
     const { analytics } = useServices(injectDesktopAnalytics);
     const { device } = useDevice();
+    const activeWalletStaticSessionId = useSelector(selectActiveWalletStaticSessionId);
     const { isDiscoveryRunning } = useDiscovery();
     const accountModal = useModal();
     const [activeTab, setActiveTab] = useState<GlobalReceiveTab>('assets');
@@ -47,12 +52,11 @@ export const GlobalReceiveModal = ({ onCancel, onSubmit }: GlobalReceiveModalPro
     const filledSearch = useSelector(globalSendReceiveFiltersSelectors.filledSearch);
 
     const { assets, balances, networks, catalogStatus, retry } = useGlobalReceiveAssets();
-
     const selectedAsset = useMemo(
         () => assets.find(asset => asset.id === selectedAssetCryptoId),
         [assets, selectedAssetCryptoId],
     );
-    const staticSessionId = device?.state?.staticSessionId;
+    const staticSessionId = activeWalletStaticSessionId;
     const selectedAssetAccounts = useMemo(() => {
         if (!selectedAsset || !staticSessionId) {
             return [];
@@ -165,7 +169,7 @@ export const GlobalReceiveModal = ({ onCancel, onSubmit }: GlobalReceiveModalPro
     };
 
     const handleAddAccount = () => {
-        if (!device) {
+        if (!device || !getDeviceOperationCapabilities(device).manualAccounts) {
             return;
         }
 
@@ -228,7 +232,7 @@ export const GlobalReceiveModal = ({ onCancel, onSubmit }: GlobalReceiveModalPro
         }
     };
 
-    if (accountModal.open && device) {
+    if (accountModal.open && device && getDeviceOperationCapabilities(device).manualAccounts) {
         return (
             <AddAccountModal
                 device={device}

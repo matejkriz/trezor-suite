@@ -90,6 +90,7 @@ const getDiscoveryStatus = ({
 // TODO move this selector somewhere more sensible
 export const selectDiscoveryOverallStatus = (state: AppState) => {
     const device = selectSelectedDevice(state);
+
     const deviceSupportedNetworks = selectDeviceSupportedNetworks(state);
     const accounts = device?.state && selectAccountsByDeviceState(state, device.state);
     const discovery = selectDiscoveryByDevicePath(state, device?.path);

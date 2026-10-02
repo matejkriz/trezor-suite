@@ -8,6 +8,7 @@ import {
     getNetworkDisplaySymbol,
     getNetworkFeatures,
 } from '@suite-common/wallet-config';
+import { useWalletDeviceAccountCapabilities } from '@suite-common/wallet-core';
 import { type Account } from '@suite-common/wallet-types';
 import { Banner, Column, H2, Icon, Row, Tooltip } from '@trezor/components';
 import { InfoIcon } from '@trezor/icons';
@@ -28,6 +29,7 @@ export type ReceiveContentProps = {
 export const ReceiveContent = ({ account, locked, AmountComponent }: ReceiveContentProps) => {
     const { dispatch } = useServices(injectDispatch);
     const { isReceiveDisabled } = useReceiveDisabled();
+    const { canConfirmAddress } = useWalletDeviceAccountCapabilities(account);
 
     // Copying an address is the entry point to verification, so the cards report the copied path
     // here and the prompt offers to verify that exact address.
@@ -48,7 +50,7 @@ export const ReceiveContent = ({ account, locked, AmountComponent }: ReceiveCont
     const networkDisplaySymbol = getNetworkDisplaySymbol(account.symbol);
 
     const handleVerifyAddress = async (path: string) => {
-        if (verifyingAddressPath !== undefined) {
+        if (!canConfirmAddress || verifyingAddressPath !== undefined) {
             return;
         }
 
@@ -127,7 +129,7 @@ export const ReceiveContent = ({ account, locked, AmountComponent }: ReceiveCont
             />
 
             <AddressCopiedModal
-                addressPath={promptedAddressPath}
+                addressPath={canConfirmAddress ? promptedAddressPath : undefined}
                 isVerifying={
                     promptedAddressPath !== undefined &&
                     verifyingAddressPath === promptedAddressPath

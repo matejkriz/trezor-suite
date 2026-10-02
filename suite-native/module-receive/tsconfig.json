@@ -53,6 +53,10 @@
         { "path": "../../packages/theme" },
         { "path": "../../packages/type-utils" },
         { "path": "../../packages/urls" },
-        { "path": "../test-utils" }
+        {
+            "path": "../../suite-common/suite-types"
+        },
+        { "path": "../test-utils" },
+        { "path": "../test-utils-store" }
     ]
 }

@@ -1,5 +1,6 @@
 import type { ProposalTypes } from '@walletconnect/types';
 
+import { type TrezorDevice } from '@suite-common/suite-types';
 import { type Account } from '@suite-common/wallet-types';
 
 import {
@@ -19,6 +20,7 @@ import {
     stellarAdapter,
 } from './stellar';
 import { type TronRequestThunkDeps, type TronRequestThunkState, tronAdapter } from './tron';
+import { getWalletConnectAccounts } from '../walletConnectAccountEligibility';
 import {
     type PendingConnectionProposalNetwork,
     type WalletConnectAdapter,
@@ -49,9 +51,10 @@ export const getAdapterByMethod = (method: string) =>
 export const getAdapterByNetwork = (networkType: string) =>
     adapters.find(adapter => adapter.networkType === networkType);
 
-export const getNamespaces = (accounts: Account[]) => {
+export const getNamespaces = (accounts: Account[], devices: TrezorDevice[]) => {
+    const eligibleAccounts = getWalletConnectAccounts(accounts, devices);
     const accountsDeduped: Account[] = [];
-    accounts.forEach(account => {
+    eligibleAccounts.forEach(account => {
         if (
             !accountsDeduped.some(
                 a => a.descriptor === account.descriptor && a.symbol === account.symbol,

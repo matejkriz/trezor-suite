@@ -107,6 +107,7 @@
 !/suite-common/http-client
 !/suite-common/icons
 !/suite-common/jsonl
+!/suite-common/ledger
 !/suite-common/legacy-network-config
 !/suite-common/logger
 !/suite-common/message-system

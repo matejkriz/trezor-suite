@@ -1,7 +1,12 @@
 import { useCallback, useRef } from 'react';
+import { useSelector } from 'react-redux';
 
 import { type RouteProp, useFocusEffect, useRoute } from '@react-navigation/native';
 
+import { useServices } from '@suite-common/dependency-injection';
+import { selectDeviceBrandName } from '@suite-common/device';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { cancelDeviceActionThunk } from '@suite-common/wallet-core';
 import {
     ContinueOnTrezorScreenContent,
     DeviceInteractionScreenWrapper,
@@ -12,19 +17,24 @@ import {
     type ReceiveAddressVerificationStackRoutes,
     useInterceptNativeNavigation,
 } from '@suite-native/navigation';
-import TrezorConnect from '@trezor/connect';
 import { exhaustive } from '@trezor/type-utils';
 
 import { useReceiveAddressVerification } from '../hooks/useReceiveAddressVerification';
 
-const getTitleTxKey = (source: ReceiveAddressVerificationSource) => {
+const getTitleTxKey = (source: ReceiveAddressVerificationSource, deviceName: string) => {
     switch (source) {
         case ReceiveAddressVerificationSource.Pasted:
-            return 'moduleReceive.addressVerificationScreen.pastedTitle';
+            return deviceName === 'Trezor'
+                ? 'moduleReceive.addressVerificationScreen.pastedTitle'
+                : 'moduleReceive.addressVerificationScreen.pastedDeviceTitle';
         case ReceiveAddressVerificationSource.Shared:
-            return 'moduleReceive.addressVerificationScreen.sharedTitle';
+            return deviceName === 'Trezor'
+                ? 'moduleReceive.addressVerificationScreen.sharedTitle'
+                : 'moduleReceive.addressVerificationScreen.sharedDeviceTitle';
         case ReceiveAddressVerificationSource.Verified:
-            return 'moduleReceive.addressVerificationScreen.verifiedTitle';
+            return deviceName === 'Trezor'
+                ? 'moduleReceive.addressVerificationScreen.verifiedTitle'
+                : 'moduleReceive.addressVerificationScreen.verifiedDeviceTitle';
         default:
             return exhaustive(source);
     }
@@ -41,6 +51,8 @@ export const ReceiveAddressVerificationScreen = () => {
             >
         >();
     const { verifyAddressOnDevice } = useReceiveAddressVerification(accountKey, addressPath);
+    const { dispatch } = useServices(injectDispatch);
+    const deviceName = useSelector(selectDeviceBrandName);
     const hasStartedVerificationRef = useRef(false);
 
     // This screen becomes focused only after the connection guard is cleared. Start verification
@@ -57,14 +69,14 @@ export const ReceiveAddressVerificationScreen = () => {
     );
 
     const handleCancel = useCallback(() => {
-        TrezorConnect.cancel();
-    }, []);
+        void dispatch(cancelDeviceActionThunk({}));
+    }, [dispatch]);
 
     useInterceptNativeNavigation({ onPress: handleCancel });
 
     return (
         <DeviceInteractionScreenWrapper>
-            <ContinueOnTrezorScreenContent titleTxKey={getTitleTxKey(source)} />
+            <ContinueOnTrezorScreenContent titleTxKey={getTitleTxKey(source, deviceName)} />
         </DeviceInteractionScreenWrapper>
     );
 };

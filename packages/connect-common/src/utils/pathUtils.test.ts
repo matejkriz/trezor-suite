@@ -1,6 +1,7 @@
 import { toHardenedPathPart } from '@trezor/crypto-utils';
 
 import {
+    __btcUnknownTxDebug__,
     getAccountType,
     getHDPath,
     getOutputScriptType,
@@ -9,6 +10,54 @@ import {
 } from './pathUtils';
 
 describe('utils/pathUtils', () => {
+    describe('unknown transaction diagnostics', () => {
+        const addresses = {
+            used: [{ path: "m/84'/0'/0'/0/7" }],
+            unused: [],
+            change: [],
+        };
+
+        it('reports only counts without address paths or input indices', () => {
+            const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+            try {
+                __btcUnknownTxDebug__(
+                    'addFakePendingTxThunk',
+                    [
+                        { address_n: getHDPath("m/84'/0'/0'/0/7") },
+                        { address_n: getHDPath("m/84'/0'/0'/1/123456") },
+                    ],
+                    addresses,
+                );
+
+                expect(consoleError).toHaveBeenCalledWith(
+                    '[btc-unknown-tx-debug-v2] addFakePendingTxThunk',
+                    {
+                        knownUsedCount: 1,
+                        knownUnusedCount: 0,
+                        knownChangeCount: 0,
+                        matchedInputsCount: 1,
+                        unmatchedInputsCount: 1,
+                    },
+                );
+            } finally {
+                consoleError.mockRestore();
+            }
+        });
+
+        it.each([
+            [{ address_n: getHDPath("m/84'/0'/0'/0/7") }],
+            [{ address_n: getHDPath("m/84'/0'/0'/1/123456"), orig_hash: 'test-rbf-txid' }],
+        ])('skips matched and RBF inputs', input => {
+            const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+            try {
+                __btcUnknownTxDebug__('signBitcoin', [input], addresses);
+                expect(consoleError).not.toHaveBeenCalled();
+            } finally {
+                consoleError.mockRestore();
+            }
+        });
+    });
+
     it('getScriptType', () => {
         expect(getScriptType(getHDPath("m/44'/1'/0'"))).toEqual('SPENDADDRESS');
         expect(getScriptType(getHDPath("m/49'/1'/0'"))).toEqual('SPENDP2SHWITNESS');

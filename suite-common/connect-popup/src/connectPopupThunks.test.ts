@@ -1,16 +1,25 @@
 import { combineReducers } from '@reduxjs/toolkit';
 
-import { deviceInitialState } from '@suite-common/device';
+import { type LedgerSuiteDevice, deviceInitialState } from '@suite-common/device';
 import { mockLockDevice } from '@suite-common/device/mocks';
-import { mockActionType } from '@suite-common/redux-utils/mocks';
+import { createMockDispatch, mockActionType } from '@suite-common/redux-utils/mocks';
+import { type TrezorDevice } from '@suite-common/suite-types';
 import { mockSuiteDevice } from '@suite-common/suite-types/mocks';
 import { createTestStore } from '@suite-common/test-utils';
 import { accountsInitialState } from '@suite-common/wallet-core';
 import * as walletUtils from '@suite-common/wallet-utils';
+import TrezorConnect from '@trezor/connect';
 
 import { connectPopupActions } from './connectPopupActions';
+import { getPopupCallDeferred } from './connectPopupPromiseManager';
 import { prepareConnectPopupReducer, selectConnectPopupCallWithState } from './connectPopupReducer';
-import { connectPopupLoadSelectAccountPageThunk } from './connectPopupThunks';
+import {
+    type ConnectPopupCallInnerThunkDeps,
+    type ConnectPopupCallInnerThunkState,
+    connectPopupCallInnerThunk,
+    connectPopupLoadSelectAccountPageThunk,
+} from './connectPopupThunks';
+import { CALL_SOURCE_WEB } from './connectPopupTypes';
 
 // prepareNewAccountPayload is the device round-trip the load thunk awaits — exactly once on the
 // manual address-phase path these tests exercise (the account-index path loops it per row). Mocking
@@ -38,6 +47,7 @@ const fakeDevice = mockSuiteDevice({
     state: undefined,
     useEmptyPassphrase: true,
 });
+const ledgerDevice = { ...fakeDevice, provider: 'ledger' as const } as LedgerSuiteDevice;
 
 // A UTXO `addressSelection: 'manual'` picker sitting in the address phase, with an empty candidate
 // list (the cold-cache drill-in). A *custom* account-type tab (no `accountType`) keeps the thunk on
@@ -69,20 +79,74 @@ const connectPopupReducer = prepareConnectPopupReducer({
 });
 const extra = { actions: { lockDevice: mockLockDevice() } };
 
-const initStore = () =>
+const initStore = (selectedDevice: TrezorDevice = fakeDevice) =>
     createTestStore({
         extra,
         reducer: combineReducers({
             connectPopup: connectPopupReducer,
-            device: (state = { ...deviceInitialState, selectedDevice: fakeDevice }) => state,
+            device: (state = { ...deviceInitialState, selectedDevice }) => state,
             wallet: (state = { accounts: accountsInitialState }) => state,
         }),
         preloadedState: {
             connectPopup: { activeCall: selectAccountState, permissions: [] },
-            device: { ...deviceInitialState, selectedDevice: fakeDevice },
+            device: { ...deviceInitialState, selectedDevice },
             wallet: { accounts: accountsInitialState },
         },
     });
+
+describe('Ledger provider boundary', () => {
+    it('rejects a Connect call without invoking Trezor Connect', async () => {
+        const getState = (): ConnectPopupCallInnerThunkState => ({
+            device: { ...deviceInitialState, selectedDevice: ledgerDevice },
+            connectPopup: { permissions: [] },
+        });
+        const callExtra: ConnectPopupCallInnerThunkDeps = {
+            actions: { lockDevice: mockLockDevice() },
+            services: {
+                analytics: {
+                    init: jest.fn(),
+                    enable: jest.fn(),
+                    disable: jest.fn(),
+                    isEnabled: jest.fn(),
+                    setUrl: jest.fn(),
+                    setLoggerEnabled: jest.fn(),
+                    report: jest.fn(),
+                },
+            },
+        };
+        const { dispatch } = createMockDispatch({ getState, extra: callExtra });
+        const callSpy = jest.spyOn(TrezorConnect, 'call');
+        const response = getPopupCallDeferred(true);
+
+        await dispatch(
+            connectPopupCallInnerThunk({
+                method: 'getFeatures',
+                payload: {},
+                source: {
+                    origin: 'https://example.test',
+                    type: CALL_SOURCE_WEB,
+                    manifest: { appName: 'Test app' },
+                },
+            }),
+        );
+
+        await expect(response.promise).resolves.toMatchObject({ success: false });
+        expect(callSpy).not.toHaveBeenCalled();
+        callSpy.mockRestore();
+    });
+
+    it('does not offer Ledger account data through the Connect account picker', async () => {
+        mockedPrepare.mockReset();
+        const store = initStore(ledgerDevice);
+
+        await store.dispatch(connectPopupLoadSelectAccountPageThunk({ page: 0 }));
+
+        expect(mockedPrepare).not.toHaveBeenCalled();
+        expect(
+            selectConnectPopupCallWithState(store.getState(), 'select-account')?.candidates,
+        ).toEqual([]);
+    });
+});
 
 describe('connectPopupLoadSelectAccountPageThunk — concurrent loads', () => {
     beforeEach(() => {

@@ -1,6 +1,10 @@
 import { type UnknownAction } from '@reduxjs/toolkit';
 
-import { type DeviceRootState } from '@suite-common/device';
+import {
+    type DeviceRootState,
+    getDeviceOperationCapabilities,
+    selectSelectedDevice,
+} from '@suite-common/device';
 import { createMiddlewareWithExtraDeps } from '@suite-common/redux-utils';
 import { notificationsActions } from '@suite-common/toast-notifications';
 import { type NetworkSymbol } from '@suite-common/wallet-config';
@@ -107,6 +111,15 @@ export const prepareConnectPopupMiddleware = createMiddlewareWithExtraDeps<
     }
 
     if (isUiRequestOfType(action, UI_REQUESTS.REQUEST_DISCOVERY_ACCOUNTS)) {
+        if (!getDeviceOperationCapabilities(selectSelectedDevice(getState())).trezorConnect) {
+            TrezorConnect.uiResponse({
+                type: UI_RESPONSE.RECEIVE_DISCOVERY_ACCOUNTS,
+                payload: null,
+            });
+
+            return action;
+        }
+
         const discovery = selectDiscoveryForSelectedDevice(getState());
 
         if (discovery && discovery.status !== 'complete') {

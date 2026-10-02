@@ -41,6 +41,7 @@ export const selectPrerequisite = (
 ): PrerequisiteType | null => {
     const { transport } = state.suite;
     const device = selectSelectedDevice(state);
+
     const router = selectRouter(state);
 
     const prerequisite = getPrerequisiteName({ router, device, transport });

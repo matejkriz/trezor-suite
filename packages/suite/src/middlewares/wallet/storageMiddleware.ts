@@ -266,8 +266,11 @@ const rememberedDeviceHandlers: RememberedDeviceHandler[] = [
         },
     }),
     defineRememberedDeviceHandler({
-        match: [deviceActions.updateSelectedDevice.match],
-        getDevice: action => action.payload,
+        match: [deviceActions.updateSelectedDevice.match, deviceActions.registerDevice.match],
+        getDevice: (action, state) =>
+            deviceActions.registerDevice.match(action)
+                ? selectSelectedDevice(state)
+                : action.payload,
         save: ({ device }, deps) => {
             const isAutoEjectEnabled = selectIsDeviceAutoEjectEnabled(deps.getState());
 

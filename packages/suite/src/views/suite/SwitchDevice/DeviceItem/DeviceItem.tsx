@@ -4,9 +4,12 @@ import { selectHasSeenDisconnectTooltip, setFlag } from '@suite/flags';
 import { Translation } from '@suite/intl';
 import { SettingsAnchor, gotoThunk } from '@suite/router';
 import { useServices } from '@suite-common/dependency-injection';
-import { selectSelectedDevice } from '@suite-common/device';
+import {
+    getDeviceBrandName,
+    getDeviceSettingsCapabilities,
+    selectSelectedDevice,
+} from '@suite-common/device';
 import { injectDispatch } from '@suite-common/redux-utils';
-import { DEFAULT_FLAGSHIP_MODEL } from '@suite-common/suite-constants';
 import * as deviceUtils from '@suite-common/suite-utils';
 import {
     Button,
@@ -19,12 +22,12 @@ import {
     Tooltip,
 } from '@trezor/components';
 import { EjectIcon } from '@trezor/icons';
-import { mapTrezorModelToIcon } from '@trezor/product-components';
 
 import {
     addDeviceIdToSeenDisconnectNotification,
     setRecentlyDisconnectedDevice,
 } from 'src/actions/suite/suiteActions';
+import { getDeviceIcon } from 'src/components/suite/DeviceImage';
 import { useSelector } from 'src/hooks/suite';
 import { selectRecentlyDisconnectedDevice } from 'src/selectors/suite/suiteSelectors';
 import type { AcquiredDevice, ForegroundAppProps, TrezorDevice } from 'src/types/suite';
@@ -59,7 +62,8 @@ export const DeviceItem = ({ device, instances, onCancel }: DeviceItemProps) => 
     const recentlyDisconnectedDevice = useSelector(selectRecentlyDisconnectedDevice);
     const hasSeenDisconnectTooltip = useSelector(selectHasSeenDisconnectTooltip);
     const [showTooltip, setShowTooltip] = useState(false);
-    const deviceModelInternal = device.features?.internal_model || DEFAULT_FLAGSHIP_MODEL;
+    const capabilities = getDeviceSettingsCapabilities(device);
+    const deviceBrand = getDeviceBrandName(device);
     const instancesWithState = instances.filter(i => i.state);
 
     useEffect(() => {
@@ -100,68 +104,10 @@ export const DeviceItem = ({ device, instances, onCancel }: DeviceItemProps) => 
             <Column gap={8}>
                 {instancesWithState.length > 0 && (
                     <Column gap={8}>
-                        {instancesWithState.map((instance, index) => (
-                            <Tooltip
-                                content={
-                                    <Column
-                                        padding={{
-                                            horizontal: 12,
-                                            vertical: 8,
-                                        }}
-                                        gap={16}
-                                    >
-                                        <Paragraph
-                                            typographyStyle="body-md-strong"
-                                            textWrap="balance"
-                                        >
-                                            <Translation id="TR_DEVICE_DISCONNECTED_TOOLTIP_TITLE" />
-                                        </Paragraph>
-                                        <List bulletGap={12}>
-                                            <ListItem icon={EjectIcon}>
-                                                <Translation id="TR_DEVICE_DISCONNECTED_TOOLTIP_ITEM_1" />
-                                            </ListItem>
-                                            <ListItem
-                                                icon={mapTrezorModelToIcon[deviceModelInternal]}
-                                            >
-                                                <Translation id="TR_DEVICE_DISCONNECTED_TOOLTIP_ITEM_2" />
-                                            </ListItem>
-                                        </List>
-                                        <Row gap={12} margin={{ top: 8 }} flexWrap="wrap">
-                                            <Button
-                                                size="small"
-                                                onClick={() => {
-                                                    onTooltipClose();
-                                                    onCancel?.();
-                                                }}
-                                            >
-                                                <Translation id="TR_DEVICE_DISCONNECTED_TOOLTIP_BUTTON_PRIMARY" />
-                                            </Button>
-                                            <Button
-                                                size="small"
-                                                intent="neutral"
-                                                priority="secondary"
-                                                onClick={() => {
-                                                    onTooltipClose();
-                                                    dispatch(
-                                                        gotoThunk({
-                                                            routeName: 'settings-index',
-                                                            anchor: SettingsAnchor.AutoEject,
-                                                        }),
-                                                    );
-                                                }}
-                                            >
-                                                <Translation id="TR_DEVICE_DISCONNECTED_TOOLTIP_BUTTON_SECONDARY" />
-                                            </Button>
-                                        </Row>
-                                    </Column>
-                                }
-                                key={`${instance.id}-${instance.instance}-${instance.state}`}
-                                isOpen={showTooltip && index === 0}
-                                width="100%"
-                                placement="right-start"
-                                offset={30}
-                            >
+                        {instancesWithState.map((instance, index) => {
+                            const walletInstance = (
                                 <WalletInstance
+                                    key={`${instance.id}-${instance.instance}-${instance.state}`}
                                     instance={instance}
                                     isSelected={deviceUtils.isSelectedInstance(
                                         selectedDevice,
@@ -170,11 +116,79 @@ export const DeviceItem = ({ device, instances, onCancel }: DeviceItemProps) => 
                                     index={index}
                                     onCancel={onCancel}
                                 />
-                            </Tooltip>
-                        ))}
+                            );
+
+                            return (
+                                <Tooltip
+                                    content={
+                                        <Column
+                                            padding={{
+                                                horizontal: 12,
+                                                vertical: 8,
+                                            }}
+                                            gap={16}
+                                        >
+                                            <Paragraph
+                                                typographyStyle="body-md-strong"
+                                                textWrap="balance"
+                                            >
+                                                <Translation id="TR_DEVICE_DISCONNECTED_TOOLTIP_TITLE" />
+                                            </Paragraph>
+                                            <List bulletGap={12}>
+                                                <ListItem icon={EjectIcon}>
+                                                    <Translation id="TR_DEVICE_DISCONNECTED_TOOLTIP_ITEM_1" />
+                                                </ListItem>
+                                                <ListItem icon={getDeviceIcon(device)}>
+                                                    <Translation
+                                                        id="TR_DEVICE_DISCONNECTED_ASSETS_WARNING"
+                                                        values={{ deviceBrand }}
+                                                    />
+                                                </ListItem>
+                                            </List>
+                                            <Row gap={12} margin={{ top: 8 }} flexWrap="wrap">
+                                                <Button
+                                                    size="small"
+                                                    onClick={() => {
+                                                        onTooltipClose();
+                                                        onCancel?.();
+                                                    }}
+                                                >
+                                                    <Translation id="TR_DEVICE_DISCONNECTED_TOOLTIP_BUTTON_PRIMARY" />
+                                                </Button>
+                                                <Button
+                                                    size="small"
+                                                    intent="neutral"
+                                                    priority="secondary"
+                                                    onClick={() => {
+                                                        onTooltipClose();
+                                                        dispatch(
+                                                            gotoThunk({
+                                                                routeName: 'settings-index',
+                                                                anchor: SettingsAnchor.AutoEject,
+                                                            }),
+                                                        );
+                                                    }}
+                                                >
+                                                    <Translation id="TR_DEVICE_DISCONNECTED_TOOLTIP_BUTTON_SECONDARY" />
+                                                </Button>
+                                            </Row>
+                                        </Column>
+                                    }
+                                    key={`${instance.id}-${instance.instance}-${instance.state}`}
+                                    isOpen={showTooltip && index === 0}
+                                    width="100%"
+                                    placement="right-start"
+                                    offset={30}
+                                >
+                                    {walletInstance}
+                                </Tooltip>
+                            );
+                        })}
                     </Column>
                 )}
-                <AddWalletButton device={device} instances={instances} onCancel={onCancel} />
+                {capabilities.passphrase && (
+                    <AddWalletButton device={device} instances={instances} onCancel={onCancel} />
+                )}
             </Column>
         </CardWithDevice>
     );

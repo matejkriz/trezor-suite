@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 
 import { useQuery } from '@suite-common/react-query';
-import TrezorConnect, { type PROTO } from '@trezor/connect';
+import TrezorConnect, { type DeviceUniquePath, type PROTO } from '@trezor/connect';
 
 import {
     type LogsApplicationInfoRootState,
-    type RedactedDevice,
+    selectApplicationLogDevices,
     selectRedactedActionsLog,
     selectRedactedApplicationInfo,
 } from '../logsSelectors';
@@ -20,6 +20,7 @@ export const useCommonApplicationLogs = (hideSensitiveInfo: boolean) => {
     const redactedApplicationInfo = useSelector((state: LogsApplicationInfoRootState) =>
         selectRedactedApplicationInfo(state, hideSensitiveInfo),
     );
+    const rawDevices = useSelector(selectApplicationLogDevices);
 
     const [envInfo, setEnvInfo] = useState<LogsEnvironmentInfo | null>(null);
     useEffect(() => {
@@ -27,35 +28,42 @@ export const useCommonApplicationLogs = (hideSensitiveInfo: boolean) => {
     }, []);
 
     // Enhance devices info with telemetry data (battery temp, etc.)
-    const devicePaths = new Set(redactedApplicationInfo.devices.map(d => d.path));
-    // eslint-disable-next-line @tanstack/query/exhaustive-deps -- cache identity is the set of device paths (already spread into the key); the queryFn reads the full device objects only to enrich them with telemetry
-    const { data: devicesWithTelemetry, isLoading } = useQuery({
+    const devicePaths = new Set(
+        rawDevices.filter(device => !device.unavailableCapabilities?.telemetry).map(d => d.path),
+    );
+
+    const { data: telemetryByPath, isLoading } = useQuery({
         queryKey: ['device-telemetry', ...devicePaths],
         queryFn: async ({ signal }) => {
-            const _devicesWithTelemetry: (RedactedDevice & { telemetry?: PROTO.Telemetry })[] = [
-                ...redactedApplicationInfo.devices,
-            ];
-            for (const device of _devicesWithTelemetry) {
+            const telemetryByDevicePath = new Map<DeviceUniquePath, PROTO.Telemetry>();
+            for (const path of devicePaths) {
                 if (signal.aborted) break;
                 const telemetry = await TrezorConnect.telemetryGet({
-                    device: { path: device.path },
+                    device: { path },
                 });
                 if (!telemetry.success) continue;
-                device.telemetry = telemetry.payload;
+                telemetryByDevicePath.set(path, telemetry.payload);
             }
 
-            return _devicesWithTelemetry;
+            return telemetryByDevicePath;
         },
         staleTime: 60 * 1000,
     });
     if (envInfo === null || isLoading) return null;
+
+    const devicesWithTelemetry = redactedApplicationInfo.devices.map((device, index) => {
+        const rawDevice = rawDevices[index];
+        const telemetry = rawDevice ? telemetryByPath?.get(rawDevice.path) : undefined;
+
+        return telemetry ? { ...device, telemetry } : device;
+    });
 
     return [
         {
             ...envInfo,
             startTime,
             ...redactedApplicationInfo,
-            devices: devicesWithTelemetry ?? redactedApplicationInfo.devices,
+            devices: devicesWithTelemetry,
         },
         redactedActionsLog,
     ];

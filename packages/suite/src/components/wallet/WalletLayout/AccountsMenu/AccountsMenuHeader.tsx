@@ -5,7 +5,7 @@ import styled from 'styled-components';
 import { Translation } from '@suite/intl';
 import { selectIsCoinsFilterVisible, suiteSettingsActions } from '@suite/settings';
 import { useServices } from '@suite-common/dependency-injection';
-import { selectSelectedDevice } from '@suite-common/device';
+import { getDeviceOperationCapabilities, selectSelectedDevice } from '@suite-common/device';
 import { injectDispatch } from '@suite-common/redux-utils';
 import { selectAllAccountsToList, selectHasRunningDiscovery } from '@suite-common/wallet-core';
 import { Box, Column, Divider, Icon, Row, Skeleton, Tooltip } from '@trezor/components';
@@ -101,7 +101,10 @@ export const AccountsMenuHeader = () => {
                                     </Tooltip>
                                 )}
 
-                                {!isEmpty && <AddAccountButton device={device} />}
+                                {!isEmpty &&
+                                    getDeviceOperationCapabilities(device).manualAccounts && (
+                                        <AddAccountButton device={device} />
+                                    )}
                             </>
                         )}
                     </Row>
@@ -109,7 +112,9 @@ export const AccountsMenuHeader = () => {
                 </ExpandedSidebarOnly>
                 <CollapsedSidebarOnly>
                     <Column alignItems="center" margin={{ bottom: 12 }}>
-                        {!isEmpty && <AddAccountButton device={device} />}
+                        {!isEmpty && getDeviceOperationCapabilities(device).manualAccounts && (
+                            <AddAccountButton device={device} />
+                        )}
                     </Column>
                 </CollapsedSidebarOnly>
             </Box>

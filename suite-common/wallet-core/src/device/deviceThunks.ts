@@ -12,6 +12,7 @@ import {
     PORTFOLIO_TRACKER_DEVICE_ID,
     acquireDeviceThunk,
     deviceActions,
+    getDeviceSettingsCapabilities,
     portfolioTrackerDevice,
     selectDeviceById,
     selectDeviceThunk,
@@ -73,6 +74,7 @@ import {
     type WalletSettingsRootState,
     selectIsDeviceAutoEjectEnabled,
 } from '../settings/walletSettingsReducer';
+import { type WalletDeviceServiceDep } from '../wallet-device/createWalletDeviceService';
 
 type HandleDeviceDisconnectThunkState = DeviceRootState;
 
@@ -254,18 +256,20 @@ type ConfirmAddressOnDeviceThunk = {
 
 export type ConfirmAddressOnDeviceThunkState = AccountsRootState & DeviceRootState;
 
+export type ConfirmAddressOnDeviceThunkDeps = WithServices<WalletDeviceServiceDep>;
+
 export const confirmAddressOnDeviceThunk = createThunk<
-    ConnectResponse<Address | CardanoAddress>,
+    Awaited<ConnectResponse<Address | CardanoAddress>>,
     ConfirmAddressOnDeviceThunk,
-    { state: ConfirmAddressOnDeviceThunkState }
+    { state: ConfirmAddressOnDeviceThunkState; extra: ConfirmAddressOnDeviceThunkDeps }
 >(
     `${DEVICE_MODULE_PREFIX}/confirmAddressOnDeviceThunk`,
     async (
         { accountKey, addressPath, chunkify, showOnTrezor = true },
-        { getState },
-    ): Promise<ConnectResponse<Address | CardanoAddress>> => {
-        const device = selectSelectedDevice(getState());
+        { getState, extra },
+    ): Promise<Awaited<ConnectResponse<Address | CardanoAddress>>> => {
         const account = selectAccountByKey(getState(), accountKey);
+        const device = selectSelectedDevice(getState());
 
         if (!device || !account)
             return {
@@ -275,6 +279,9 @@ export const confirmAddressOnDeviceThunk = createThunk<
                     code: 'Failure_UnknownCode',
                 },
             };
+
+        const operations = extra.services.walletDeviceService.get(device);
+        if (operations) return operations.confirmAddress({ account, addressPath });
 
         return await getAddressForNetworkType({
             device,
@@ -440,7 +447,7 @@ export const forgetDevicePersistentDataThunk = createThunk<
         const btIdToRemove =
             bluetoothId ?? (knownBtDevice ? asBluetoothDeviceId(knownBtDevice.id) : undefined);
 
-        if (btIdToRemove !== undefined) {
+        if (btIdToRemove !== undefined && getDeviceSettingsCapabilities(device).bluetoothPairing) {
             dispatch(bluetoothActions.removeKnownDeviceAction({ id: btIdToRemove }));
             // try to remove OS-level Bluetooth bonds, if supported by the platform
             await dispatch(
@@ -487,10 +494,9 @@ export const forgetDeviceThunk = createThunk<
     ) => {
         const devices = selectDevices(getState());
 
-        const explicitDevice = deviceId
+        const device = deviceId
             ? devices.find(candidateDevice => candidateDevice.id === deviceId)
-            : undefined;
-        const device = explicitDevice ?? selectSelectedDevice(getState());
+            : selectSelectedDevice(getState());
         if (!device) return;
 
         const deviceInstances = getDeviceInstances(device, devices);
@@ -544,7 +550,7 @@ const handlePostWipeCleanupThunk = createThunk<
         const newDevice = selectSelectedDevice(getState());
         const newDevices = selectDevices(getState());
 
-        deviceInstances.push(...getDeviceInstances(newDevice!, newDevices));
+        if (newDevice) deviceInstances.push(...getDeviceInstances(newDevice, newDevices));
         deviceInstances.forEach(d => {
             dispatch(deviceActions.forgetDevice({ device: d }));
         });
@@ -611,6 +617,8 @@ export const wipeDeviceThunk = createThunk<
 >(`${DEVICE_MODULE_PREFIX}/wipeDevice`, async (_, { dispatch, getState, rejectWithValue }) => {
     const device = selectSelectedDevice(getState());
     if (!device) return;
+    if (!getDeviceSettingsCapabilities(device).wipe)
+        return rejectWithValue('Device does not support wipe in Suite');
 
     const devices = selectDevices(getState());
     // collect devices with old "device.id" to be removed (see description below)

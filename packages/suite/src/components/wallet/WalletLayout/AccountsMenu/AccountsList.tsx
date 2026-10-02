@@ -5,7 +5,7 @@ import { selectCoinjoinIsPreloading } from '@suite/coinjoin';
 import { Translation, useTranslation } from '@suite/intl';
 import { selectAccountLabelsLegacy } from '@suite/metadata';
 import { type RouteParams, selectRouterParams } from '@suite/router';
-import { selectSelectedDevice } from '@suite-common/device';
+import { selectActiveWalletStaticSessionId } from '@suite-common/device';
 import { selectAccountsWithSuiteSyncLabel } from '@suite-common/suite-sync';
 import { selectTokenDefinitions } from '@suite-common/token-definitions';
 import { getTokens, selectAllAccountsToList } from '@suite-common/wallet-core';
@@ -52,18 +52,14 @@ type AccountsListProps = {
 };
 
 export const AccountsList = memo(({ scrollElementRef, scrollSentinels }: AccountsListProps) => {
-    const device = useSelector(selectSelectedDevice);
+    const activeWalletStaticSessionId = useSelector(selectActiveWalletStaticSessionId);
     const baseAccounts = useSelector(selectAllAccountsToList);
 
     const coinjoinIsPreloading = useSelector(selectCoinjoinIsPreloading);
     const accountLegacyLabels = useSelector(selectAccountLabelsLegacy);
 
     const accounts = useSelector(state =>
-        selectAccountsWithSuiteSyncLabel(
-            state,
-            baseAccounts,
-            device?.state?.staticSessionId ?? null,
-        ),
+        selectAccountsWithSuiteSyncLabel(state, baseAccounts, activeWalletStaticSessionId ?? null),
     );
     const params = useSelector(selectRouterParams) as RouteParams;
 
@@ -174,7 +170,7 @@ export const AccountsList = memo(({ scrollElementRef, scrollSentinels }: Account
         [params],
     );
 
-    if (!device) {
+    if (!activeWalletStaticSessionId) {
         return null;
     }
 

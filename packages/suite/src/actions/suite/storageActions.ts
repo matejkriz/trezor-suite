@@ -711,6 +711,7 @@ export const saveBackendThunk =
     };
 
 type SaveSuiteSettingsThunkState = FlagsRootState &
+    DeviceRootState &
     SuiteSettingsRootState & {
         suite: Pick<SuiteState, 'evmSettings' | 'seenDisconnectNotificationForDeviceIds'>;
     };

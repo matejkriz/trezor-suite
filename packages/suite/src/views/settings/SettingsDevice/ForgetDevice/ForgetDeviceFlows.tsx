@@ -2,6 +2,10 @@ import { useState } from 'react';
 
 import { unpairCurrentBondThunk } from '@suite/bluetooth';
 import { gotoThunk } from '@suite/router';
+import { selectSelectedDevice } from '@suite-common/device';
+import { disconnectWalletDeviceThunk } from '@suite-common/wallet-core';
+
+import { useSelector } from 'src/hooks/suite';
 
 import { ConfirmationModal } from './ConfirmationModal';
 import { OsAndTrezorCleanupModal } from './OsAndTrezorCleanupModal';
@@ -18,12 +22,14 @@ export type ForgetFlowProps = {
  * Confirmation → forget immediately.
  */
 export const ImmediateForgetFlow = ({ onCancel }: ForgetFlowProps) => {
+    const device = useSelector(selectSelectedDevice);
     const { dispatch, forgetDevice } = useForgetDevice();
 
     return (
         <ConfirmationModal
-            onConfirm={() => {
-                forgetDevice();
+            onConfirm={async () => {
+                if (device) await dispatch(disconnectWalletDeviceThunk({ device }));
+                await forgetDevice({ deviceId: device?.id ?? undefined });
                 dispatch(gotoThunk({ routeName: 'suite-index' }));
                 onCancel();
             }}

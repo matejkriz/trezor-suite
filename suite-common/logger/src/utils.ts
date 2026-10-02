@@ -99,7 +99,14 @@ export const redactAccount = (
 // inferred type in the emitted declaration.
 type RedactedDevice = Omit<
     DeepPartial<TrezorDevice>,
-    'id' | 'label' | 'state' | 'firmwareReleaseConfigInfo' | 'features' | 'metadata'
+    | 'id'
+    | 'label'
+    | 'state'
+    | 'firmwareReleaseConfigInfo'
+    | 'features'
+    | 'metadata'
+    | 'path'
+    | 'descriptor'
 > & {
     id: string;
     label: string | undefined;
@@ -107,6 +114,8 @@ type RedactedDevice = Omit<
     firmwareReleaseConfigInfo: string | undefined;
     features: object | undefined;
     metadata: string | undefined;
+    path: string;
+    descriptor: object | undefined;
 };
 
 export const redactDevice = (
@@ -116,6 +125,13 @@ export const redactDevice = (
 
     return {
         ...device,
+        name: REDACTED_REPLACEMENT,
+        path: REDACTED_REPLACEMENT,
+        descriptor: device.descriptor
+            ? { ...device.descriptor, id: REDACTED_REPLACEMENT }
+            : undefined,
+        ...('ledgerInfo' in device ? { ledgerInfo: undefined } : {}),
+        deviceInfo: undefined,
         id: REDACTED_REPLACEMENT,
         label: device.label ? REDACTED_REPLACEMENT : undefined,
         state: REDACTED_REPLACEMENT,
@@ -180,9 +196,12 @@ export const redactAction = (action: LogEntry): LogEntry => {
             break;
         case DEVICE.CONNECT:
         case DEVICE.DISCONNECT:
+        case deviceActions.registerDevice.type:
         case deviceActions.updateSelectedDevice.type:
         case deviceActions.setRememberDevice.type:
-            payload = redactDevice(action.payload);
+            payload = action.payload?.device
+                ? { ...action.payload, device: redactDevice(action.payload.device) }
+                : redactDevice(action.payload);
             break;
         default:
             return action;

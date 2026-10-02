@@ -2,7 +2,7 @@ import { useWatch } from 'react-hook-form';
 
 import styled from 'styled-components';
 
-import { setConnectionModal, setConnectionMode, useDevice } from '@suite/device';
+import { openDeviceConnectionThunk, useDevice } from '@suite/device';
 import { Translation } from '@suite/intl';
 import { useServices } from '@suite-common/dependency-injection';
 import { injectDispatch } from '@suite-common/redux-utils';
@@ -54,7 +54,7 @@ export const ReviewButton = () => {
     const areFeesLoading = useSelector(state => selectAreFeesLoading(state, symbol));
     const isLoading = isSendFormLoading || areFeesLoading;
 
-    const isDeviceConnected = device?.connected && device?.available;
+    const isDeviceConnected = !!device?.connected && !!device?.available;
 
     const options = useWatch({
         name: 'options',
@@ -103,10 +103,7 @@ export const ReviewButton = () => {
 
     const handleButtonReviewClick = () => {
         if (!isDeviceConnected) {
-            if (device?.descriptor?.apiType === 'bluetooth') {
-                dispatch(setConnectionMode('bluetooth'));
-            }
-            dispatch(setConnectionModal(true));
+            dispatch(openDeviceConnectionThunk(device));
 
             return;
         }

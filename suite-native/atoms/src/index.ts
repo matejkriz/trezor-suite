@@ -92,6 +92,7 @@ export * from './useTapGesture';
 export * from './SegmentedControl';
 export * from './ProgressBar';
 export * from './SubTabs';
+export * from './HardwareWalletSvg';
 
 export { useDebugView } from './DebugView';
 export { TouchableSwitchRow, TouchableSwitchRowDescription } from './TouchableSwitchRow';

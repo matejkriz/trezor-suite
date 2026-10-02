@@ -18,6 +18,7 @@ import { type Err } from '@trezor/type-utils';
 
 import { type DeviceStateActionPayload, deviceActions } from './deviceActions';
 import { PORTFOLIO_TRACKER_DEVICE_ID } from './deviceConstants';
+import { getDeviceProvider } from './devicePresentation';
 
 export type DeviceReducerState = {
     /**
@@ -568,6 +569,42 @@ export const prepareDeviceReducer = createReducerWithExtraDeps(
     deviceInitialState,
     (builder, extra: DeviceReducerDeps) => {
         builder
+            .addCase(deviceActions.registerDevice, (state, { payload }) => {
+                const index = state.devices.findIndex(
+                    device =>
+                        device.id === payload.id &&
+                        device.state?.staticSessionId === payload.state.staticSessionId,
+                );
+                if (index >= 0) {
+                    const previous = state.devices[index];
+                    state.devices[index] = {
+                        ...payload,
+                        firstConnectedTimestamp:
+                            previous?.firstConnectedTimestamp ?? payload.firstConnectedTimestamp,
+                        metadata: previous?.metadata ?? payload.metadata,
+                        passwords: previous?.passwords ?? payload.passwords,
+                    };
+                } else {
+                    state.devices.push(payload);
+                }
+                state.selectedDevice = state.devices.find(
+                    device =>
+                        device.id === payload.id &&
+                        device.state?.staticSessionId === payload.state.staticSessionId,
+                );
+            })
+            .addCase(deviceActions.disconnectDevicesByProvider, (state, { payload }) => {
+                state.devices.forEach(device => {
+                    if (getDeviceProvider(device) === payload) {
+                        device.connected = false;
+                        device.buttonRequests = [];
+                    }
+                });
+                if (state.selectedDevice && getDeviceProvider(state.selectedDevice) === payload) {
+                    state.selectedDevice.connected = false;
+                    state.selectedDevice.buttonRequests = [];
+                }
+            })
             .addCase(deviceActions.deviceChanged, (state, { payload }) => {
                 changeDevice(state, payload, { connected: true, available: true });
             })

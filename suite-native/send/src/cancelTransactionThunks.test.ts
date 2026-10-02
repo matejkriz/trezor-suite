@@ -1,11 +1,11 @@
 import { createAction, isFulfilled, isRejected } from '@reduxjs/toolkit';
 
-import { asGetter } from '@suite-common/dependency-injection';
+import { asGetter, mockNotExpected } from '@suite-common/dependency-injection';
 import { selectIsMevProtectionFeatureEnabled } from '@suite-common/mev';
 import { createTestStore } from '@suite-common/test-utils';
 import { asNetworkSymbol } from '@suite-common/wallet-config';
 import {
-    type PushSendFormTransactionThunkDeps,
+    type WalletDeviceService,
     pushSendFormTransactionThunk,
     selectAccountByKey,
     selectIsMevProtectionEnabled,
@@ -17,7 +17,10 @@ import {
 import { mockWalletAccount } from '@suite-common/wallet-types/mocks';
 import { mockNativeAnalytics } from '@suite-native/analytics/mocks';
 
-import { signAndPushEvmCancelTransactionThunk } from './cancelTransactionThunks';
+import {
+    type SignAndPushEvmCancelTransactionThunkDeps,
+    signAndPushEvmCancelTransactionThunk,
+} from './cancelTransactionThunks';
 import { cleanupSendFormThunk, signTransactionNativeThunk } from './sendFormThunks';
 
 jest.mock('@suite-common/mev', () => ({
@@ -72,12 +75,17 @@ const cleanupMock = cleanupSendFormThunk as unknown as jest.Mock;
 const selectAccountByKeyMock = selectAccountByKey as unknown as jest.Mock;
 const mevEnabledMock = selectIsMevProtectionEnabled as unknown as jest.Mock;
 const mevFeatureMock = selectIsMevProtectionFeatureEnabled as unknown as jest.Mock;
-const extra: PushSendFormTransactionThunkDeps = {
+const extra: SignAndPushEvmCancelTransactionThunkDeps = {
     actions: { onModalCancel: createAction<void>('test/onModalCancel') },
     services: {
         analytics: mockNativeAnalytics(),
         getIsWindowVisible: asGetter(() => true),
         getTradedAccountKeys: asGetter(() => []),
+        walletDeviceService: {
+            get: mockNotExpected<WalletDeviceService['get']>('get'),
+            cancelAction: mockNotExpected<WalletDeviceService['cancelAction']>('cancelAction'),
+            disconnect: mockNotExpected<WalletDeviceService['disconnect']>('disconnect'),
+        },
     },
 };
 

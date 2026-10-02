@@ -5,7 +5,7 @@ import styled from 'styled-components';
 
 import { Translation } from '@suite/intl';
 import { useServices } from '@suite-common/dependency-injection';
-import { selectSelectedDevice } from '@suite-common/device';
+import { selectActiveWalletStaticSessionId } from '@suite-common/device';
 import { injectDispatch } from '@suite-common/redux-utils';
 import { calcTicks, calcTicksFromData } from '@suite-common/suite-utils';
 import { selectBaseCurrency } from '@suite-common/wallet-core';
@@ -53,7 +53,7 @@ type DashboardGraphProps = {
 
 export const DashboardGraph = memo(({ accounts }: DashboardGraphProps) => {
     const graph = useSelector(selectGraph);
-    const selectedDevice = useSelector(selectSelectedDevice);
+    const selectedDeviceState = useSelector(selectActiveWalletStaticSessionId);
     const baseCurrencyCode = useSelector(selectBaseCurrency);
     const { dispatch } = useServices(injectDispatch);
 
@@ -61,7 +61,6 @@ export const DashboardGraph = memo(({ accounts }: DashboardGraphProps) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [xTicks, setXticks] = useState<number[]>([]);
 
-    const selectedDeviceState = selectedDevice?.state?.staticSessionId;
     const failedAccounts = graph.error?.filter(a => a.deviceState === selectedDeviceState);
     const allFailed =
         failedAccounts !== undefined &&

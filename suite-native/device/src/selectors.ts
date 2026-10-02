@@ -2,10 +2,12 @@ import { A } from '@mobily/ts-belt';
 
 import {
     type DeviceRootState,
+    getDeviceSettingsCapabilities,
     getIsDeviceIdValid,
     selectDeviceFirmwareVersionArray,
     selectDeviceInstances,
     selectDeviceModel,
+    selectDeviceProvider,
     selectHasDeviceFirmwareInstalled,
     selectIsConnectedDeviceUninitialized,
     selectIsDeviceConnected,
@@ -67,6 +69,7 @@ import type { BaseCurrencyCode } from '@trezor/blockchain-link-types';
 import { type Device } from '@trezor/connect';
 import { BigNumber, isNotNullOrUndefined } from '@trezor/utils';
 
+import { type DeviceImageKind } from './components/DeviceImage';
 import { getIsDeviceSetupSupported, isFirmwareVersionSupported } from './utils';
 
 export type NativeDeviceRootState = DeviceRootState &
@@ -84,6 +87,12 @@ export type NativeDeviceRootState = DeviceRootState &
 
 const createMemoizedSelector = createWeakMapSelector.withTypes<NativeDeviceRootState>();
 
+export const selectDeviceImageKind = (state: DeviceRootState): DeviceImageKind =>
+    selectDeviceProvider(state);
+
+export const selectIsDeviceConnectionScrollable = (state: DeviceRootState) =>
+    selectDeviceProvider(state) === 'ledger';
+
 export const selectIsDeviceFirmwareSupported = (state: DeviceRootState) => {
     const deviceFwVersion = selectDeviceFirmwareVersionArray(state);
     const deviceModel = selectDeviceModel(state);
@@ -91,9 +100,7 @@ export const selectIsDeviceFirmwareSupported = (state: DeviceRootState) => {
     return isFirmwareVersionSupported(deviceFwVersion, deviceModel);
 };
 
-export const selectIsDeviceReadyToUse = (
-    state: DeviceRootState & AccountsRootState & DiscoveryRootState,
-) => {
+export const selectIsDeviceReadyToUse = (state: DeviceRootState) => {
     const isUnacquiredDevice = selectIsUnacquiredDevice(state);
     const isDeviceFirmwareSupported = selectIsDeviceFirmwareSupported(state);
     const isDeviceUninitialized = selectIsConnectedDeviceUninitialized(state);
@@ -194,6 +201,8 @@ export const selectFirmwareRevisionCheckErrorIfEnabled = (
     state: FwAuthenticityCheckState,
     device: Device,
 ) => {
+    if (device.unavailableCapabilities?.['firmwareRevisionCheck']) return null;
+
     const { revisionCheckError } = getFirmwareAuthenticityCheckErrors(device);
     const isFirmwareRevisionCheckEnabled = selectIsFirmwareRevisionCheckEnabled(state);
     const isMessageSystemFeatureEnabled = selectIsFeatureEnabled(
@@ -313,15 +322,23 @@ export const selectCompromisedDeviceFailedCheck = (
         device,
     );
     const isDeviceAuthenticityEnabledAndFailed =
-        isDeviceAuthenticityCheckEnabled && isDeviceAuthenticityCheckFailed;
+        getDeviceSettingsCapabilities(device).authenticity &&
+        isDeviceAuthenticityCheckEnabled &&
+        isDeviceAuthenticityCheckFailed;
 
     if (isDeviceAuthenticityEnabledAndFailed) return 'device-authenticity';
-    if (isEntropyCheckEnabledAndFailed) return 'entropy';
+    if (!device.unavailableCapabilities?.['entropyCheck'] && isEntropyCheckEnabledAndFailed)
+        return 'entropy';
 
     // All the following checks are dismissable together by a shared mechanism
     if (!isFirmwareAuthenticityCheckDismissed) {
-        if (isDeviceIdCheckEnabledAndFailed) return 'device-id';
-        if (isDeviceInvariabilityEnabledAndFailed) return 'device-invariability';
+        if (!device.unavailableCapabilities?.['deviceIdCheck'] && isDeviceIdCheckEnabledAndFailed)
+            return 'device-id';
+        if (
+            !device.unavailableCapabilities?.['deviceInvariabilityCheck'] &&
+            isDeviceInvariabilityEnabledAndFailed
+        )
+            return 'device-invariability';
         if (hasFirmwareAuthenticityCheckHardFailed) return 'firmware-authenticity';
     }
 

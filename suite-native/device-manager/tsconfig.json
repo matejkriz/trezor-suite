@@ -36,11 +36,13 @@
         { "path": "../intl" },
         { "path": "../labeling" },
         { "path": "../navigation" },
+        { "path": "../settings" },
         { "path": "../wallet" },
         { "path": "../../packages/device-utils" },
         {
             "path": "../../packages/styles-native"
         },
-        { "path": "../../packages/theme" }
+        { "path": "../../packages/theme" },
+        { "path": "../test-utils-store" }
     ]
 }

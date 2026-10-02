@@ -1,6 +1,6 @@
 import { A, F, G, pipe } from '@mobily/ts-belt';
 
-import { type DeviceRootState, selectSelectedDevice } from '@suite-common/device';
+import { type DeviceRootState, selectActiveWalletStaticSessionId } from '@suite-common/device';
 import { createWeakMapSelector, returnStableArrayIfEmpty } from '@suite-common/redux-utils';
 import { type AccountType, type Network, type NetworkSymbol } from '@suite-common/wallet-config';
 import { type Account, type AccountKey } from '@suite-common/wallet-types';
@@ -57,11 +57,11 @@ export const selectAccountsByDeviceStateAndNetworkSymbol = createMemoizedSelecto
 );
 
 export const selectDeviceAccounts = createMemoizedSelector(
-    [selectAccounts, selectSelectedDevice],
-    (accounts, device) => {
-        if (!device?.state?.staticSessionId) return EMPTY_STABLE_ACCOUNTS_ARRAY;
+    [selectAccounts, selectActiveWalletStaticSessionId],
+    (accounts, staticSessionId) => {
+        if (!staticSessionId) return EMPTY_STABLE_ACCOUNTS_ARRAY;
 
-        return pipe(getAccountsByDeviceState(accounts, device.state), returnStableArrayIfEmpty);
+        return pipe(getAccountsByDeviceState(accounts, staticSessionId), returnStableArrayIfEmpty);
     },
 );
 

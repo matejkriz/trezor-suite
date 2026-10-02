@@ -1,8 +1,8 @@
 import { selectDeviceLabelOrNameById } from '@suite-common/device';
 import { Row, ShortcutBadge, TOOLTIP_DELAY_LONG, Tooltip } from '@trezor/components';
-import { type DeviceModelInternal, getDeviceColorVariant } from '@trezor/device-utils';
-import { RotateDeviceImage } from '@trezor/product-components';
+import { type DeviceModelInternal } from '@trezor/device-utils';
 
+import { DeviceImage } from 'src/components/suite/DeviceImage';
 import { useSelector } from 'src/hooks/suite';
 import { type TrezorDevice } from 'src/types/suite';
 import { DeviceDetail } from 'src/views/suite/SwitchDevice/DeviceItem/DeviceDetail';
@@ -17,7 +17,6 @@ type DeviceStatusProps = {
 };
 
 export const DeviceStatus = ({
-    deviceModel,
     deviceNeedsRefresh = false,
     device,
     forceConnectionInfo = false,
@@ -27,13 +26,7 @@ export const DeviceStatus = ({
 
     const image = (
         <Row justifyContent="center" width={24} opacity={deviceNeedsRefresh ? 0.4 : 1}>
-            {device && (
-                <RotateDeviceImage
-                    deviceModel={deviceModel}
-                    deviceColor={getDeviceColorVariant(device)}
-                    height={34}
-                />
-            )}
+            {device && <DeviceImage device={device} size={34} iconSize={24} isRotated />}
         </Row>
     );
 

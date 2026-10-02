@@ -1,3 +1,4 @@
+import { webHidTransportFactory } from '@ledgerhq/device-transport-kit-web-hid';
 import { saveAs } from 'file-saver';
 
 import { type DesktopAnalyticsDep, createAnalytics } from '@suite/analytics';
@@ -26,9 +27,13 @@ import {
 } from '@suite-common/connect-init';
 import { delegatedIdentityKeyCompositionRoot } from '@suite-common/delegated-identity-key';
 import { toGetter } from '@suite-common/dependency-injection';
-import { selectDeviceByStaticSessionId } from '@suite-common/device';
+import { deviceActions, selectDeviceByStaticSessionId } from '@suite-common/device';
 import { type CommonServices } from '@suite-common/extra-dependencies';
 import { FW_HASH_CHECK_DEFAULT_TIMEOUTS } from '@suite-common/firmware-authenticity';
+import {
+    type LedgerBitcoinServiceDep,
+    createLedgerBitcoinServiceForTransport,
+} from '@suite-common/ledger';
 import { createNetworksCompositionRoot } from '@suite-common/networks';
 import { type PlatformEncryptionDep } from '@suite-common/platform-encryption';
 import { createMigrateSuiteSyncLabelsForRbfTransactionCompositionRoot } from '@suite-common/suite-rbf-labels-migrations';
@@ -41,7 +46,12 @@ import {
 import { type GetBinFilesBaseUrlDep, type ReloadAppDep } from '@suite-common/suite-types';
 import { type ThpHostNameDep } from '@suite-common/thp';
 import { selectTradedAccountKeys } from '@suite-common/trading';
-import { selectAccountsByDeviceState } from '@suite-common/wallet-core';
+import {
+    type WalletDeviceServiceDep,
+    createLedgerWalletDeviceOperationsFactory,
+    createWalletDeviceService,
+    selectAccountsByDeviceState,
+} from '@suite-common/wallet-core';
 import { type CreateLoggerDep, type GetTrezorConnectPrivilegedDep } from '@trezor/connect';
 import { isDesktop } from '@trezor/env-utils';
 
@@ -72,7 +82,9 @@ export type SuiteServices = CommonServices &
     MetadataMigrationDep &
     SuiteRouterHistoryDep &
     TransportsDep &
-    BluetoothDep;
+    BluetoothDep &
+    LedgerBitcoinServiceDep &
+    WalletDeviceServiceDep;
 
 export type StoreAPIDep = Pick<SuiteReduxStore, 'getState' | 'dispatch'>;
 
@@ -99,6 +111,13 @@ export const createSuiteServicesCompositionRoot = (deps: SuiteAppDeps): SuiteSer
     });
 
     const analytics = createAnalytics();
+    const ledgerBitcoinService = createLedgerBitcoinServiceForTransport(
+        webHidTransportFactory,
+        'interactive',
+        () => {
+            deps.dispatch(deviceActions.disconnectDevicesByProvider('ledger'));
+        },
+    );
     const bluetooth = createBluetoothCompositionRoot({
         dispatch: deps.dispatch,
         getState: deps.getState,
@@ -173,6 +192,14 @@ export const createSuiteServicesCompositionRoot = (deps: SuiteAppDeps): SuiteSer
         ensureDelegatedIdentityKey,
         platformEncryption: deps.platformEncryption,
         analytics,
+        ledgerBitcoinService,
+        walletDeviceService: createWalletDeviceService({
+            getOperations: createLedgerWalletDeviceOperationsFactory({
+                ledgerBitcoinService,
+                dispatch: deps.dispatch,
+            }),
+            cancelTrezorAction: reason => deps.getTrezorConnect().cancel(reason),
+        }),
         bluetooth,
         suiteRouterHistory: createSuiteRouterHistory({
             history: deps.history,

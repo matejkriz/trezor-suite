@@ -6,9 +6,13 @@ import {
     selectIsUnlockedBootloaderAllowed,
 } from '@suite/settings';
 import { useServices } from '@suite-common/dependency-injection';
-import { deviceActions, selectDevices, selectSelectedDevice } from '@suite-common/device';
+import {
+    deviceActions,
+    selectDevices,
+    selectIsDeviceAuthenticityCheckSupported,
+    selectSelectedDevice,
+} from '@suite-common/device';
 import { injectDispatch } from '@suite-common/redux-utils';
-import { SUPPORTS_DEVICE_AUTHENTICITY_CHECK } from '@suite-common/suite-constants';
 import { type AcquiredDevice } from '@suite-common/suite-types';
 import { Box, Card } from '@trezor/components';
 
@@ -26,6 +30,7 @@ import { ManualDeviceCheck } from './ManualDeviceCheck';
  */
 export const InteractiveDeviceChecksFlow = () => {
     const selectedDevice = useSelector(selectSelectedDevice);
+    const supportsDeviceAuthenticityCheck = useSelector(selectIsDeviceAuthenticityCheckSupported);
     const devices = useSelector(selectDevices);
     const { initialRun } = useSelector(selectFlags);
     const isDeviceAuthenticityCheckEnabled = useSelector(selectIsDeviceAuthenticityCheckEnabled);
@@ -40,7 +45,7 @@ export const InteractiveDeviceChecksFlow = () => {
 
     const shouldAuthenticateSelectedDevice =
         !!selectedDevice?.features?.internal_model &&
-        SUPPORTS_DEVICE_AUTHENTICITY_CHECK[selectedDevice.features.internal_model] &&
+        supportsDeviceAuthenticityCheck &&
         initialRun &&
         isDeviceAuthenticityCheckEnabled &&
         !isDebugDevice(selectedDevice);

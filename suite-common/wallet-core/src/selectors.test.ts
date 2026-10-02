@@ -127,6 +127,12 @@ describe(selectDiscoveryAccountsParam.name, () => {
 });
 
 describe(selectShouldRediscover.name, () => {
+    it('does not run Trezor discovery for a Ledger in the selected device slot', () => {
+        const device = { ...mockDeviceWithPathAndState(), provider: 'ledger' as const };
+
+        expect(selectShouldRediscover(getState({ device }), device)).toBe(false);
+    });
+
     it('returns false while discovery is in progress', () => {
         const device = mockDeviceWithPathAndState();
 

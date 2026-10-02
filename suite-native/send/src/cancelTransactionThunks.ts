@@ -27,6 +27,7 @@ import { type Ok } from '@trezor/type-utils';
 import { SEND_MODULE_PREFIX } from './constants';
 import {
     type CleanupSendFormThunkState,
+    type SignTransactionNativeThunkDeps,
     type SignTransactionNativeThunkState,
     cleanupSendFormThunk,
     signTransactionNativeThunk,
@@ -48,7 +49,8 @@ type SignAndPushEvmCancelTransactionThunkState = AccountsRootState &
     PushSendFormTransactionThunkState &
     CleanupSendFormThunkState;
 
-type SignAndPushEvmCancelTransactionThunkDeps = PushSendFormTransactionThunkDeps;
+export type SignAndPushEvmCancelTransactionThunkDeps = PushSendFormTransactionThunkDeps &
+    SignTransactionNativeThunkDeps;
 
 /**
  * Signs and broadcasts a composed EVM cancel transaction (see

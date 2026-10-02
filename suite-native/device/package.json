@@ -21,6 +21,7 @@
         "@suite-common/device": "workspace:*",
         "@suite-common/device-authenticity": "workspace:*",
         "@suite-common/firmware-authenticity": "workspace:*",
+        "@suite-common/ledger": "workspace:*",
         "@suite-common/message-system": "workspace:*",
         "@suite-common/persistent-device-data": "workspace:*",
         "@suite-common/redux-utils": "workspace:*",
@@ -61,7 +62,7 @@
         "@trezor/urls": "workspace:*",
         "@trezor/utils": "workspace:*",
         "@types/semver": "^7.7.0",
-        "expo": "~57.0.8",
+        "expo": "~57.0.23",
         "expo-video": "~57.0.1",
         "jotai": "2.17.1",
         "react": "19.2.3",
@@ -72,5 +73,10 @@
         "react-redux": "9.3.0",
         "semver": "^7.7.1",
         "type-fest": "5.5.0"
+    },
+    "devDependencies": {
+        "@ledgerhq/device-management-kit": "1.9.0",
+        "@suite-native/test-utils": "workspace:*",
+        "@suite-native/test-utils-store": "workspace:*"
     }
 }

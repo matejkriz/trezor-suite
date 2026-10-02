@@ -5,6 +5,7 @@ import { useDevice } from '@suite/device';
 import { Translation } from '@suite/intl';
 import { gotoThunk } from '@suite/router';
 import { useServices } from '@suite-common/dependency-injection';
+import { getDeviceBrandName } from '@suite-common/device';
 import {
     Feature,
     type MessageSystemRootState,
@@ -215,7 +216,10 @@ export const TradingOfferExchange = () => {
                             size="large"
                             width="100%"
                         >
-                            <Translation id="TR_EXCHANGE_CONFIRM_ON_TREZOR_SEND" />
+                            <Translation
+                                id="TR_CONFIRM_ON_DEVICE_AND_SEND"
+                                values={{ deviceBrand: getDeviceBrandName(device) }}
+                            />
                         </Button>
                     )}
                 </Column>

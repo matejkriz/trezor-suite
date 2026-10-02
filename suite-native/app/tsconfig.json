@@ -15,6 +15,7 @@
         {
             "path": "../../suite-common/formatters"
         },
+        { "path": "../../suite-common/ledger" },
         {
             "path": "../../suite-common/react-query"
         },
@@ -48,6 +49,7 @@
         { "path": "../device" },
         { "path": "../device-authorization" },
         { "path": "../device-bootloader-mode" },
+        { "path": "../device-manager" },
         { "path": "../feature-flags" },
         { "path": "../formatters-config" },
         { "path": "../icons" },
@@ -107,6 +109,9 @@
             "path": "../../packages/styles-native"
         },
         { "path": "../../packages/theme" },
+        {
+            "path": "../../packages/transport-native-bluetooth"
+        },
         {
             "path": "../../packages/trezor-user-env-link"
         },

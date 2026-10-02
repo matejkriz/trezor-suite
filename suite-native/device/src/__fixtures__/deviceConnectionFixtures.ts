@@ -390,7 +390,7 @@ export const deviceConnectCompromisedFixtures: NavigationFixture[] = [
                 enabledNetworks: [asNetworkSymbol('btc')],
             },
             device: {
-                selectedDevice: mockSuiteDevice(),
+                selectedDevice: mockSuiteDevice({}, { internal_model: DeviceModelInternal.T3B1 }),
             },
             persistentDeviceData: {
                 devices: [
@@ -404,7 +404,7 @@ export const deviceConnectCompromisedFixtures: NavigationFixture[] = [
         action: {
             type: deviceActions.connectDevice.type,
             payload: {
-                device: mockSuiteDevice(),
+                device: mockSuiteDevice({}, { internal_model: DeviceModelInternal.T3B1 }),
             },
         },
         expectedNavigation: {

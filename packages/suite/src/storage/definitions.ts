@@ -43,6 +43,7 @@ import type { BioAuthState } from 'src/reducers/bioAuth';
 import type { SuiteState } from 'src/reducers/suite/suiteReducer';
 import type { Account, WalletAccountTransaction } from 'src/types/wallet';
 
+import { type LegacyExternalWallet } from './legacyExternalWallet';
 import { type GraphData } from '../types/wallet/graph';
 
 export interface DBWalletAccountTransaction {
@@ -106,6 +107,7 @@ export interface SuiteDBSchema extends DBSchema {
             flags: FlagsState;
             evmSettings: SuiteState['evmSettings'];
             seenDisconnectNotificationForDeviceIds: SuiteState['seenDisconnectNotificationForDeviceIds'];
+            externalWallets?: LegacyExternalWallet[];
         };
     };
     historicRates: {

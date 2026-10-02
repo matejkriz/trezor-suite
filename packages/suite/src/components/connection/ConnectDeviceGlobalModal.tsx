@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 
 import { events, injectDesktopAnalytics } from '@suite/analytics';
 import { selectIsManualPairingRequired, selectIsUnpairingDevice } from '@suite/bluetooth';
+import { selectConnectionModalType } from '@suite/device';
 import { Translation } from '@suite/intl';
 import { selectAdapterStatus, selectIsDeviceOsUnpairingRequired } from '@suite-common/bluetooth';
 import { useServices } from '@suite-common/dependency-injection';
@@ -34,6 +35,7 @@ import { BluetoothConnectionModal } from './BluetoothConnectionModal';
 import { BluetoothManualPairingModal } from './BluetoothManualPairingModal';
 import { CantSeeTrezorModal } from './CantSeeTrezorModal';
 import { CableConnectionAnimation } from './DeviceConnectionAnimation';
+import { LedgerConnectionModal } from './LedgerConnectionModal';
 import { useConnectionGlobalModalContext } from './context/ConnectionGlobalModalContext';
 import { selectHasTransportOfType } from '../../selectors/suite/suiteSelectors';
 import { WebUsbButton } from '../suite/WebUsbButton';
@@ -201,6 +203,7 @@ const ViaCableCard = ({ onClick }: ConnectionModeCardProps) => (
 
 export const ConnectDeviceGlobalModal = ({ onCancel }: { onCancel: () => void }) => {
     const { analytics } = useServices(injectDesktopAnalytics);
+    const connectionModalType = useSelector(selectConnectionModalType);
     const [isModeSelected, setIsModeSelected] = useState(false);
     const isWebUsbTransport = useSelector(selectHasTransportOfType('WebUsbTransport'));
     const {
@@ -223,6 +226,10 @@ export const ConnectDeviceGlobalModal = ({ onCancel }: { onCancel: () => void })
     const isUnpairingDevice = useSelector(selectIsUnpairingDevice);
 
     const bluetoothAdapterStatus = useSelector(selectAdapterStatus);
+
+    if (connectionModalType === 'ledger') {
+        return <LedgerConnectionModal onCancel={onCancel} onBack={onCancel} />;
+    }
 
     if (wasBluetoothDeviceWiped?.isRequired || isUnpairingDevice) return null;
 

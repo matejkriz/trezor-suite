@@ -1,6 +1,7 @@
 import { isRecoveryInProgress } from '@suite/recovery';
 import { type RouterState } from '@suite/router';
 import { isAdditionalShamirBackupInProgress } from '@suite-common/backup';
+import { getDeviceOperationCapabilities } from '@suite-common/device';
 
 import type { TransportState } from 'src/reducers/suite/suiteReducer';
 import type { AppState, TrezorDevice } from 'src/types/suite';
@@ -44,7 +45,12 @@ export const getPrerequisiteName = ({
     if (!router || router.app === 'unknown') return null;
 
     // no transport available
-    if (transport && !transport.transports.length) return 'no-transport';
+    if (
+        getDeviceOperationCapabilities(device).trezorConnect &&
+        transport &&
+        !transport.transports.length
+    )
+        return 'no-transport';
 
     if (!device) return 'device-disconnected';
 

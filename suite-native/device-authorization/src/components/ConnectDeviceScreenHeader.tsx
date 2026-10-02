@@ -3,7 +3,10 @@ import { useSelector } from 'react-redux';
 
 import { useNavigation } from '@react-navigation/native';
 
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
 import {
+    cancelDeviceActionThunk,
     selectHasRunningDiscovery,
     selectIsCreatingNewPassphraseWallet,
 } from '@suite-common/wallet-core';
@@ -19,7 +22,6 @@ import {
     type StackToStackCompositeNavigationProps,
     useInterceptNativeNavigation,
 } from '@suite-native/navigation';
-import TrezorConnect from '@trezor/connect';
 
 import { selectDeviceRequestedPin } from '../deviceAuthorizationSlice';
 
@@ -43,6 +45,7 @@ export const ConnectDeviceScreenHeader = ({
     onCancel,
 }: ConnectDeviceScreenHeaderProps) => {
     const navigation = useNavigation<NavigationProps>();
+    const { dispatch } = useServices(injectDispatch);
     const { showAlert, hideAlert } = useAlert();
 
     const hasDiscovery = useSelector(selectHasRunningDiscovery);
@@ -70,7 +73,7 @@ export const ConnectDeviceScreenHeader = ({
             }
         } else {
             if (hasDeviceRequestedPin || isAddingHiddenWallet) {
-                TrezorConnect.cancel({ reason: 'pin-cancelled' });
+                void dispatch(cancelDeviceActionThunk({ reason: { reason: 'pin-cancelled' } }));
             }
 
             if (onCancel) {
@@ -83,6 +86,7 @@ export const ConnectDeviceScreenHeader = ({
             }
         }
     }, [
+        dispatch,
         hasDiscovery,
         isAddingHiddenWallet,
         hasDeviceRequestedPin,

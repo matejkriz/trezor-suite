@@ -3,6 +3,11 @@ import { useSelector } from 'react-redux';
 import { type RouteProp, useRoute } from '@react-navigation/native';
 
 import { selectIsPortfolioTrackerDevice } from '@suite-common/device';
+import {
+    type AccountsRootState,
+    selectAccountByKey,
+    useWalletDeviceAccountCapabilities,
+} from '@suite-common/wallet-core';
 import { parseAccountKey } from '@suite-common/wallet-utils';
 import { ErrorMessage, ScreenFooterGradient, VStack } from '@suite-native/atoms';
 import { selectHasFirmwareAuthenticityCheckHardFailedForSelectedDevice } from '@suite-native/device';
@@ -35,6 +40,11 @@ export const ReceiveAddressDetailScreen = () => {
         selectHasFirmwareAuthenticityCheckHardFailedForSelectedDevice,
     );
     const isPortfolioTrackerDevice = useSelector(selectIsPortfolioTrackerDevice);
+    const account = useSelector((state: AccountsRootState) =>
+        selectAccountByKey(state, accountKey),
+    );
+    const { canConfirmAddress } = useWalletDeviceAccountCapabilities(account);
+    const isDeviceVerificationEnabled = !isPortfolioTrackerDevice && canConfirmAddress;
 
     if (hasFirmwareAuthenticityCheckHardFailed) {
         return <ReceiveBlockedDeviceCompromisedScreen />;
@@ -62,7 +72,7 @@ export const ReceiveAddressDetailScreen = () => {
             accountKey={accountKey}
             address={address.address}
             addressPath={addressPath}
-            isDeviceVerificationEnabled={!isPortfolioTrackerDevice}
+            isDeviceVerificationEnabled={isDeviceVerificationEnabled}
         >
             <Screen
                 header={<ReceiveAddressDetailHeader address={address} symbol={networkSymbol} />}
@@ -72,7 +82,7 @@ export const ReceiveAddressDetailScreen = () => {
                         <VStack paddingHorizontal="sp16" paddingTop="sp8" paddingBottom="sp16">
                             <ReceiveAddressActions
                                 address={address.address}
-                                isDeviceVerificationEnabled={!isPortfolioTrackerDevice}
+                                isDeviceVerificationEnabled={isDeviceVerificationEnabled}
                             />
                         </VStack>
                     </>

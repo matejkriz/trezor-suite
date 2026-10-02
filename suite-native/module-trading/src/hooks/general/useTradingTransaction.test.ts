@@ -37,6 +37,7 @@ type State = TradingRootState &
     SettingsSliceRootState;
 
 const mockComposeTradingTransaction = jest.fn();
+const mockCancelDeviceAction = jest.fn();
 
 // Mock TrezorConnect to prevent errors during cleanup
 jest.mock('@trezor/connect', () => ({
@@ -80,6 +81,11 @@ jest.mock('./useComposeTradingTransaction', () => ({
 
 jest.mock('@suite-common/wallet-core', () => ({
     ...jest.requireActual('@suite-common/wallet-core'),
+    cancelDeviceActionThunk: jest
+        .requireActual('@reduxjs/toolkit')
+        .createAsyncThunk('@test/cancelDeviceAction', (params: unknown) =>
+            mockCancelDeviceAction(params),
+        ),
 }));
 
 const btc1Account = getBtcAccount({ descriptor: asAccountDescriptor('btc1') });
@@ -266,19 +272,12 @@ describe('useTradingTransaction', () => {
     });
 
     describe('useEffect cleanup', () => {
-        it('should call TrezorConnect.cancel on unmount', async () => {
+        it('cancels the selected wallet device operation on unmount', async () => {
             const store = getInitializedStore();
             const { unmount } = await renderUseTradingTransaction({ store });
 
-            // Get the mocked TrezorConnect.cancel function
-            const TrezorConnect = require('@trezor/connect');
-            const mockCancel = TrezorConnect.cancel;
-
-            // Unmount the component to trigger the cleanup useEffect
             await unmount();
-
-            // Verify that TrezorConnect.cancel was called
-            expect(mockCancel).toHaveBeenCalled();
+            expect(mockCancelDeviceAction).toHaveBeenCalledWith({});
         });
     });
 });

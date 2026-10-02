@@ -4,7 +4,7 @@ import { type EarnYieldWorkerBaseUrl } from '@suite-common/earn-stablecoin-defs'
 import { isDetoxTestBuild } from '@suite-native/config';
 import { DEVICE } from '@trezor/connect';
 
-export type ExperimentalFeature = 'suite-sync' | 'slip24';
+export type ExperimentalFeature = 'suite-sync' | 'slip24' | 'ledger';
 
 export interface AppSettingsState {
     isOnboardingFinished: boolean;

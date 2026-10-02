@@ -520,6 +520,21 @@ export const messages = {
             secondaryButton: 'Continue checking',
         },
     },
+    moduleConnectLedger: {
+        button: 'Connect Ledger',
+        title: 'Connect & unlock\nyour Ledger',
+        status: 'Checking for connected Ledgers...',
+        discovering: 'Checking apps and loading your accounts...',
+        instructions:
+            'Turn on Bluetooth on your Ledger and unlock it. On your Ledger, allow Suite to check installed apps. If Accounts Discovery is installed, approve opening it and exporting public account data. Otherwise, confirm opening Bitcoin.',
+        permission: 'Allow Bluetooth access to connect your Ledger.',
+        permissionButton: 'Allow Bluetooth',
+        blockedPermission: 'Enable Bluetooth access for Suite in system settings.',
+        settingsButton: 'Open settings',
+        retry: 'Scan again',
+        error: 'Could not connect your Ledger. Unlock it and try again. Approve checking apps, opening the selected app and exporting public account data when prompted.',
+        scanError: 'Could not scan for Ledgers. Check that Bluetooth is turned on and try again.',
+    },
     moduleConnectDevice: {
         crossroads: {
             bluetooth: {
@@ -792,6 +807,12 @@ export const messages = {
         },
     },
     moduleDeviceSettings: {
+        deviceInfo: {
+            model: 'Model',
+            osVersion: 'Operating system',
+            bitcoinAppVersion: 'Bitcoin app',
+            batteryLevel: 'Battery',
+        },
         sectionTitles: {
             general: 'General',
             security: 'Security',
@@ -1032,20 +1053,28 @@ export const messages = {
                 pasteAddress:
                     'Paste the address into the exchange or app from where you will receive the funds.',
                 verifyAddress: 'Verify the pasted address against your Trezor for maximum safety.',
+                verifyAddressOnDevice:
+                    'Verify the pasted address against your {deviceName} for maximum safety.',
             },
             buttons: {
                 verifyOnTrezor: 'Verify on Trezor',
+                verifyOnDevice: 'Verify on {deviceName}',
                 skipVerification: 'Skip verification',
             },
         },
         addressSharedBottomSheet: {
             title: 'Verify the shared address',
             subtitle: 'Verify the address you just shared against your Trezor for maximum safety.',
+            deviceSubtitle:
+                'Verify the address you just shared against your {deviceName} for maximum safety.',
         },
         addressVerificationScreen: {
             pastedTitle: 'Compare the pasted address against your Trezor',
             sharedTitle: 'Compare the shared address against your Trezor',
             verifiedTitle: 'Check the address on your Trezor',
+            pastedDeviceTitle: 'Compare the pasted address against your {deviceName}',
+            sharedDeviceTitle: 'Compare the shared address against your {deviceName}',
+            verifiedDeviceTitle: 'Check the address on your {deviceName}',
         },
         bottomSheets: {
             addressMismatch: {
@@ -1608,6 +1637,11 @@ export const messages = {
         experimental: {
             title: 'Experimental',
             subtitle: 'For experienced users only. Use at your own risk.',
+            ledger: {
+                title: 'Ledger support',
+                description:
+                    'Connect a Ledger hardware wallet via Bluetooth. View other supported networks with the Accounts Discovery app.',
+            },
             slip24: {
                 title: 'SLIP-24 (clear signing)',
                 description:
@@ -2097,6 +2131,8 @@ export const messages = {
             errorMessage: 'Token not found.',
         },
         accountDetail: {
+            discoveryOnly:
+                'Public account discovery only. Sending and on-device address verification are unavailable for this account.',
             stablecoinYield: {
                 defiYieldInfoText:
                     'This token represents your position in the vault. It grows in value as yield accrues.',
@@ -2325,11 +2361,16 @@ export const messages = {
     device: {
         title: {
             continueOnTrezor: 'Continue\non your Trezor',
+            continueOnDevice: 'Continue\non your {deviceName}',
         },
         continueOnTrezor: {
             headerTitle: 'Continue on your Trezor',
             title: 'Confirm the action on Trezor.',
             subtitle: 'Follow the on-screen instructions.',
+        },
+        continueOnDevice: {
+            headerTitle: 'Continue on your {deviceName}',
+            title: 'Confirm the action on {deviceName}.',
         },
     },
     deviceManager: {

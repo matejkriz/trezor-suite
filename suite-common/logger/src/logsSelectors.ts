@@ -82,19 +82,27 @@ export const selectRedactedActionsLog = createActionsLogsMemoizedSelector(
         ),
 );
 
-export const selectRedactedDevices = createApplicationInfoLogsMemoizedSelector(
-    [selectDevices, (_state, shouldHideSensitiveData?: boolean) => shouldHideSensitiveData],
-    (devices, shouldHideSensitiveData) => {
-        const bootloaderDevices = devices.filter(device => device.id === null);
+export const selectApplicationLogDevices = createWeakMapSelector([selectDevices], devices =>
+    pipe(
+        devices,
+        A.uniqBy(device => device.id),
+        A.concat(devices.filter(device => device.id === null)),
+    ),
+);
 
-        return pipe(
-            devices,
-            A.uniqBy(device => device.id),
-            A.concat(bootloaderDevices),
+export const selectRedactedDevices = createApplicationInfoLogsMemoizedSelector(
+    [
+        selectApplicationLogDevices,
+        selectDevices,
+        (_state, shouldHideSensitiveData?: boolean) => shouldHideSensitiveData,
+    ],
+    (logDevices, devices, shouldHideSensitiveData) =>
+        pipe(
+            logDevices,
             A.map(device => ({
                 id: shouldHideSensitiveData ? REDACTED_REPLACEMENT : device.id,
                 label: shouldHideSensitiveData ? REDACTED_REPLACEMENT : device.label,
-                path: device.path, // needed to load telemetry
+                path: shouldHideSensitiveData ? REDACTED_REPLACEMENT : device.path,
                 mode: device.mode,
                 connected: device.connected,
                 passphraseProtection: device.features?.passphrase_protection,
@@ -109,8 +117,7 @@ export const selectRedactedDevices = createApplicationInfoLogsMemoizedSelector(
                         ? devices.filter(d => d.id === device.id).length
                         : 1,
             })),
-        );
-    },
+        ),
 );
 export type RedactedDevice = ReturnType<typeof selectRedactedDevices>[number];
 

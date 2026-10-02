@@ -3,7 +3,10 @@ import { useSelector } from 'react-redux';
 
 import { useNavigation } from '@react-navigation/native';
 
+import { useServices } from '@suite-common/dependency-injection';
 import { selectSelectedDevice } from '@suite-common/device';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { cancelDeviceActionThunk } from '@suite-common/wallet-core';
 import {
     AppTabsRoutes,
     type DeviceSettingsStackParamList,
@@ -13,7 +16,6 @@ import {
     RootStackRoutes,
     type StackToStackCompositeNavigationProps,
 } from '@suite-native/navigation';
-import TrezorConnect from '@trezor/connect';
 
 type NavigationProps = StackToStackCompositeNavigationProps<
     DeviceSettingsStackParamList,
@@ -25,6 +27,7 @@ type NavigationProps = StackToStackCompositeNavigationProps<
 // he will be prompted to connect Trezor. This hook prevents usage of incorrect device.
 export const useDeviceChangedCheck = () => {
     const device = useSelector(selectSelectedDevice);
+    const { dispatch } = useServices(injectDispatch);
     const navigation = useNavigation<NavigationProps>();
     const initialDeviceIdRef = useRef<string | null>(null);
     // Important for device wipe. Device ID changes for wiped device, but if it was connected,
@@ -47,7 +50,7 @@ export const useDeviceChangedCheck = () => {
             !hasDeviceBeenConnected.current &&
             device.connected
         ) {
-            TrezorConnect.cancel();
+            void dispatch(cancelDeviceActionThunk({ device }));
             navigation.popTo(RootStackRoutes.AppTabs, {
                 screen: AppTabsRoutes.HomeStack,
                 params: {
@@ -55,5 +58,5 @@ export const useDeviceChangedCheck = () => {
                 },
             });
         }
-    }, [device?.id, navigation, device?.connected]);
+    }, [device, dispatch, navigation]);
 };

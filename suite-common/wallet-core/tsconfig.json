@@ -11,6 +11,7 @@
         { "path": "../earn-staking-api" },
         { "path": "../fiat-services" },
         { "path": "../firmware" },
+        { "path": "../ledger" },
         { "path": "../legacy-network-config" },
         { "path": "../metadata-types" },
         { "path": "../networks" },
@@ -69,6 +70,7 @@
         { "path": "../../packages/react-utils" },
         { "path": "../../packages/type-utils" },
         { "path": "../../packages/urls" },
-        { "path": "../../packages/utils" }
+        { "path": "../../packages/utils" },
+        { "path": "../../packages/utxo-lib" }
     ]
 }

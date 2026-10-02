@@ -37,7 +37,11 @@ import {
     initPreloadedState,
     testMocks,
 } from '@suite-common/test-utils';
-import { type SendState } from '@suite-common/wallet-core';
+import {
+    type SendState,
+    type WalletDeviceServiceDep,
+    createLedgerSuiteDevice,
+} from '@suite-common/wallet-core';
 import { type FormState, type GetTradedAccountKeysDep } from '@suite-common/wallet-types';
 import { mockGetTradedAccountKeys } from '@suite-common/wallet-types/mocks';
 import { type PROTO } from '@trezor/connect';
@@ -101,11 +105,19 @@ type SendFormTestServices = SuiteRouterHistoryDep &
     GetIsWindowVisibleDep &
     GetTradedAccountKeysDep &
     MigrateSuiteSyncLabelsForRbfTransactionDep &
+    WalletDeviceServiceDep &
     SuiteSyncDep & {
         networks: AddressValidatorDep & GetNamedAddressSupportDep & NetworkModuleRepositoryDep;
     };
 
 const services: SendFormTestServices = {
+    walletDeviceService: {
+        get: () => undefined,
+        cancelAction: async ({ reason }) => {
+            await TrezorConnect.cancel(reason);
+        },
+        disconnect: () => Promise.resolve(),
+    },
     suiteRouterHistory: mockSuiteRouterHistory(),
     analytics: mockDesktopAnalytics(),
     getIsWindowVisible: mockGetIsWindowVisible(),
@@ -565,4 +577,32 @@ describe('useSendForm hook', () => {
             TEST_TIMEOUT,
         );
     });
+
+    it(
+        'shows the recipient address field for a selected Ledger without a Trezor device',
+        async () => {
+            const staticSessionId = 'ledgerwallet@ledger:0' as const;
+            const selectedAccount = {
+                ...fixtures.BTC_ACCOUNT,
+                account: { ...fixtures.BTC_ACCOUNT.account, deviceState: staticSessionId },
+            };
+            const params = buildTestCompositionRootParams({ selectedAccount });
+            const device = createLedgerSuiteDevice({
+                id: 'ledgerwallet',
+                label: 'Ledger Flex',
+                staticSessionId,
+            });
+            params.preloadedState.device = {
+                devices: [device],
+                selectedDevice: device,
+            };
+            const root = createTestCompositionRoot(params);
+            const { unmount } = renderWithProviders(root, <SendIndex />);
+
+            await waitFor(() => expect(findByTestId(/^outputs\.[0-9]+\.address$/)).toHaveLength(1));
+
+            unmount();
+        },
+        TEST_TIMEOUT,
+    );
 });

@@ -1,14 +1,21 @@
 import { Translation } from '@suite/intl';
+import { selectDeviceBrandName } from '@suite-common/device';
 import { Card, Icon, List, Modal, Paragraph } from '@trezor/components';
 import { BluetoothSlashIcon, LinkBreakIcon, ScrollIcon } from '@trezor/icons';
+
+import { useSelector } from 'src/hooks/suite';
+
+type ConfirmationContentProps = {
+    isBluetoothDevice: boolean;
+    isBluetoothConnectedDevice: boolean;
+    deviceBrand: string;
+};
 
 const ConfirmationContent = ({
     isBluetoothDevice,
     isBluetoothConnectedDevice,
-}: {
-    isBluetoothDevice: boolean;
-    isBluetoothConnectedDevice: boolean;
-}) => (
+    deviceBrand,
+}: ConfirmationContentProps) => (
     <Card paddingType="normal" data-testid="@settings/device/forget/confirm-content">
         <List gap={24}>
             <List.Item
@@ -17,7 +24,7 @@ const ConfirmationContent = ({
                 }
             >
                 <Paragraph intent="neutral" priority="secondary">
-                    <Translation id="TR_FORGET_DEVICE_MODAL_BULLET_FORGET" />
+                    <Translation id="TR_FORGET_PROVIDER_DEVICE_BULLET" values={{ deviceBrand }} />
                 </Paragraph>
             </List.Item>
             {isBluetoothDevice && (
@@ -53,44 +60,53 @@ const ConfirmationContent = ({
     </Card>
 );
 
+type ConfirmationModalProps = {
+    onConfirm: () => void;
+    onCancel: () => void;
+    isBluetoothDevice: boolean;
+    isBluetoothConnectedDevice: boolean;
+};
+
 export const ConfirmationModal = ({
     onConfirm,
     onCancel,
     isBluetoothDevice,
     isBluetoothConnectedDevice,
-}: {
-    onConfirm: () => void;
-    onCancel: () => void;
-    isBluetoothDevice: boolean;
-    isBluetoothConnectedDevice: boolean;
-}) => (
-    <Modal
-        onCancel={onCancel}
-        heading={<Translation id="TR_FORGET_DEVICE_MODAL_HEADING" />}
-        intent="warning"
-        width={680}
-        bottomContent={
-            <>
-                <Modal.Button
-                    data-testid="@settings/device/forget-button-confirm"
-                    onClick={onConfirm}
-                >
-                    <Translation id="TR_FORGET_DEVICE_MODAL_CONFIRM" />
-                </Modal.Button>
-                <Modal.Button
-                    data-testid="@settings/device/forget-button-cancel"
-                    intent="neutral"
-                    priority="secondary"
-                    onClick={onCancel}
-                >
-                    <Translation id="TR_CANCEL" />
-                </Modal.Button>
-            </>
-        }
-    >
-        <ConfirmationContent
-            isBluetoothDevice={isBluetoothDevice}
-            isBluetoothConnectedDevice={isBluetoothConnectedDevice}
-        />
-    </Modal>
-);
+}: ConfirmationModalProps) => {
+    const deviceBrand = useSelector(selectDeviceBrandName);
+
+    return (
+        <Modal
+            onCancel={onCancel}
+            heading={
+                <Translation id="TR_FORGET_PROVIDER_DEVICE_HEADING" values={{ deviceBrand }} />
+            }
+            intent="warning"
+            width={680}
+            bottomContent={
+                <>
+                    <Modal.Button
+                        data-testid="@settings/device/forget-button-confirm"
+                        onClick={onConfirm}
+                    >
+                        <Translation id="TR_FORGET_DEVICE_MODAL_CONFIRM" />
+                    </Modal.Button>
+                    <Modal.Button
+                        data-testid="@settings/device/forget-button-cancel"
+                        intent="neutral"
+                        priority="secondary"
+                        onClick={onCancel}
+                    >
+                        <Translation id="TR_CANCEL" />
+                    </Modal.Button>
+                </>
+            }
+        >
+            <ConfirmationContent
+                isBluetoothDevice={isBluetoothDevice}
+                isBluetoothConnectedDevice={isBluetoothConnectedDevice}
+                deviceBrand={deviceBrand}
+            />
+        </Modal>
+    );
+};

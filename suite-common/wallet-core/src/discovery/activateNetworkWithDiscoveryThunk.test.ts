@@ -99,6 +99,11 @@ const createExtra = (): ActivateNetworkWithDiscoveryThunkDeps => ({
     services: {
         analytics: mockAnalytics<AnalyticsSharedEvents>(),
         getTradedAccountKeys: mockGetTradedAccountKeys(),
+        walletDeviceService: {
+            get: () => undefined,
+            cancelAction: () => Promise.resolve(),
+            disconnect: () => Promise.resolve(),
+        },
     },
 });
 

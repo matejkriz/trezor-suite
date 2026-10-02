@@ -1,6 +1,9 @@
 import { getSupportedNetworks } from '@suite-common/wallet-config';
 
+import { serializeDevice } from 'src/utils/suite/storage';
+
 import { type Db } from './createDb';
+import { restoreLegacyLedgerDevices } from './restoreLegacyLedgerDevices';
 
 export const loadStoragePayload = async (db: Db) => {
     // Load state from database in parallel using Promise.all
@@ -76,13 +79,28 @@ export const loadStoragePayload = async (db: Db) => {
         db.getItemsWithKeys('earnOnboarding'),
     ]);
 
+    const legacyLedgerDevices = restoreLegacyLedgerDevices(
+        new Set(devices.flatMap(device => (device.id ? [device.id] : []))),
+        suiteSettings?.externalWallets,
+    );
+    await Promise.all(
+        legacyLedgerDevices.map(device =>
+            db.addItem('devices', serializeDevice(device), device.state.staticSessionId, true),
+        ),
+    );
+    if (suiteSettings?.externalWallets?.length) {
+        const updatedSettings = { ...suiteSettings };
+        delete updatedSettings.externalWallets;
+        await db.addItem('suiteSettings', updatedSettings, 'suite', true);
+    }
+
     return {
         // Hydration runs before network metadata is loaded into Redux.
         // TODO(#30572): Supply migration ordering without the legacy registry.
         supportedNetworks: getSupportedNetworks(),
         suiteSettings,
         walletSettings,
-        devices,
+        devices: [...devices, ...legacyLedgerDevices.map(serializeDevice)],
         thp,
         bluetooth,
         accounts,

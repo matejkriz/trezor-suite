@@ -39,6 +39,11 @@ export * from './fees/feesReducer';
 export * from './fees/feesThunks';
 export * from './fees/feesUtils';
 export * from './fees/hooks/useRefetchFees';
+export {
+    createLedgerSuiteDevice,
+    type LedgerWalletIdentity,
+} from './ledger/createLedgerSuiteDevice';
+export { connectLedgerBitcoinWalletThunk } from './ledger/connectLedgerBitcoinWalletThunk';
 export * from './fiat-rates/fiatRatesMiddleware';
 export * from './fiat-rates/fiatRatesReducer';
 export * from './fiat-rates/fiatRatesSelectors';
@@ -147,3 +152,9 @@ export * from './yield/yieldTypes';
 // Named re-export, not `export *`: the .tsx this hook reaches must stay prunable from the Electron
 // main bundle, whose webpack resolves .ts/.js only.
 export { useResolveNamedAddress } from './named-address/useResolveNamedAddress';
+
+export * from './wallet-device/createWalletDeviceService';
+export { createLedgerWalletDeviceOperationsFactory } from './wallet-device/createLedgerWalletDeviceOperations';
+export { getWalletDeviceAccountCapabilities } from './wallet-device/walletDeviceAccountCapabilities';
+export * from './wallet-device/walletDeviceThunks';
+export { useWalletDeviceAccountCapabilities } from './wallet-device/useWalletDeviceAccountCapabilities';

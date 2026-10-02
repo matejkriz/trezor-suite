@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useThrottle } from 'react-use';
 
-import { selectSelectedDevice } from '@suite-common/device';
+import { selectActiveWalletStaticSessionId } from '@suite-common/device';
 import {
     type SuiteSyncDataRootState,
     selectAccountsWithSuiteSyncLabel,
@@ -12,14 +12,10 @@ import { useSelector } from 'src/hooks/suite';
 
 export function useAccountsOptions() {
     const baseAccounts = useSelector(selectAllAccountsToList);
-    const device = useSelector(selectSelectedDevice);
+    const activeWalletStaticSessionId = useSelector(selectActiveWalletStaticSessionId);
 
     const accounts = useSelector((state: SuiteSyncDataRootState) =>
-        selectAccountsWithSuiteSyncLabel(
-            state,
-            baseAccounts,
-            device?.state?.staticSessionId ?? null,
-        ),
+        selectAccountsWithSuiteSyncLabel(state, baseAccounts, activeWalletStaticSessionId ?? null),
     );
 
     const throttledAccounts = useThrottle(accounts, 1000);

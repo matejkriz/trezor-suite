@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 
 import { selectKnownDeviceByDeviceId } from '@suite-common/bluetooth/src/bluetoothSelectors';
-import { selectSelectedDevice } from '@suite-common/device';
+import { getDeviceOperationCapabilities, selectSelectedDevice } from '@suite-common/device';
 import { selectPersistentDeviceDataById } from '@suite-common/persistent-device-data';
 import { type TrezorDevice } from '@suite-common/suite-types';
 import { getIsDeviceConnectedViaBluetooth, getIsThpDevice } from '@suite-common/suite-utils';
@@ -28,6 +28,7 @@ import {
  * - `thp-disconnected`: THP device not connected and no BT credentials — forget immediately.
  */
 type ForgetDeviceState =
+    | 'provider-managed'
     | 'non-thp-connected'
     | 'non-thp-disconnected'
     | 'thp-cable-connected'
@@ -39,6 +40,8 @@ const resolveForgetDeviceState = (
     device: TrezorDevice,
     { hasBluetoothCredentials }: { hasBluetoothCredentials: boolean },
 ): ForgetDeviceState => {
+    if (!getDeviceOperationCapabilities(device).trezorConnect) return 'provider-managed';
+
     const isThp = getIsThpDevice(device);
 
     if (!isThp) {
@@ -92,6 +95,7 @@ export const ForgetDeviceModal = ({ onCancel }: { onCancel: () => void }) => {
         case 'non-thp-connected':
             return <ConnectedCableForgetFlow onCancel={onCancel} isBluetoothDevice={false} />;
 
+        case 'provider-managed':
         case 'non-thp-disconnected':
         case 'thp-disconnected':
             return <ImmediateForgetFlow onCancel={onCancel} />;

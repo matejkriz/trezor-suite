@@ -1,6 +1,12 @@
 import { createAction } from '@reduxjs/toolkit';
 
-import type { AcquiredDevice, ButtonRequest, TrezorDevice } from '@suite-common/suite-types';
+import type {
+    AcquiredDevice,
+    ButtonRequest,
+    DeviceProvider,
+    TrezorDevice,
+    TrezorDeviceWithState,
+} from '@suite-common/suite-types';
 import {
     DEVICE,
     type DecodedTrezorPushNotification,
@@ -93,6 +99,13 @@ const selectDevice = createAction(
     }),
 );
 
+const registerDevice = createAction<TrezorDeviceWithState>(
+    `${DEVICE_MODULE_PREFIX}/registerDevice`,
+);
+const disconnectDevicesByProvider = createAction<DeviceProvider>(
+    `${DEVICE_MODULE_PREFIX}/disconnectDevicesByProvider`,
+);
+
 const updateSelectedDevice = createAction(
     `${DEVICE_MODULE_PREFIX}/updateSelectedDevice`,
     (payload: TrezorDevice) => ({ payload }),
@@ -139,6 +152,8 @@ export const deviceActions = {
     addButtonRequest,
     requestDeviceReconnect,
     selectDevice,
+    registerDevice,
+    disconnectDevicesByProvider,
     updateSelectedDevice,
     removeButtonRequests,
     setDiscovered,

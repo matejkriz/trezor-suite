@@ -14,6 +14,7 @@ import {
     type PushTransactionError,
     type SendRootState,
     type SignTransactionError,
+    type SignTransactionThunkDeps,
     type SignTransactionThunkState,
     type SignTransactionTimeoutError,
     enhancePrecomposedTransactionThunk,
@@ -52,6 +53,8 @@ export type SignTransactionNativeThunkState = SendRootState &
     EnhancePrecomposedTransactionThunkState &
     SignTransactionThunkState;
 
+export type SignTransactionNativeThunkDeps = SignTransactionThunkDeps;
+
 export const signTransactionNativeThunk = createThunk<
     BlockbookTransaction | undefined,
     {
@@ -65,6 +68,7 @@ export const signTransactionNativeThunk = createThunk<
     {
         rejectValue: SignTransactionError | SignTransactionTimeoutError | undefined;
         state: SignTransactionNativeThunkState;
+        extra: SignTransactionNativeThunkDeps;
     }
 >(
     `${SEND_MODULE_PREFIX}/signTransactionNativeThunk`,

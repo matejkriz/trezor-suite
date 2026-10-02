@@ -2,6 +2,7 @@ import { type ComponentType } from 'react';
 import { useSelector } from 'react-redux';
 
 import { type NetworkSymbol, asNetworkSymbol } from '@suite-common/wallet-config';
+import { useWalletDeviceAccountCapabilities } from '@suite-common/wallet-core';
 import { type Account } from '@suite-common/wallet-types';
 import {
     type BannerFlagsSliceRootState,
@@ -21,12 +22,13 @@ const earnPromoBanners: Partial<Record<NetworkSymbol, ComponentType<{ account: A
 
 export const AccountEarnPromoBanner = ({ account }: AccountEarnPromoBannerProps) => {
     const symbol = account?.symbol;
+    const { canSignTransaction } = useWalletDeviceAccountCapabilities(account ?? undefined);
 
     const isClosed = useSelector((state: BannerFlagsSliceRootState) =>
         symbol !== undefined ? selectIsEarnBannerClosed(state, symbol) : false,
     );
 
-    if (isClosed || !account?.symbol) {
+    if (!canSignTransaction || isClosed || !account?.symbol) {
         return null;
     }
 

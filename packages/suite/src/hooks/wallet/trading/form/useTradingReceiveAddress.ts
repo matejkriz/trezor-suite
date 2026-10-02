@@ -6,7 +6,11 @@ import { type CryptoId } from 'invity-api';
 import { selectFullSelectedAccount } from '@suite/account';
 import { selectIsDebugModeActive } from '@suite/debug';
 import { useServices } from '@suite-common/dependency-injection';
-import { selectSelectedDevice } from '@suite-common/device';
+import {
+    getDeviceOperationCapabilities,
+    selectActiveWalletStaticSessionId,
+    selectSelectedDevice,
+} from '@suite-common/device';
 import { injectAddressValidator, selectSupportedNetworkSymbols } from '@suite-common/networks';
 import { injectDispatch } from '@suite-common/redux-utils';
 import {
@@ -65,6 +69,7 @@ export const useTradingReceiveAddress = ({
     const accounts = useSelector(selectAccounts);
     const walletSelectedAccount = useSelector(selectFullSelectedAccount);
     const device = useSelector(selectSelectedDevice);
+    const activeWalletStaticSessionId = useSelector(selectActiveWalletStaticSessionId);
     const sendAccountKey = useSelector(selectTradingExchangeAccountKey);
 
     const persistedExchangeReceiveAccountKey = useSelector(selectTradingExchangeReceiveAccountKey);
@@ -105,14 +110,18 @@ export const useTradingReceiveAddress = ({
             filterReceiveAccounts({
                 accounts,
                 supportedNetworks,
-                deviceState: device?.state?.staticSessionId,
+                deviceState: activeWalletStaticSessionId,
                 symbol,
                 isDebug,
             }),
-        [accounts, symbol, device?.state?.staticSessionId, isDebug, supportedNetworks],
+        [accounts, symbol, activeWalletStaticSessionId, isDebug, supportedNetworks],
     );
 
-    const canAddSuiteAccount = !!(device?.connected && isSupportedNetwork);
+    const canAddSuiteAccount = !!(
+        device?.connected &&
+        isSupportedNetwork &&
+        getDeviceOperationCapabilities(device).manualAccounts
+    );
     const canUseNonSuiteAccount = nonSuiteAccount;
     const hasSuiteReceiveAccount = !!suiteReceiveAccounts?.length;
 

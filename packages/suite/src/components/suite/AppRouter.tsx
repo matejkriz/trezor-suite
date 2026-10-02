@@ -10,6 +10,7 @@ import {
 } from '@suite/router';
 import { useServices } from '@suite-common/dependency-injection';
 
+import { EarnDeviceGuard } from 'src/components/earn/EarnDeviceGuard';
 import { useSelector } from 'src/hooks/suite';
 
 type AppRouterProps = {
@@ -40,6 +41,10 @@ export const AppRouter = memo(({ components }: AppRouterProps) => {
     const componentToRender =
         componentName && (components as Record<string, ComponentType>)[componentName];
     if (componentToRender) {
+        if (resolvedRouteName === 'suite-earn' || resolvedRouteName?.startsWith('earn-')) {
+            return <EarnDeviceGuard>{createElement(componentToRender)}</EarnDeviceGuard>;
+        }
+
         return createElement(componentToRender);
     }
 

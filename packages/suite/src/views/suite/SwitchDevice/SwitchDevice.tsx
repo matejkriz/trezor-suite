@@ -1,13 +1,14 @@
 import { events, injectDesktopAnalytics } from '@suite/analytics';
-import { setConnectionMode, toggleConnectionModal } from '@suite/device';
+import { openConnectionModal, setConnectionMode, toggleConnectionModal } from '@suite/device';
 import { Translation } from '@suite/intl';
+import { selectHasExperimentalFeature } from '@suite/settings';
 import { bluetoothActions, selectAdapterStatus } from '@suite-common/bluetooth';
 import { useServices } from '@suite-common/dependency-injection';
 import { selectDevices } from '@suite-common/device';
 import { injectDispatch } from '@suite-common/redux-utils';
 import * as deviceUtils from '@suite-common/suite-utils';
 import { Button, Column } from '@trezor/components';
-import { TrezorDevicesIcon } from '@trezor/icons';
+import { CableUsbCIcon, TrezorDevicesIcon } from '@trezor/icons';
 
 import { useSelector } from 'src/hooks/suite';
 import { type ForegroundAppProps } from 'src/types/suite';
@@ -19,6 +20,7 @@ export const SwitchDeviceContent = ({ cancelable, onCancel }: ForegroundAppProps
     const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
     const bluetoothAdapterStatus = useSelector(selectAdapterStatus);
     const devices = useSelector(selectDevices);
+    const isLedgerEnabled = useSelector(selectHasExperimentalFeature('ledger'));
 
     // exclude selectedDevice from list, because other devices could have a higher priority,
     // and we want to have selectedDevice on top
@@ -44,6 +46,11 @@ export const SwitchDeviceContent = ({ cancelable, onCancel }: ForegroundAppProps
         onCancel();
     };
 
+    const openLedgerConnectionModal = () => {
+        dispatch(openConnectionModal('ledger'));
+        onCancel();
+    };
+
     return (
         <Column gap={12}>
             {sortedDevices.map(device => (
@@ -65,6 +72,19 @@ export const SwitchDeviceContent = ({ cancelable, onCancel }: ForegroundAppProps
             >
                 <Translation id="TR_CONNECT_DEVICE" />
             </Button>
+            {isLedgerEnabled && (
+                <Button
+                    intent="neutral"
+                    priority="secondary"
+                    iconLeft={CableUsbCIcon}
+                    isFloating
+                    width="100%"
+                    size="large"
+                    onClick={openLedgerConnectionModal}
+                >
+                    Connect Ledger
+                </Button>
+            )}
         </Column>
     );
 };

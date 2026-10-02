@@ -1,4 +1,8 @@
-import { type DeviceRootState, selectSelectedDevice } from '@suite-common/device';
+import {
+    type DeviceRootState,
+    getDeviceSettingsCapabilities,
+    selectSelectedDevice,
+} from '@suite-common/device';
 import { type WithServices, createThunk } from '@suite-common/redux-utils';
 import {
     type GetBinFilesBaseUrlDep,
@@ -67,7 +71,7 @@ export const firmwareUpdateThunk = createThunk<
             dispatch(firmwareActions.setFirmwareUpdateError(undefined));
         }
 
-        if (!device) {
+        if (!device || !getDeviceSettingsCapabilities(device).firmwareUpdate) {
             dispatch(firmwareActions.setStatus('error'));
             dispatch(firmwareActions.setFirmwareUpdateError('Device not connected'));
 

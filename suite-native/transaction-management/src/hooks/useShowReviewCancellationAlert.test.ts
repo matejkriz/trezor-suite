@@ -1,5 +1,6 @@
 import { type Store } from '@reduxjs/toolkit';
 
+import { deviceReducerInitialState } from '@suite-common/device';
 import { type CancelSignSendFormTransactionThunkState } from '@suite-common/wallet-core';
 import {
     createStoreFromPreloadedState,
@@ -34,6 +35,7 @@ describe('useShowReviewCancellationAlert', () => {
     beforeEach(() => {
         mockShowAlert.mockClear();
         const state: CancelSignSendFormTransactionThunkState = {
+            device: deviceReducerInitialState,
             wallet: { send: { drafts: {} } },
         };
         store = createStoreFromPreloadedState(state);

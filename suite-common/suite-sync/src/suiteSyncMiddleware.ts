@@ -1,6 +1,11 @@
 import { type UnknownAction, isAnyOf } from '@reduxjs/toolkit';
 
-import { deviceActions, isTrezorDeviceWithState, selectDeviceThunk } from '@suite-common/device';
+import {
+    deviceActions,
+    isTrezorDeviceWithState,
+    selectDeviceByStaticSessionId,
+    selectDeviceThunk,
+} from '@suite-common/device';
 import { type MessageSystemRootState } from '@suite-common/message-system';
 import { type WithServices, createMiddlewareWithExtraDeps } from '@suite-common/redux-utils';
 import { type SuiteSyncDep } from '@suite-common/suite-sync-types';
@@ -10,6 +15,7 @@ import {
     selectHasDeviceSuiteSyncError,
     selectIsSuiteSyncEnabled,
 } from './suiteSyncSelectors';
+import { isSuiteSyncSupportedByDevice } from './suiteSyncUtils';
 
 type SuiteSyncMiddlewareDeps = WithServices<SuiteSyncDep>;
 type SuiteSyncMiddlewareState = WithSuiteSyncAndDeviceState & MessageSystemRootState;
@@ -22,7 +28,10 @@ export const prepareSuiteSyncMiddleware = createMiddlewareWithExtraDeps<
     if (
         selectIsSuiteSyncEnabled(getState()) &&
         deviceActions.setDiscovered.match(action) &&
-        action.payload.success
+        action.payload.success &&
+        isSuiteSyncSupportedByDevice(
+            selectDeviceByStaticSessionId(getState(), action.payload.staticSessionId),
+        )
     ) {
         const suiteSyncErrors = selectHasDeviceSuiteSyncError(
             getState(),
@@ -39,7 +48,11 @@ export const prepareSuiteSyncMiddleware = createMiddlewareWithExtraDeps<
     if (selectIsSuiteSyncEnabled(getState()) && isAnyOf(selectDeviceThunk.fulfilled)(action)) {
         const { payload } = action;
 
-        if (isTrezorDeviceWithState(payload.device) && payload.device.discovered) {
+        if (
+            isTrezorDeviceWithState(payload.device) &&
+            payload.device.discovered &&
+            isSuiteSyncSupportedByDevice(payload.device)
+        ) {
             const suiteSyncErrors = selectHasDeviceSuiteSyncError(
                 getState(),
                 payload.device?.state.staticSessionId,

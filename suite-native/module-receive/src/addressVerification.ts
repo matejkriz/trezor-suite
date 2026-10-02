@@ -42,7 +42,7 @@ type AddressVerificationConnectError = Extract<
     { success: false }
 >['error'];
 
-type ConfirmAddressOnDevice = () => Promise<ConnectResponse<Address | CardanoAddress>>;
+type ConfirmAddressOnDevice = () => ConnectResponse<Address | CardanoAddress>;
 
 export type AddressVerificationResult =
     | { type: AddressVerificationResultType.Success }

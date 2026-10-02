@@ -145,6 +145,7 @@ const getPlugins = (): ExpoPlugins => {
                 },
                 ios: {
                     deploymentTarget: '16.4',
+                    enableSceneSupport: true,
                 },
             },
         ],
@@ -293,9 +294,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             supportsTablet: true,
             infoPlist: {
                 NSBluetoothAlwaysUsageDescription:
-                    '$(PRODUCT_NAME) needs access to Bluetooth to connect to your Trezor device.',
+                    '$(PRODUCT_NAME) needs access to Bluetooth to connect to your hardware wallet.',
                 NSBluetoothPeripheralUsageDescription:
-                    '$(PRODUCT_NAME) needs access to Bluetooth to connect to your Trezor device.',
+                    '$(PRODUCT_NAME) needs access to Bluetooth to connect to your hardware wallet.',
                 NSCameraUsageDescription:
                     '$(PRODUCT_NAME) needs access to your Camera to scan your XPUB.',
                 NSFaceIDUsageDescription:

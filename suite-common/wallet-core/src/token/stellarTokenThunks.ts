@@ -1,7 +1,8 @@
 import { G } from '@mobily/ts-belt';
+import { type GetThunkAPI } from '@reduxjs/toolkit';
 
-import { type DeviceRootState, selectSelectedDevice } from '@suite-common/device';
-import { createThunk } from '@suite-common/redux-utils';
+import { type DeviceRootState, selectDeviceByStaticSessionId } from '@suite-common/device';
+import { type WithServices, createThunk } from '@suite-common/redux-utils';
 import { type Account } from '@suite-common/wallet-types';
 import {
     getConvertedOrDefaultFeeInfo,
@@ -14,6 +15,8 @@ import stellar from '@trezor/network-stellar/runtime';
 import { StellarAssetType } from '@trezor/protobuf/src/definitions';
 
 import { type FeesRootState, selectRawNetworkFeeInfo } from '../fees/feesReducer';
+import { type WalletDeviceServiceDep } from '../wallet-device/createWalletDeviceService';
+import { getWalletDeviceAccountCapabilities } from '../wallet-device/walletDeviceAccountCapabilities';
 
 export interface TokenThunkPayload {
     account: Account;
@@ -22,22 +25,51 @@ export interface TokenThunkPayload {
     customFeePerUnit?: string;
 }
 
+type StellarTokenThunkConfig = {
+    rejectValue: { error: string; message: string };
+    state: ActivateStellarTokenThunkState;
+    extra: ActivateStellarTokenThunkDeps;
+};
+
+type ManageTrustlineDeps = Pick<
+    GetThunkAPI<StellarTokenThunkConfig>,
+    'getState' | 'rejectWithValue' | 'extra'
+>;
+
 const STELLAR_TOKEN_MODULE_PREFIX = '@common/wallet-core/stellar-token';
 
 const manageTrustline = async (
     payload: TokenThunkPayload,
     operation: 'activate' | 'deactivate',
-    getState: () => DeviceRootState & FeesRootState,
-    rejectWithValue: (value: any) => any,
+    deps: ManageTrustlineDeps,
 ) => {
     const { account, contractAddress, selectedFee, customFeePerUnit } = payload;
-    const device = selectSelectedDevice(getState());
-    const rawFeeInfo = selectRawNetworkFeeInfo(getState(), account.symbol);
-
-    if (G.isNullable(account) || !device || !rawFeeInfo) {
-        return rejectWithValue({
+    if (G.isNullable(account)) {
+        return deps.rejectWithValue({
             error: 'sign-transaction-failed',
             message: 'Invalid input data.',
+        });
+    }
+
+    const device = selectDeviceByStaticSessionId(deps.getState(), account.deviceState);
+    const rawFeeInfo = selectRawNetworkFeeInfo(deps.getState(), account.symbol);
+
+    if (!device || !rawFeeInfo) {
+        return deps.rejectWithValue({
+            error: 'sign-transaction-failed',
+            message: 'Invalid input data.',
+        });
+    }
+
+    if (
+        !getWalletDeviceAccountCapabilities(
+            deps.extra.services.walletDeviceService.get(device),
+            account,
+        ).canSignTransaction
+    ) {
+        return deps.rejectWithValue({
+            error: 'sign-transaction-failed',
+            message: 'Account transaction signing is not supported by this device.',
         });
     }
 
@@ -52,7 +84,7 @@ const manageTrustline = async (
     } else {
         const feeLevel = feeInfo.levels.find(level => level.label === selectedFee);
         if (!feeLevel) {
-            return rejectWithValue({
+            return deps.rejectWithValue({
                 error: 'sign-transaction-failed',
                 message: 'Invalid input data.',
             });
@@ -100,7 +132,7 @@ const manageTrustline = async (
     });
 
     if (!response.success) {
-        return rejectWithValue({
+        return deps.rejectWithValue({
             error: 'sign-transaction-failed',
             message: response.error.message,
         });
@@ -118,14 +150,16 @@ const manageTrustline = async (
     });
 
     if (!pushResponse.success) {
-        return rejectWithValue({
+        return deps.rejectWithValue({
             error: 'sign-transaction-failed',
             message: pushResponse.error.message,
         });
     }
 };
 
-type ActivateStellarTokenThunkState = DeviceRootState & FeesRootState;
+export type ActivateStellarTokenThunkState = DeviceRootState & FeesRootState;
+
+export type ActivateStellarTokenThunkDeps = WithServices<WalletDeviceServiceDep>;
 
 export const activateStellarTokenThunk = createThunk<
     void,
@@ -133,14 +167,15 @@ export const activateStellarTokenThunk = createThunk<
     {
         rejectValue: { error: string; message: string };
         state: ActivateStellarTokenThunkState;
+        extra: ActivateStellarTokenThunkDeps;
     }
->(
-    `${STELLAR_TOKEN_MODULE_PREFIX}/activateStellarTokenThunk`,
-    (payload, { getState, rejectWithValue }) =>
-        manageTrustline(payload, 'activate', getState, rejectWithValue),
+>(`${STELLAR_TOKEN_MODULE_PREFIX}/activateStellarTokenThunk`, (payload, deps) =>
+    manageTrustline(payload, 'activate', deps),
 );
 
-type DeactivateStellarTokenThunkState = DeviceRootState & FeesRootState;
+export type DeactivateStellarTokenThunkState = ActivateStellarTokenThunkState;
+
+export type DeactivateStellarTokenThunkDeps = ActivateStellarTokenThunkDeps;
 
 export const deactivateStellarTokenThunk = createThunk<
     void,
@@ -148,9 +183,8 @@ export const deactivateStellarTokenThunk = createThunk<
     {
         rejectValue: { error: string; message: string };
         state: DeactivateStellarTokenThunkState;
+        extra: DeactivateStellarTokenThunkDeps;
     }
->(
-    `${STELLAR_TOKEN_MODULE_PREFIX}/deactivateStellarTokenThunk`,
-    (payload, { getState, rejectWithValue }) =>
-        manageTrustline(payload, 'deactivate', getState, rejectWithValue),
+>(`${STELLAR_TOKEN_MODULE_PREFIX}/deactivateStellarTokenThunk`, (payload, deps) =>
+    manageTrustline(payload, 'deactivate', deps),
 );

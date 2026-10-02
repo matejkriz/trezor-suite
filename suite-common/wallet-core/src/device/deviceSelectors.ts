@@ -60,5 +60,5 @@ export const selectSupportedNetworkByDevice = (
 
 export const selectDeviceSupportedNetworks = createMemoizedSelector(
     [selectSelectedDevice, selectSupportedNetworkSymbols],
-    selectSupportedNetworkByDevice,
+    (device, supportedNetworks) => selectSupportedNetworkByDevice(device, supportedNetworks),
 );

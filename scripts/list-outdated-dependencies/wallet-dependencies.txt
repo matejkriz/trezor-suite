@@ -10,6 +10,16 @@
 @testing-library/user-event
 @types/jest
 @types/redux-logger
+
+# Ledger Bitcoin proof of concept
+@ledgerhq/device-management-kit
+@ledgerhq/device-signer-kit-bitcoin
+@ledgerhq/device-transport-kit-react-native-ble
+@ledgerhq/device-transport-kit-speculos
+@ledgerhq/device-transport-kit-web-hid
+bitcoinjs-lib
+rxjs
+
 cashaddrjs
 expo-media-library
 golomb

@@ -9,6 +9,7 @@ import { injectDispatch } from '@suite-common/redux-utils';
 import {
     type AccountsRootState,
     type SendRootState,
+    cancelDeviceActionThunk,
     selectAccountByKey,
     selectSendPrecomposedTx,
     sendFormActions,
@@ -25,7 +26,6 @@ import {
     selectIsTransactionAlreadySigned,
     useTxValidityTimer,
 } from '@suite-native/transaction-management';
-import TrezorConnect from '@trezor/connect';
 
 import { useHandleCommonSignRejection } from './useHandleCommonSignRejection';
 
@@ -64,7 +64,7 @@ export const useTxValidityFlow = ({
 
         const txToRetry = precomposedTx;
 
-        TrezorConnect.cancel('tx-timeout');
+        await dispatch(cancelDeviceActionThunk({ reason: 'tx-timeout' })).unwrap();
         dispatch(sendFormActions.clearSignedTransactionData());
         revealConfirmOnTrezorSheet();
 
@@ -104,7 +104,7 @@ export const useTxValidityFlow = ({
 
     // popTo dispatches POP, not GO_BACK — skips the back-interceptor's cancel alert.
     const handleCancel = useCallback(() => {
-        TrezorConnect.cancel('tx-timeout');
+        void dispatch(cancelDeviceActionThunk({ reason: 'tx-timeout' }));
         dispatch(cleanupSendFormThunk({ accountKey, tokenContract, shouldDeleteDraft: false }));
         navigation.popTo(SendStackRoutes.SendOutputs, { accountKey, tokenContract });
     }, [accountKey, tokenContract, navigation, dispatch]);

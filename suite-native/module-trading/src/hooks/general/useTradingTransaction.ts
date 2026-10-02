@@ -25,6 +25,7 @@ import {
     type FormDraftRootState,
     type SerializedTx,
     type WalletSettingsRootState,
+    cancelDeviceActionThunk,
     selectAccountByKey,
     selectDeepCopyOfFormDraft,
     selectIsAmountInSats,
@@ -43,7 +44,6 @@ import {
     selectFeeLevels,
     usePrecomposedTransactionError,
 } from '@suite-native/transaction-management';
-import TrezorConnect from '@trezor/connect';
 import { noop } from '@trezor/utils';
 
 import { useComposeTradingTransaction } from './useComposeTradingTransaction';
@@ -149,7 +149,12 @@ export const useTradingTransaction = ({
     const { composeTradingTransaction } = useComposeTradingTransaction({ tradeType });
 
     // cancel txn signing on unmount
-    useEffect(() => () => TrezorConnect.cancel(), []);
+    useEffect(
+        () => () => {
+            void dispatch(cancelDeviceActionThunk({}));
+        },
+        [dispatch],
+    );
 
     // this is the reusable signAndPushSendFormTransaction function
     // waitForPushApproval is used so that we can wait for the user to approve the transaction before sending it

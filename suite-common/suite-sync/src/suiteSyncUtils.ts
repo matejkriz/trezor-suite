@@ -1,3 +1,4 @@
+import { isDeviceCapabilitySupported } from '@suite-common/device';
 import { type TrezorDevice } from '@suite-common/suite-types';
 import { type Device } from '@trezor/connect';
 import { exhaustive } from '@trezor/type-utils';
@@ -6,11 +7,11 @@ import { type SuiteSyncInteraction } from './suiteSyncTypes';
 
 export const isFwUpgradeNeededForSuiteSync = (device: Device | TrezorDevice | undefined): boolean =>
     device?.unavailableCapabilities?.evolu !== undefined &&
-    device.unavailableCapabilities.evolu === 'update-required';
+    device?.unavailableCapabilities?.evolu === 'update-required';
 
 export const isSuiteSyncSupportedByDevice = (device: Device | TrezorDevice | undefined): boolean =>
-    device?.unavailableCapabilities?.evolu === undefined ||
-    device.unavailableCapabilities.evolu === 'update-required';
+    isDeviceCapabilitySupported(device, 'evolu') ||
+    device?.unavailableCapabilities?.evolu === 'update-required';
 
 export const getIsSuiteSyncLabelingActionEnabled = (
     suiteSyncInteraction: SuiteSyncInteraction | null,

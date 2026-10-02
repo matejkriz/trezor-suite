@@ -7,6 +7,7 @@ import {
 import { deviceActions, prepareDeviceReducer } from '@suite-common/device';
 import { preparePersistentDeviceDataReducer } from '@suite-common/persistent-device-data';
 import { mockActionType, mockReducer } from '@suite-common/redux-utils/mocks';
+import { mockSuiteDevice } from '@suite-common/suite-types/mocks';
 import { createTestStore, filterThunkActionTypes } from '@suite-common/test-utils';
 import { prepareThpReducer } from '@suite-common/thp';
 import { DEVICE } from '@trezor/connect';
@@ -16,6 +17,7 @@ import { handleDeviceDisconnectFixture } from './__fixtures__/handleDeviceDiscon
 import {
     type ForgetDevicePersistentDataThunkDeps,
     forgetDevicePersistentDataThunk,
+    forgetDeviceThunk,
     handleDeviceDisconnectThunk,
 } from './deviceThunks';
 
@@ -47,7 +49,7 @@ const extra: ForgetDevicePersistentDataThunkDeps = {
     },
 };
 
-const initStore = () =>
+const initStore = (preloadedState = forgetPersistentDataPreloadedStateFixture) =>
     createTestStore({
         extra,
         reducer: combineReducers({
@@ -56,10 +58,56 @@ const initStore = () =>
             thp: thpReducer,
             persistentDeviceData: persistentDeviceDataReducer,
         }),
-        preloadedState: forgetPersistentDataPreloadedStateFixture,
+        preloadedState,
     });
 
+describe('forget an explicitly chosen device', () => {
+    it('keeps the selected wallet when the requested device has already disappeared', async () => {
+        const selectedDevice = mockSuiteDevice({ id: 'device-id-1' });
+        const state = {
+            ...forgetPersistentDataPreloadedStateFixture,
+            device: { ...forgetPersistentDataPreloadedStateFixture.device, selectedDevice },
+        };
+        const store = initStore(state);
+
+        await store.dispatch(forgetDeviceThunk({ deviceId: 'already-removed-wallet' }));
+
+        expect(store.getState()).toEqual(state);
+        expect(store.getActions()).not.toContainEqual(
+            expect.objectContaining({ type: deviceActions.forgetDevice.type }),
+        );
+    });
+});
+
 describe(forgetDevicePersistentDataThunk.name, () => {
+    it('does not run Trezor OS pairing cleanup for a device without Bluetooth pairing support', async () => {
+        jest.mocked(extra.thunks.forgetBluetoothDevice).mockClear();
+        const fixture = forgetPersistentDataPreloadedStateFixture;
+        const store = initStore({
+            ...fixture,
+            device: {
+                ...fixture.device,
+                devices: fixture.device.devices.map(device => {
+                    if (device.type !== 'acquired') return device;
+
+                    return {
+                        ...device,
+                        unavailableCapabilities: {
+                            ...device.unavailableCapabilities,
+                            'settings.bluetoothPairing': 'no-support' as const,
+                        },
+                    };
+                }),
+            },
+        });
+
+        await store.dispatch(forgetDevicePersistentDataThunk({ deviceId: 'device-id-1' }));
+
+        expect(extra.thunks.forgetBluetoothDevice).not.toHaveBeenCalled();
+        expect(
+            store.getState().persistentDeviceData.devices.map(device => device.device_id),
+        ).not.toContain('device-id-1');
+    });
     it('forgets a single device data with Bluetooth and THP', async () => {
         const store = initStore();
         await store.dispatch(forgetDevicePersistentDataThunk({ deviceId: 'device-id-1' }));

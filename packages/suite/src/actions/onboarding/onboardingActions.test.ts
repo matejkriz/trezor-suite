@@ -19,6 +19,7 @@ type OnboardingActionsTestDeps = StartDiscoveryThunkDeps &
 
 const extra: OnboardingActionsTestDeps = {
     services: {
+        walletDeviceService: { get: jest.fn(), cancelAction: jest.fn(), disconnect: jest.fn() },
         analytics: mockDesktopAnalytics(),
         getTradedAccountKeys: asGetter(() => []),
         suiteRouterHistory: {

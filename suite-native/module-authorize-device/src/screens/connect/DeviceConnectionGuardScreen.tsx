@@ -3,15 +3,10 @@ import { useSelector } from 'react-redux';
 
 import { useFocusEffect } from '@react-navigation/native';
 
+import { selectIsDeviceAuthorized, selectIsDeviceConnected } from '@suite-common/device';
 import {
-    selectIsBluetoothSupportedByDevice,
-    selectIsDeviceAuthorized,
-    selectIsDeviceConnected,
-} from '@suite-common/device';
-import { selectBluetoothPermissionStatus } from '@suite-native/bluetooth';
-import {
-    ConnectAndUnlockDeviceScreenContent,
-    TurnOnAndUnlockDeviceScreenContent,
+    DeviceConnectionScreenContent,
+    selectIsDeviceConnectionScrollable,
 } from '@suite-native/device';
 import { ConnectDeviceScreenHeader } from '@suite-native/device-authorization';
 import {
@@ -32,11 +27,7 @@ export const DeviceConnectionGuardScreen = ({
 >) => {
     const isDeviceConnected = useSelector(selectIsDeviceConnected);
     const isDeviceAuthorized = useSelector(selectIsDeviceAuthorized);
-    const bluetoothPermissionStatus = useSelector(selectBluetoothPermissionStatus);
-    const isBluetoothSupportedByDevice = useSelector(selectIsBluetoothSupportedByDevice);
-
-    const isBluetoothVariantVisible =
-        bluetoothPermissionStatus === 'granted' && isBluetoothSupportedByDevice;
+    const isScrollable = useSelector(selectIsDeviceConnectionScrollable);
 
     useFocusEffect(
         useCallback(() => {
@@ -53,13 +44,9 @@ export const DeviceConnectionGuardScreen = ({
                     onCancelNavigationTarget={params?.onCancelNavigationTarget}
                 />
             }
-            isScrollable={false}
+            isScrollable={isScrollable}
         >
-            {isBluetoothVariantVisible ? (
-                <TurnOnAndUnlockDeviceScreenContent />
-            ) : (
-                <ConnectAndUnlockDeviceScreenContent />
-            )}
+            <DeviceConnectionScreenContent />
         </Screen>
     );
 };

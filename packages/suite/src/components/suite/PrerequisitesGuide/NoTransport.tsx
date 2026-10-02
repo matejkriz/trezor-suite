@@ -1,4 +1,9 @@
 import { selectIsDebugModeActive } from '@suite/debug';
+import { openConnectionModal } from '@suite/device';
+import { selectHasExperimentalFeature } from '@suite/settings';
+import { useServices } from '@suite-common/dependency-injection';
+import { injectDispatch } from '@suite-common/redux-utils';
+import { Button, Column } from '@trezor/components';
 import { isDesktop } from '@trezor/env-utils';
 
 import { TroubleshootingTips } from 'src/components/suite/troubleshooting/TroubleshootingTips';
@@ -18,18 +23,35 @@ const tipItems: TroubleshootingTipsItem[] = [
     TROUBLESHOOTING_TIP_RESTART_COMPUTER,
 ] as const;
 
-const Tips = ({ items }: { items: TroubleshootingTipsItem[] }) => (
+const Tips = ({ items }: { items: TroubleshootingTipsItem[] }) => {
+    const { dispatch } = useServices(injectDispatch);
+    const isLedgerEnabled = useSelector(selectHasExperimentalFeature('ledger'));
+
     // No transport layer (bridge/webUSB) is available
     // On web it makes sense to
     // - offer downloading Trezor Suite desktop, or
     // - use a browser that supports WebUSB
     // Desktop app should have Bridge transport layer available as it is built-in, if it is not available we fucked up something.
-    <TroubleshootingTips
-        intent="warning"
-        items={items}
-        data-testid="@connect-device-prompt/bridge-not-running"
-    />
-);
+    return (
+        <Column alignItems="center" gap={12}>
+            <TroubleshootingTips
+                intent="warning"
+                items={items}
+                data-testid="@connect-device-prompt/bridge-not-running"
+            />
+            {isLedgerEnabled && (
+                <Button
+                    minWidth={240}
+                    size="large"
+                    priority="secondary"
+                    onClick={() => dispatch(openConnectionModal('ledger'))}
+                >
+                    Connect Ledger
+                </Button>
+            )}
+        </Column>
+    );
+};
 
 const TransportDesktop = ({ items }: { items: TroubleshootingTipsItem[] }) => {
     const isDebugModeActive = useSelector(selectIsDebugModeActive);

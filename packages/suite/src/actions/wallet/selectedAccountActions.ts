@@ -42,6 +42,7 @@ type SelectedAccountState = DeviceRootState &
 // move to selector!!!!
 export const getAccountState = (state: SelectedAccountState): SelectedAccountStatus => {
     const device = selectSelectedDevice(state);
+    const activeWalletStaticSessionId = device?.state?.staticSessionId;
 
     // waiting for device
     if (!device) {
@@ -51,7 +52,7 @@ export const getAccountState = (state: SelectedAccountState): SelectedAccountSta
         };
     }
 
-    if (!device.state) {
+    if (device && !device.state) {
         return {
             status: 'loading',
             loader: 'auth',
@@ -113,7 +114,7 @@ export const getAccountState = (state: SelectedAccountState): SelectedAccountSta
     }
 
     // get selected account
-    const account = getSelectedAccount(device.state.staticSessionId, state.wallet.accounts, params);
+    const account = getSelectedAccount(activeWalletStaticSessionId, state.wallet.accounts, params);
     // account does exist
     if (account?.visible) {
         if (account.backendType === 'coinjoin') {
@@ -180,6 +181,8 @@ export const getAccountState = (state: SelectedAccountState): SelectedAccountSta
 const actions = new Set<UnknownAction['type']>([
     routerLocationChange.type,
     deviceActions.selectDevice.type,
+    deviceActions.registerDevice.type,
+    deviceActions.disconnectDevicesByProvider.type,
     deviceActions.updateSelectedDevice.type,
     metadataActions.setAccountAdd.type,
     accountsActions.createAccount.type,

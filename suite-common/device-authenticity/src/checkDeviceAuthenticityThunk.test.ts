@@ -5,6 +5,7 @@ import { mockSuiteDevice } from '@suite-common/suite-types/mocks';
 import { createTestStore, testMocks } from '@suite-common/test-utils';
 import { type ToastPayload, notificationsActions } from '@suite-common/toast-notifications';
 import type { AuthenticateDeviceResult, Response } from '@trezor/connect';
+import { DeviceModelInternal } from '@trezor/device-utils';
 import type { Err, Ok } from '@trezor/type-utils';
 
 import { checkDeviceAuthenticityThunk } from './checkDeviceAuthenticityThunk';
@@ -22,7 +23,10 @@ const initStore = (device?: TrezorDevice) =>
     });
 
 const getDevice = (isLocked: boolean) => ({
-    ...mockSuiteDevice(undefined, { bootloader_locked: isLocked }),
+    ...mockSuiteDevice(undefined, {
+        bootloader_locked: isLocked,
+        internal_model: DeviceModelInternal.T3B1,
+    }),
 });
 
 const connectCallFailResponse: Err<any> = {
@@ -136,6 +140,36 @@ const fixtures: Fixture[] = [
 ];
 
 describe('Check device authenticity', () => {
+    it.each([DeviceModelInternal.T2T1, DeviceModelInternal.T1B1])(
+        'does not authenticate unsupported Trezor model %s',
+        async internal_model => {
+            const store = initStore(mockSuiteDevice({}, { internal_model }));
+            const connect = testMocks.getTrezorConnectMock();
+            connect.authenticateDevice.mockClear();
+
+            const result = await store.dispatch(
+                checkDeviceAuthenticityThunk({ allowDebugKeys: false }),
+            );
+
+            expect(result.type).toBe(checkDeviceAuthenticityThunk.rejected.type);
+            expect(connect.authenticateDevice).not.toHaveBeenCalled();
+        },
+    );
+
+    it('does not send a Ledger to Trezor Connect', async () => {
+        const device = { ...deviceWithLockedBootloader, provider: 'ledger' as const };
+        const store = initStore(device);
+        const connect = testMocks.getTrezorConnectMock();
+        connect.authenticateDevice.mockClear();
+
+        const result = await store.dispatch(
+            checkDeviceAuthenticityThunk({ allowDebugKeys: false }),
+        );
+
+        expect(result.type).toBe(checkDeviceAuthenticityThunk.rejected.type);
+        expect(connect.authenticateDevice).not.toHaveBeenCalled();
+    });
+
     fixtures.forEach(f => {
         it(f.description, async () => {
             const store = initStore(f.device);

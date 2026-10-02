@@ -1,3 +1,7 @@
+import { RNBleTransportFactory } from '@ledgerhq/device-transport-kit-react-native-ble';
+
+import { deviceActions } from '@suite-common/device';
+import { createLedgerBitcoinServiceForTransport } from '@suite-common/ledger';
 import { getSupportedNetworks } from '@suite-common/wallet-config';
 import { launchArguments } from '@suite-native/config';
 import {
@@ -11,8 +15,10 @@ import {
 } from '@suite-native/state';
 import { createEnsureEncryptionKey, createMMKVStorage } from '@suite-native/storage';
 import TrezorConnect from '@trezor/connect';
+import { bluetoothManager } from '@trezor/transport-native-bluetooth';
 
 import { type NativeApp, createNativeApp } from './createNativeApp';
+import { createNativeLedgerBitcoinService } from './ledger/createNativeLedgerBitcoinService';
 
 type SuiteNativeCompositionRoot = {
     app: NativeApp;
@@ -35,12 +41,20 @@ export const createSuiteNativeCompositionRoot = (
         extraDependencies,
         preloadedState,
     });
+    const ledgerBitcoinService = createNativeLedgerBitcoinService({
+        suspendDeviceScan: bluetoothManager.suspendDeviceScan,
+        createService: () =>
+            createLedgerBitcoinServiceForTransport(RNBleTransportFactory, 'available', () => {
+                store.dispatch(deviceActions.disconnectDevicesByProvider('ledger'));
+            }),
+    });
     const nativeServices = createNativeServicesCompositionRoot({
         dispatch: store.dispatch,
         getState: store.getState,
         ensureEncryptionKey,
         mmkvStorage,
         getTrezorConnect: () => TrezorConnect,
+        ledgerBitcoinService,
     });
     const storePersistor = createStorePersistor({ store });
     const hydrateReduxStore = createHydrateReduxStore({ storePersistor });
