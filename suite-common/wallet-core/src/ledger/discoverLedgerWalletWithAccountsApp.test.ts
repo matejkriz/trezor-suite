@@ -1,6 +1,5 @@
 import { createMockDeps } from '@suite-common/dependency-injection';
 import {
-    type LedgerDevice,
     getLedgerDiscoveryPath,
     getLedgerWalletIdentity,
     serializeLedgerDiscoveryKey,
@@ -13,11 +12,9 @@ import {
     discoverLedgerWalletWithAccountsApp,
 } from './discoverLedgerWalletWithAccountsApp';
 
-const device = { id: 'disposable-usb-id' } as LedgerDevice;
 const prepareTest = () => {
     const deps = createMockDeps<DiscoverLedgerWalletWithAccountsAppDeps>({
         ledgerBitcoinService: {
-            connect: () => Promise.resolve(),
             isConnectionOwner: () => true,
             getDeviceInfo: () => ({ name: 'My Ledger', model: 'Ledger Flex' }),
             openAccountsDiscovery: () =>
@@ -69,14 +66,11 @@ const prepareTest = () => {
 };
 
 describe(discoverLedgerWalletWithAccountsApp.name, () => {
-    it('connects the injected service once and binds BTC and ETH to the same stable Suite identity', async () => {
+    it('binds BTC and ETH to the same stable Suite identity', async () => {
         const deps = prepareTest();
-        const result = await discoverLedgerWalletWithAccountsApp(deps, device, {
+        const result = await discoverLedgerWalletWithAccountsApp(deps, {
             owner: 'acquisition-a',
             networkSymbols: ['btc', 'eth', 'ada'].map(asNetworkSymbol),
-        });
-        expect(deps.ledgerBitcoinService.connect).toHaveBeenCalledWith(device, {
-            owner: 'acquisition-a',
         });
         expect(deps.ledgerBitcoinService.openAccountsDiscovery).toHaveBeenCalledTimes(1);
         expect(result.accounts.map(account => account.symbol)).toEqual(['btc', 'eth']);
@@ -101,7 +95,7 @@ describe(discoverLedgerWalletWithAccountsApp.name, () => {
         const deps = prepareTest();
         deps.ledgerBitcoinService.isConnectionOwner.mockReturnValue(false);
         await expect(
-            discoverLedgerWalletWithAccountsApp(deps, device, {
+            discoverLedgerWalletWithAccountsApp(deps, {
                 owner: 'old-owner',
                 networkSymbols: ['btc', 'eth'].map(asNetworkSymbol),
             }),
@@ -116,7 +110,7 @@ describe(discoverLedgerWalletWithAccountsApp.name, () => {
             error: { message: 'private request URL' },
         });
         await expect(
-            discoverLedgerWalletWithAccountsApp(deps, device, {
+            discoverLedgerWalletWithAccountsApp(deps, {
                 networkSymbols: ['btc', 'eth'].map(asNetworkSymbol),
             }),
         ).rejects.toThrow('No Ledger accounts could be discovered');

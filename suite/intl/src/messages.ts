@@ -6076,7 +6076,8 @@ export const messages = defineMessages({
     },
     TR_EXPERIMENTAL_LEDGER_DESCRIPTION: {
         id: 'TR_EXPERIMENTAL_LEDGER_DESCRIPTION',
-        defaultMessage: 'Connect a Ledger hardware wallet via USB to manage Bitcoin accounts.',
+        defaultMessage:
+            'Connect a Ledger hardware wallet via USB. View other supported networks with the Accounts Discovery app.',
     },
     TR_EXPERIMENTAL_GAP_LIMIT: {
         id: 'TR_EXPERIMENTAL_GAP_LIMIT',

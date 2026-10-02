@@ -1,8 +1,4 @@
-import {
-    type LedgerBitcoinService,
-    type LedgerDevice,
-    getLedgerWalletIdentity,
-} from '@suite-common/ledger';
+import { type LedgerBitcoinService, getLedgerWalletIdentity } from '@suite-common/ledger';
 
 import {
     type DiscoverLedgerAccountsDeps,
@@ -14,7 +10,7 @@ import { type DiscoveredLedgerWallet } from './ledgerWalletTypes';
 export type DiscoverLedgerWalletWithAccountsAppDeps = {
     ledgerBitcoinService: Pick<
         LedgerBitcoinService,
-        'connect' | 'openAccountsDiscovery' | 'getDeviceInfo' | 'isConnectionOwner'
+        'openAccountsDiscovery' | 'getDeviceInfo' | 'isConnectionOwner'
     >;
     getAccountInfo: DiscoverLedgerAccountsDeps['getAccountInfo'];
 };
@@ -25,7 +21,6 @@ type DiscoverLedgerWalletWithAccountsAppOptions = DiscoverLedgerAccountsOptions 
 
 export const discoverLedgerWalletWithAccountsApp = async (
     deps: DiscoverLedgerWalletWithAccountsAppDeps,
-    device: LedgerDevice,
     options: DiscoverLedgerWalletWithAccountsAppOptions,
 ): Promise<DiscoveredLedgerWallet> => {
     const isCurrentConnection = () =>
@@ -34,8 +29,6 @@ export const discoverLedgerWalletWithAccountsApp = async (
         if (options.signal?.aborted || !isCurrentConnection())
             throw new Error('Ledger connection canceled');
     };
-    if (options.signal?.aborted) throw new Error('Ledger connection canceled');
-    await deps.ledgerBitcoinService.connect(device, { owner: options.owner });
     ensureCurrentConnection();
     const accountsDiscoveryService = await deps.ledgerBitcoinService.openAccountsDiscovery();
     ensureCurrentConnection();

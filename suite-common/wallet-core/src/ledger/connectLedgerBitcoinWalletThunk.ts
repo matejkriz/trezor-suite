@@ -20,7 +20,6 @@ type ConnectLedgerBitcoinWalletParams = {
     device: LedgerDevice;
     apiType?: 'usb' | 'bluetooth';
     expectedDeviceId?: string;
-    useAccountsDiscovery?: boolean;
 };
 
 export type ConnectLedgerBitcoinWalletThunkState = DeviceRootState &
@@ -40,7 +39,7 @@ export const connectLedgerBitcoinWalletThunk = createThunk<
 >(
     '@common/wallet-core/ledger/connectBitcoinWallet',
     async (
-        { device, apiType = 'usb', expectedDeviceId, useAccountsDiscovery = false },
+        { device, apiType = 'usb', expectedDeviceId },
         { dispatch, getState, extra, signal, requestId, rejectWithValue },
     ) => {
         let isAcquisitionCommitted = false;
@@ -56,6 +55,16 @@ export const connectLedgerBitcoinWalletThunk = createThunk<
         signal.addEventListener('abort', handleAbort, { once: true });
 
         try {
+            const { ledgerBitcoinService } = extra.services;
+            const isCurrentConnection = () =>
+                !signal.aborted && ledgerBitcoinService.isConnectionOwner(requestId);
+            if (signal.aborted) return rejectWithValue('Ledger connection canceled');
+            await ledgerBitcoinService.connect(device, { owner: requestId });
+            if (!isCurrentConnection()) return rejectWithValue('Ledger connection canceled');
+
+            const hasAccountsDiscovery = await ledgerBitcoinService.hasAccountsDiscovery();
+            if (!isCurrentConnection()) return rejectWithValue('Ledger connection canceled');
+
             const getAccountInfo = (coin: string, descriptor: string) =>
                 TrezorConnect.getAccountInfo({
                     coin: asCoinSymbol(coin),
@@ -66,14 +75,13 @@ export const connectLedgerBitcoinWalletThunk = createThunk<
                     suppressBackupWarning: true,
                 });
             const enabledNetworks = selectEnabledNetworks(getState());
-            const discovered = useAccountsDiscovery
+            const discovered = hasAccountsDiscovery
                 ? await discoverLedgerWalletWithAccountsApp(
                       {
-                          ledgerBitcoinService: extra.services.ledgerBitcoinService,
+                          ledgerBitcoinService,
                           getAccountInfo: ({ symbol, descriptor }) =>
                               getAccountInfo(symbol, descriptor),
                       },
-                      device,
                       {
                           signal,
                           owner: requestId,
@@ -85,17 +93,13 @@ export const connectLedgerBitcoinWalletThunk = createThunk<
                   )
                 : await discoverLedgerBitcoinWallet(
                       {
-                          ledgerBitcoinService: extra.services.ledgerBitcoinService,
+                          ledgerBitcoinService,
                           getAccountInfo: descriptor => getAccountInfo('btc', descriptor),
                       },
-                      device,
                       { signal, owner: requestId },
                   );
 
-            if (
-                signal.aborted ||
-                !extra.services.ledgerBitcoinService.isConnectionOwner(requestId)
-            ) {
+            if (!isCurrentConnection()) {
                 return rejectWithValue('Ledger connection canceled');
             }
 

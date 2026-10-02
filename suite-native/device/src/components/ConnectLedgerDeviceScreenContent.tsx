@@ -3,11 +3,10 @@ import { Linking } from 'react-native';
 import { useSelector } from 'react-redux';
 
 import { useServices } from '@suite-common/dependency-injection';
-import { isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
 import { type LedgerDevice, injectLedgerBitcoinService } from '@suite-common/ledger';
 import { injectDispatch } from '@suite-common/redux-utils';
 import { connectLedgerBitcoinWalletThunk } from '@suite-common/wallet-core';
-import { Button, HStack, Loader, Switch, Text, VStack } from '@suite-native/atoms';
+import { Button, HStack, Loader, Text, VStack } from '@suite-native/atoms';
 import { selectBluetoothPermissionStatus, useBluetoothPermissions } from '@suite-native/bluetooth';
 import { Translation } from '@suite-native/intl';
 import { DeviceModelInternal } from '@trezor/device-utils';
@@ -26,7 +25,6 @@ export const ConnectLedgerDeviceScreenContent = ({
     onConnected,
 }: ConnectLedgerDeviceScreenContentProps) => {
     const permissionStatus = useSelector(selectBluetoothPermissionStatus);
-    const selectedDevice = useSelector(selectSelectedDevice);
     const { ledgerBitcoinService, dispatch } = useServices(
         injectLedgerBitcoinService,
         injectDispatch,
@@ -37,12 +35,6 @@ export const ConnectLedgerDeviceScreenContent = ({
     const [status, setStatus] = useState<ConnectionStatus>('idle');
     const [error, setError] = useState<'scanError' | 'error'>();
     const [scanAttempt, setScanAttempt] = useState(0);
-    const [useAccountsDiscovery, setUseAccountsDiscovery] = useState(
-        expectedDeviceId !== undefined &&
-            selectedDevice?.id === expectedDeviceId &&
-            isLedgerDevice(selectedDevice) &&
-            !!selectedDevice.ledgerInfo?.accountsDiscoveryAppVersion,
-    );
     const isActive = useRef(true);
     const abortConnection = useRef<(() => void) | undefined>(undefined);
     const stopScanning = useRef<(() => Promise<void>) | undefined>(undefined);
@@ -123,7 +115,6 @@ export const ConnectLedgerDeviceScreenContent = ({
                 device,
                 apiType: 'bluetooth',
                 expectedDeviceId,
-                useAccountsDiscovery,
             }),
         );
         abortConnection.current = connection.abort;
@@ -147,9 +138,6 @@ export const ConnectLedgerDeviceScreenContent = ({
 
     const isConnecting = status === 'connecting';
     const hasPermission = permissionStatus === 'granted';
-    const discoveringTranslation = useAccountsDiscovery
-        ? 'moduleConnectLedger.accountsDiscoveryStatus'
-        : 'moduleConnectLedger.discovering';
     const permissionButtonTranslation =
         permissionStatus === 'blocked'
             ? 'moduleConnectLedger.settingsButton'
@@ -178,7 +166,7 @@ export const ConnectLedgerDeviceScreenContent = ({
                             <Translation
                                 id={
                                     isConnecting
-                                        ? discoveringTranslation
+                                        ? 'moduleConnectLedger.discovering'
                                         : 'moduleConnectLedger.status'
                                 }
                             />
@@ -193,25 +181,8 @@ export const ConnectLedgerDeviceScreenContent = ({
                 maxHeight={280}
             />
             <VStack spacing="sp12">
-                <HStack alignItems="center" justifyContent="space-between" spacing="sp12">
-                    <Text variant="body-md" flex={1}>
-                        <Translation id="moduleConnectLedger.accountsDiscovery" />
-                    </Text>
-                    <Switch
-                        isChecked={useAccountsDiscovery}
-                        isDisabled={isConnecting}
-                        onChange={setUseAccountsDiscovery}
-                        testID="@connect-ledger/accounts-discovery"
-                    />
-                </HStack>
                 <Text color="contentSecondary" textAlign="center">
-                    <Translation
-                        id={
-                            useAccountsDiscovery
-                                ? 'moduleConnectLedger.accountsDiscoveryInstructions'
-                                : 'moduleConnectLedger.instructions'
-                        }
-                    />
+                    <Translation id="moduleConnectLedger.instructions" />
                 </Text>
                 {!isConnecting &&
                     devices.map(device => (
@@ -227,13 +198,7 @@ export const ConnectLedgerDeviceScreenContent = ({
                     ))}
                 {!!error && (
                     <Text color="contentCritical" textAlign="center">
-                        <Translation
-                            id={
-                                error === 'error' && useAccountsDiscovery
-                                    ? 'moduleConnectLedger.accountsDiscoveryError'
-                                    : `moduleConnectLedger.${error}`
-                            }
-                        />
+                        <Translation id={`moduleConnectLedger.${error}`} />
                     </Text>
                 )}
                 {!hasPermission && (

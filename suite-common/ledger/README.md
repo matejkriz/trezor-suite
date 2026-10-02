@@ -32,12 +32,24 @@ public account keys for the Suite network set in one consent session. The custom
 app uses short APDUs through the existing injected DMK transport. It does not use
 LedgerJS, sign transactions, export private keys, or require network-app switches.
 
-Install the app, enable experimental Ledger support, then select **Use Accounts
-Discovery** in Connect Ledger. Suite discovers enabled networks into its ordinary
-devices and accounts; if no networks are enabled, it starts with BTC and ETH.
+Install the app, enable experimental Ledger support, then choose **Connect Ledger**.
+On every connection, Suite checks the installed apps through DMK's local
+`ListAppsDeviceAction`. Approve listing apps on the Ledger when prompted. This
+check does not use Ledger's backend or a secure-channel app catalogue. If Accounts
+Discovery is installed, Suite opens it and reads its protocol metadata before
+requesting approval to export public account data. Without that app, Suite opens
+Bitcoin and discovers BIP84 accounts. Rejected checks and communication/protocol
+errors fail the connection instead of silently downgrading to Bitcoin-only.
+
+Suite derives available network capabilities and firmware type from the custom
+app's advertised profiles, while unsupported signing and device operations remain
+disabled. Availability is rechecked on reconnect, including after uninstalling the
+app. Speculos has no OS app list, so the adapter probes the running ELF's metadata.
+
+Suite discovers enabled networks into its ordinary devices and accounts; if no
+networks are enabled, it starts with BTC and ETH.
 Discovery stops each network/profile at its first unused account (up to ten
-accounts per profile by default). Reconnect with this option after changing the
-enabled networks. Existing Bitcoin-only connection remains the default.
+accounts per profile by default). Reconnect after changing the enabled networks.
 
 The app supports public data for 27 of the 28 Suite network symbols, including
 Ledger Live paths for ETH, TRX and SOL. Cardano and Bitcoin CoinJoin are omitted.

@@ -82,7 +82,27 @@ describe(createLedgerSuiteDevice.name, () => {
         expect(device.unavailableCapabilities['settings.firmwareUpdate']).toBe('no-support');
         expect(device.unavailableCapabilities['settings.authenticity']).toBe('no-support');
         expect(device.ledgerInfo?.accountsDiscoveryAppVersion).toBe('0.1.0');
+        expect(device.features.capabilities).toContain('Capability_Ethereum');
+        expect(device.features.capabilities).not.toContain('Capability_Cardano');
         expect(hasBitcoinOnlyFirmware(device)).toBe(false);
+    });
+
+    it('reflects discovered network families without duplicate firmware capabilities', () => {
+        const device = createLedgerSuiteDevice({
+            ...wallet,
+            supportedNetworks: ['btc', 'eth', 'arb', 'xrp', 'sol', 'xlm', 'trx'].map(
+                asNetworkSymbol,
+            ),
+        });
+
+        expect(device.features.capabilities).toEqual([
+            'Capability_Bitcoin_like',
+            'Capability_Ethereum',
+            'Capability_Ripple',
+            'Capability_Solana',
+            'Capability_Stellar',
+            'Capability_Tron',
+        ]);
     });
 
     it('uses the native Bluetooth transport and disables unsupported device settings', () => {

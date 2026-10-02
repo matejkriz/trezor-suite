@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { useServices } from '@suite-common/dependency-injection';
-import { isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
+import { selectSelectedDevice } from '@suite-common/device';
 import { type LedgerDevice, injectLedgerBitcoinService } from '@suite-common/ledger';
 import { injectDispatch } from '@suite-common/redux-utils';
 import { connectLedgerBitcoinWalletThunk } from '@suite-common/wallet-core';
-import { Button, Checkbox, Column, H3, Modal, Row, Spinner, Text } from '@trezor/components';
+import { Button, Column, H3, Modal, Row, Spinner, Text } from '@trezor/components';
 
 import { redirectAfterWalletSelectedThunk } from 'src/actions/wallet/addWalletThunk';
 import { useSelector } from 'src/hooks/suite';
@@ -27,9 +27,6 @@ export const LedgerConnectionModal = ({ onCancel, onBack }: LedgerConnectionModa
     const [devices, setDevices] = useState<LedgerDevice[]>([]);
     const [isScanning, setIsScanning] = useState(false);
     const [isBusy, setIsBusy] = useState(false);
-    const [useAccountsDiscovery, setUseAccountsDiscovery] = useState(
-        isLedgerDevice(selectedDevice) && !!selectedDevice.ledgerInfo?.accountsDiscoveryAppVersion,
-    );
     const [errorMessage, setErrorMessage] = useState<string>();
     const isActive = useRef(true);
     const abortConnection = useRef<(() => void) | undefined>(undefined);
@@ -83,9 +80,7 @@ export const LedgerConnectionModal = ({ onCancel, onBack }: LedgerConnectionModa
 
         setIsBusy(true);
         setErrorMessage(undefined);
-        const connection = dispatch(
-            connectLedgerBitcoinWalletThunk({ device, useAccountsDiscovery }),
-        );
+        const connection = dispatch(connectLedgerBitcoinWalletThunk({ device }));
         abortConnection.current = connection.abort;
 
         try {
@@ -133,24 +128,16 @@ export const LedgerConnectionModal = ({ onCancel, onBack }: LedgerConnectionModa
                     <Row gap={8} alignItems="center" justifyContent="center" height={36}>
                         {(isScanning || isBusy) && <Spinner size={16} />}
                         <Text intent="brand">
-                            {isBusy && useAccountsDiscovery
-                                ? 'Discovering enabled networks'
+                            {isBusy
+                                ? 'Checking apps and discovering accounts'
                                 : 'Checking for connected Ledgers'}
                         </Text>
                     </Row>
                     <LedgerConnectionIllustration />
-                    <Checkbox
-                        isChecked={useAccountsDiscovery}
-                        isDisabled={isBusy}
-                        onChange={() => setUseAccountsDiscovery(current => !current)}
-                        data-testid="@suite/ledger-accounts-discovery"
-                    >
-                        Use Accounts Discovery
-                    </Checkbox>
                     <Text align="center">
-                        {useAccountsDiscovery
-                            ? 'Requires the installed Accounts Discovery app. Connect and unlock your Ledger, confirm opening the app, and approve exporting public account data. Suite checks supported enabled networks. This app cannot sign transactions.'
-                            : 'Connect your Ledger by USB and unlock it. Confirm opening the Bitcoin app when prompted.'}
+                        Unlock your Ledger and allow Suite to check installed apps. If Accounts
+                        Discovery is installed, approve opening it and exporting public data.
+                        Otherwise, open Bitcoin.
                     </Text>
                     <Column gap={12} width="100%">
                         {!isWebHIDAvailable && (

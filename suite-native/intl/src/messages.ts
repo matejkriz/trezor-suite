@@ -524,21 +524,15 @@ export const messages = {
         button: 'Connect Ledger',
         title: 'Connect & unlock\nyour Ledger',
         status: 'Checking for connected Ledgers...',
-        discovering: 'Loading your Bitcoin accounts...',
+        discovering: 'Checking apps and loading your accounts...',
         instructions:
-            'Turn on Bluetooth on your Ledger and unlock it. Confirm opening the Bitcoin app when prompted.',
-        accountsDiscovery: 'Use Accounts Discovery',
-        accountsDiscoveryInstructions:
-            'Turn on Bluetooth and unlock your Ledger. Accounts Discovery must be installed. Confirm opening it and approve exporting public account data. Suite checks supported enabled networks. This app cannot sign transactions.',
-        accountsDiscoveryStatus: 'Discovering enabled networks...',
-        accountsDiscoveryError:
-            'Could not discover your Ledger accounts. Check that Accounts Discovery is installed and approve the public account export on your Ledger.',
+            'Turn on Bluetooth on your Ledger and unlock it. On your Ledger, allow Suite to check installed apps. If Accounts Discovery is installed, approve opening it and exporting public account data. Otherwise, confirm opening Bitcoin.',
         permission: 'Allow Bluetooth access to connect your Ledger.',
         permissionButton: 'Allow Bluetooth',
         blockedPermission: 'Enable Bluetooth access for Suite in system settings.',
         settingsButton: 'Open settings',
         retry: 'Scan again',
-        error: 'Could not connect your Ledger. Unlock it and try again. Confirm opening the Bitcoin app when prompted.',
+        error: 'Could not connect your Ledger. Unlock it and try again. Approve checking apps, opening the selected app and exporting public account data when prompted.',
         scanError: 'Could not scan for Ledgers. Check that Bluetooth is turned on and try again.',
     },
     moduleConnectDevice: {
@@ -1646,7 +1640,7 @@ export const messages = {
             ledger: {
                 title: 'Ledger support',
                 description:
-                    'Connect a Ledger hardware wallet via Bluetooth. Bitcoin accounts only.',
+                    'Connect a Ledger hardware wallet via Bluetooth. View other supported networks with the Accounts Discovery app.',
             },
             slip24: {
                 title: 'SLIP-24 (clear signing)',

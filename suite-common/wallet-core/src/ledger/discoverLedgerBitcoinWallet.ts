@@ -1,8 +1,4 @@
-import {
-    type LedgerBitcoinService,
-    type LedgerDevice,
-    getLedgerWalletIdentity,
-} from '@suite-common/ledger';
+import { type LedgerBitcoinService, getLedgerWalletIdentity } from '@suite-common/ledger';
 import { asNetworkSymbol } from '@suite-common/wallet-config';
 import { type AccountInfo } from '@trezor/connect';
 
@@ -18,7 +14,7 @@ type GetAccountInfoResult =
 export type DiscoverLedgerBitcoinWalletDeps = {
     ledgerBitcoinService: Pick<
         LedgerBitcoinService,
-        'connect' | 'getAccount' | 'getDeviceInfo' | 'isConnectionOwner'
+        'getAccount' | 'getDeviceInfo' | 'isConnectionOwner'
     >;
     getAccountInfo: (descriptor: string) => Promise<GetAccountInfoResult>;
 };
@@ -30,7 +26,6 @@ type DiscoverLedgerBitcoinWalletOptions = {
 
 export const discoverLedgerBitcoinWallet = async (
     deps: DiscoverLedgerBitcoinWalletDeps,
-    device: LedgerDevice,
     options: DiscoverLedgerBitcoinWalletOptions = {},
 ): Promise<DiscoveredLedgerWallet> => {
     const ensureNotAborted = () => {
@@ -43,8 +38,6 @@ export const discoverLedgerBitcoinWallet = async (
         }
     };
 
-    ensureNotAborted();
-    await deps.ledgerBitcoinService.connect(device, { owner: options.owner });
     ensureCurrentConnection();
 
     const accounts: DiscoveredLedgerNetworkAccount[] = [];

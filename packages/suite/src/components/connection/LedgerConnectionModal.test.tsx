@@ -93,9 +93,10 @@ describe('LedgerConnectionModal', () => {
         mockUnwrap.mockResolvedValue(mockSuiteDevice({ id: device.id }));
     });
 
-    it('keeps the existing Bitcoin connection as the default', async () => {
+    it('lets the shared connection detect installed apps automatically', async () => {
         const { onCancel } = renderModal();
-        expect(screen.getByText(/Confirm opening the Bitcoin app/)).toBeTruthy();
+        expect(screen.getByText(/allow Suite to check installed apps/)).toBeTruthy();
+        expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
 
         await act(() => {
             fireEvent.click(screen.getByRole('button', { name: device.name }));
@@ -105,29 +106,11 @@ describe('LedgerConnectionModal', () => {
 
         expect(connectLedgerBitcoinWalletThunk).toHaveBeenCalledWith({
             device,
-            useAccountsDiscovery: false,
         });
         await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
     });
 
-    it('opens Accounts Discovery only after enabling its connection option', async () => {
-        renderModal();
-        fireEvent.click(screen.getByRole('checkbox', { name: 'Use Accounts Discovery' }));
-
-        expect(screen.getByText(/approve exporting public account data/)).toBeTruthy();
-        await act(() => {
-            fireEvent.click(screen.getByRole('button', { name: device.name }));
-
-            return Promise.resolve();
-        });
-
-        expect(connectLedgerBitcoinWalletThunk).toHaveBeenCalledWith({
-            device,
-            useAccountsDiscovery: true,
-        });
-    });
-
-    it('restores the mode for a previously discovered Ledger', () => {
+    it('checks availability again for a previously discovered Ledger', async () => {
         const selectedDevice = mockSuiteDevice();
         if (selectedDevice.type !== 'acquired') throw new Error('Expected acquired fixture');
         const ledgerDevice: LedgerSuiteDevice = {
@@ -141,7 +124,12 @@ describe('LedgerConnectionModal', () => {
         };
         renderModal(ledgerDevice);
 
-        expect(screen.getByRole('checkbox', { name: 'Use Accounts Discovery' })).toBeChecked();
-        expect(screen.getByText(/approve exporting public account data/)).toBeTruthy();
+        expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+        await act(() => {
+            fireEvent.click(screen.getByRole('button', { name: device.name }));
+
+            return Promise.resolve();
+        });
+        expect(connectLedgerBitcoinWalletThunk).toHaveBeenCalledWith({ device });
     });
 });

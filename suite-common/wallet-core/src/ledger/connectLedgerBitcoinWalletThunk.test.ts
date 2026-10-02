@@ -1,6 +1,10 @@
 import { createMockDeps } from '@suite-common/dependency-injection';
 import { deviceActions, deviceInitialState } from '@suite-common/device';
-import { type LedgerDevice, getLedgerDiscoveryPath } from '@suite-common/ledger';
+import {
+    type LedgerDevice,
+    getLedgerDiscoveryPath,
+    serializeLedgerDiscoveryKey,
+} from '@suite-common/ledger';
 import { createMockDispatch } from '@suite-common/redux-utils/mocks';
 import { asNetworkSymbol } from '@suite-common/wallet-config';
 import TrezorConnect, {
@@ -142,6 +146,7 @@ describe(connectLedgerBitcoinWalletThunk.name, () => {
 
     it('uses Accounts Discovery for enabled ETH while keeping a Bitcoin-derived wallet identity', async () => {
         const { actions, dispatch, state, service } = prepareTest();
+        service.hasAccountsDiscovery.mockResolvedValue(true);
         state.wallet.settings.enabledNetworks = [asNetworkSymbol('eth')];
         jest.spyOn(accountInfoClient, 'getAccountInfo').mockImplementation(params =>
             Promise.resolve({
@@ -149,14 +154,13 @@ describe(connectLedgerBitcoinWalletThunk.name, () => {
                 payload: { ...accountInfo, descriptor: params.descriptor ?? '' },
             }),
         );
-        const connected = await dispatch(
-            connectLedgerBitcoinWalletThunk({ device, useAccountsDiscovery: true }),
-        ).unwrap();
+        const connected = await dispatch(connectLedgerBitcoinWalletThunk({ device })).unwrap();
         expect(service.connect).toHaveBeenCalledTimes(1);
         expect(service.getAccount).not.toHaveBeenCalled();
         expect(service.openAccountsDiscovery).toHaveBeenCalledTimes(1);
         expect(connected.ledgerInfo?.accountsDiscoveryAppVersion).toBe('0.1.0');
         expect(connected.unavailableCapabilities.eth).toBeUndefined();
+        expect(connected.unavailableCapabilities.ada).toBe('no-support');
         expect(
             actions
                 .filter(accountsActions.createAccount.match)
@@ -169,6 +173,94 @@ describe(connectLedgerBitcoinWalletThunk.name, () => {
             expect.objectContaining({ coin: 'btc' }),
         );
         expect(actions.filter(deviceActions.selectDevice.match)).toHaveLength(1);
+    });
+
+    it('keeps Bitcoin-only capabilities when Accounts Discovery is not installed', async () => {
+        const { dispatch, service } = prepareTest();
+        const connected = await dispatch(connectLedgerBitcoinWalletThunk({ device })).unwrap();
+
+        expect(service.hasAccountsDiscovery).toHaveBeenCalledTimes(1);
+        expect(service.connect).toHaveBeenCalledTimes(1);
+        expect(service.openAccountsDiscovery).not.toHaveBeenCalled();
+        expect(connected.unavailableCapabilities.eth).toBe('no-support');
+        expect(connected.ledgerInfo?.accountsDiscoveryAppVersion).toBeUndefined();
+    });
+
+    it('refreshes capabilities and drops old app metadata after the custom app is removed', async () => {
+        const { dispatch, state, service } = prepareTest();
+        state.wallet.settings.enabledNetworks = ['btc', 'eth'].map(asNetworkSymbol);
+        jest.spyOn(accountInfoClient, 'getAccountInfo').mockImplementation(params =>
+            Promise.resolve({
+                success: true,
+                payload: { ...accountInfo, descriptor: params.descriptor ?? '' },
+            }),
+        );
+        service.hasAccountsDiscovery.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+        const client = await service.openAccountsDiscovery();
+        const key = (await client.readPublicKeys([{ profile: 3, account: 0 }]))[0];
+        if (!key) throw new Error('Missing fixture key');
+        const serialized = serializeLedgerDiscoveryKey(key);
+        if (!serialized.success) throw new Error('Invalid fixture');
+        service.getAccount.mockResolvedValue({
+            ...ledgerAccount,
+            descriptor: serialized.payload.descriptor,
+        });
+
+        const previous = await dispatch(connectLedgerBitcoinWalletThunk({ device })).unwrap();
+        state.device.devices = [previous];
+        state.device.selectedDevice = previous;
+        const current = await dispatch(
+            connectLedgerBitcoinWalletThunk({ device, expectedDeviceId: previous.id }),
+        ).unwrap();
+
+        expect(service.hasAccountsDiscovery).toHaveBeenCalledTimes(2);
+        expect(current.id).toBe(previous.id);
+        expect(previous.unavailableCapabilities.eth).toBeUndefined();
+        expect(current.unavailableCapabilities.eth).toBe('no-support');
+        expect(current.features.capabilities).not.toContain('Capability_Ethereum');
+        expect(current.ledgerInfo?.accountsDiscoveryAppVersion).toBeUndefined();
+    });
+
+    it.each(['listing', 'opening', 'metadata'] as const)(
+        'does not silently downgrade after a failed %s check',
+        async stage => {
+            const { dispatch, service, actions } = prepareTest();
+            service.hasAccountsDiscovery.mockResolvedValue(true);
+            if (stage === 'listing')
+                service.hasAccountsDiscovery.mockRejectedValue(new Error('Denied'));
+            if (stage === 'opening')
+                service.openAccountsDiscovery.mockRejectedValue(new Error('Denied'));
+            if (stage === 'metadata') {
+                const client = await service.openAccountsDiscovery();
+                service.openAccountsDiscovery.mockResolvedValue({
+                    ...client,
+                    getInfo: () => Promise.reject(new Error('Invalid protocol')),
+                });
+            }
+
+            await expect(
+                dispatch(connectLedgerBitcoinWalletThunk({ device })).unwrap(),
+            ).rejects.toBe('Ledger connection failed');
+            expect(service.getAccount).not.toHaveBeenCalled();
+            expect(actions.filter(deviceActions.connectLedgerDevice.match)).toHaveLength(0);
+            expect(service.disconnect).toHaveBeenCalled();
+        },
+    );
+
+    it('stops before discovery when app detection belongs to an old connection', async () => {
+        const { dispatch, service, actions } = prepareTest();
+        service.hasAccountsDiscovery.mockImplementation(() => {
+            service.isConnectionOwner.mockReturnValue(false);
+
+            return Promise.resolve(true);
+        });
+
+        await expect(dispatch(connectLedgerBitcoinWalletThunk({ device })).unwrap()).rejects.toBe(
+            'Ledger connection canceled',
+        );
+        expect(service.getAccount).not.toHaveBeenCalled();
+        expect(service.openAccountsDiscovery).not.toHaveBeenCalled();
+        expect(actions.filter(deviceActions.connectLedgerDevice.match)).toHaveLength(0);
     });
 
     it('rejects a different wallet during reconnection before adding device or accounts', async () => {

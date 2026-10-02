@@ -2,12 +2,27 @@ import { type LedgerSuiteDevice } from '@suite-common/device';
 import { type LedgerDeviceInfo } from '@suite-common/ledger';
 import {
     type NetworkSymbol,
+    type NetworkType,
     asNetworkSymbol,
+    getNetworkType,
     getSupportedNetworks,
 } from '@suite-common/wallet-config';
 import { type StaticSessionId, type UnavailableCapabilities } from '@trezor/connect';
 import { asDeviceUniquePath } from '@trezor/connect-common';
 import { DeviceModelInternal, FirmwareType } from '@trezor/device-utils';
+
+const networkCapabilities = {
+    bitcoin: 'Capability_Bitcoin_like',
+    ethereum: 'Capability_Ethereum',
+    ripple: 'Capability_Ripple',
+    cardano: 'Capability_Cardano',
+    solana: 'Capability_Solana',
+    stellar: 'Capability_Stellar',
+    tron: 'Capability_Tron',
+} as const satisfies Record<
+    NetworkType,
+    NonNullable<LedgerSuiteDevice['features']['capabilities']>[number]
+>;
 
 export type LedgerWalletIdentity = {
     id: string;
@@ -122,7 +137,11 @@ export const createLedgerSuiteDevice = (
             passphrase_protection: false,
             backup_availability: 'NotAvailable',
             ...(deviceInfo?.batteryLevel !== undefined ? { soc: deviceInfo.batteryLevel } : {}),
-            capabilities: ['Capability_Bitcoin_like'],
+            capabilities: [
+                ...new Set(
+                    supportedNetworks.map(symbol => networkCapabilities[getNetworkType(symbol)]),
+                ),
+            ],
         },
         unavailableCapabilities,
         availableTranslations: {},

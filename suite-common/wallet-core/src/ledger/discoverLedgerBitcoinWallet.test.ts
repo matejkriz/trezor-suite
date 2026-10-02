@@ -1,9 +1,6 @@
-import { type LedgerDevice } from '@suite-common/ledger';
 import { type AccountInfo } from '@trezor/connect';
 
 import { discoverLedgerBitcoinWallet } from './discoverLedgerBitcoinWallet';
-
-const device = { id: 'transient-webhid-id', name: 'Ledger Flex' } as LedgerDevice;
 
 const ledgerAccount = (index: number) => ({
     path: `84'/0'/${index}'`,
@@ -28,7 +25,6 @@ const accountInfo = (index: number, empty: boolean): AccountInfo =>
 describe('discoverLedgerBitcoinWallet', () => {
     it('binds Bitcoin accounts to a stable descriptor-based wallet identity', async () => {
         const service = {
-            connect: jest.fn().mockResolvedValue(undefined),
             isConnectionOwner: jest.fn(() => true),
             getDeviceInfo: jest.fn().mockReturnValue({
                 name: 'My Ledger',
@@ -45,13 +41,10 @@ describe('discoverLedgerBitcoinWallet', () => {
 
         const result = await discoverLedgerBitcoinWallet(
             { ledgerBitcoinService: service, getAccountInfo },
-            device,
             { owner: 'acquisition-a' },
         );
 
-        expect(service.connect).toHaveBeenCalledWith(device, { owner: 'acquisition-a' });
         expect(getAccountInfo).toHaveBeenCalledWith('zpub-0');
-        expect(result.wallet.id).not.toContain(device.id);
         expect(result.wallet.staticSessionId).toContain('@ledger:0');
         expect(result.wallet.sessionId).toBe('acquisition-a');
         expect(result.wallet.label).toBe('My Ledger');
@@ -70,7 +63,6 @@ describe('discoverLedgerBitcoinWallet', () => {
 
     it('discovers used accounts until the first empty account', async () => {
         const service = {
-            connect: jest.fn().mockResolvedValue(undefined),
             isConnectionOwner: jest.fn(() => true),
             getDeviceInfo: jest.fn().mockReturnValue(undefined),
             getAccount: jest.fn(index => Promise.resolve(ledgerAccount(index))),
@@ -82,10 +74,10 @@ describe('discoverLedgerBitcoinWallet', () => {
             }),
         );
 
-        const result = await discoverLedgerBitcoinWallet(
-            { ledgerBitcoinService: service, getAccountInfo },
-            device,
-        );
+        const result = await discoverLedgerBitcoinWallet({
+            ledgerBitcoinService: service,
+            getAccountInfo,
+        });
 
         expect(service.getAccount).toHaveBeenCalledTimes(2);
         expect(result.accounts).toHaveLength(2);
@@ -96,7 +88,6 @@ describe('discoverLedgerBitcoinWallet', () => {
 
     it('does not expose a wallet when the backend query fails', async () => {
         const service = {
-            connect: jest.fn().mockResolvedValue(undefined),
             isConnectionOwner: jest.fn(() => true),
             getDeviceInfo: jest.fn().mockReturnValue(undefined),
             getAccount: jest.fn().mockResolvedValue(ledgerAccount(0)),
@@ -107,7 +98,7 @@ describe('discoverLedgerBitcoinWallet', () => {
         });
 
         await expect(
-            discoverLedgerBitcoinWallet({ ledgerBitcoinService: service, getAccountInfo }, device),
+            discoverLedgerBitcoinWallet({ ledgerBitcoinService: service, getAccountInfo }),
         ).rejects.toThrow('Backend unavailable');
     });
 });
