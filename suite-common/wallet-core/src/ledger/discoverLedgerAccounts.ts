@@ -42,6 +42,7 @@ export type DiscoveredLedgerAccounts = {
     supportedNetworks: NetworkSymbol[];
     availableNetworks: NetworkSymbol[];
     skippedNetworks: NetworkSymbol[];
+    failedNetworks: NetworkSymbol[];
 };
 
 type ActiveLedgerDiscoveryProfile = {
@@ -104,6 +105,7 @@ export const discoverLedgerAccounts = async (
     }
 
     const accounts: DiscoveredLedgerNetworkAccount[] = [];
+    const failedNetworks = new Set<NetworkSymbol>();
     const stoppedProfiles = new Set<string>();
     const backendCache = new Map<string, AccountInfo>();
     const returnedAccounts = new Set<string>();
@@ -172,6 +174,7 @@ export const discoverLedgerAccounts = async (
                         ensureCurrentConnection();
                         if (!response?.success) {
                             skippedNetworks.add(symbol);
+                            failedNetworks.add(symbol);
                             stoppedProfiles.add(`${key.profile}:${symbol}`);
                             continue;
                         }
@@ -209,6 +212,7 @@ export const discoverLedgerAccounts = async (
             supportedNetworks,
             availableNetworks,
             skippedNetworks: [...skippedNetworks],
+            failedNetworks: [...failedNetworks],
         };
     } finally {
         if (isApproved && deps.isCurrentConnection()) {

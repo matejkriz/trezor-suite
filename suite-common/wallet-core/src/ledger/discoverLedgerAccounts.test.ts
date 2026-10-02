@@ -79,6 +79,7 @@ describe(discoverLedgerAccounts.name, () => {
         expect(result.baseDescriptor).toBe(bitcoin.payload.descriptor);
         expect(result.supportedNetworks).toEqual(['btc', 'eth']);
         expect(result.skippedNetworks).toEqual(['ada']);
+        expect(result.failedNetworks).toEqual([]);
         expect(result.accounts.filter(account => account.symbol === 'eth')).toHaveLength(2);
         expect(
             result.accounts.filter(account => account.visible).map(account => account.accountType),
@@ -151,6 +152,7 @@ describe(discoverLedgerAccounts.name, () => {
         });
         expect(result.accounts.map(account => account.symbol)).toEqual(['eth']);
         expect(result.skippedNetworks).toEqual(['btc']);
+        expect(result.failedNetworks).toEqual(['btc']);
         expect(result.baseDescriptor).toMatch(/^zpub/);
 
         const onlyEthereum = prepareTest([3, 15]);

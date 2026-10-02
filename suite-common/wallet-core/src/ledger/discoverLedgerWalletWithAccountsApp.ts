@@ -57,5 +57,6 @@ export const discoverLedgerWalletWithAccountsApp = async (
             accountsDiscoveryAppVersion: discovered.appVersion,
         },
         accounts: discovered.accounts,
+        failedNetworks: discovered.failedNetworks,
     };
 };
