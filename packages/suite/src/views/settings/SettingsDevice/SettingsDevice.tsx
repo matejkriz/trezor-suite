@@ -10,10 +10,11 @@ import { ContextMessage } from '@suite/message-system';
 import { isRecoveryInProgress } from '@suite/recovery';
 import { useServices } from '@suite-common/dependency-injection';
 import {
-    type LedgerSuiteDevice,
-    isLedgerDevice,
+    getDeviceBrandName,
+    getDeviceInformation,
+    getDeviceOperationCapabilities,
+    getDeviceSettingsCapabilities,
     selectIsDeviceAuthenticityCheckSupported,
-    selectSelectedDevice,
 } from '@suite-common/device';
 import { Context } from '@suite-common/message-system';
 import { injectDispatch } from '@suite-common/redux-utils';
@@ -79,72 +80,16 @@ const deviceSettingsUnavailable = (device?: TrezorDevice) => {
     return wrongDeviceType || wrongDeviceMode || firmwareUpdateRequired;
 };
 
-const LedgerSettingsDevice = ({ device }: { device: LedgerSuiteDevice }) => {
-    const hasContentBelowTabletWidth = useIsContentBelowBreakpoint(breakpoints.tablet);
-    const { ledgerInfo } = device;
-
-    return (
-        <SettingsLayout>
-            <SettingsSection
-                hasVerticalLayout={hasContentBelowTabletWidth}
-                title={<Translation id="TR_DEVICE" />}
-                icon={PuzzlePieceIcon}
-            >
-                <SectionItem data-testid="@settings/device/ledger/name">
-                    <TextColumn title={<Translation id="TR_DEVICE_SETTINGS_DEVICE_LABEL" />} />
-                    <ActionColumn>
-                        <Text>{device.features?.label || device.name || 'Ledger'}</Text>
-                    </ActionColumn>
-                </SectionItem>
-                <SectionItem data-testid="@settings/device/ledger/model">
-                    <TextColumn title="Model" />
-                    <ActionColumn>
-                        <Text>{ledgerInfo?.model || 'Ledger'}</Text>
-                    </ActionColumn>
-                </SectionItem>
-                {device.connected && ledgerInfo?.osVersion && (
-                    <SectionItem data-testid="@settings/device/ledger/os-version">
-                        <TextColumn title="OS version" />
-                        <ActionColumn>
-                            <Text>{ledgerInfo.osVersion}</Text>
-                        </ActionColumn>
-                    </SectionItem>
-                )}
-                {device.connected && ledgerInfo?.bitcoinAppVersion && (
-                    <SectionItem data-testid="@settings/device/ledger/bitcoin-app-version">
-                        <TextColumn title="Bitcoin app version" />
-                        <ActionColumn>
-                            <Text>{ledgerInfo.bitcoinAppVersion}</Text>
-                        </ActionColumn>
-                    </SectionItem>
-                )}
-                {device.connected && ledgerInfo?.batteryLevel !== undefined && (
-                    <SectionItem data-testid="@settings/device/ledger/battery">
-                        <TextColumn title="Battery" />
-                        <ActionColumn>
-                            <Text>{`${ledgerInfo.batteryLevel}%`}</Text>
-                        </ActionColumn>
-                    </SectionItem>
-                )}
-            </SettingsSection>
-
-            <SettingsSection
-                hasVerticalLayout={hasContentBelowTabletWidth}
-                title={<Translation id="TR_DEVICE_CONNECTION" />}
-                icon={PlugsIcon}
-            >
-                <ForgetDevice />
-            </SettingsSection>
-        </SettingsLayout>
-    );
-};
-
-const TrezorSettingsDevice = () => {
+export const SettingsDevice = () => {
     const { dispatch } = useServices(injectDispatch);
     const hasContentBelowTabletWidth = useIsContentBelowBreakpoint(breakpoints.tablet);
     const hasContentBelowLaptopWidth = useIsContentBelowBreakpoint(breakpoints.laptop);
     const { device, isLocked } = useDevice();
-    const noTransportAvailable = !useSelector(selectHasActiveTransport);
+    const hasActiveTransport = useSelector(selectHasActiveTransport);
+    const capabilities = getDeviceSettingsCapabilities(device);
+    const operations = getDeviceOperationCapabilities(device);
+    const deviceInfo = getDeviceInformation(device);
+    const noTransportAvailable = operations.trezorConnect && !hasActiveTransport;
     const deviceUnavailable = !device?.features;
     const isDeviceLocked = isLocked();
     const bootloaderMode = device?.mode === 'bootloader';
@@ -206,7 +151,9 @@ const TrezorSettingsDevice = () => {
 
     // because Device authenticity check is something you can (and have to) do on a device with FW but without seed
     const isSecuritySectionVisible =
-        isNormalMode || (initializeMode && supportsDeviceAuthentication);
+        (isNormalMode &&
+            (capabilities.pin || capabilities.safetyChecks || supportsDeviceAuthentication)) ||
+        (initializeMode && supportsDeviceAuthentication);
 
     const isThpDevice = device?.thp !== undefined;
 
@@ -215,6 +162,61 @@ const TrezorSettingsDevice = () => {
     return (
         <SettingsLayout>
             <ContextMessage context={Context.getSettings('device')} />
+
+            {(!capabilities.rename || deviceInfo) && (
+                <SettingsSection
+                    hasVerticalLayout={hasContentBelowTabletWidth}
+                    title={<Translation id="TR_DEVICE" />}
+                    icon={PuzzlePieceIcon}
+                >
+                    {!capabilities.rename && (
+                        <SectionItem data-testid="@settings/device/info/name">
+                            <TextColumn
+                                title={<Translation id="TR_DEVICE_SETTINGS_DEVICE_LABEL" />}
+                            />
+                            <ActionColumn>
+                                <Text>
+                                    {device.features.label ||
+                                        device.name ||
+                                        getDeviceBrandName(device)}
+                                </Text>
+                            </ActionColumn>
+                        </SectionItem>
+                    )}
+                    {deviceInfo && (
+                        <SectionItem data-testid="@settings/device/info/model">
+                            <TextColumn title="Model" />
+                            <ActionColumn>
+                                <Text>{deviceInfo.model}</Text>
+                            </ActionColumn>
+                        </SectionItem>
+                    )}
+                    {device.connected && deviceInfo?.osVersion && (
+                        <SectionItem data-testid="@settings/device/info/os-version">
+                            <TextColumn title="OS version" />
+                            <ActionColumn>
+                                <Text>{deviceInfo.osVersion}</Text>
+                            </ActionColumn>
+                        </SectionItem>
+                    )}
+                    {device.connected && deviceInfo?.bitcoinAppVersion && (
+                        <SectionItem data-testid="@settings/device/info/bitcoin-app-version">
+                            <TextColumn title="Bitcoin app version" />
+                            <ActionColumn>
+                                <Text>{deviceInfo.bitcoinAppVersion}</Text>
+                            </ActionColumn>
+                        </SectionItem>
+                    )}
+                    {device.connected && deviceInfo?.batteryLevel !== undefined && (
+                        <SectionItem data-testid="@settings/device/info/battery">
+                            <TextColumn title="Battery" />
+                            <ActionColumn>
+                                <Text>{`${deviceInfo.batteryLevel}%`}</Text>
+                            </ActionColumn>
+                        </SectionItem>
+                    )}
+                </SettingsSection>
+            )}
 
             {bootloaderMode && (
                 <DeviceBanner
@@ -233,7 +235,7 @@ const TrezorSettingsDevice = () => {
                 />
             )}
 
-            {isNormalMode && (
+            {isNormalMode && capabilities.backup && (
                 <SettingsSection
                     hasVerticalLayout={hasContentBelowTabletWidth}
                     title={<Translation id="TR_BACKUP" />}
@@ -252,25 +254,31 @@ const TrezorSettingsDevice = () => {
                 </SettingsSection>
             )}
 
-            <SettingsSection
-                hasVerticalLayout={hasContentBelowTabletWidth}
-                title={<Translation id="TR_PASSPHRASE" />}
-                icon={PasswordIcon}
-            >
-                <Passphrase isDeviceLocked={isDeviceLocked} />
-            </SettingsSection>
+            {capabilities.passphrase && (
+                <SettingsSection
+                    hasVerticalLayout={hasContentBelowTabletWidth}
+                    title={<Translation id="TR_PASSPHRASE" />}
+                    icon={PasswordIcon}
+                >
+                    <Passphrase isDeviceLocked={isDeviceLocked} />
+                </SettingsSection>
+            )}
 
-            <SettingsSection
-                hasVerticalLayout={hasContentBelowTabletWidth}
-                title={<Translation id="TR_FIRMWARE" />}
-                icon={PuzzlePieceIcon}
-            >
-                <FirmwareVersion isDeviceLocked={isDeviceLocked} />
-                {(!bootloaderMode || bitcoinOnlyDevice) && (
-                    <FirmwareTypeChange isDeviceLocked={isDeviceLocked} />
-                )}
-                <ChangeLanguage isDeviceLocked={isDeviceLocked} />
-            </SettingsSection>
+            {(capabilities.firmwareUpdate || capabilities.language) && (
+                <SettingsSection
+                    hasVerticalLayout={hasContentBelowTabletWidth}
+                    title={<Translation id="TR_FIRMWARE" />}
+                    icon={PuzzlePieceIcon}
+                >
+                    {capabilities.firmwareUpdate && (
+                        <FirmwareVersion isDeviceLocked={isDeviceLocked} />
+                    )}
+                    {capabilities.firmwareUpdate && (!bootloaderMode || bitcoinOnlyDevice) && (
+                        <FirmwareTypeChange isDeviceLocked={isDeviceLocked} />
+                    )}
+                    {capabilities.language && <ChangeLanguage isDeviceLocked={isDeviceLocked} />}
+                </SettingsSection>
+            )}
 
             {isSecuritySectionVisible && (
                 <SettingsSection
@@ -280,9 +288,13 @@ const TrezorSettingsDevice = () => {
                 >
                     {isNormalMode && (
                         <>
-                            <PinProtection isDeviceLocked={isDeviceLocked} />
-                            {pinProtection && <ChangePin isDeviceLocked={isDeviceLocked} />}
-                            {safetyChecks && <SafetyChecks isDeviceLocked={isDeviceLocked} />}
+                            {capabilities.pin && <PinProtection isDeviceLocked={isDeviceLocked} />}
+                            {capabilities.pin && pinProtection && (
+                                <ChangePin isDeviceLocked={isDeviceLocked} />
+                            )}
+                            {capabilities.safetyChecks && safetyChecks && (
+                                <SafetyChecks isDeviceLocked={isDeviceLocked} />
+                            )}
                         </>
                     )}
                     {supportsDeviceAuthentication && (
@@ -291,20 +303,32 @@ const TrezorSettingsDevice = () => {
                 </SettingsSection>
             )}
 
-            {isNormalMode && (
-                <SettingsSection
-                    hasVerticalLayout={hasContentBelowTabletWidth}
-                    title={<Translation id="TR_PERSONALIZATION" />}
-                    icon={PaletteIcon}
-                >
-                    <DeviceLabel isDeviceLocked={isDeviceLocked} />
-                    <Homescreen isDeviceLocked={isDeviceLocked} />
-                    <DisplayRotation isDeviceLocked={isDeviceLocked} />
-                    <Brightness isDeviceLocked={isDeviceLocked} />
-                    <HapticFeedback isDeviceLocked={isDeviceLocked} />
-                    {pinProtection && <AutoLock isDeviceLocked={isDeviceLocked} />}
-                </SettingsSection>
-            )}
+            {isNormalMode &&
+                (capabilities.rename ||
+                    capabilities.homescreen ||
+                    capabilities.displayRotation ||
+                    capabilities.brightness ||
+                    capabilities.hapticFeedback ||
+                    (capabilities.autoLock && pinProtection)) && (
+                    <SettingsSection
+                        hasVerticalLayout={hasContentBelowTabletWidth}
+                        title={<Translation id="TR_PERSONALIZATION" />}
+                        icon={PaletteIcon}
+                    >
+                        {capabilities.rename && <DeviceLabel isDeviceLocked={isDeviceLocked} />}
+                        {capabilities.homescreen && <Homescreen isDeviceLocked={isDeviceLocked} />}
+                        {capabilities.displayRotation && (
+                            <DisplayRotation isDeviceLocked={isDeviceLocked} />
+                        )}
+                        {capabilities.brightness && <Brightness isDeviceLocked={isDeviceLocked} />}
+                        {capabilities.hapticFeedback && (
+                            <HapticFeedback isDeviceLocked={isDeviceLocked} />
+                        )}
+                        {capabilities.autoLock && pinProtection && (
+                            <AutoLock isDeviceLocked={isDeviceLocked} />
+                        )}
+                    </SettingsSection>
+                )}
 
             <SettingsSection
                 hasVerticalLayout={hasContentBelowTabletWidth}
@@ -315,36 +339,32 @@ const TrezorSettingsDevice = () => {
                 <ForgetDevice />
             </SettingsSection>
 
-            <SettingsSection
-                hasVerticalLayout={hasContentBelowTabletWidth}
-                title={<Translation id="TR_SETTINGS_ADVANCED" />}
-                icon={ShieldWarningIcon}
-            >
-                <DeviceAuthenticityOptOut
-                    isDeviceAuthenticityCheckSupported={supportsDeviceAuthentication}
-                />
-                <FirmwareAuthenticityChecks />
-            </SettingsSection>
+            {(supportsDeviceAuthentication || operations.firmwareChecks) && (
+                <SettingsSection
+                    hasVerticalLayout={hasContentBelowTabletWidth}
+                    title={<Translation id="TR_SETTINGS_ADVANCED" />}
+                    icon={ShieldWarningIcon}
+                >
+                    <DeviceAuthenticityOptOut
+                        isDeviceAuthenticityCheckSupported={supportsDeviceAuthentication}
+                    />
+                    {operations.firmwareChecks && <FirmwareAuthenticityChecks />}
+                </SettingsSection>
+            )}
 
-            <SettingsSection
-                hasVerticalLayout={hasContentBelowTabletWidth}
-                title={<Translation id="TR_ADVANCED" />}
-                icon={GhostIcon}
-            >
-                <WipeDevice isDeviceLocked={isDeviceLocked} />
-                {isNormalMode && <WipeCode isDeviceLocked={isDeviceLocked} />}
-                <CustomFirmware />
-            </SettingsSection>
+            {(capabilities.wipe || capabilities.wipeCode || capabilities.firmwareUpdate) && (
+                <SettingsSection
+                    hasVerticalLayout={hasContentBelowTabletWidth}
+                    title={<Translation id="TR_ADVANCED" />}
+                    icon={GhostIcon}
+                >
+                    {capabilities.wipe && <WipeDevice isDeviceLocked={isDeviceLocked} />}
+                    {isNormalMode && capabilities.wipeCode && (
+                        <WipeCode isDeviceLocked={isDeviceLocked} />
+                    )}
+                    {capabilities.firmwareUpdate && <CustomFirmware />}
+                </SettingsSection>
+            )}
         </SettingsLayout>
     );
-};
-
-export const SettingsDevice = () => {
-    const selectedDevice = useSelector(selectSelectedDevice);
-
-    if (isLedgerDevice(selectedDevice)) {
-        return <LedgerSettingsDevice device={selectedDevice} />;
-    }
-
-    return <TrezorSettingsDevice />;
 };

@@ -13,7 +13,6 @@ import { createTestCompositionRoot, screen } from '@suite-common/test-utils';
 
 import { DeviceConnect } from 'src/components/suite/PrerequisitesGuide/DeviceConnect';
 import { NoTransport } from 'src/components/suite/PrerequisitesGuide/NoTransport';
-import { type AppState } from 'src/reducers/store';
 import { type SuiteServices } from 'src/support/createSuiteCompositionRoot';
 import { renderWithProviders } from 'src/support/test-utils/hooksHelper';
 import { type ForegroundAppProps } from 'src/types/suite';
@@ -83,10 +82,14 @@ it('updates connection visibility when Ledger support is toggled in settings', a
     const services: DesktopAnalyticsDep = { analytics: mockDesktopAnalytics() };
     const root = createTestCompositionRoot({
         extra: { services },
-        reducer: (state: AppState = mockInitialAppState, action) => ({
-            ...state,
-            suiteSettings: suiteSettingsReducer(state.suiteSettings, action),
-        }),
+        reducer: (state = {}, action) => {
+            const previous = { ...mockInitialAppState, ...state };
+
+            return {
+                ...previous,
+                suiteSettings: suiteSettingsReducer(previous.suiteSettings, action),
+            };
+        },
     });
     renderWithProviders(
         root,

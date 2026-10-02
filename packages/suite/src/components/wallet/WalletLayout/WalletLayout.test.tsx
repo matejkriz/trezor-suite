@@ -4,7 +4,7 @@ import { screen } from '@testing-library/react';
 import { StyleSheetManager } from 'styled-components';
 
 import { mockDesktopAnalytics } from '@suite/analytics/mocks';
-import { type PageName } from '@suite/router';
+import { type PageName, suiteRoutes } from '@suite/router';
 import { createTestCompositionRoot } from '@suite-common/test-utils';
 import { asNetworkSymbol, getNetwork } from '@suite-common/wallet-config';
 import { useWalletDeviceAccountCapabilities } from '@suite-common/wallet-core';
@@ -46,6 +46,9 @@ const renderLayout = (routeName: PageName, canSignTransaction: boolean) => {
         canSignTransaction,
         canConfirmAddress: canSignTransaction,
     });
+    const route = suiteRoutes.find(candidate => candidate.name === routeName);
+    if (route?.app !== 'wallet') throw new Error('Expected a wallet route fixture');
+
     const state: AppState = {
         ...mockInitialAppState,
         wallet: {
@@ -56,7 +59,7 @@ const renderLayout = (routeName: PageName, canSignTransaction: boolean) => {
         router: {
             ...mockInitialAppState.router,
             app: 'wallet',
-            route: { name: routeName, pattern: '/accounts', app: 'wallet' },
+            route,
         },
     };
     const root = createTestCompositionRoot({

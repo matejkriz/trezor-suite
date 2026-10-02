@@ -2,15 +2,9 @@ import { useWatch } from 'react-hook-form';
 
 import styled from 'styled-components';
 
-import {
-    openConnectionModal,
-    setConnectionModal,
-    setConnectionMode,
-    useDevice,
-} from '@suite/device';
+import { openDeviceConnectionThunk, useDevice } from '@suite/device';
 import { Translation } from '@suite/intl';
 import { useServices } from '@suite-common/dependency-injection';
-import { isLedgerDevice } from '@suite-common/device';
 import { injectDispatch } from '@suite-common/redux-utils';
 import { selectAreFeesLoading } from '@suite-common/wallet-core';
 import { isLowAnonymityWarning } from '@suite-common/wallet-utils';
@@ -109,15 +103,7 @@ export const ReviewButton = () => {
 
     const handleButtonReviewClick = () => {
         if (!isDeviceConnected) {
-            if (isLedgerDevice(device)) {
-                dispatch(openConnectionModal('ledger'));
-
-                return;
-            }
-            if (device?.descriptor?.apiType === 'bluetooth') {
-                dispatch(setConnectionMode('bluetooth'));
-            }
-            dispatch(setConnectionModal(true));
+            dispatch(openDeviceConnectionThunk(device));
 
             return;
         }

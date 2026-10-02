@@ -7,7 +7,7 @@ import { selectIsLegacyLabelingVisible, selectLabelingValueBeingEdited } from '@
 import { SuiteSyncWalletDebug } from '@suite/suite-sync';
 import { useWalletLabel } from '@suite/wallet';
 import { useServices } from '@suite-common/dependency-injection';
-import { isLedgerDevice, selectDeviceThunk } from '@suite-common/device';
+import { selectDeviceThunk } from '@suite-common/device';
 import { injectDispatch, injectGetState } from '@suite-common/redux-utils';
 import {
     getAccountsByDeviceState,
@@ -110,7 +110,6 @@ export const WalletInstance = ({
     const baseCurrencyCode = useSelector(selectBaseCurrency);
     const editing = useSelector(selectLabelingValueBeingEdited);
     const { dispatch, getState } = useServices(injectDispatch, injectGetState);
-    const isLedger = isLedgerDevice(instance);
 
     const deviceAccounts = getAllAccounts(instance.state, accounts);
 
@@ -169,7 +168,7 @@ export const WalletInstance = ({
             {...rest}
         >
             <Box padding={{ vertical: 12, right: 12, left: 16 }}>
-                <Collapsible isOpen={!isLedger && isEjecting}>
+                <Collapsible isOpen={isEjecting}>
                     <Column gap={8} alignItems="flex-start">
                         <Row justifyContent="space-between" width="100%">
                             <Text
@@ -178,43 +177,37 @@ export const WalletInstance = ({
                                 priority={isSelected ? 'primary' : 'secondary'}
                                 typographyStyle={isSelected ? 'body-md-strong' : 'body-md'}
                             >
-                                {isLedger ? (
-                                    <Translation id="TR_NO_PASSPHRASE_WALLET" />
-                                ) : (
-                                    <TrezorWalletInstanceLabel instance={instance} />
-                                )}
+                                <TrezorWalletInstanceLabel instance={instance} />
                             </Text>
-                            {!isLedger && (
-                                <Collapsible.Toggle>
-                                    <IconButton
-                                        data-testid={
-                                            isEjecting
-                                                ? `@switch-device/cancelEject`
-                                                : `${dataTestBase}/eject-button`
-                                        }
-                                        icon={isEjecting ? XIcon : EjectIcon}
-                                        size="small"
-                                        intent="neutral"
-                                        priority="secondary"
-                                        onClick={e => {
-                                            e.stopPropagation();
-                                            setIsEjecting(prev => !prev);
-                                        }}
-                                        tooltip={{
-                                            delayShow: TOOLTIP_DELAY_LONG,
-                                            content: (
-                                                <Translation
-                                                    id={
-                                                        isEjecting
-                                                            ? 'TR_CANCEL'
-                                                            : 'TR_SWITCH_DEVICE_EJECT_TOOLTIP'
-                                                    }
-                                                />
-                                            ),
-                                        }}
-                                    />
-                                </Collapsible.Toggle>
-                            )}
+                            <Collapsible.Toggle>
+                                <IconButton
+                                    data-testid={
+                                        isEjecting
+                                            ? `@switch-device/cancelEject`
+                                            : `${dataTestBase}/eject-button`
+                                    }
+                                    icon={isEjecting ? XIcon : EjectIcon}
+                                    size="small"
+                                    intent="neutral"
+                                    priority="secondary"
+                                    onClick={e => {
+                                        e.stopPropagation();
+                                        setIsEjecting(prev => !prev);
+                                    }}
+                                    tooltip={{
+                                        delayShow: TOOLTIP_DELAY_LONG,
+                                        content: (
+                                            <Translation
+                                                id={
+                                                    isEjecting
+                                                        ? 'TR_CANCEL'
+                                                        : 'TR_SWITCH_DEVICE_EJECT_TOOLTIP'
+                                                }
+                                            />
+                                        ),
+                                    }}
+                                />
+                            </Collapsible.Toggle>
                         </Row>
 
                         <FiatHeader
@@ -225,16 +218,14 @@ export const WalletInstance = ({
                         />
                     </Column>
 
-                    {!isLedger && (
-                        <Collapsible.Content>
-                            <Divider margin={{ vertical: 12 }} />
-                            <EjectConfirmation
-                                instance={instance}
-                                onClick={stopPropagation}
-                                onCancel={onEjectCancelClick}
-                            />
-                        </Collapsible.Content>
-                    )}
+                    <Collapsible.Content>
+                        <Divider margin={{ vertical: 12 }} />
+                        <EjectConfirmation
+                            instance={instance}
+                            onClick={stopPropagation}
+                            onCancel={onEjectCancelClick}
+                        />
+                    </Collapsible.Content>
                 </Collapsible>
             </Box>
         </Card>

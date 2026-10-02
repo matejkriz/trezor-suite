@@ -1,6 +1,7 @@
 import { Translation } from '@suite/intl';
-import { isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
-import { type SerializedTx } from '@suite-common/wallet-core';
+import { useServices } from '@suite-common/dependency-injection';
+import { selectDeviceBrandName, selectSelectedDevice } from '@suite-common/device';
+import { type SerializedTx, injectWalletDeviceService } from '@suite-common/wallet-core';
 import { ConfirmOnDevicePill } from '@trezor/product-components';
 
 import { useSelector } from 'src/hooks/suite';
@@ -38,15 +39,16 @@ export const TransactionReviewModalConfirmOnDevice = ({
     onCancel,
 }: TransactionReviewModalConfirmOnDeviceProps) => {
     const device = useSelector(selectSelectedDevice);
-    const isLedger = isLedgerDevice(device);
+    const deviceBrand = useSelector(selectDeviceBrandName);
+    const { walletDeviceService } = useServices(injectWalletDeviceService);
+    const steps = (device && walletDeviceService.get(device)?.transactionReviewSteps) ?? totalSteps;
     const deviceModelInternal = device?.features?.internal_model;
-    let activeStep = getActiveStep({ totalSteps, serializedTx, reviewStep });
-    if (isLedger) activeStep = serializedTx ? 2 : 1;
+    const activeStep = getActiveStep({ totalSteps: steps, serializedTx, reviewStep });
 
     return (
         <ConfirmOnDevicePill
-            title={isLedger ? 'Confirm on Ledger' : <Translation id="TR_CONFIRM_ON_TREZOR" />}
-            steps={isLedger ? 1 : totalSteps}
+            title={<Translation id="TR_CONFIRM_ON_DEVICE" values={{ deviceBrand }} />}
+            steps={steps}
             activeStep={activeStep}
             deviceModelInternal={deviceModelInternal}
             deviceUnitColor={device?.features?.unit_color}

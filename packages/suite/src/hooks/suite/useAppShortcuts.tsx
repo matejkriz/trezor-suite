@@ -7,7 +7,11 @@ import { openModal } from '@suite/modal';
 import { SettingsAnchor, closeModalAppThunk, gotoThunk } from '@suite/router';
 import { selectAutodetectTheme, selectTheme, suiteSettingsActions } from '@suite/settings';
 import { useServices } from '@suite-common/dependency-injection';
-import { isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
+import {
+    getDeviceOperationCapabilities,
+    getDeviceSettingsCapabilities,
+    selectSelectedDevice,
+} from '@suite-common/device';
 import { useDiscreetMode } from '@suite-common/discreet-mode';
 import { injectDispatch } from '@suite-common/redux-utils';
 import { selectAllAccountsToList, startDiscoveryThunk } from '@suite-common/wallet-core';
@@ -84,7 +88,7 @@ export const useAppShortcuts = () => {
             altOnly &&
             e.code === KEYBOARD_CODE.KEY_P &&
             selectedDevice?.connected &&
-            !isLedgerDevice(selectedDevice)
+            getDeviceSettingsCapabilities(selectedDevice).passphrase
         ) {
             e.preventDefault();
             dispatch(closeModalAppThunk());
@@ -120,7 +124,7 @@ export const useAppShortcuts = () => {
             altOnly &&
             e.code === KEYBOARD_CODE.KEY_A &&
             selectedDevice &&
-            !isLedgerDevice(selectedDevice)
+            getDeviceOperationCapabilities(selectedDevice).manualAccounts
         ) {
             e.preventDefault();
             dispatch(openModal({ type: 'add-account', device: selectedDevice }));

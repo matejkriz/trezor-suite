@@ -1,6 +1,6 @@
 import { useDevice } from '@suite/device';
 import { Translation } from '@suite/intl';
-import { isLedgerDevice } from '@suite-common/device';
+import { getDeviceOperationCapabilities } from '@suite-common/device';
 import { type Account } from '@suite-common/wallet-types';
 import { Column, H4, IconCircle, Paragraph, Row, Text } from '@trezor/components';
 import { PlusIcon } from '@trezor/icons';
@@ -47,7 +47,10 @@ export const GlobalReceiveAccountsTab = ({
     const accountsOptions = useAccountsOptions();
     const accountOptions = useFilterAccounts(accountsOptions);
     const isAddAccountDisabled =
-        isLedgerDevice(device) || isDiscoveryRunning || !device?.connected || !device?.available;
+        !getDeviceOperationCapabilities(device).manualAccounts ||
+        isDiscoveryRunning ||
+        !device?.connected ||
+        !device?.available;
 
     if (accountOptions.length === 0) {
         return <AccountsNoResults />;

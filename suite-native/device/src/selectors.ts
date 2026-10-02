@@ -4,10 +4,10 @@ import {
     type DeviceRootState,
     getDeviceSettingsCapabilities,
     getIsDeviceIdValid,
-    isLedgerDevice,
     selectDeviceFirmwareVersionArray,
     selectDeviceInstances,
     selectDeviceModel,
+    selectDeviceProvider,
     selectHasDeviceFirmwareInstalled,
     selectIsConnectedDeviceUninitialized,
     selectIsDeviceConnected,
@@ -88,7 +88,10 @@ export type NativeDeviceRootState = DeviceRootState &
 const createMemoizedSelector = createWeakMapSelector.withTypes<NativeDeviceRootState>();
 
 export const selectDeviceImageKind = (state: DeviceRootState): DeviceImageKind =>
-    isLedgerDevice(selectSelectedDevice(state)) ? 'ledger' : 'trezor';
+    selectDeviceProvider(state);
+
+export const selectIsDeviceConnectionScrollable = (state: DeviceRootState) =>
+    selectDeviceProvider(state) === 'ledger';
 
 export const selectIsDeviceFirmwareSupported = (state: DeviceRootState) => {
     const deviceFwVersion = selectDeviceFirmwareVersionArray(state);

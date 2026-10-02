@@ -46,9 +46,9 @@ const ethAccount = mockWalletAccount({ symbol: asNetworkSymbol('eth'), deviceSta
 const tronAccount = mockWalletAccount({ symbol: asNetworkSymbol('trx'), deviceState });
 const publicAccounts = [btcAccount, ethAccount, tronAccount];
 const mockRouteContent = jest.fn(() => <div data-testid="earn-content" />);
-const components = Object.fromEntries(
+const components: Record<string, ComponentType> = Object.fromEntries(
     suiteRoutes.map(route => [route.name, mockRouteContent]),
-) as Record<PageName, ComponentType>;
+);
 
 const createOperations = (canSignAccount: (account: Account) => boolean) =>
     createMockDeps<WalletDeviceOperations>({

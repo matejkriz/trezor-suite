@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { Translation } from '@suite/intl';
-import { isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
+import { getDeviceBrandName, selectSelectedDevice } from '@suite-common/device';
 import * as deviceUtils from '@suite-common/suite-utils';
 import { selectHasRunningDiscovery } from '@suite-common/wallet-core';
 import { ActionButton, ActionColumn, SectionItem, TextColumn } from '@trezor/product-components';
@@ -29,11 +29,10 @@ export const ForgetDevice = () => {
                 <TextColumn
                     title={<Translation id="TR_FORGET_DEVICE_HEADING" />}
                     description={
-                        isLedgerDevice(selectedDevice) ? (
-                            'Remove this Ledger from Trezor Suite on this computer. Your device and funds stay intact.'
-                        ) : (
-                            <Translation id="TR_FORGET_DEVICE_DESCRIPTION" />
-                        )
+                        <Translation
+                            id="TR_FORGET_PROVIDER_DEVICE_DESCRIPTION"
+                            values={{ deviceBrand: getDeviceBrandName(selectedDevice) }}
+                        />
                     }
                 />
                 <ActionColumn>

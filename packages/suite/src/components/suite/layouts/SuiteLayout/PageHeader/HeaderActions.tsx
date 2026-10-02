@@ -2,7 +2,7 @@ import { selectFullSelectedAccount } from '@suite/account';
 import { useDevice } from '@suite/device';
 import { Translation } from '@suite/intl';
 import { selectRouterParams } from '@suite/router';
-import { isLedgerDevice } from '@suite-common/device';
+import { getDeviceOperationCapabilities } from '@suite-common/device';
 import { useWalletDeviceAccountCapabilities } from '@suite-common/wallet-core';
 import { Row } from '@trezor/components';
 import { ButtonGroup } from '@trezor/components/src/components/buttons/ButtonGroup/ButtonGroup';
@@ -31,7 +31,7 @@ export const HeaderActions = () => {
 
     return (
         <Row gap={12} alignItems="center">
-            {!isLedgerDevice(device) && (
+            {getDeviceOperationCapabilities(device).messageSigning && (
                 <HeaderDropdown isDisabled={isAccountLoading} showSignAndVerify />
             )}
 
@@ -57,7 +57,7 @@ export const HeaderActions = () => {
                         <Translation id="TR_NAV_RECEIVE" />
                     </HeaderActionButton>
 
-                    {canSignTransaction && (
+                    {canSignTransaction ? (
                         <HeaderActionButton
                             key="wallet-send"
                             icon={ArrowUpIcon}
@@ -71,7 +71,7 @@ export const HeaderActions = () => {
                         >
                             <Translation id="TR_NAV_SEND" />
                         </HeaderActionButton>
-                    )}
+                    ) : null}
                 </ButtonGroup>
             </AppNavigationTooltip>
         </Row>

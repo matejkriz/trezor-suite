@@ -1,13 +1,13 @@
 import { Translation } from '@suite/intl';
 import {
-    isLedgerDevice,
+    getDeviceBrandName,
     selectDeviceLabelOrNameById,
     selectSelectedDevice,
 } from '@suite-common/device';
-import { getDeviceInternalModel } from '@suite-common/suite-utils';
-import { Icon, Image, Row } from '@trezor/components';
-import { CableUsbCIcon, LinkBreakIcon, LinkIcon } from '@trezor/icons';
+import { Row } from '@trezor/components';
+import { LinkBreakIcon, LinkIcon } from '@trezor/icons';
 
+import { DeviceImage } from 'src/components/suite/DeviceImage';
 import { useSelector } from 'src/hooks/suite';
 
 import { DeviceConnectionText } from './DeviceConnectionText';
@@ -25,26 +25,13 @@ export const SmallDeviceItem = ({ forceAlternativeDeviceLabel }: SmallDeviceItem
 
     const isConnected = selectedDevice?.connected ?? false;
 
-    const selectedDeviceModelInternal = getDeviceInternalModel(selectedDevice);
-
     return (
         <Row gap={8} padding={{ vertical: 8, horizontal: 8 }} alignItems="center">
-            {isLedgerDevice(selectedDevice) ? (
-                <Icon as={CableUsbCIcon} size={18} />
-            ) : (
-                <Image
-                    width={18}
-                    objectFit="contain"
-                    alt="Trezor"
-                    image={`TREZOR_${selectedDeviceModelInternal}`}
-                />
-            )}
+            <DeviceImage device={selectedDevice} size={18} />
 
             <DeviceDetail
                 label={
-                    forceAlternativeDeviceLabel ||
-                    deviceLabel ||
-                    (isLedgerDevice(selectedDevice) ? 'Ledger' : 'Trezor')
+                    forceAlternativeDeviceLabel || deviceLabel || getDeviceBrandName(selectedDevice)
                 }
             >
                 <DeviceConnectionText

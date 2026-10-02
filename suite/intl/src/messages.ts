@@ -778,10 +778,6 @@ export const messages = defineMessages({
         defaultMessage: 'Failed to update slippage. Please try again.',
         id: 'TR_EXCHANGE_SWAP_SLIPPAGE_ERROR',
     },
-    TR_EXCHANGE_CONFIRM_ON_TREZOR_SEND: {
-        defaultMessage: 'Confirm on Trezor & send',
-        id: 'TR_EXCHANGE_CONFIRM_ON_TREZOR_SEND',
-    },
     TR_EXCHANGE_RECEIVE_NON_SUITE_ACCOUNT_QUESTION_TOOLTIP: {
         id: 'TR_EXCHANGE_RECEIVE_NON_SUITE_ACCOUNT_QUESTION_TOOLTIP',
         defaultMessage: 'Receive account is outside of Trezor Suite.',
@@ -921,10 +917,6 @@ export const messages = defineMessages({
     TR_SELL_SEND_TO: {
         defaultMessage: "Send to {providerName}'s address",
         id: 'TR_SELL_SEND_TO',
-    },
-    TR_SELL_CONFIRM_ON_TREZOR_SEND: {
-        defaultMessage: 'Confirm on Trezor & send',
-        id: 'TR_SELL_CONFIRM_ON_TREZOR_SEND',
     },
     TR_SELL_BANK_ACCOUNT: {
         defaultMessage: 'Your bank accounts',
@@ -5094,22 +5086,9 @@ export const messages = defineMessages({
         id: 'TR_FORGET_DEVICE_HEADING',
         defaultMessage: 'Forget device',
     },
-    TR_FORGET_DEVICE_DESCRIPTION: {
-        id: 'TR_FORGET_DEVICE_DESCRIPTION',
-        defaultMessage:
-            'Permanently delete all data related to your Trezor from this computer, including Bluetooth pairing and connection settings.',
-    },
     TR_DEVICE_CONNECTION: {
         id: 'TR_DEVICE_CONNECTION',
         defaultMessage: 'Device connection',
-    },
-    TR_FORGET_DEVICE_MODAL_HEADING: {
-        id: 'TR_FORGET_DEVICE_MODAL_HEADING',
-        defaultMessage: 'Forget this Trezor?',
-    },
-    TR_FORGET_DEVICE_MODAL_BULLET_FORGET: {
-        id: 'TR_FORGET_DEVICE_MODAL_BULLET_FORGET',
-        defaultMessage: 'Trezor Suite will forget this Trezor.',
     },
     TR_FORGET_DEVICE_MODAL_BLUETOOTH_REMOVED_AND_DISCONNECTED: {
         id: 'TR_FORGET_DEVICE_MODAL_BLUETOOTH_REMOVED_AND_DISCONNECTED',
@@ -5203,10 +5182,6 @@ export const messages = defineMessages({
     RECEIVE_ADDRESS_COPIED_STEP_VERIFY: {
         id: 'RECEIVE_ADDRESS_COPIED_STEP_VERIFY',
         defaultMessage: 'Verify the pasted address against your Trezor for maximum safety.',
-    },
-    RECEIVE_VERIFY_ON_TREZOR: {
-        id: 'RECEIVE_VERIFY_ON_TREZOR',
-        defaultMessage: 'Verify on Trezor',
     },
     RECEIVE_SHARE: {
         id: 'RECEIVE_SHARE',
@@ -12367,10 +12342,6 @@ export const messages = defineMessages({
         id: 'TR_DEVICE_DISCONNECTED_TOOLTIP_ITEM_1',
         defaultMessage: 'Enable auto-eject to hide your balances when you disconnect your Trezor.',
     },
-    TR_DEVICE_DISCONNECTED_TOOLTIP_ITEM_2: {
-        id: 'TR_DEVICE_DISCONNECTED_TOOLTIP_ITEM_2',
-        defaultMessage: "Assets can't be moved or swapped without a connected Trezor.",
-    },
     TR_DEVICE_DISCONNECTED_TOOLTIP_BUTTON_PRIMARY: {
         id: 'TR_DEVICE_DISCONNECTED_TOOLTIP_BUTTON_PRIMARY',
         defaultMessage: 'Got it',
@@ -12378,14 +12349,6 @@ export const messages = defineMessages({
     TR_DEVICE_DISCONNECTED_TOOLTIP_BUTTON_SECONDARY: {
         id: 'TR_DEVICE_DISCONNECTED_TOOLTIP_BUTTON_SECONDARY',
         defaultMessage: 'Enable auto-eject',
-    },
-    TR_CONNECT_DEVICE_GENERIC_PROMO_TITLE: {
-        id: 'TR_CONNECT_DEVICE_GENERIC_PROMO_TITLE',
-        defaultMessage: 'Trezor disconnected',
-    },
-    TR_CONNECT_DEVICE_GENERIC_PROMO_DESCRIPTION: {
-        id: 'TR_CONNECT_DEVICE_GENERIC_PROMO_DESCRIPTION',
-        defaultMessage: 'Connect your Trezor to continue.',
     },
     TR_SELECT_TREZOR: {
         id: 'TR_SELECT_TREZOR',
@@ -13402,5 +13365,42 @@ export const messages = defineMessages({
     KILLSWITCH_SCREEN_DEFAULT_CONTENT: {
         id: 'KILLSWITCH_SCREEN_DEFAULT_CONTENT',
         defaultMessage: 'Update to continue using Trezor Suite. Your funds are secure.',
+    },
+    TR_CONFIRM_ON_DEVICE: {
+        id: 'TR_CONFIRM_ON_DEVICE',
+        defaultMessage: 'Confirm on {deviceBrand}',
+    },
+    TR_CONFIRM_ON_DEVICE_AND_SEND: {
+        id: 'TR_CONFIRM_ON_DEVICE_AND_SEND',
+        defaultMessage: 'Confirm on {deviceBrand} & send',
+    },
+    TR_VERIFY_ON_DEVICE: {
+        id: 'TR_VERIFY_ON_DEVICE',
+        defaultMessage: 'Verify on {deviceBrand}',
+    },
+    TR_DEVICE_DISCONNECTED: {
+        id: 'TR_DEVICE_DISCONNECTED',
+        defaultMessage: '{deviceBrand} disconnected',
+    },
+    TR_CONNECT_DEVICE_TO_CONTINUE: {
+        id: 'TR_CONNECT_DEVICE_TO_CONTINUE',
+        defaultMessage: 'Connect your {deviceBrand} to continue.',
+    },
+    TR_DEVICE_DISCONNECTED_ASSETS_WARNING: {
+        id: 'TR_DEVICE_DISCONNECTED_ASSETS_WARNING',
+        defaultMessage: "Assets can't be moved or swapped without a connected {deviceBrand}.",
+    },
+    TR_FORGET_PROVIDER_DEVICE_DESCRIPTION: {
+        id: 'TR_FORGET_PROVIDER_DEVICE_DESCRIPTION',
+        defaultMessage:
+            'Remove this {deviceBrand} from Trezor Suite on this computer. Your device and funds stay intact.',
+    },
+    TR_FORGET_PROVIDER_DEVICE_HEADING: {
+        id: 'TR_FORGET_PROVIDER_DEVICE_HEADING',
+        defaultMessage: 'Forget this {deviceBrand}?',
+    },
+    TR_FORGET_PROVIDER_DEVICE_BULLET: {
+        id: 'TR_FORGET_PROVIDER_DEVICE_BULLET',
+        defaultMessage: 'Trezor Suite will forget this {deviceBrand}.',
     },
 } as const);

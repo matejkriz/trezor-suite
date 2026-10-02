@@ -6,6 +6,7 @@ import { useServices } from '@suite-common/dependency-injection';
 import { deviceActions } from '@suite-common/device';
 import { injectDispatch } from '@suite-common/redux-utils';
 import { type AcquiredDevice } from '@suite-common/suite-types';
+import { disconnectWalletDeviceThunk } from '@suite-common/wallet-core';
 import { Box, Button, H4, Paragraph, Row } from '@trezor/components';
 import { EjectIcon } from '@trezor/icons';
 
@@ -18,7 +19,8 @@ type EjectConfirmationProps = {
 export const EjectConfirmation = ({ onClick, onCancel, instance }: EjectConfirmationProps) => {
     const { analytics, dispatch } = useServices(injectDesktopAnalytics, injectDispatch);
 
-    const handleEject = () => {
+    const handleEject = async () => {
+        await dispatch(disconnectWalletDeviceThunk({ device: instance }));
         dispatch(deviceActions.forgetDevice({ device: instance }));
 
         analytics.report({

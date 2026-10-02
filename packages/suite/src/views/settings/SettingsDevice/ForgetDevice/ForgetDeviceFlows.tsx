@@ -22,23 +22,6 @@ export type ForgetFlowProps = {
  * Confirmation → forget immediately.
  */
 export const ImmediateForgetFlow = ({ onCancel }: ForgetFlowProps) => {
-    const { dispatch, forgetDevice } = useForgetDevice();
-
-    return (
-        <ConfirmationModal
-            onConfirm={() => {
-                forgetDevice();
-                dispatch(gotoThunk({ routeName: 'suite-index' }));
-                onCancel();
-            }}
-            onCancel={onCancel}
-            isBluetoothDevice={false}
-            isBluetoothConnectedDevice={false}
-        />
-    );
-};
-
-export const LedgerForgetFlow = ({ onCancel }: ForgetFlowProps) => {
     const device = useSelector(selectSelectedDevice);
     const { dispatch, forgetDevice } = useForgetDevice();
 
@@ -46,14 +29,13 @@ export const LedgerForgetFlow = ({ onCancel }: ForgetFlowProps) => {
         <ConfirmationModal
             onConfirm={async () => {
                 if (device) await dispatch(disconnectWalletDeviceThunk({ device }));
-                await forgetDevice();
+                await forgetDevice({ deviceId: device?.id ?? undefined });
                 dispatch(gotoThunk({ routeName: 'suite-index' }));
                 onCancel();
             }}
             onCancel={onCancel}
             isBluetoothDevice={false}
             isBluetoothConnectedDevice={false}
-            isLedger
         />
     );
 };

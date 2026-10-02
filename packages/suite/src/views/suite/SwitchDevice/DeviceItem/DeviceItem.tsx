@@ -4,9 +4,12 @@ import { selectHasSeenDisconnectTooltip, setFlag } from '@suite/flags';
 import { Translation } from '@suite/intl';
 import { SettingsAnchor, gotoThunk } from '@suite/router';
 import { useServices } from '@suite-common/dependency-injection';
-import { isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
+import {
+    getDeviceBrandName,
+    getDeviceSettingsCapabilities,
+    selectSelectedDevice,
+} from '@suite-common/device';
 import { injectDispatch } from '@suite-common/redux-utils';
-import { DEFAULT_FLAGSHIP_MODEL } from '@suite-common/suite-constants';
 import * as deviceUtils from '@suite-common/suite-utils';
 import {
     Button,
@@ -19,12 +22,12 @@ import {
     Tooltip,
 } from '@trezor/components';
 import { EjectIcon } from '@trezor/icons';
-import { mapTrezorModelToIcon } from '@trezor/product-components';
 
 import {
     addDeviceIdToSeenDisconnectNotification,
     setRecentlyDisconnectedDevice,
 } from 'src/actions/suite/suiteActions';
+import { getDeviceIcon } from 'src/components/suite/DeviceImage';
 import { useSelector } from 'src/hooks/suite';
 import { selectRecentlyDisconnectedDevice } from 'src/selectors/suite/suiteSelectors';
 import type { AcquiredDevice, ForegroundAppProps, TrezorDevice } from 'src/types/suite';
@@ -59,12 +62,12 @@ export const DeviceItem = ({ device, instances, onCancel }: DeviceItemProps) => 
     const recentlyDisconnectedDevice = useSelector(selectRecentlyDisconnectedDevice);
     const hasSeenDisconnectTooltip = useSelector(selectHasSeenDisconnectTooltip);
     const [showTooltip, setShowTooltip] = useState(false);
-    const deviceModelInternal = device.features?.internal_model || DEFAULT_FLAGSHIP_MODEL;
-    const isLedger = isLedgerDevice(device);
+    const capabilities = getDeviceSettingsCapabilities(device);
+    const deviceBrand = getDeviceBrandName(device);
     const instancesWithState = instances.filter(i => i.state);
 
     useEffect(() => {
-        if (!isLedger && recentlyDisconnectedDevice === device.id) {
+        if (recentlyDisconnectedDevice === device.id) {
             if (!device.connected && !hasSeenDisconnectTooltip) {
                 setShowTooltip(true);
             } else {
@@ -80,7 +83,6 @@ export const DeviceItem = ({ device, instances, onCancel }: DeviceItemProps) => 
         device.connected,
         hasSeenDisconnectTooltip,
         dispatch,
-        isLedger,
     ]);
 
     const onTooltipClose = () => {
@@ -116,10 +118,6 @@ export const DeviceItem = ({ device, instances, onCancel }: DeviceItemProps) => 
                                 />
                             );
 
-                            if (isLedger) {
-                                return walletInstance;
-                            }
-
                             return (
                                 <Tooltip
                                     content={
@@ -140,10 +138,11 @@ export const DeviceItem = ({ device, instances, onCancel }: DeviceItemProps) => 
                                                 <ListItem icon={EjectIcon}>
                                                     <Translation id="TR_DEVICE_DISCONNECTED_TOOLTIP_ITEM_1" />
                                                 </ListItem>
-                                                <ListItem
-                                                    icon={mapTrezorModelToIcon[deviceModelInternal]}
-                                                >
-                                                    <Translation id="TR_DEVICE_DISCONNECTED_TOOLTIP_ITEM_2" />
+                                                <ListItem icon={getDeviceIcon(device)}>
+                                                    <Translation
+                                                        id="TR_DEVICE_DISCONNECTED_ASSETS_WARNING"
+                                                        values={{ deviceBrand }}
+                                                    />
                                                 </ListItem>
                                             </List>
                                             <Row gap={12} margin={{ top: 8 }} flexWrap="wrap">
@@ -187,7 +186,7 @@ export const DeviceItem = ({ device, instances, onCancel }: DeviceItemProps) => 
                         })}
                     </Column>
                 )}
-                {!isLedger && (
+                {capabilities.passphrase && (
                     <AddWalletButton device={device} instances={instances} onCancel={onCancel} />
                 )}
             </Column>

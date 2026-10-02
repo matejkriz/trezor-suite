@@ -14,6 +14,7 @@ export * from './components/ContinueOnTrezorScreenContent';
 export * from './components/FollowDeviceScreenContent';
 export * from './components/ConnectAndUnlockDeviceScreenContent';
 export * from './components/ConnectLedgerDeviceScreenContent';
+export * from './components/DeviceConnectionScreenContent';
 export * from './components/TurnOnAndUnlockDeviceScreenContent';
 export * from './components/DeviceDangerBanner';
 export * from './utils';

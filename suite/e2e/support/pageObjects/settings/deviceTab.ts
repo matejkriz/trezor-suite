@@ -123,13 +123,17 @@ export class DeviceTab {
     }
 
     @step()
-    async verifyForgetDeviceModal(translation: TranslationKey) {
+    async verifyForgetDeviceModal(translation: TranslationKey, deviceBrand = 'Trezor') {
         await expect(this.page.modal).toBeVisible();
-        await expect(this.page.modalHeader).toHaveTranslation(translation);
+        await expect(this.page.modalHeader).toHaveTranslation(translation, {
+            values: { deviceBrand },
+        });
     }
 
     @step()
-    async verifyForgetDeviceContent(translation: TranslationKey[]) {
-        await expect(this.deviceForgetConfirmContent.locator('li')).toHaveTranslation(translation);
+    async verifyForgetDeviceContent(translation: TranslationKey[], deviceBrand = 'Trezor') {
+        await expect(this.deviceForgetConfirmContent.locator('li')).toHaveTranslation(translation, {
+            values: { deviceBrand },
+        });
     }
 }

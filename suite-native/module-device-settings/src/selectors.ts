@@ -1,4 +1,8 @@
-import { type DeviceRootState, isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
+import {
+    type DeviceRootState,
+    getDeviceInformation,
+    selectSelectedDevice,
+} from '@suite-common/device';
 import { createWeakMapSelector } from '@suite-common/redux-utils';
 import { type ThpRootState, selectThpCredentials } from '@suite-common/thp';
 import { type TxKeyPath } from '@suite-native/intl';
@@ -11,9 +15,10 @@ type DeviceInformationItem = {
 export const selectDeviceSettingsInformation = createWeakMapSelector(
     [selectSelectedDevice],
     (device): DeviceInformationItem[] => {
-        if (!isLedgerDevice(device) || !device.ledgerInfo) return [];
+        const deviceInfo = getDeviceInformation(device);
+        if (!deviceInfo) return [];
 
-        const { model, osVersion, bitcoinAppVersion, batteryLevel } = device.ledgerInfo;
+        const { model, osVersion, bitcoinAppVersion, batteryLevel } = deviceInfo;
         const information: DeviceInformationItem[] = [
             { title: 'moduleDeviceSettings.deviceInfo.model', value: model },
         ];

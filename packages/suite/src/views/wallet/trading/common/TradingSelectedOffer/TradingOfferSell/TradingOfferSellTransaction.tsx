@@ -1,7 +1,7 @@
 import { events, injectDesktopAnalytics } from '@suite/analytics';
 import { Translation } from '@suite/intl';
 import { useServices } from '@suite-common/dependency-injection';
-import { isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
+import { getDeviceBrandName, selectSelectedDevice } from '@suite-common/device';
 import {
     selectTradingSellActiveTrade,
     selectTradingSellInfo,
@@ -156,11 +156,8 @@ export const TradingSelectedOfferSellTransaction = () => {
                     data-testid="@trading/offer/confirm-on-trezor-and-send"
                 >
                     <Translation
-                        id={
-                            isLedgerDevice(device)
-                                ? 'TR_SELL_CONFIRM_SEND_STEP'
-                                : 'TR_SELL_CONFIRM_ON_TREZOR_SEND'
-                        }
+                        id="TR_CONFIRM_ON_DEVICE_AND_SEND"
+                        values={{ deviceBrand: getDeviceBrandName(device) }}
                     />
                 </Button>
             </Column>

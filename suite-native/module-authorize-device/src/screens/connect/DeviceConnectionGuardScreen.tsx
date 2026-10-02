@@ -3,18 +3,10 @@ import { useSelector } from 'react-redux';
 
 import { useFocusEffect } from '@react-navigation/native';
 
+import { selectIsDeviceAuthorized, selectIsDeviceConnected } from '@suite-common/device';
 import {
-    isLedgerDevice,
-    selectIsBluetoothSupportedByDevice,
-    selectIsDeviceAuthorized,
-    selectIsDeviceConnected,
-    selectSelectedDevice,
-} from '@suite-common/device';
-import { selectBluetoothPermissionStatus } from '@suite-native/bluetooth';
-import {
-    ConnectAndUnlockDeviceScreenContent,
-    ConnectLedgerDeviceScreenContent,
-    TurnOnAndUnlockDeviceScreenContent,
+    DeviceConnectionScreenContent,
+    selectIsDeviceConnectionScrollable,
 } from '@suite-native/device';
 import { ConnectDeviceScreenHeader } from '@suite-native/device-authorization';
 import {
@@ -35,12 +27,7 @@ export const DeviceConnectionGuardScreen = ({
 >) => {
     const isDeviceConnected = useSelector(selectIsDeviceConnected);
     const isDeviceAuthorized = useSelector(selectIsDeviceAuthorized);
-    const bluetoothPermissionStatus = useSelector(selectBluetoothPermissionStatus);
-    const isBluetoothSupportedByDevice = useSelector(selectIsBluetoothSupportedByDevice);
-    const selectedDevice = useSelector(selectSelectedDevice);
-
-    const isBluetoothVariantVisible =
-        bluetoothPermissionStatus === 'granted' && isBluetoothSupportedByDevice;
+    const isScrollable = useSelector(selectIsDeviceConnectionScrollable);
 
     useFocusEffect(
         useCallback(() => {
@@ -50,12 +37,6 @@ export const DeviceConnectionGuardScreen = ({
         }, [isDeviceConnected, isDeviceAuthorized, navigation]),
     );
 
-    const trezorConnectionContent = isBluetoothVariantVisible ? (
-        <TurnOnAndUnlockDeviceScreenContent />
-    ) : (
-        <ConnectAndUnlockDeviceScreenContent />
-    );
-
     return (
         <Screen
             header={
@@ -63,13 +44,9 @@ export const DeviceConnectionGuardScreen = ({
                     onCancelNavigationTarget={params?.onCancelNavigationTarget}
                 />
             }
-            isScrollable={isLedgerDevice(selectedDevice)}
+            isScrollable={isScrollable}
         >
-            {isLedgerDevice(selectedDevice) ? (
-                <ConnectLedgerDeviceScreenContent expectedDeviceId={selectedDevice.id} />
-            ) : (
-                trezorConnectionContent
-            )}
+            <DeviceConnectionScreenContent />
         </Screen>
     );
 };

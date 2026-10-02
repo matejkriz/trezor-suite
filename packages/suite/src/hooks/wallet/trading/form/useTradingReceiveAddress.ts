@@ -7,7 +7,7 @@ import { selectFullSelectedAccount } from '@suite/account';
 import { selectIsDebugModeActive } from '@suite/debug';
 import { useServices } from '@suite-common/dependency-injection';
 import {
-    isLedgerDevice,
+    getDeviceOperationCapabilities,
     selectActiveWalletStaticSessionId,
     selectSelectedDevice,
 } from '@suite-common/device';
@@ -120,7 +120,7 @@ export const useTradingReceiveAddress = ({
     const canAddSuiteAccount = !!(
         device?.connected &&
         isSupportedNetwork &&
-        !isLedgerDevice(device)
+        getDeviceOperationCapabilities(device).manualAccounts
     );
     const canUseNonSuiteAccount = nonSuiteAccount;
     const hasSuiteReceiveAccount = !!suiteReceiveAccounts?.length;

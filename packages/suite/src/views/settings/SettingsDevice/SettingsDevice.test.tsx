@@ -41,15 +41,13 @@ describe('Ledger Device settings', () => {
 
         renderWithProviders(root, <SettingsDevice />);
 
-        expect(screen.getByTestId('@settings/device/ledger/name')).toHaveTextContent('My Ledger');
-        expect(screen.getByTestId('@settings/device/ledger/model')).toHaveTextContent(
-            'Ledger Flex',
-        );
-        expect(screen.getByTestId('@settings/device/ledger/os-version')).toHaveTextContent('1.3.0');
-        expect(screen.getByTestId('@settings/device/ledger/bitcoin-app-version')).toHaveTextContent(
+        expect(screen.getByTestId('@settings/device/info/name')).toHaveTextContent('My Ledger');
+        expect(screen.getByTestId('@settings/device/info/model')).toHaveTextContent('Ledger Flex');
+        expect(screen.getByTestId('@settings/device/info/os-version')).toHaveTextContent('1.3.0');
+        expect(screen.getByTestId('@settings/device/info/bitcoin-app-version')).toHaveTextContent(
             '2.4.0',
         );
-        expect(screen.getByTestId('@settings/device/ledger/battery')).toHaveTextContent('80%');
+        expect(screen.getByTestId('@settings/device/info/battery')).toHaveTextContent('80%');
         expect(screen.getByTestId('@settings/device/forget-button')).toBeInTheDocument();
         expect(screen.getByTestId('@settings/device/forget')).toHaveTextContent(
             'Remove this Ledger from Trezor Suite',

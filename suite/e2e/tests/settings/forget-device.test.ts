@@ -36,10 +36,10 @@ test.describe('Device Settings - Forget TS7', { tag: ['@T3W1', '@optional'] }, (
                 await settingsPage.deviceTab.deviceForgetButton.click();
 
                 await settingsPage.deviceTab.verifyForgetDeviceModal(
-                    'TR_FORGET_DEVICE_MODAL_HEADING',
+                    'TR_FORGET_PROVIDER_DEVICE_HEADING',
                 );
                 await settingsPage.deviceTab.verifyForgetDeviceContent([
-                    'TR_FORGET_DEVICE_MODAL_BULLET_FORGET',
+                    'TR_FORGET_PROVIDER_DEVICE_BULLET',
                     'TR_FORGET_DEVICE_MODAL_BLUETOOTH_REMOVED',
                     'TR_FORGET_DEVICE_MODAL_BULLET_NOT_WIPE',
                 ]);
@@ -83,10 +83,10 @@ test.describe('Device Settings - Forget TS7', { tag: ['@T3W1', '@optional'] }, (
                 await settingsPage.deviceTab.deviceForgetButton.click();
 
                 await settingsPage.deviceTab.verifyForgetDeviceModal(
-                    'TR_FORGET_DEVICE_MODAL_HEADING',
+                    'TR_FORGET_PROVIDER_DEVICE_HEADING',
                 );
                 await settingsPage.deviceTab.verifyForgetDeviceContent([
-                    'TR_FORGET_DEVICE_MODAL_BULLET_FORGET',
+                    'TR_FORGET_PROVIDER_DEVICE_BULLET',
                     'TR_FORGET_DEVICE_MODAL_BLUETOOTH_REMOVED',
                     'TR_FORGET_DEVICE_MODAL_BULLET_NOT_WIPE',
                 ]);
@@ -132,10 +132,10 @@ test.describe('Device Settings - Forget TS7', { tag: ['@T3W1', '@optional'] }, (
                 await settingsPage.deviceTab.deviceForgetButton.click();
 
                 await settingsPage.deviceTab.verifyForgetDeviceModal(
-                    'TR_FORGET_DEVICE_MODAL_HEADING',
+                    'TR_FORGET_PROVIDER_DEVICE_HEADING',
                 );
                 await settingsPage.deviceTab.verifyForgetDeviceContent([
-                    'TR_FORGET_DEVICE_MODAL_BULLET_FORGET',
+                    'TR_FORGET_PROVIDER_DEVICE_BULLET',
                     'TR_FORGET_DEVICE_MODAL_BULLET_NOT_WIPE',
                 ]);
             });
@@ -177,10 +177,10 @@ test.describe('Device Settings - Forget TS7', { tag: ['@T3W1', '@optional'] }, (
                 await settingsPage.deviceTab.deviceForgetButton.click();
 
                 await settingsPage.deviceTab.verifyForgetDeviceModal(
-                    'TR_FORGET_DEVICE_MODAL_HEADING',
+                    'TR_FORGET_PROVIDER_DEVICE_HEADING',
                 );
                 await settingsPage.deviceTab.verifyForgetDeviceContent([
-                    'TR_FORGET_DEVICE_MODAL_BULLET_FORGET',
+                    'TR_FORGET_PROVIDER_DEVICE_BULLET',
                     'TR_FORGET_DEVICE_MODAL_BULLET_NOT_WIPE',
                 ]);
             });
@@ -208,7 +208,7 @@ test.describe('Device Settings - Forget TS7', { tag: ['@T3W1', '@optional'] }, (
                 await settingsPage.deviceTab.deviceForgetButton.click();
 
                 await settingsPage.deviceTab.verifyForgetDeviceModal(
-                    'TR_FORGET_DEVICE_MODAL_HEADING',
+                    'TR_FORGET_PROVIDER_DEVICE_HEADING',
                 );
             });
 
@@ -282,10 +282,10 @@ test.describe('Device Settings - Forget TS5', { tag: ['@T3T1', '@optional'] }, (
                 await settingsPage.deviceTab.deviceForgetButton.click();
 
                 await settingsPage.deviceTab.verifyForgetDeviceModal(
-                    'TR_FORGET_DEVICE_MODAL_HEADING',
+                    'TR_FORGET_PROVIDER_DEVICE_HEADING',
                 );
                 await settingsPage.deviceTab.verifyForgetDeviceContent([
-                    'TR_FORGET_DEVICE_MODAL_BULLET_FORGET',
+                    'TR_FORGET_PROVIDER_DEVICE_BULLET',
                     'TR_FORGET_DEVICE_MODAL_BULLET_NOT_WIPE',
                 ]);
             });
@@ -325,10 +325,10 @@ test.describe('Device Settings - Forget TS5', { tag: ['@T3T1', '@optional'] }, (
                 await settingsPage.deviceTab.deviceForgetButton.click();
 
                 await settingsPage.deviceTab.verifyForgetDeviceModal(
-                    'TR_FORGET_DEVICE_MODAL_HEADING',
+                    'TR_FORGET_PROVIDER_DEVICE_HEADING',
                 );
                 await settingsPage.deviceTab.verifyForgetDeviceContent([
-                    'TR_FORGET_DEVICE_MODAL_BULLET_FORGET',
+                    'TR_FORGET_PROVIDER_DEVICE_BULLET',
                     'TR_FORGET_DEVICE_MODAL_BULLET_NOT_WIPE',
                 ]);
             });

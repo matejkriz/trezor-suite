@@ -1,4 +1,4 @@
-import { isLedgerDevice, selectDevices, selectSelectedDevice } from '@suite-common/device';
+import { selectDevices, selectSelectedDevice } from '@suite-common/device';
 import * as deviceUtils from '@suite-common/suite-utils';
 import { getDeviceInternalModel } from '@suite-common/suite-utils';
 
@@ -37,8 +37,7 @@ export const SidebarDeviceStatus = () => {
     const instancesWithState = instances.filter(i => i.state);
 
     const isConnectionShown =
-        isLedgerDevice(selectedDevice) ||
-        (instancesWithState.length === 1 && selectedDevice.useEmptyPassphrase === true);
+        instancesWithState.length === 1 && selectedDevice.useEmptyPassphrase === true;
 
     return (
         <DeviceStatus

@@ -5,7 +5,7 @@ import { useDevice } from '@suite/device';
 import { Translation } from '@suite/intl';
 import { gotoThunk } from '@suite/router';
 import { useServices } from '@suite-common/dependency-injection';
-import { isLedgerDevice } from '@suite-common/device';
+import { getDeviceBrandName } from '@suite-common/device';
 import {
     Feature,
     type MessageSystemRootState,
@@ -217,11 +217,8 @@ export const TradingOfferExchange = () => {
                             width="100%"
                         >
                             <Translation
-                                id={
-                                    isLedgerDevice(device)
-                                        ? 'TR_SELL_CONFIRM_SEND_STEP'
-                                        : 'TR_EXCHANGE_CONFIRM_ON_TREZOR_SEND'
-                                }
+                                id="TR_CONFIRM_ON_DEVICE_AND_SEND"
+                                values={{ deviceBrand: getDeviceBrandName(device) }}
                             />
                         </Button>
                     )}
