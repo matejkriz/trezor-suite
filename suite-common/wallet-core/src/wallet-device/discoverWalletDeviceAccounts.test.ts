@@ -8,12 +8,14 @@ import {
     serializeLedgerDiscoveryKey,
 } from '@suite-common/ledger';
 import { asNetworkSymbol } from '@suite-common/wallet-config';
+import TrezorConnect from '@trezor/connect';
 import { bip32 } from '@trezor/utxo-lib';
 
 import {
-    type WalletDeviceServiceDeps,
-    createWalletDeviceService,
-} from './createWalletDeviceService';
+    type LedgerWalletDeviceOperationsDeps,
+    createLedgerWalletDeviceOperationsFactory,
+} from './createLedgerWalletDeviceOperations';
+import { createWalletDeviceService } from './createWalletDeviceService';
 import { WalletDeviceActionError } from './walletDeviceError';
 import { createLedgerSuiteDevice } from '../ledger/createLedgerSuiteDevice';
 
@@ -60,7 +62,7 @@ const prepareTest = (hasAccountsDiscovery = true) => {
         close: () => Promise.resolve(),
         readPublicKeys: requests => Promise.resolve(requests.map(createKey)),
     });
-    const deps = createMockDeps<WalletDeviceServiceDeps>({
+    const deps = createMockDeps<LedgerWalletDeviceOperationsDeps>({
         ledgerBitcoinService: {
             isConnectionOwner: candidate => candidate === owner,
             getDeviceInfo: () => ({ name: 'Test wallet', model: 'Ledger Flex' }),
@@ -96,7 +98,10 @@ const prepareTest = (hasAccountsDiscovery = true) => {
             }),
         ),
     };
-    const service = createWalletDeviceService(deps);
+    const service = createWalletDeviceService({
+        getOperations: createLedgerWalletDeviceOperationsFactory(deps),
+        cancelTrezorAction: reason => TrezorConnect.cancel(reason),
+    });
     const operations = service.get(device);
     if (!operations) throw new Error('Missing fixture operations');
 

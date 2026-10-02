@@ -1,7 +1,3 @@
-import { isLedgerDevice } from '@suite-common/device';
-import TrezorConnect from '@trezor/connect';
-
-import { createLedgerWalletDeviceOperations } from './createLedgerWalletDeviceOperations';
 import {
     type WalletDeviceService,
     type WalletDeviceServiceDep,
@@ -23,30 +19,17 @@ export type {
 } from './walletDeviceTypes';
 
 export const createWalletDeviceService = (deps: WalletDeviceServiceDeps): WalletDeviceService => ({
-    get: device =>
-        isLedgerDevice(device) ? createLedgerWalletDeviceOperations(deps, device) : undefined,
+    get: device => deps.getOperations(device),
     async cancelAction({ device, reason }) {
-        if (isLedgerDevice(device)) {
-            const owner = device.state?.sessionId;
-            if (!device.connected || !owner || !deps.ledgerBitcoinService.isConnectionOwner(owner))
-                return;
-
-            const cancellationReason = typeof reason === 'string' ? reason : reason?.reason;
-            deps.ledgerBitcoinService.cancelAction(
-                cancellationReason === 'tx-timeout' ? 'timeout' : 'cancelled',
-            );
+        const operations = device ? deps.getOperations(device) : undefined;
+        if (operations) {
+            await operations.cancelAction?.(reason);
         } else {
-            await TrezorConnect.cancel(reason);
+            await deps.cancelTrezorAction(reason);
         }
     },
     async disconnect(device) {
-        if (isLedgerDevice(device)) {
-            const owner = device.state?.sessionId;
-            if (!device.connected || !owner || !deps.ledgerBitcoinService.isConnectionOwner(owner))
-                return;
-
-            await deps.ledgerBitcoinService.disconnect({ owner });
-        }
+        await deps.getOperations(device)?.disconnect?.();
     },
 });
 

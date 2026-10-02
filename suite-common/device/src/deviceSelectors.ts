@@ -35,13 +35,14 @@ import {
 import { getSuiteVersion } from '@trezor/env-utils';
 import { versionUtils } from '@trezor/utils';
 
+import { isDeviceCapabilitySupported } from './deviceCapabilities';
 import {
     DEVICE_LOW_BATTERY_PERCENTAGE_THRESHOLD,
     PORTFOLIO_TRACKER_DEVICE_ID,
 } from './deviceConstants';
+import { getDeviceBrandName, getDeviceProvider } from './devicePresentation';
 import { type DeviceRootState } from './deviceReducer';
 import { isTrezorDeviceWithState } from './deviceUtils';
-import { isLedgerDevice } from './ledgerDevice';
 
 const createMemoizedSelector = createWeakMapSelector.withTypes<DeviceRootState>();
 
@@ -51,8 +52,13 @@ export const selectDevicesCount = (state: DeviceRootState) => state.device?.devi
 
 export const selectSelectedDevice = (state: DeviceRootState) => state.device.selectedDevice;
 
-export const selectDeviceBrandName = createMemoizedSelector([selectSelectedDevice], device =>
-    isLedgerDevice(device) ? 'Ledger' : 'Trezor',
+export const selectDeviceBrandName = createMemoizedSelector(
+    [selectSelectedDevice],
+    getDeviceBrandName,
+);
+export const selectDeviceProvider = createMemoizedSelector(
+    [selectSelectedDevice],
+    getDeviceProvider,
 );
 
 export const selectActiveWalletStaticSessionId = (state: DeviceRootState) =>
@@ -386,7 +392,7 @@ export const selectDeviceModelWithFlagshipFallback = (
 ): DeviceModelInternal => getDeviceModelWithFlagshipFallback(selectSelectedDevice(state));
 
 const getIsDeviceAuthenticityCheckSupported = (device?: Device): boolean =>
-    !isLedgerDevice(device) &&
+    isDeviceCapabilitySupported(device, 'settings.authenticity') &&
     !!device &&
     (device.id === PORTFOLIO_TRACKER_DEVICE_ID ||
         SUPPORTS_DEVICE_AUTHENTICITY_CHECK[getDeviceInternalModel(device)]);
@@ -405,21 +411,36 @@ export type DeviceSettingsCapabilities = {
     wipe: boolean;
     authenticity: boolean;
     bluetoothPairing: boolean;
+    language: boolean;
+    homescreen: boolean;
+    displayRotation: boolean;
+    brightness: boolean;
+    hapticFeedback: boolean;
+    autoLock: boolean;
+    safetyChecks: boolean;
+    wipeCode: boolean;
 };
 
 export const getDeviceSettingsCapabilities = (device?: Device): DeviceSettingsCapabilities => {
-    const unavailable = device?.unavailableCapabilities;
     const authenticity = getIsDeviceAuthenticityCheckSupported(device);
 
     return {
-        rename: !unavailable?.['settings.rename'],
-        pin: !unavailable?.['settings.pin'],
-        backup: !unavailable?.['settings.backup'],
-        passphrase: !unavailable?.['settings.passphrase'],
-        firmwareUpdate: !unavailable?.['settings.firmwareUpdate'],
-        wipe: !unavailable?.['settings.wipe'],
-        authenticity: authenticity && !unavailable?.['settings.authenticity'],
-        bluetoothPairing: !unavailable?.['settings.bluetoothPairing'],
+        rename: isDeviceCapabilitySupported(device, 'settings.rename'),
+        pin: isDeviceCapabilitySupported(device, 'settings.pin'),
+        backup: isDeviceCapabilitySupported(device, 'settings.backup'),
+        passphrase: isDeviceCapabilitySupported(device, 'settings.passphrase'),
+        firmwareUpdate: isDeviceCapabilitySupported(device, 'settings.firmwareUpdate'),
+        wipe: isDeviceCapabilitySupported(device, 'settings.wipe'),
+        authenticity,
+        bluetoothPairing: isDeviceCapabilitySupported(device, 'settings.bluetoothPairing'),
+        language: isDeviceCapabilitySupported(device, 'settings.language'),
+        homescreen: isDeviceCapabilitySupported(device, 'settings.homescreen'),
+        displayRotation: isDeviceCapabilitySupported(device, 'settings.displayRotation'),
+        brightness: isDeviceCapabilitySupported(device, 'settings.brightness'),
+        hapticFeedback: isDeviceCapabilitySupported(device, 'settings.hapticFeedback'),
+        autoLock: isDeviceCapabilitySupported(device, 'settings.autoLock'),
+        safetyChecks: isDeviceCapabilitySupported(device, 'settings.safetyChecks'),
+        wipeCode: isDeviceCapabilitySupported(device, 'settings.wipeCode'),
     };
 };
 

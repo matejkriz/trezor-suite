@@ -1,6 +1,6 @@
 import { RNBleTransportFactory } from '@ledgerhq/device-transport-kit-react-native-ble';
 
-import { deviceActions, isLedgerDevice, selectDevices } from '@suite-common/device';
+import { deviceActions } from '@suite-common/device';
 import { createLedgerBitcoinServiceForTransport } from '@suite-common/ledger';
 import { getSupportedNetworks } from '@suite-common/wallet-config';
 import { launchArguments } from '@suite-native/config';
@@ -45,12 +45,7 @@ export const createSuiteNativeCompositionRoot = (
         suspendDeviceScan: bluetoothManager.suspendDeviceScan,
         createService: () =>
             createLedgerBitcoinServiceForTransport(RNBleTransportFactory, 'available', () => {
-                selectDevices(store.getState())
-                    .filter(isLedgerDevice)
-                    .filter(device => device.connected)
-                    .forEach(device =>
-                        store.dispatch(deviceActions.disconnectLedgerDevice(device.id)),
-                    );
+                store.dispatch(deviceActions.disconnectDevicesByProvider('ledger'));
             }),
     });
     const nativeServices = createNativeServicesCompositionRoot({

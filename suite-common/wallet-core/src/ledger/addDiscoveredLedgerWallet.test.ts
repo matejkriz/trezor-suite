@@ -42,7 +42,7 @@ describe('addDiscoveredLedgerWallet', () => {
             type: discoveryActions.startDiscovery.type,
         });
         expect(dispatch.mock.calls[1]?.[0]).toMatchObject({
-            type: deviceActions.connectLedgerDevice.type,
+            type: deviceActions.registerDevice.type,
             payload: {
                 provider: 'ledger',
                 id: wallet.id,

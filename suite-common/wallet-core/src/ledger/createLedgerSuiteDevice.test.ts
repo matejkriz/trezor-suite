@@ -60,7 +60,7 @@ describe(createLedgerSuiteDevice.name, () => {
             deviceInfo,
         });
 
-        expect(device.ledgerInfo).toEqual({
+        expect(device.deviceInfo).toEqual({
             model: deviceInfo.model,
             osVersion: deviceInfo.osVersion,
             bitcoinAppVersion: deviceInfo.bitcoinAppVersion,
@@ -81,7 +81,7 @@ describe(createLedgerSuiteDevice.name, () => {
         expect(device.unavailableCapabilities.ada).toBe('no-support');
         expect(device.unavailableCapabilities['settings.firmwareUpdate']).toBe('no-support');
         expect(device.unavailableCapabilities['settings.authenticity']).toBe('no-support');
-        expect(device.ledgerInfo?.accountsDiscoveryAppVersion).toBe('0.1.0');
+        expect(device.deviceInfo?.accountsDiscoveryAppVersion).toBe('0.1.0');
         expect(device.features.capabilities).toContain('Capability_Ethereum');
         expect(device.features.capabilities).not.toContain('Capability_Cardano');
         expect(hasBitcoinOnlyFirmware(device)).toBe(false);

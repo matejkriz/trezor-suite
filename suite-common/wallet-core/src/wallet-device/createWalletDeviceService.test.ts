@@ -4,9 +4,10 @@ import { mockSuiteDevice } from '@suite-common/suite-types/mocks';
 import TrezorConnect from '@trezor/connect';
 
 import {
-    type WalletDeviceServiceDeps,
-    createWalletDeviceService,
-} from './createWalletDeviceService';
+    type LedgerWalletDeviceOperationsDeps,
+    createLedgerWalletDeviceOperationsFactory,
+} from './createLedgerWalletDeviceOperations';
+import { createWalletDeviceService } from './createWalletDeviceService';
 
 const ledgerDevice = {
     ...mockSuiteDevice({ connected: true, state: { sessionId: 'acquisition-a' } }),
@@ -15,7 +16,7 @@ const ledgerDevice = {
 
 describe('wallet device service', () => {
     it('resolves only the adapter for the selected vendor', () => {
-        const deps = createMockDeps<WalletDeviceServiceDeps>({
+        const deps = createMockDeps<LedgerWalletDeviceOperationsDeps>({
             ledgerBitcoinService: {
                 getDeviceInfo: null,
                 openAccountsDiscovery: null,
@@ -28,14 +29,17 @@ describe('wallet device service', () => {
             },
             dispatch: action => action,
         });
-        const service = createWalletDeviceService(deps);
+        const service = createWalletDeviceService({
+            getOperations: createLedgerWalletDeviceOperationsFactory(deps),
+            cancelTrezorAction: cancellation => TrezorConnect.cancel(cancellation),
+        });
 
         expect(service.get(ledgerDevice)).toBeDefined();
         expect(service.get(mockSuiteDevice())).toBeUndefined();
     });
 
     it('cancels Ledger without canceling Trezor Connect', async () => {
-        const deps = createMockDeps<WalletDeviceServiceDeps>({
+        const deps = createMockDeps<LedgerWalletDeviceOperationsDeps>({
             ledgerBitcoinService: {
                 getDeviceInfo: null,
                 openAccountsDiscovery: null,
@@ -52,7 +56,10 @@ describe('wallet device service', () => {
             .spyOn(TrezorConnect, 'cancel')
             .mockImplementation(() => undefined);
 
-        await createWalletDeviceService(deps).cancelAction({ device: ledgerDevice });
+        await createWalletDeviceService({
+            getOperations: createLedgerWalletDeviceOperationsFactory(deps),
+            cancelTrezorAction: cancellation => TrezorConnect.cancel(cancellation),
+        }).cancelAction({ device: ledgerDevice });
 
         expect(deps.ledgerBitcoinService.cancelAction).toHaveBeenCalled();
         expect(cancelTrezor).not.toHaveBeenCalled();
@@ -60,7 +67,7 @@ describe('wallet device service', () => {
     });
 
     it('preserves the reason when canceling Trezor', async () => {
-        const deps = createMockDeps<WalletDeviceServiceDeps>({
+        const deps = createMockDeps<LedgerWalletDeviceOperationsDeps>({
             ledgerBitcoinService: {
                 getDeviceInfo: null,
                 openAccountsDiscovery: null,
@@ -77,7 +84,10 @@ describe('wallet device service', () => {
             .spyOn(TrezorConnect, 'cancel')
             .mockImplementation(() => undefined);
 
-        await createWalletDeviceService(deps).cancelAction({
+        await createWalletDeviceService({
+            getOperations: createLedgerWalletDeviceOperationsFactory(deps),
+            cancelTrezorAction: cancellation => TrezorConnect.cancel(cancellation),
+        }).cancelAction({
             device: mockSuiteDevice(),
             reason: 'tx-timeout',
         });
@@ -90,7 +100,7 @@ describe('wallet device service', () => {
     it.each(['tx-timeout', { reason: 'tx-timeout' }])(
         'maps timeout cancellation to the Ledger adapter',
         async reason => {
-            const deps = createMockDeps<WalletDeviceServiceDeps>({
+            const deps = createMockDeps<LedgerWalletDeviceOperationsDeps>({
                 ledgerBitcoinService: {
                     getDeviceInfo: null,
                     openAccountsDiscovery: null,
@@ -104,14 +114,17 @@ describe('wallet device service', () => {
                 dispatch: action => action,
             });
 
-            await createWalletDeviceService(deps).cancelAction({ device: ledgerDevice, reason });
+            await createWalletDeviceService({
+                getOperations: createLedgerWalletDeviceOperationsFactory(deps),
+                cancelTrezorAction: cancellation => TrezorConnect.cancel(cancellation),
+            }).cancelAction({ device: ledgerDevice, reason });
 
             expect(deps.ledgerBitcoinService.cancelAction).toHaveBeenCalledWith('timeout');
         },
     );
 
     it('disconnects the Ledger session through its injected transport', async () => {
-        const deps = createMockDeps<WalletDeviceServiceDeps>({
+        const deps = createMockDeps<LedgerWalletDeviceOperationsDeps>({
             ledgerBitcoinService: {
                 getDeviceInfo: null,
                 openAccountsDiscovery: null,
@@ -125,7 +138,10 @@ describe('wallet device service', () => {
             dispatch: action => action,
         });
 
-        await createWalletDeviceService(deps).disconnect(ledgerDevice);
+        await createWalletDeviceService({
+            getOperations: createLedgerWalletDeviceOperationsFactory(deps),
+            cancelTrezorAction: cancellation => TrezorConnect.cancel(cancellation),
+        }).disconnect(ledgerDevice);
 
         expect(deps.ledgerBitcoinService.disconnect).toHaveBeenCalledWith({
             owner: 'acquisition-a',
@@ -142,7 +158,7 @@ describe('wallet device service', () => {
     ])(
         'does not cancel or disconnect a replaced or restored session',
         async ({ device, ownsConnection }) => {
-            const deps = createMockDeps<WalletDeviceServiceDeps>({
+            const deps = createMockDeps<LedgerWalletDeviceOperationsDeps>({
                 ledgerBitcoinService: {
                     getDeviceInfo: null,
                     openAccountsDiscovery: null,
@@ -155,7 +171,10 @@ describe('wallet device service', () => {
                 },
                 dispatch: action => action,
             });
-            const service = createWalletDeviceService(deps);
+            const service = createWalletDeviceService({
+                getOperations: createLedgerWalletDeviceOperationsFactory(deps),
+                cancelTrezorAction: cancellation => TrezorConnect.cancel(cancellation),
+            });
 
             await service.cancelAction({ device });
             await service.disconnect(device);

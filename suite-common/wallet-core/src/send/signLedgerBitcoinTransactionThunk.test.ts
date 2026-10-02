@@ -15,9 +15,10 @@ import { initialState as sendFormReducerInitialState } from './sendFormReducer';
 import { cancelSignSendFormTransactionThunk, signTransactionThunk } from './sendFormThunks';
 import { signLedgerBitcoinTransaction } from './signLedgerBitcoinTransaction';
 import {
-    type WalletDeviceServiceDeps,
-    createWalletDeviceService,
-} from '../wallet-device/createWalletDeviceService';
+    type LedgerWalletDeviceOperationsDeps,
+    createLedgerWalletDeviceOperationsFactory,
+} from '../wallet-device/createLedgerWalletDeviceOperations';
+import { createWalletDeviceService } from '../wallet-device/createWalletDeviceService';
 
 jest.mock('./signLedgerBitcoinTransaction', () => ({
     signLedgerBitcoinTransaction: jest.fn().mockResolvedValue('01000000'),
@@ -35,7 +36,7 @@ const transaction = { type: 'final' } as PrecomposedTransactionFinal;
 const formState = {} as FormState;
 
 const createStore = () => {
-    const deps = createMockDeps<WalletDeviceServiceDeps>({
+    const deps = createMockDeps<LedgerWalletDeviceOperationsDeps>({
         ledgerBitcoinService: {
             getDeviceInfo: null,
             openAccountsDiscovery: null,
@@ -51,7 +52,12 @@ const createStore = () => {
     const { ledgerBitcoinService } = deps;
     const store = createTestStore({
         extra: {
-            services: { walletDeviceService: createWalletDeviceService(deps) },
+            services: {
+                walletDeviceService: createWalletDeviceService({
+                    getOperations: createLedgerWalletDeviceOperationsFactory(deps),
+                    cancelTrezorAction: reason => TrezorConnect.cancel(reason),
+                }),
+            },
             actions: { onModalCancel: createAction('test/modalCancel') },
         },
         preloadedState: {

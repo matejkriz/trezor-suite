@@ -18,7 +18,7 @@ import { type Err } from '@trezor/type-utils';
 
 import { type DeviceStateActionPayload, deviceActions } from './deviceActions';
 import { PORTFOLIO_TRACKER_DEVICE_ID } from './deviceConstants';
-import { isLedgerDevice } from './ledgerDevice';
+import { getDeviceProvider } from './devicePresentation';
 
 export type DeviceReducerState = {
     /**
@@ -569,12 +569,11 @@ export const prepareDeviceReducer = createReducerWithExtraDeps(
     deviceInitialState,
     (builder, extra: DeviceReducerDeps) => {
         builder
-            .addCase(deviceActions.connectLedgerDevice, (state, { payload }) => {
-                state.devices.forEach(device => {
-                    if (isLedgerDevice(device)) device.connected = false;
-                });
+            .addCase(deviceActions.registerDevice, (state, { payload }) => {
                 const index = state.devices.findIndex(
-                    device => isLedgerDevice(device) && device.id === payload.id,
+                    device =>
+                        device.id === payload.id &&
+                        device.state?.staticSessionId === payload.state.staticSessionId,
                 );
                 if (index >= 0) {
                     const previous = state.devices[index];
@@ -589,18 +588,19 @@ export const prepareDeviceReducer = createReducerWithExtraDeps(
                     state.devices.push(payload);
                 }
                 state.selectedDevice = state.devices.find(
-                    device => isLedgerDevice(device) && device.id === payload.id,
+                    device =>
+                        device.id === payload.id &&
+                        device.state?.staticSessionId === payload.state.staticSessionId,
                 );
             })
-            .addCase(deviceActions.disconnectLedgerDevice, (state, { payload }) => {
-                const device = state.devices.find(
-                    item => isLedgerDevice(item) && item.id === payload,
-                );
-                if (device) {
-                    device.connected = false;
-                    device.buttonRequests = [];
-                }
-                if (isLedgerDevice(state.selectedDevice) && state.selectedDevice.id === payload) {
+            .addCase(deviceActions.disconnectDevicesByProvider, (state, { payload }) => {
+                state.devices.forEach(device => {
+                    if (getDeviceProvider(device) === payload) {
+                        device.connected = false;
+                        device.buttonRequests = [];
+                    }
+                });
+                if (state.selectedDevice && getDeviceProvider(state.selectedDevice) === payload) {
                     state.selectedDevice.connected = false;
                     state.selectedDevice.buttonRequests = [];
                 }

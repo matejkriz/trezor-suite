@@ -58,6 +58,7 @@ describe('signDataAndConfirmThunk', () => {
             orderId: 'orderId',
         };
         const operations = createMockDeps<WalletDeviceOperations>({
+            discoverAccounts: null,
             confirmAddress: null,
             signTransaction: null,
             getAccountCapabilities,

@@ -28,7 +28,7 @@ const ledger = {
 
 describe('Ledger device selection', () => {
     it('adds Ledger to devices and selects it', () => {
-        const state = reducer(deviceReducerInitialState, deviceActions.connectLedgerDevice(ledger));
+        const state = reducer(deviceReducerInitialState, deviceActions.registerDevice(ledger));
 
         expect(state.devices).toEqual([ledger]);
         expect(state.selectedDevice).toEqual(ledger);
@@ -36,10 +36,10 @@ describe('Ledger device selection', () => {
     });
 
     it('updates the same Ledger instead of duplicating it', () => {
-        const first = reducer(deviceReducerInitialState, deviceActions.connectLedgerDevice(ledger));
+        const first = reducer(deviceReducerInitialState, deviceActions.registerDevice(ledger));
         const second = reducer(
             first,
-            deviceActions.connectLedgerDevice({ ...ledger, name: 'Renamed Ledger' }),
+            deviceActions.registerDevice({ ...ledger, name: 'Renamed Ledger' }),
         );
 
         expect(second.devices).toHaveLength(1);
@@ -49,7 +49,7 @@ describe('Ledger device selection', () => {
     it('preserves remembered wallet data on reconnect', () => {
         const first = reducer(
             deviceReducerInitialState,
-            deviceActions.connectLedgerDevice({
+            deviceActions.registerDevice({
                 ...ledger,
                 firstConnectedTimestamp: 10,
                 metadata: { 1: { fileName: 'wallet-labels', aesKey: 'key', key: 'key' } },
@@ -57,7 +57,7 @@ describe('Ledger device selection', () => {
         );
         const second = reducer(
             first,
-            deviceActions.connectLedgerDevice({
+            deviceActions.registerDevice({
                 ...ledger,
                 name: 'Ledger Flex from SDK',
                 firstConnectedTimestamp: 20,
@@ -72,25 +72,41 @@ describe('Ledger device selection', () => {
         expect(second.selectedDevice).toEqual(second.devices[0]);
     });
 
-    it('disconnects the previous Ledger when another one connects', () => {
-        const first = reducer(deviceReducerInitialState, deviceActions.connectLedgerDevice(ledger));
+    it('keeps connection ownership outside device registration', () => {
+        const first = reducer(deviceReducerInitialState, deviceActions.registerDevice(ledger));
         const other = {
             ...ledger,
             id: 'second-ledger-wallet',
             state: { staticSessionId: 'second-ledger-wallet@ledger:0' as const },
         };
-        const second = reducer(first, deviceActions.connectLedgerDevice(other));
+        const second = reducer(first, deviceActions.registerDevice(other));
 
-        expect(second.devices[0]?.connected).toBe(false);
+        expect(second.devices[0]?.connected).toBe(true);
         expect(second.devices[1]).toEqual(other);
         expect(second.selectedDevice).toEqual(other);
     });
 
     it('keeps a disconnected Ledger selected for account history', () => {
-        const first = reducer(deviceReducerInitialState, deviceActions.connectLedgerDevice(ledger));
-        const disconnected = reducer(first, deviceActions.disconnectLedgerDevice(ledger.id));
+        const first = reducer(deviceReducerInitialState, deviceActions.registerDevice(ledger));
+        const disconnected = reducer(first, deviceActions.disconnectDevicesByProvider('ledger'));
 
         expect(disconnected.devices[0]?.connected).toBe(false);
+        expect(disconnected.selectedDevice?.connected).toBe(false);
+    });
+
+    it('disconnects only the provider that reports a transport disconnection', () => {
+        const trezor = mockSuiteDevice({ connected: true });
+        const connected = reducer(
+            { ...deviceReducerInitialState, devices: [trezor] },
+            deviceActions.registerDevice(ledger),
+        );
+        const disconnected = reducer(
+            connected,
+            deviceActions.disconnectDevicesByProvider('ledger'),
+        );
+
+        expect(disconnected.devices[0]?.connected).toBe(true);
+        expect(disconnected.devices[1]?.connected).toBe(false);
         expect(disconnected.selectedDevice?.connected).toBe(false);
     });
 });

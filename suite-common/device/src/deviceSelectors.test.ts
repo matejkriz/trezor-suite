@@ -15,6 +15,21 @@ import {
 } from './deviceSelectors';
 
 describe('device settings capabilities', () => {
+    it('hides unsupported personalization for a restored provider device', () => {
+        const device = { ...mockSuiteDevice(), provider: 'ledger' as const };
+
+        expect(getDeviceSettingsCapabilities(device)).toMatchObject({
+            rename: false,
+            language: false,
+            homescreen: false,
+            displayRotation: false,
+            brightness: false,
+            hapticFeedback: false,
+            autoLock: false,
+            safetyChecks: false,
+            wipeCode: false,
+        });
+    });
     it('accepts a Connect device before wallet fields are populated', () => {
         const device: Device = mockSuiteDevice(
             { unavailableCapabilities: { 'settings.rename': 'no-support' } },
@@ -44,6 +59,14 @@ describe('device settings capabilities', () => {
             wipe: true,
             authenticity: false,
             bluetoothPairing: true,
+            language: true,
+            homescreen: true,
+            displayRotation: true,
+            brightness: true,
+            hapticFeedback: true,
+            autoLock: true,
+            safetyChecks: true,
+            wipeCode: true,
         });
         expect(selectDeviceBrandName(state)).toBe('Trezor');
     });
@@ -78,6 +101,14 @@ describe('device settings capabilities', () => {
             wipe: false,
             authenticity: false,
             bluetoothPairing: false,
+            language: false,
+            homescreen: false,
+            displayRotation: false,
+            brightness: false,
+            hapticFeedback: false,
+            autoLock: false,
+            safetyChecks: false,
+            wipeCode: false,
         });
         expect(selectDeviceBrandName(state)).toBe('Ledger');
     });

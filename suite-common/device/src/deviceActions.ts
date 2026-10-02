@@ -1,6 +1,12 @@
 import { createAction } from '@reduxjs/toolkit';
 
-import type { AcquiredDevice, ButtonRequest, TrezorDevice } from '@suite-common/suite-types';
+import type {
+    AcquiredDevice,
+    ButtonRequest,
+    DeviceProvider,
+    TrezorDevice,
+    TrezorDeviceWithState,
+} from '@suite-common/suite-types';
 import {
     DEVICE,
     type DecodedTrezorPushNotification,
@@ -12,7 +18,6 @@ import { type SerializedError } from '@trezor/connect-common/src/constants/error
 import { type Err } from '@trezor/type-utils';
 
 import { DEVICE_MODULE_PREFIX } from './deviceConstants';
-import { type LedgerSuiteDevice } from './ledgerDevice';
 
 export type DeviceConnectActionPayload = {
     device: Device;
@@ -94,11 +99,11 @@ const selectDevice = createAction(
     }),
 );
 
-const connectLedgerDevice = createAction<LedgerSuiteDevice>(
-    `${DEVICE_MODULE_PREFIX}/connectLedgerDevice`,
+const registerDevice = createAction<TrezorDeviceWithState>(
+    `${DEVICE_MODULE_PREFIX}/registerDevice`,
 );
-const disconnectLedgerDevice = createAction<string>(
-    `${DEVICE_MODULE_PREFIX}/disconnectLedgerDevice`,
+const disconnectDevicesByProvider = createAction<DeviceProvider>(
+    `${DEVICE_MODULE_PREFIX}/disconnectDevicesByProvider`,
 );
 
 const updateSelectedDevice = createAction(
@@ -147,8 +152,8 @@ export const deviceActions = {
     addButtonRequest,
     requestDeviceReconnect,
     selectDevice,
-    connectLedgerDevice,
-    disconnectLedgerDevice,
+    registerDevice,
+    disconnectDevicesByProvider,
     updateSelectedDevice,
     removeButtonRequests,
     setDiscovered,

@@ -1,4 +1,4 @@
-import { isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
+import { getDeviceOperationCapabilities, selectSelectedDevice } from '@suite-common/device';
 import { createThunk } from '@suite-common/redux-utils';
 import { type OpenModalDep } from '@suite-common/suite-types';
 import {
@@ -42,7 +42,11 @@ export const verifyAddressThunk = createThunk<
         const activeSection = selectTradingActiveSection(getState());
 
         if (!device) return;
-        if (isLedgerDevice(device) && account.deviceState !== device.state?.staticSessionId) return;
+        if (
+            !getDeviceOperationCapabilities(device).trezorConnect &&
+            account.deviceState !== device.state?.staticSessionId
+        )
+            return;
 
         const accountAddress = getUnusedAddressFromAccount(account);
         address = address ?? accountAddress.address;

@@ -1,11 +1,11 @@
 import { type SelectedAccountRootState, selectSelectedAccount } from '@suite/account';
 import { type DesktopAnalyticsDep, events } from '@suite/analytics';
-import { openConnectionModal, setConnectionModal, setConnectionMode } from '@suite/device';
+import { openDeviceConnectionThunk } from '@suite/device';
 import { closeModal, preserveModal, removePreserveModal } from '@suite/modal';
 import {
     type DeviceRootState,
     acquireDeviceThunk,
-    isLedgerDevice,
+    getDeviceOperationCapabilities,
     selectIsDevicePinLocked,
     selectSelectedDevice,
 } from '@suite-common/device';
@@ -46,17 +46,8 @@ export const showAddressThunk =
         });
 
         // Verification cannot start without a device, so ask the user to connect one.
-        if (isLedgerDevice(device) && !device.connected) {
-            dispatch(openConnectionModal('ledger'));
-
-            return;
-        }
-
         if (!device.connected || !device.available) {
-            if (device.descriptor?.apiType === 'bluetooth') {
-                dispatch(setConnectionMode('bluetooth'));
-            }
-            dispatch(setConnectionModal(true));
+            dispatch(openDeviceConnectionThunk(device));
 
             return;
         }
@@ -66,7 +57,10 @@ export const showAddressThunk =
         // makes the device prompt for the PIN. It emits device-change before it resolves, so the
         // status below is already up to date; still locked means the user dismissed the prompt, and
         // acquireDeviceThunk has reported any real failure itself.
-        if (!isLedgerDevice(device) && selectIsDevicePinLocked(getState())) {
+        if (
+            getDeviceOperationCapabilities(device).trezorConnect &&
+            selectIsDevicePinLocked(getState())
+        ) {
             await dispatch(acquireDeviceThunk({ requestedDevice: device }));
 
             if (selectIsDevicePinLocked(getState())) return;
@@ -97,7 +91,7 @@ export const showAddressThunk =
             // address modal afterwards.
             dispatch(closeModal());
 
-            if (!isLedgerDevice(device)) {
+            if (getDeviceOperationCapabilities(device).trezorConnect) {
                 extra.services.analytics.report({
                     type: events.createReceiveAddressConfirmOnTrezorEvent.name,
                     payload: { assetSymbol: account.symbol },

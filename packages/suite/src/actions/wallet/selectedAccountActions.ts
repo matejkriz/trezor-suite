@@ -181,8 +181,8 @@ export const getAccountState = (state: SelectedAccountState): SelectedAccountSta
 const actions = new Set<UnknownAction['type']>([
     routerLocationChange.type,
     deviceActions.selectDevice.type,
-    deviceActions.connectLedgerDevice.type,
-    deviceActions.disconnectLedgerDevice.type,
+    deviceActions.registerDevice.type,
+    deviceActions.disconnectDevicesByProvider.type,
     deviceActions.updateSelectedDevice.type,
     metadataActions.setAccountAdd.type,
     accountsActions.createAccount.type,

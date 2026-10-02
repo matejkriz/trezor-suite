@@ -4,12 +4,14 @@ import { mockSuiteDevice } from '@suite-common/suite-types/mocks';
 import { createTestStore } from '@suite-common/test-utils';
 import { asNetworkSymbol } from '@suite-common/wallet-config';
 import { mockWalletAccount } from '@suite-common/wallet-types/mocks';
+import TrezorConnect from '@trezor/connect';
 
 import { confirmAddressOnDeviceThunk } from './device/deviceThunks';
 import {
-    type WalletDeviceServiceDeps,
-    createWalletDeviceService,
-} from './wallet-device/createWalletDeviceService';
+    type LedgerWalletDeviceOperationsDeps,
+    createLedgerWalletDeviceOperationsFactory,
+} from './wallet-device/createLedgerWalletDeviceOperations';
+import { createWalletDeviceService } from './wallet-device/createWalletDeviceService';
 
 const staticSessionId = 'ledgerwallet@ledger:0' as const;
 const address = 'bc1qtestledgeraddress';
@@ -30,7 +32,7 @@ const account = mockWalletAccount({
 });
 
 const createStore = ({ connected = true, returnedAddress = address, accountIndex = 0 } = {}) => {
-    const deps = createMockDeps<WalletDeviceServiceDeps>({
+    const deps = createMockDeps<LedgerWalletDeviceOperationsDeps>({
         ledgerBitcoinService: {
             getDeviceInfo: null,
             openAccountsDiscovery: null,
@@ -44,7 +46,14 @@ const createStore = ({ connected = true, returnedAddress = address, accountIndex
         dispatch: action => action,
     });
     const store = createTestStore({
-        extra: { services: { walletDeviceService: createWalletDeviceService(deps) } },
+        extra: {
+            services: {
+                walletDeviceService: createWalletDeviceService({
+                    getOperations: createLedgerWalletDeviceOperationsFactory(deps),
+                    cancelTrezorAction: reason => TrezorConnect.cancel(reason),
+                }),
+            },
+        },
         preloadedState: {
             device: {
                 selectedDevice: {

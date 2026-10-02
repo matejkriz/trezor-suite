@@ -2,7 +2,6 @@ import { type UnknownAction, isAnyOf } from '@reduxjs/toolkit';
 
 import {
     deviceActions,
-    isLedgerDevice,
     isTrezorDeviceWithState,
     selectDeviceByStaticSessionId,
     selectDeviceThunk,
@@ -16,6 +15,7 @@ import {
     selectHasDeviceSuiteSyncError,
     selectIsSuiteSyncEnabled,
 } from './suiteSyncSelectors';
+import { isSuiteSyncSupportedByDevice } from './suiteSyncUtils';
 
 type SuiteSyncMiddlewareDeps = WithServices<SuiteSyncDep>;
 type SuiteSyncMiddlewareState = WithSuiteSyncAndDeviceState & MessageSystemRootState;
@@ -29,7 +29,9 @@ export const prepareSuiteSyncMiddleware = createMiddlewareWithExtraDeps<
         selectIsSuiteSyncEnabled(getState()) &&
         deviceActions.setDiscovered.match(action) &&
         action.payload.success &&
-        !isLedgerDevice(selectDeviceByStaticSessionId(getState(), action.payload.staticSessionId))
+        isSuiteSyncSupportedByDevice(
+            selectDeviceByStaticSessionId(getState(), action.payload.staticSessionId),
+        )
     ) {
         const suiteSyncErrors = selectHasDeviceSuiteSyncError(
             getState(),
@@ -49,7 +51,7 @@ export const prepareSuiteSyncMiddleware = createMiddlewareWithExtraDeps<
         if (
             isTrezorDeviceWithState(payload.device) &&
             payload.device.discovered &&
-            !isLedgerDevice(payload.device)
+            isSuiteSyncSupportedByDevice(payload.device)
         ) {
             const suiteSyncErrors = selectHasDeviceSuiteSyncError(
                 getState(),

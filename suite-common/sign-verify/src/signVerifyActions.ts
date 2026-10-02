@@ -1,7 +1,11 @@
 import { type Dispatch } from 'redux';
 
 import { type AnalyticsDep, events } from '@suite-common/analytics';
-import { type DeviceRootState, isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
+import {
+    type DeviceRootState,
+    getDeviceOperationCapabilities,
+    selectSelectedDevice,
+} from '@suite-common/device';
 import { type WithServices } from '@suite-common/redux-utils';
 import { type TrezorDevice } from '@suite-common/suite-types';
 import { notificationsActions } from '@suite-common/toast-notifications';
@@ -64,7 +68,10 @@ const getStateParams = (
     const device = selectSelectedDevice(getState());
     const addressDisplayType = selectAddressDisplayType(getState());
 
-    return !device || !device.connected || !device.available || isLedgerDevice(device)
+    return !device ||
+        !device.connected ||
+        !device.available ||
+        !getDeviceOperationCapabilities(device).messageSigning
         ? Promise.reject(new Error('Device not found'))
         : Promise.resolve({
               device,

@@ -5,7 +5,7 @@ import {
     type DeviceRootState,
     type LockDeviceDep,
     deviceActions,
-    isLedgerDevice,
+    getDeviceOperationCapabilities,
     selectSelectedDevice,
 } from '@suite-common/device';
 import { createThunk } from '@suite-common/redux-utils';
@@ -90,7 +90,7 @@ export const connectPopupCallInnerThunk = createThunk<
     `${CONNECT_POPUP_MODULE}/callThunk`,
     async ({ source, ...params }, { dispatch, getState, extra }) => {
         try {
-            if (isLedgerDevice(selectSelectedDevice(getState()))) {
+            if (!getDeviceOperationCapabilities(selectSelectedDevice(getState())).trezorConnect) {
                 throw TypedError('Method_NotAllowed');
             }
 
@@ -182,7 +182,8 @@ export const connectPopupCallInnerThunk = createThunk<
             }
 
             let device = selectSelectedDevice(getState());
-            if (isLedgerDevice(device)) throw TypedError('Method_NotAllowed');
+            if (!getDeviceOperationCapabilities(device).trezorConnect)
+                throw TypedError('Method_NotAllowed');
             let attempt = 0;
             // more time needed on mobile deeplink, less on desktop
             // todo: be smarter about the timeout based on actual connection events
@@ -191,7 +192,8 @@ export const connectPopupCallInnerThunk = createThunk<
             while (!device?.connected) {
                 await resolveAfter(1000);
                 device = selectSelectedDevice(getState());
-                if (isLedgerDevice(device)) throw TypedError('Method_NotAllowed');
+                if (!getDeviceOperationCapabilities(device).trezorConnect)
+                    throw TypedError('Method_NotAllowed');
                 attempt++;
                 if (attempt > maxAttempts) {
                     throw TypedError('Device_Disconnected');
@@ -212,7 +214,8 @@ export const connectPopupCallInnerThunk = createThunk<
             // refresh device state before call (could have changed during preCallHooks)
             device = selectSelectedDevice(getState());
             if (!device) throw TypedError('Device_Disconnected');
-            if (isLedgerDevice(device)) throw TypedError('Method_NotAllowed');
+            if (!getDeviceOperationCapabilities(device).trezorConnect)
+                throw TypedError('Method_NotAllowed');
 
             const response = await TrezorConnect.call({
                 device: {
@@ -426,7 +429,12 @@ export const connectPopupVerifyAddressThunk = createThunk<
 
         const device = selectSelectedDevice(getState());
         const call = selectConnectPopupCall(getState());
-        if (!device || isLedgerDevice(device) || call?.state !== 'address-confirmation') return;
+        if (
+            !device ||
+            !getDeviceOperationCapabilities(device).trezorConnect ||
+            call?.state !== 'address-confirmation'
+        )
+            return;
 
         // Update loading state of addresses
         dispatch(
@@ -527,7 +535,12 @@ export const connectPopupLoadSelectAccountPageThunk = createThunk<
 
         const device = selectSelectedDevice(getState());
         const call = selectConnectPopupCall(getState());
-        if (!device || isLedgerDevice(device) || call?.state !== 'select-account') return;
+        if (
+            !device ||
+            !getDeviceOperationCapabilities(device).trezorConnect ||
+            call?.state !== 'select-account'
+        )
+            return;
 
         // Keep the picker's two load layers from stepping on each other (see #29662):
         //  - loadingKey dedups an *identical* load. The concrete double-dispatch is the cold-cache
@@ -954,7 +967,12 @@ export const connectPopupVerifySelectAccountThunk = createThunk<
 
         const device = selectSelectedDevice(getState());
         const call = selectConnectPopupCall(getState());
-        if (!device || isLedgerDevice(device) || call?.state !== 'select-account') return;
+        if (
+            !device ||
+            !getDeviceOperationCapabilities(device).trezorConnect ||
+            call?.state !== 'select-account'
+        )
+            return;
         const candidate = call.candidates.find(isTarget);
         if (!candidate?.address && !candidate?.xpub) return;
 
@@ -1063,7 +1081,7 @@ export const connectPopupResolveSelectAccountThunk = createThunk<
     const call = selectConnectPopupCall(getState());
     if (call?.state !== 'select-account') return;
 
-    if (isLedgerDevice(selectSelectedDevice(getState()))) {
+    if (!getDeviceOperationCapabilities(selectSelectedDevice(getState())).trezorConnect) {
         getPermissionDeferred().reject(TypedError('Method_NotAllowed'));
         dispatch(connectPopupActions.finishCall());
 

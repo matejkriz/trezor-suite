@@ -99,8 +99,11 @@ export const createNativeServicesCompositionRoot = (deps: NativeAppDeps): Native
     return {
         ledgerBitcoinService: deps.ledgerBitcoinService,
         walletDeviceService: createWalletDeviceService({
-            ledgerBitcoinService: deps.ledgerBitcoinService,
-            dispatch: deps.dispatch,
+            getOperations: createLedgerWalletDeviceOperationsFactory({
+                ledgerBitcoinService: deps.ledgerBitcoinService,
+                dispatch: deps.dispatch,
+            }),
+            cancelTrezorAction: reason => deps.getTrezorConnect().cancel(reason),
         }),
         networks,
         suiteSync,

@@ -17,7 +17,7 @@ export const addDiscoveredLedgerWallet = (
     const device = createLedgerSuiteDevice(wallet, apiType);
 
     dispatch(discoveryActions.startDiscovery(device.path));
-    dispatch(deviceActions.connectLedgerDevice(device));
+    dispatch(deviceActions.registerDevice(device));
     applyDiscoveredAccounts(
         dispatch,
         existingAccounts,

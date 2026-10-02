@@ -4,11 +4,15 @@ import { mockWalletAccount } from '@suite-common/wallet-types/mocks';
 
 import { getWalletConnectAccounts } from './walletConnectAccountEligibility';
 
-jest.mock('@suite-common/device', () => ({
-    isLedgerDevice: (device: { provider?: string }) => device.provider === 'ledger',
-}));
-
 describe(getWalletConnectAccounts.name, () => {
+    it('does not advertise an orphaned account without a known device', () => {
+        const account = mockWalletAccount({
+            symbol: asNetworkSymbol('btc'),
+            deviceState: 'orphanedwallet@device:0',
+        });
+
+        expect(getWalletConnectAccounts([account], [])).toEqual([]);
+    });
     it('excludes accounts belonging to Ledger devices', () => {
         const trezorState = 'trezorwallet@device:0';
         const ledgerState = 'ledgerwallet@ledger:0';

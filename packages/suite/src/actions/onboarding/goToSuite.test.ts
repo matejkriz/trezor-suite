@@ -18,6 +18,7 @@ type GoToSuiteTestDeps = StartDiscoveryThunkDeps &
 
 const createExtra = (report: jest.Mock): GoToSuiteTestDeps => ({
     services: {
+        walletDeviceService: { get: jest.fn(), cancelAction: jest.fn(), disconnect: jest.fn() },
         analytics: mockDesktopAnalytics(report),
         getTradedAccountKeys: asGetter(() => []),
         suiteRouterHistory: {

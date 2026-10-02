@@ -1,5 +1,5 @@
 import { type EnsureDelegatedIdentityKeyDep } from '@suite-common/delegated-identity-key-types';
-import { isLedgerDevice, isTrezorDeviceWithState } from '@suite-common/device';
+import { isTrezorDeviceWithState } from '@suite-common/device';
 import { type Dispatch } from '@suite-common/redux-utils';
 import {
     type EnsureSuiteSyncKeys,
@@ -10,6 +10,7 @@ import { notificationsActions } from '@suite-common/toast-notifications';
 import { err, exhaustive, ok } from '@trezor/type-utils';
 
 import { type GetDeviceForStaticSessionIdDep } from './getDeviceForStaticSessionId';
+import { isSuiteSyncSupportedByDevice } from './suiteSyncUtils';
 
 /**
  * Device is not connected or device is in a state/configuration, that does not
@@ -36,7 +37,7 @@ export type EnsureSuiteSyncKeysDeps = {
 export const createEnsureSuiteSyncKeys =
     (deps: EnsureSuiteSyncKeysDeps): EnsureSuiteSyncKeys =>
     async ({ device }): ReturnType<EnsureSuiteSyncKeys> => {
-        if (!device || !isTrezorDeviceWithState(device) || isLedgerDevice(device)) {
+        if (!device || !isTrezorDeviceWithState(device) || !isSuiteSyncSupportedByDevice(device)) {
             return err(SuiteSyncUnavailableOnDeviceError());
         }
 

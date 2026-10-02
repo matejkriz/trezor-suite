@@ -48,7 +48,18 @@ export type DelegatedIdentityKey = string & Branded<'DelegatedIdentityKey'>; // 
 export const asDelegatedIdentityKey = (privateKey: string): DelegatedIdentityKey =>
     privateKey as DelegatedIdentityKey;
 
+export type DeviceProvider = 'trezor' | 'ledger';
+
+export type DeviceInformation = {
+    model: string;
+    osVersion?: string;
+    bitcoinAppVersion?: string;
+    batteryLevel?: number;
+    accountsDiscoveryAppVersion?: string;
+};
+
 export interface ExtendedDevice {
+    deviceInfo?: DeviceInformation;
     useEmptyPassphrase?: boolean;
     remember?: boolean; // device should be remembered
     temporaryRemember?: boolean; // device should be remembered only for fw update or this session

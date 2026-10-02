@@ -313,7 +313,7 @@ describe('Storage actions', () => {
         });
         const store = mockStore(db, getInitialState({ wallet: { accounts: [account] } }));
 
-        store.dispatch(deviceActions.connectLedgerDevice(device));
+        store.dispatch(deviceActions.registerDevice(device));
         store.dispatch(accountsActions.changeAccountVisibility(account, false));
         await storageActions.saveDevice({ db }, device);
 

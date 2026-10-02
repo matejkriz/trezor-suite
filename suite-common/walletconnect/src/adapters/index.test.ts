@@ -17,9 +17,6 @@ jest.mock('./ethereum', () => ({ ethereumAdapter: { getNamespace: () => ({}) } }
 jest.mock('./solana', () => ({ solanaAdapter: { getNamespace: () => ({}) } }));
 jest.mock('./stellar', () => ({ stellarAdapter: { getNamespace: () => ({}) } }));
 jest.mock('./tron', () => ({ tronAdapter: { getNamespace: () => ({}) } }));
-jest.mock('@suite-common/device', () => ({
-    isLedgerDevice: (device: { provider?: string }) => device.provider === 'ledger',
-}));
 
 const trezorSessionId = 'trezorwallet@device:0';
 const ledgerSessionId = 'ledgerwallet@ledger:0';

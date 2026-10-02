@@ -2,7 +2,7 @@ import { type WalletKitTypes } from '@reown/walletkit';
 import type { ProposalTypes } from '@walletconnect/types';
 
 import * as trezorConnectPopupActions from '@suite-common/connect-popup';
-import { isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
+import { getDeviceOperationCapabilities, selectSelectedDevice } from '@suite-common/device';
 import { createThunk } from '@suite-common/redux-utils';
 import { getNetwork, networksCollection } from '@suite-common/wallet-config';
 import { type AccountsRootState, selectAccounts } from '@suite-common/wallet-core';
@@ -52,8 +52,8 @@ const bitcoinRequestThunk = createThunk<
     { state: BitcoinRequestThunkState; extra: BitcoinRequestThunkDeps }
 >(`${WALLETCONNECT_MODULE}/bitcoinRequest`, async ({ event }, { dispatch, getState }) => {
     const device = selectSelectedDevice(getState());
-    if (isLedgerDevice(device)) {
-        throw new Error('Ledger accounts are not supported by WalletConnect');
+    if (!getDeviceOperationCapabilities(device).trezorConnect) {
+        throw new Error('Device accounts are not supported by WalletConnect');
     }
 
     const session = selectSessionByTopic(getState(), event.topic);

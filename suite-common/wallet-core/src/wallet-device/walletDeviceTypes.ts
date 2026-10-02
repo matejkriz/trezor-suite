@@ -1,6 +1,3 @@
-import { type Dispatch } from '@reduxjs/toolkit';
-
-import { type LedgerBitcoinService } from '@suite-common/ledger';
 import { type TrezorDevice } from '@suite-common/suite-types';
 import { type NetworkSymbol } from '@suite-common/wallet-config';
 import {
@@ -57,6 +54,9 @@ export type WalletDeviceAccountCapabilities = {
 
 /** @serviceContract */
 export type WalletDeviceOperations = {
+    transactionReviewSteps?: number;
+    cancelAction?: (reason: CancelWalletDeviceActionParams['reason']) => Promise<void>;
+    disconnect?: () => Promise<void>;
     discoverAccounts: (
         params: DiscoverWalletDeviceAccountsParams,
     ) => Promise<WalletDeviceDiscoveryResult>;
@@ -74,19 +74,16 @@ export type CancelWalletDeviceActionParams = {
     reason?: Parameters<typeof TrezorConnect.cancel>[0];
 };
 
+/** @serviceContract */
+export type WalletDeviceOperationsFactory = (
+    device: TrezorDevice,
+) => WalletDeviceOperations | undefined;
+
 export type WalletDeviceServiceDeps = {
-    ledgerBitcoinService: Pick<
-        LedgerBitcoinService,
-        | 'verifyAddress'
-        | 'getAccount'
-        | 'signTransaction'
-        | 'cancelAction'
-        | 'disconnect'
-        | 'isConnectionOwner'
-        | 'getDeviceInfo'
-        | 'openAccountsDiscovery'
-    >;
-    dispatch: Dispatch;
+    getOperations: WalletDeviceOperationsFactory;
+    cancelTrezorAction: (
+        reason: CancelWalletDeviceActionParams['reason'],
+    ) => ReturnType<typeof TrezorConnect.cancel>;
 };
 
 export type WalletDeviceService = {

@@ -27,12 +27,7 @@ import {
 } from '@suite-common/connect-init';
 import { delegatedIdentityKeyCompositionRoot } from '@suite-common/delegated-identity-key';
 import { toGetter } from '@suite-common/dependency-injection';
-import {
-    deviceActions,
-    isLedgerDevice,
-    selectDeviceByStaticSessionId,
-    selectDevices,
-} from '@suite-common/device';
+import { deviceActions, selectDeviceByStaticSessionId } from '@suite-common/device';
 import { type CommonServices } from '@suite-common/extra-dependencies';
 import { FW_HASH_CHECK_DEFAULT_TIMEOUTS } from '@suite-common/firmware-authenticity';
 import {
@@ -53,6 +48,7 @@ import { type ThpHostNameDep } from '@suite-common/thp';
 import { selectTradedAccountKeys } from '@suite-common/trading';
 import {
     type WalletDeviceServiceDep,
+    createLedgerWalletDeviceOperationsFactory,
     createWalletDeviceService,
     selectAccountsByDeviceState,
 } from '@suite-common/wallet-core';
@@ -119,10 +115,7 @@ export const createSuiteServicesCompositionRoot = (deps: SuiteAppDeps): SuiteSer
         webHidTransportFactory,
         'interactive',
         () => {
-            selectDevices(deps.getState())
-                .filter(isLedgerDevice)
-                .filter(device => device.connected)
-                .forEach(device => deps.dispatch(deviceActions.disconnectLedgerDevice(device.id)));
+            deps.dispatch(deviceActions.disconnectDevicesByProvider('ledger'));
         },
     );
     const bluetooth = createBluetoothCompositionRoot({
@@ -201,8 +194,11 @@ export const createSuiteServicesCompositionRoot = (deps: SuiteAppDeps): SuiteSer
         analytics,
         ledgerBitcoinService,
         walletDeviceService: createWalletDeviceService({
-            ledgerBitcoinService,
-            dispatch: deps.dispatch,
+            getOperations: createLedgerWalletDeviceOperationsFactory({
+                ledgerBitcoinService,
+                dispatch: deps.dispatch,
+            }),
+            cancelTrezorAction: reason => deps.getTrezorConnect().cancel(reason),
         }),
         bluetooth,
         suiteRouterHistory: createSuiteRouterHistory({

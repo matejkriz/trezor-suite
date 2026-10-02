@@ -7,7 +7,7 @@ import {
 
 export const getWalletDeviceAccountCapabilities = (
     operations: WalletDeviceOperations | undefined,
-    account: Account | undefined,
+    account: Account | null | undefined,
 ): WalletDeviceAccountCapabilities => {
     if (!account) return { canSignTransaction: false, canConfirmAddress: false };
 

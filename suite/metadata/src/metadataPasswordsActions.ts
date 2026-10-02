@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 
-import { isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
+import { getDeviceOperationCapabilities, selectSelectedDevice } from '@suite-common/device';
 import {
     type LabelableEntityKeys,
     type PasswordEntry,
@@ -88,7 +88,10 @@ type InitThunkState = MetadataRootState;
 export const initThunk = () => async (dispatch: Dispatch, getState: () => InitThunkState) => {
     let device = selectSelectedDevice(getState());
 
-    if (!device?.state?.staticSessionId || isLedgerDevice(device)) {
+    if (
+        !device?.state?.staticSessionId ||
+        !getDeviceOperationCapabilities(device).metadataEncryption
+    ) {
         console.error('no device state!');
 
         return Promise.resolve();

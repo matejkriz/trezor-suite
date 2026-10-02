@@ -1,4 +1,5 @@
-import { openConnectionModal } from '@suite/device';
+import { openConnectionModal, setConnectionMode } from '@suite/device';
+import { createMockDispatch } from '@suite-common/redux-utils/mocks';
 import { mockSuiteDevice } from '@suite-common/suite-types/mocks';
 
 import { showAddressThunk } from './showAddressThunk';
@@ -23,7 +24,7 @@ describe(showAddressThunk.name, () => {
             },
             receive: { accounts: {} },
         };
-        const dispatch = jest.fn();
+        const { dispatch, actions } = createMockDispatch({ getState: () => state });
         const analytics = { report: jest.fn() };
 
         await showAddressThunk({ path: "m/84'/0'/0'/0/0" })(
@@ -32,6 +33,7 @@ describe(showAddressThunk.name, () => {
             { services: { analytics } } as never,
         );
 
-        expect(dispatch).toHaveBeenCalledWith(openConnectionModal('ledger'));
+        expect(actions).toContainEqual(openConnectionModal('ledger'));
+        expect(actions).toContainEqual(setConnectionMode('cable'));
     });
 });

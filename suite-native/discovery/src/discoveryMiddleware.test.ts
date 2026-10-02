@@ -82,7 +82,7 @@ describe('Ledger selection in native discovery', () => {
         const getAccountInfo = jest.spyOn(TrezorConnect, 'getAccountInfo');
 
         expect(selectIsBitcoinEnabled(store.getState())).toBe(false);
-        store.dispatch(deviceActions.connectLedgerDevice(device));
+        store.dispatch(deviceActions.registerDevice(device));
         store.dispatch(discoveryActions.startDiscovery(device.path));
         store.dispatch(discoveryActions.updateDiscovery({ status: 'complete' }, device.path));
         store.dispatch(deviceActions.selectDevice(device));
@@ -102,7 +102,7 @@ describe('Ledger selection in native discovery', () => {
             supportedNetworks: ['btc', 'eth'].map(asNetworkSymbol),
             accountsDiscoveryAppVersion: '0.1.0',
         });
-        store.dispatch(deviceActions.connectLedgerDevice(multiNetworkDevice));
+        store.dispatch(deviceActions.registerDevice(multiNetworkDevice));
         store.dispatch(
             changeNetworks(
                 ['btc', 'eth'].map(asNetworkSymbol),

@@ -11,11 +11,13 @@ import {
     mockWalletAccount,
     networkSpecificDefaultEthereum,
 } from '@suite-common/wallet-types/mocks';
+import TrezorConnect from '@trezor/connect';
 
 import {
-    type WalletDeviceServiceDeps,
-    createWalletDeviceService,
-} from './createWalletDeviceService';
+    type LedgerWalletDeviceOperationsDeps,
+    createLedgerWalletDeviceOperationsFactory,
+} from './createLedgerWalletDeviceOperations';
+import { createWalletDeviceService } from './createWalletDeviceService';
 import { createLedgerSuiteDevice } from '../ledger/createLedgerSuiteDevice';
 import { signLedgerBitcoinTransaction } from '../send/signLedgerBitcoinTransaction';
 
@@ -53,7 +55,7 @@ const prepareTest = () => {
         staticSessionId: 'walleta@ledger:0',
         sessionId: owner,
     });
-    const deps = createMockDeps<WalletDeviceServiceDeps>({
+    const deps = createMockDeps<LedgerWalletDeviceOperationsDeps>({
         ledgerBitcoinService: {
             getDeviceInfo: null,
             openAccountsDiscovery: null,
@@ -73,7 +75,10 @@ const prepareTest = () => {
         },
         dispatch: action => action,
     });
-    const service = createWalletDeviceService(deps);
+    const service = createWalletDeviceService({
+        getOperations: createLedgerWalletDeviceOperationsFactory(deps),
+        cancelTrezorAction: reason => TrezorConnect.cancel(reason),
+    });
     const operations = service.get(device);
     if (!operations) throw new Error('Missing test wallet operations');
 
@@ -188,7 +193,7 @@ describe('Ledger wallet operations connection ownership', () => {
                 storageLoadDevices: mockReducer(),
             },
         });
-        let state = deviceReducer(undefined, deviceActions.connectLedgerDevice(device));
+        let state = deviceReducer(undefined, deviceActions.registerDevice(device));
         deps.dispatch.mockImplementation(action => {
             state = deviceReducer(state, action);
 
@@ -206,7 +211,7 @@ describe('Ledger wallet operations connection ownership', () => {
             state: { ...device.state, sessionId: 'acquisition-b' },
             buttonRequests: [],
         };
-        state = deviceReducer(state, deviceActions.connectLedgerDevice(replacementDevice));
+        state = deviceReducer(state, deviceActions.registerDevice(replacementDevice));
         state = deviceReducer(
             state,
             deviceActions.addButtonRequest({

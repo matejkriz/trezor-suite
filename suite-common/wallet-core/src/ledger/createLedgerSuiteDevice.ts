@@ -1,4 +1,4 @@
-import { type LedgerSuiteDevice } from '@suite-common/device';
+import { type LedgerSuiteDevice, ledgerUnsupportedDeviceCapabilities } from '@suite-common/device';
 import { type LedgerDeviceInfo } from '@suite-common/ledger';
 import {
     type NetworkSymbol,
@@ -53,20 +53,12 @@ const unsupportedCapabilities = [
     'entropyCheck',
     'evmApproval',
     'slip24',
-    'evolu',
     'monero',
     'telemetry',
     'evmClearSigning',
     'legacy',
     'segwit',
-    'settings.rename',
-    'settings.pin',
-    'settings.backup',
-    'settings.passphrase',
-    'settings.firmwareUpdate',
-    'settings.wipe',
-    'settings.bluetoothPairing',
-    'settings.authenticity',
+    ...ledgerUnsupportedDeviceCapabilities,
     'deviceIdCheck',
     'deviceInvariabilityCheck',
     'firmwareRevisionCheck',
@@ -103,7 +95,7 @@ export const createLedgerSuiteDevice = (
         id,
         name: label,
         label,
-        ledgerInfo:
+        deviceInfo:
             deviceInfo || accountsDiscoveryAppVersion
                 ? {
                       model: deviceInfo?.model ?? 'Ledger',

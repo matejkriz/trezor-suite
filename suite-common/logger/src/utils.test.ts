@@ -93,14 +93,20 @@ describe('logsUtils', () => {
             expect(JSON.stringify(redactAction(entry))).not.toContain('private-name');
         });
         it('redacts a Ledger acquisition log entry', () => {
-            const ledgerDevice = { ...device, provider: 'ledger', name: 'private-name' };
+            const ledgerDevice = {
+                ...device,
+                provider: 'ledger',
+                name: 'private-name',
+                deviceInfo: { model: 'private-info' },
+            };
             const entry = {
                 datetime: 'Thu, 01 Jan 1970 00:00:00 GMT',
-                type: deviceActions.connectLedgerDevice.type,
+                type: deviceActions.registerDevice.type,
                 payload: ledgerDevice,
             };
 
             expect(JSON.stringify(redactAction(entry))).not.toContain('private-name');
+            expect(JSON.stringify(redactAction(entry))).not.toContain('private-info');
         });
         it('redacts the account of an updateSelectedAccount log entry', () => {
             const entry = {

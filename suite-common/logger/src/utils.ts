@@ -131,6 +131,7 @@ export const redactDevice = (
             ? { ...device.descriptor, id: REDACTED_REPLACEMENT }
             : undefined,
         ...('ledgerInfo' in device ? { ledgerInfo: undefined } : {}),
+        deviceInfo: undefined,
         id: REDACTED_REPLACEMENT,
         label: device.label ? REDACTED_REPLACEMENT : undefined,
         state: REDACTED_REPLACEMENT,
@@ -195,15 +196,12 @@ export const redactAction = (action: LogEntry): LogEntry => {
             break;
         case DEVICE.CONNECT:
         case DEVICE.DISCONNECT:
-        case deviceActions.connectLedgerDevice.type:
+        case deviceActions.registerDevice.type:
         case deviceActions.updateSelectedDevice.type:
         case deviceActions.setRememberDevice.type:
             payload = action.payload?.device
                 ? { ...action.payload, device: redactDevice(action.payload.device) }
                 : redactDevice(action.payload);
-            break;
-        case deviceActions.disconnectLedgerDevice.type:
-            payload = { id: REDACTED_REPLACEMENT };
             break;
         default:
             return action;

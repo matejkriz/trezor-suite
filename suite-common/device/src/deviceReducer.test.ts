@@ -32,10 +32,10 @@ describe('Ledger session lifecycle', () => {
             }),
             provider: 'ledger',
         } as LedgerSuiteDevice;
-        const connectedState = deviceReducer(undefined, deviceActions.connectLedgerDevice(device));
+        const connectedState = deviceReducer(undefined, deviceActions.registerDevice(device));
         const state = deviceReducer(
             { ...connectedState, selectedDevice: { ...device } },
-            deviceActions.disconnectLedgerDevice(device.id),
+            deviceActions.disconnectDevicesByProvider('ledger'),
         );
 
         expect(state.devices[0]).toMatchObject({ connected: false, buttonRequests: [] });

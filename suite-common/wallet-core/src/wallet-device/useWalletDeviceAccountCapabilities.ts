@@ -7,7 +7,7 @@ import { type Account } from '@suite-common/wallet-types';
 import { injectWalletDeviceService } from './createWalletDeviceService';
 import { getWalletDeviceAccountCapabilities } from './walletDeviceAccountCapabilities';
 
-export const useWalletDeviceAccountCapabilities = (account: Account | undefined) => {
+export const useWalletDeviceAccountCapabilities = (account: Account | null | undefined) => {
     const { walletDeviceService } = useServices(injectWalletDeviceService);
     const device = useSelector(selectSelectedDevice);
 

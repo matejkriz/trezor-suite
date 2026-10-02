@@ -132,7 +132,7 @@ describe(connectLedgerBitcoinWalletThunk.name, () => {
         expect(connectedDevice.features.label).toBe('My travel wallet');
         expect(actions).toEqual(
             expect.arrayContaining([
-                deviceActions.connectLedgerDevice(connectedDevice),
+                deviceActions.registerDevice(connectedDevice),
                 expect.objectContaining({ type: accountsActions.createAccount.type }),
                 discoveryActions.startDiscovery(connectedDevice.path),
                 discoveryActions.updateDiscovery({ status: 'complete' }, connectedDevice.path),
@@ -158,7 +158,7 @@ describe(connectLedgerBitcoinWalletThunk.name, () => {
         expect(service.connect).toHaveBeenCalledTimes(1);
         expect(service.getAccount).not.toHaveBeenCalled();
         expect(service.openAccountsDiscovery).toHaveBeenCalledTimes(1);
-        expect(connected.ledgerInfo?.accountsDiscoveryAppVersion).toBe('0.1.0');
+        expect(connected.deviceInfo?.accountsDiscoveryAppVersion).toBe('0.1.0');
         expect(connected.unavailableCapabilities.eth).toBeUndefined();
         expect(connected.unavailableCapabilities.ada).toBe('no-support');
         expect(
@@ -183,7 +183,7 @@ describe(connectLedgerBitcoinWalletThunk.name, () => {
         expect(service.connect).toHaveBeenCalledTimes(1);
         expect(service.openAccountsDiscovery).not.toHaveBeenCalled();
         expect(connected.unavailableCapabilities.eth).toBe('no-support');
-        expect(connected.ledgerInfo?.accountsDiscoveryAppVersion).toBeUndefined();
+        expect(connected.deviceInfo?.accountsDiscoveryAppVersion).toBeUndefined();
     });
 
     it('refreshes capabilities and drops old app metadata after the custom app is removed', async () => {
@@ -218,7 +218,7 @@ describe(connectLedgerBitcoinWalletThunk.name, () => {
         expect(previous.unavailableCapabilities.eth).toBeUndefined();
         expect(current.unavailableCapabilities.eth).toBe('no-support');
         expect(current.features.capabilities).not.toContain('Capability_Ethereum');
-        expect(current.ledgerInfo?.accountsDiscoveryAppVersion).toBeUndefined();
+        expect(current.deviceInfo?.accountsDiscoveryAppVersion).toBeUndefined();
     });
 
     it.each(['listing', 'opening', 'metadata'] as const)(
@@ -242,7 +242,7 @@ describe(connectLedgerBitcoinWalletThunk.name, () => {
                 dispatch(connectLedgerBitcoinWalletThunk({ device })).unwrap(),
             ).rejects.toBe('Ledger connection failed');
             expect(service.getAccount).not.toHaveBeenCalled();
-            expect(actions.filter(deviceActions.connectLedgerDevice.match)).toHaveLength(0);
+            expect(actions.filter(deviceActions.registerDevice.match)).toHaveLength(0);
             expect(service.disconnect).toHaveBeenCalled();
         },
     );
@@ -260,7 +260,7 @@ describe(connectLedgerBitcoinWalletThunk.name, () => {
         );
         expect(service.getAccount).not.toHaveBeenCalled();
         expect(service.openAccountsDiscovery).not.toHaveBeenCalled();
-        expect(actions.filter(deviceActions.connectLedgerDevice.match)).toHaveLength(0);
+        expect(actions.filter(deviceActions.registerDevice.match)).toHaveLength(0);
     });
 
     it('rejects a different wallet during reconnection before adding device or accounts', async () => {
@@ -273,7 +273,7 @@ describe(connectLedgerBitcoinWalletThunk.name, () => {
 
         expect(actions).not.toEqual(
             expect.arrayContaining([
-                expect.objectContaining({ type: deviceActions.connectLedgerDevice.type }),
+                expect.objectContaining({ type: deviceActions.registerDevice.type }),
             ]),
         );
         expect(service.disconnect).toHaveBeenCalled();
@@ -296,7 +296,7 @@ describe(connectLedgerBitcoinWalletThunk.name, () => {
 
         expect(actions).not.toEqual(
             expect.arrayContaining([
-                expect.objectContaining({ type: deviceActions.connectLedgerDevice.type }),
+                expect.objectContaining({ type: deviceActions.registerDevice.type }),
             ]),
         );
         expect(service.disconnect).toHaveBeenCalled();
@@ -335,7 +335,7 @@ describe(connectLedgerBitcoinWalletThunk.name, () => {
         finishBackend({ success: true, payload: accountInfo });
         await expect(connection.unwrap()).rejects.toBe('Ledger connection failed');
 
-        expect(actions.filter(deviceActions.connectLedgerDevice.match)).toHaveLength(0);
+        expect(actions.filter(deviceActions.registerDevice.match)).toHaveLength(0);
         expect(actions.filter(accountsActions.createAccount.match)).toHaveLength(0);
     });
 
@@ -411,7 +411,7 @@ describe(connectLedgerBitcoinWalletThunk.name, () => {
             expect(connectLedgerBitcoinWalletThunk.rejected.match(firstResult)).toBe(true);
             expect(currentOwner).toBe(second.requestId);
             expect(disconnectedOwners).toEqual([]);
-            expect(actions.filter(deviceActions.connectLedgerDevice.match)).toHaveLength(1);
+            expect(actions.filter(deviceActions.registerDevice.match)).toHaveLength(1);
             expect(service.connect).toHaveBeenNthCalledWith(1, device, { owner: first.requestId });
             expect(service.connect).toHaveBeenNthCalledWith(2, device, { owner: second.requestId });
         },

@@ -1,4 +1,8 @@
-import { type DeviceRootState, isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
+import {
+    type DeviceRootState,
+    getDeviceSettingsCapabilities,
+    selectSelectedDevice,
+} from '@suite-common/device';
 import {
     Feature,
     type MessageSystemRootState,
@@ -35,7 +39,7 @@ export const checkDeviceAuthenticityThunk = createThunk<
         { dispatch, getState, fulfillWithValue, rejectWithValue },
     ) => {
         const device = selectSelectedDevice(getState());
-        if (!device || isLedgerDevice(device)) {
+        if (!device || !getDeviceSettingsCapabilities(device).authenticity) {
             throw new Error('device is not connected');
         }
 

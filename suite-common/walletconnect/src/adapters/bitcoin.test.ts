@@ -7,15 +7,11 @@ import TrezorConnect from '@trezor/connect';
 import { type BitcoinRequestThunkDeps, bitcoinAdapter } from './bitcoin';
 
 jest.mock('@suite-common/connect-popup', () => ({}));
-jest.mock('@suite-common/device', () => ({
-    selectSelectedDevice: (state: { device: { selectedDevice: unknown } }) =>
-        state.device.selectedDevice,
-    isLedgerDevice: (device: { provider?: string }) => device.provider === 'ledger',
-}));
 jest.mock('@suite-common/wallet-core', () => ({ selectAccounts: () => [] }));
 jest.mock('@trezor/connect', () => ({
+    ...jest.requireActual('@trezor/connect'),
     __esModule: true,
-    default: { call: jest.fn() },
+    default: { ...jest.requireActual('@trezor/connect').default, call: jest.fn() },
 }));
 
 describe('Ledger Bitcoin WalletConnect requests', () => {
@@ -42,7 +38,7 @@ describe('Ledger Bitcoin WalletConnect requests', () => {
 
         expect(result.type).toContain('/rejected');
         if (bitcoinAdapter.requestThunk.rejected.match(result)) {
-            expect(result.error.message).toBe('Ledger accounts are not supported by WalletConnect');
+            expect(result.error.message).toBe('Device accounts are not supported by WalletConnect');
         }
         expect(connectCall).not.toHaveBeenCalled();
         connectCall.mockRestore();

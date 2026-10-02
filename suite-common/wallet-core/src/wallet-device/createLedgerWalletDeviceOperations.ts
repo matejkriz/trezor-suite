@@ -1,7 +1,15 @@
-import { type LedgerSuiteDevice, deviceActions } from '@suite-common/device';
+import { type Dispatch } from '@reduxjs/toolkit';
+
+import {
+    type LedgerSuiteDevice,
+    deviceActions,
+    getDeviceInformation,
+    isLedgerDevice,
+} from '@suite-common/device';
 import {
     LedgerAccountsDiscoveryError,
     LedgerActionError,
+    type LedgerBitcoinService,
     getLedgerBitcoinAccountPath,
 } from '@suite-common/ledger';
 import { type ButtonRequest } from '@suite-common/suite-types';
@@ -14,12 +22,28 @@ import { BigNumber } from '@trezor/utils';
 import { Transaction } from '@trezor/utxo-lib';
 
 import { WalletDeviceActionError } from './walletDeviceError';
-import { type WalletDeviceOperations, type WalletDeviceServiceDeps } from './walletDeviceTypes';
+import {
+    type WalletDeviceOperations,
+    type WalletDeviceOperationsFactory,
+} from './walletDeviceTypes';
 import { discoverLedgerBitcoinWallet } from '../ledger/discoverLedgerBitcoinWallet';
 import { discoverLedgerWalletWithAccountsApp } from '../ledger/discoverLedgerWalletWithAccountsApp';
 import { signLedgerBitcoinTransaction } from '../send/signLedgerBitcoinTransaction';
 
-type LedgerWalletDeviceOperationsDeps = WalletDeviceServiceDeps;
+export type LedgerWalletDeviceOperationsDeps = {
+    ledgerBitcoinService: Pick<
+        LedgerBitcoinService,
+        | 'verifyAddress'
+        | 'getAccount'
+        | 'signTransaction'
+        | 'cancelAction'
+        | 'disconnect'
+        | 'isConnectionOwner'
+        | 'getDeviceInfo'
+        | 'openAccountsDiscovery'
+    >;
+    dispatch: Dispatch;
+};
 
 const isSupportedBitcoinAccount = (account: Account): boolean =>
     account.symbol === 'btc' &&
@@ -76,10 +100,21 @@ export const createLedgerWalletDeviceOperations = (
     };
 
     return {
+        transactionReviewSteps: 1,
+        async cancelAction(reason) {
+            if (!ownsConnection()) return;
+            const cancellationReason = typeof reason === 'string' ? reason : reason?.reason;
+            await deps.ledgerBitcoinService.cancelAction(
+                cancellationReason === 'tx-timeout' ? 'timeout' : 'cancelled',
+            );
+        },
+        async disconnect() {
+            if (ownsConnection()) await deps.ledgerBitcoinService.disconnect({ owner });
+        },
         discoverAccounts: ({ networkSymbols, signal, getAccountInfo }) =>
             withCurrentConnection(async () => {
                 if (networkSymbols.length === 0) return { accounts: [], failedNetworks: [] };
-                const discovered = device.ledgerInfo?.accountsDiscoveryAppVersion
+                const discovered = getDeviceInformation(device)?.accountsDiscoveryAppVersion
                     ? await discoverLedgerWalletWithAccountsApp(
                           { ledgerBitcoinService: deps.ledgerBitcoinService, getAccountInfo },
                           { networkSymbols, signal, owner },
@@ -240,3 +275,10 @@ export const createLedgerWalletDeviceOperations = (
         },
     };
 };
+
+export type CreateLedgerWalletDeviceOperationsFactoryDeps = LedgerWalletDeviceOperationsDeps;
+
+export const createLedgerWalletDeviceOperationsFactory =
+    (deps: CreateLedgerWalletDeviceOperationsFactoryDeps): WalletDeviceOperationsFactory =>
+    device =>
+        isLedgerDevice(device) ? createLedgerWalletDeviceOperations(deps, device) : undefined;

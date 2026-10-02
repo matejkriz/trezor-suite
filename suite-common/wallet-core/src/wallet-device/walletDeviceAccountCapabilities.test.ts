@@ -25,20 +25,26 @@ describe(getWalletDeviceAccountCapabilities.name, () => {
         });
     });
 
-    it('disables operations when there is no account without calling a vendor implementation', () => {
-        const operations = createMockDeps<WalletDeviceOperations>({
-            discoverAccounts: null,
-            confirmAddress: null,
-            signTransaction: null,
-            getAccountCapabilities: () => ({ canSignTransaction: true, canConfirmAddress: true }),
-        });
+    it.each([undefined, null])(
+        'disables operations when there is no account (%s) without calling a vendor implementation',
+        emptyAccount => {
+            const operations = createMockDeps<WalletDeviceOperations>({
+                discoverAccounts: null,
+                confirmAddress: null,
+                signTransaction: null,
+                getAccountCapabilities: () => ({
+                    canSignTransaction: true,
+                    canConfirmAddress: true,
+                }),
+            });
 
-        expect(getWalletDeviceAccountCapabilities(operations, undefined)).toEqual({
-            canSignTransaction: false,
-            canConfirmAddress: false,
-        });
-        expect(operations.getAccountCapabilities).not.toHaveBeenCalled();
-    });
+            expect(getWalletDeviceAccountCapabilities(operations, emptyAccount)).toEqual({
+                canSignTransaction: false,
+                canConfirmAddress: false,
+            });
+            expect(operations.getAccountCapabilities).not.toHaveBeenCalled();
+        },
+    );
 
     it('uses the injected operations capabilities without inspecting device vendors', () => {
         const operations = createMockDeps<WalletDeviceOperations>({

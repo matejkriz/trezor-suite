@@ -266,9 +266,9 @@ const rememberedDeviceHandlers: RememberedDeviceHandler[] = [
         },
     }),
     defineRememberedDeviceHandler({
-        match: [deviceActions.updateSelectedDevice.match, deviceActions.connectLedgerDevice.match],
+        match: [deviceActions.updateSelectedDevice.match, deviceActions.registerDevice.match],
         getDevice: (action, state) =>
-            deviceActions.connectLedgerDevice.match(action)
+            deviceActions.registerDevice.match(action)
                 ? selectSelectedDevice(state)
                 : action.payload,
         save: ({ device }, deps) => {

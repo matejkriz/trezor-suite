@@ -1,4 +1,5 @@
 import { portfolioTrackerDevice } from '@suite-common/device';
+import { type TrezorDevice } from '@suite-common/suite-types';
 import { mockSuiteDevice } from '@suite-common/suite-types/mocks';
 
 import { type SuiteSyncInteraction } from './suiteSyncTypes';
@@ -7,8 +8,16 @@ import {
     isSuiteSyncSupportedByDevice,
 } from './suiteSyncUtils';
 
+const restoredLedger = { ...mockSuiteDevice(), provider: 'ledger' as const };
+
 describe(isSuiteSyncSupportedByDevice.name, () => {
-    it.each([
+    it.each<[TrezorDevice, boolean, string]>([
+        [restoredLedger, false, 'remembered Ledger without capabilities'],
+        [
+            mockSuiteDevice({ unavailableCapabilities: { evolu: 'update-required' } }),
+            true,
+            'Trezor needing firmware upgrade',
+        ],
         [portfolioTrackerDevice, false, "portfolio tracker doesn't support evolu"],
         [
             mockSuiteDevice({ unavailableCapabilities: {} }),

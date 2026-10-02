@@ -3,10 +3,10 @@ import { type TrezorDevice } from '@suite-common/suite-types';
 import { notificationsActions } from '@suite-common/toast-notifications';
 import TrezorConnect from '@trezor/connect';
 
+import { getDeviceOperationCapabilities } from './deviceCapabilities';
 import { DEVICE_MODULE_PREFIX } from './deviceConstants';
 import { type DeviceRootState } from './deviceReducer';
 import { selectSelectedDevice } from './deviceSelectors';
-import { isLedgerDevice } from './ledgerDevice';
 
 /**
  * Called from <AcquireDevice /> component
@@ -27,7 +27,7 @@ export const acquireDeviceThunk = createThunk<
     async ({ requestedDevice }, { dispatch, getState, rejectWithValue }) => {
         const device = requestedDevice ?? selectSelectedDevice(getState());
 
-        if (!device || isLedgerDevice(device)) {
+        if (!device || !getDeviceOperationCapabilities(device).trezorConnect) {
             return rejectWithValue({ error: 'Device_NotFound' });
         }
 

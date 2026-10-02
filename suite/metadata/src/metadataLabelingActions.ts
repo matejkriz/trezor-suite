@@ -1,6 +1,6 @@
 import { type DesktopAnalyticsDep, events } from '@suite/analytics';
 import {
-    isLedgerDevice,
+    getDeviceOperationCapabilities,
     selectDeviceByStaticSessionId,
     selectDevices,
     selectSelectedDevice,
@@ -493,7 +493,12 @@ type SetDeviceMetadataKeyThunkState = MetadataRootState;
 export const setDeviceMetadataKeyThunk =
     (device: TrezorDevice, encryptionVersion = METADATA_LABELING.ENCRYPTION_VERSION) =>
     async (dispatch: Dispatch, getState: () => SetDeviceMetadataKeyThunkState) => {
-        if (!device.state?.staticSessionId || !device.connected || isLedgerDevice(device)) return;
+        if (
+            !device.state?.staticSessionId ||
+            !device.connected ||
+            !getDeviceOperationCapabilities(device).metadataEncryption
+        )
+            return;
 
         const result = await TrezorConnect.cipherKeyValue({
             device: {
