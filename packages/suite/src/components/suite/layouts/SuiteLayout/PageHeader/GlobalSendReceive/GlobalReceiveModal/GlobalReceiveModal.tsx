@@ -7,7 +7,10 @@ import { events, injectDesktopAnalytics } from '@suite/analytics';
 import { selectIsDebugModeActive } from '@suite/debug';
 import { useDevice } from '@suite/device';
 import { useServices } from '@suite-common/dependency-injection';
-import { isLedgerDevice, selectActiveWalletStaticSessionId } from '@suite-common/device';
+import {
+    getDeviceOperationCapabilities,
+    selectActiveWalletStaticSessionId,
+} from '@suite-common/device';
 import { selectSupportedNetworkSymbols } from '@suite-common/networks';
 import { type TradingAssetOption } from '@suite-common/trading';
 import { selectAccounts, selectEnabledNetworks } from '@suite-common/wallet-core';
@@ -48,21 +51,7 @@ export const GlobalReceiveModal = ({ onCancel, onSubmit }: GlobalReceiveModalPro
     const isDebug = useSelector(selectIsDebugModeActive);
     const filledSearch = useSelector(globalSendReceiveFiltersSelectors.filledSearch);
 
-    const {
-        assets: catalogAssets,
-        balances,
-        networks,
-        catalogStatus,
-        retry,
-    } = useGlobalReceiveAssets();
-    const assets = useMemo(
-        () =>
-            isLedgerDevice(device)
-                ? catalogAssets.filter(asset => asset.networkSymbol === 'btc')
-                : catalogAssets,
-        [catalogAssets, device],
-    );
-
+    const { assets, balances, networks, catalogStatus, retry } = useGlobalReceiveAssets();
     const selectedAsset = useMemo(
         () => assets.find(asset => asset.id === selectedAssetCryptoId),
         [assets, selectedAssetCryptoId],
@@ -180,7 +169,7 @@ export const GlobalReceiveModal = ({ onCancel, onSubmit }: GlobalReceiveModalPro
     };
 
     const handleAddAccount = () => {
-        if (!device || isLedgerDevice(device)) {
+        if (!device || !getDeviceOperationCapabilities(device).manualAccounts) {
             return;
         }
 
@@ -243,7 +232,7 @@ export const GlobalReceiveModal = ({ onCancel, onSubmit }: GlobalReceiveModalPro
         }
     };
 
-    if (accountModal.open && device && !isLedgerDevice(device)) {
+    if (accountModal.open && device && getDeviceOperationCapabilities(device).manualAccounts) {
         return (
             <AddAccountModal
                 device={device}

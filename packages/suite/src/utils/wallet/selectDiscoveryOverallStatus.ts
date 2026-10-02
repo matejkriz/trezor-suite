@@ -1,4 +1,4 @@
-import { isLedgerDevice, selectSelectedDevice } from '@suite-common/device';
+import { selectSelectedDevice } from '@suite-common/device';
 import { type TrezorDevice } from '@suite-common/suite-types';
 import { type NetworkSymbol } from '@suite-common/wallet-config';
 import {
@@ -90,7 +90,6 @@ const getDiscoveryStatus = ({
 // TODO move this selector somewhere more sensible
 export const selectDiscoveryOverallStatus = (state: AppState) => {
     const device = selectSelectedDevice(state);
-    if (isLedgerDevice(device)) return undefined;
 
     const deviceSupportedNetworks = selectDeviceSupportedNetworks(state);
     const accounts = device?.state && selectAccountsByDeviceState(state, device.state);
