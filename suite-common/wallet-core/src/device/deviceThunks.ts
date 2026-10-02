@@ -494,10 +494,9 @@ export const forgetDeviceThunk = createThunk<
     ) => {
         const devices = selectDevices(getState());
 
-        const explicitDevice = deviceId
+        const device = deviceId
             ? devices.find(candidateDevice => candidateDevice.id === deviceId)
-            : undefined;
-        const device = explicitDevice ?? selectSelectedDevice(getState());
+            : selectSelectedDevice(getState());
         if (!device) return;
 
         const deviceInstances = getDeviceInstances(device, devices);
