@@ -88,6 +88,8 @@ const main = async () => {
         phase = 'connection';
         await service.connect(device, { owner: 'accounts-discovery-smoke' });
         assert(service.isConnectionOwner('accounts-discovery-smoke'));
+        phase = 'detecting custom app';
+        assert.equal(await service.hasAccountsDiscovery(), true);
         phase = 'opening custom app';
         discovery = await service.openAccountsDiscovery();
         const info = await discovery.getInfo();

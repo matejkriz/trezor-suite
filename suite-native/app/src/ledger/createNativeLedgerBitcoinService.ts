@@ -141,6 +141,7 @@ export const createNativeLedgerBitcoinService = (
         getDeviceInfo: () => service?.getDeviceInfo(),
         getMasterFingerprint: () => getConnectedService().getMasterFingerprint(),
         getAccount: index => getConnectedService().getAccount(index),
+        hasAccountsDiscovery: () => getConnectedService().hasAccountsDiscovery(),
         openAccountsDiscovery: () => getConnectedService().openAccountsDiscovery(),
         verifyAddress: (index, addressIndex) =>
             getConnectedService().verifyAddress(index, addressIndex),

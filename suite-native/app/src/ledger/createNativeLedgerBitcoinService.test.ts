@@ -27,6 +27,7 @@ const prepareTest = () => {
             getDeviceInfo: () => undefined,
             getMasterFingerprint: null,
             getAccount: null,
+            hasAccountsDiscovery: () => Promise.resolve(false),
             openAccountsDiscovery: null,
             verifyAddress: null,
             signPsbt: null,
@@ -43,6 +44,15 @@ const prepareTest = () => {
 };
 
 describe('native Ledger Bluetooth lifecycle', () => {
+    it('delegates installed-app detection to the connected transport service', async () => {
+        const { wrapper, service } = prepareTest();
+        await wrapper.connect(device);
+        service.hasAccountsDiscovery.mockResolvedValue(true);
+
+        await expect(wrapper.hasAccountsDiscovery()).resolves.toBe(true);
+        expect(service.hasAccountsDiscovery).toHaveBeenCalledTimes(1);
+    });
+
     it('does not construct DMK or Bluetooth at startup or during unused cleanup', async () => {
         const { wrapper, createService, suspendDeviceScan } = prepareTest();
 

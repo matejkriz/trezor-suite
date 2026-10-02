@@ -1,6 +1,7 @@
 import {
     DeviceManagementKitBuilder,
     GoToDashboardDeviceAction,
+    ListAppsDeviceAction,
     OpenAppDeviceAction,
     type TransportFactory,
 } from '@ledgerhq/device-management-kit';
@@ -26,6 +27,11 @@ export const createLedgerBitcoinServiceForTransport = (
             dmk.executeDeviceAction({
                 sessionId,
                 deviceAction: new OpenAppDeviceAction({ input: { appName: 'Accounts Discovery' } }),
+            }),
+        listApps: sessionId =>
+            dmk.executeDeviceAction({
+                sessionId,
+                deviceAction: new ListAppsDeviceAction({ input: {} }),
             }),
         listenToAvailableDevices:
             discoveryMode === 'available' ? () => dmk.listenToAvailableDevices({}) : undefined,

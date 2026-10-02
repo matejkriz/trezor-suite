@@ -104,12 +104,102 @@ const createDeps = (
             observable: of({ status: DeviceActionStatus.Completed, output: undefined }),
             cancel: jest.fn(),
         }),
+        listApps: () => ({
+            observable: of({ status: DeviceActionStatus.Completed, output: [] }),
+            cancel: jest.fn(),
+        }),
         createSigner: () => signer,
         onDisconnect: jest.fn(),
     });
 };
 
 describe('createLedgerBitcoinService', () => {
+    it.each([true, false])(
+        'detects whether Accounts Discovery is installed: %s',
+        async installed => {
+            const deps = createDeps();
+            deps.listApps.mockReturnValue({
+                observable: of({
+                    status: DeviceActionStatus.Completed,
+                    output: [
+                        {
+                            appEntryLength: 1,
+                            appSizeInBlocks: 1,
+                            appCodeHash: '',
+                            appFullHash: '',
+                            appName: installed ? 'Accounts Discovery' : 'Bitcoin',
+                        },
+                    ],
+                }),
+                cancel: jest.fn(),
+            });
+            const service = createLedgerBitcoinService(deps);
+            await service.connect(device);
+
+            await expect(service.hasAccountsDiscovery()).resolves.toBe(installed);
+            expect(deps.listApps).toHaveBeenCalledWith('session-1');
+            expect(deps.openAccountsDiscoveryApp).not.toHaveBeenCalled();
+        },
+    );
+
+    it('does not treat denied app listing as an absent discovery app', async () => {
+        const deps = createDeps();
+        deps.listApps.mockReturnValue({
+            observable: throwError(() => new Error('Denied')),
+            cancel: jest.fn(),
+        });
+        const service = createLedgerBitcoinService(deps);
+        await service.connect(device);
+
+        await expect(service.hasAccountsDiscovery()).rejects.toThrow('Denied');
+    });
+
+    it('cancels an app availability check when its connection is replaced', async () => {
+        const deps = createDeps();
+        const listing = new Subject<
+            ObservedValueOf<ReturnType<LedgerBitcoinServiceDeps['listApps']>['observable']>
+        >();
+        const cancel = jest.fn();
+        deps.listApps.mockReturnValue({ observable: listing, cancel });
+        const service = createLedgerBitcoinService(deps);
+        await service.connect(device);
+        const check = service.hasAccountsDiscovery().catch((error: unknown) => error);
+        await service.disconnect();
+        listing.next({ status: DeviceActionStatus.Completed, output: [] });
+
+        expect(await check).toMatchObject({ kind: 'cancelled' });
+        expect(cancel).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([true, false])(
+        'detects the running Speculos application without an OS: %s',
+        async installed => {
+            const deps = createDeps();
+            const service = createLedgerBitcoinService(deps);
+            await service.connect({ ...device, transport: 'SPECULOS_HTTP_TRANSPORT' });
+            deps.dmk.sendApdu.mockResolvedValue({
+                data: installed
+                    ? Uint8Array.from([65, 68, 1, 0, 1, 0, 1, 3, 2, 3, 15])
+                    : new Uint8Array(),
+                statusCode: installed ? Uint8Array.of(0x90, 0) : Uint8Array.of(0x6e, 0),
+            });
+
+            await expect(service.hasAccountsDiscovery()).resolves.toBe(installed);
+            expect(deps.listApps).not.toHaveBeenCalled();
+            expect(deps.openAccountsDiscoveryApp).not.toHaveBeenCalled();
+        },
+    );
+
+    it('does not mistake a malformed Speculos app response for Bitcoin-only support', async () => {
+        const deps = createDeps();
+        const service = createLedgerBitcoinService(deps);
+        await service.connect({ ...device, transport: 'SPECULOS_HTTP_TRANSPORT' });
+
+        await expect(service.hasAccountsDiscovery()).rejects.toThrow(
+            'Invalid Accounts Discovery metadata or response',
+        );
+    });
+
     it('opens multi-network discovery without using the Bitcoin signer', async () => {
         const deps = createDeps();
         const service = createLedgerBitcoinService(deps);

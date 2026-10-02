@@ -4,6 +4,9 @@ import type {
     ExecuteDeviceActionReturnType,
     GoToDashboardDAError,
     GoToDashboardDAIntermediateValue,
+    ListAppsDAError,
+    ListAppsDAIntermediateValue,
+    ListAppsDAOutput,
     OpenAppDAError,
     OpenAppDAIntermediateValue,
 } from '@ledgerhq/device-management-kit';
@@ -19,6 +22,7 @@ import { type Observable, type Subscription, mergeMap } from 'rxjs';
 import { bip32, deriveAddresses, networks } from '@trezor/utxo-lib';
 
 import {
+    LedgerAccountsDiscoveryError,
     type LedgerAccountsDiscoveryService,
     createLedgerAccountsDiscoveryService,
 } from './createLedgerAccountsDiscoveryService';
@@ -68,6 +72,13 @@ export type LedgerBitcoinServiceDeps = {
     openAccountsDiscoveryApp: (
         sessionId: string,
     ) => ExecuteDeviceActionReturnType<void, OpenAppDAError, OpenAppDAIntermediateValue>;
+    listApps: (
+        sessionId: string,
+    ) => ExecuteDeviceActionReturnType<
+        ListAppsDAOutput,
+        ListAppsDAError,
+        ListAppsDAIntermediateValue
+    >;
     listenToAvailableDevices?: () => Observable<DiscoveredDevice[]>;
     createSigner: (
         sessionId: string,
@@ -113,6 +124,7 @@ export type LedgerBitcoinService = {
     getDeviceInfo: () => LedgerDeviceInfo | undefined;
     getMasterFingerprint: () => Promise<string>;
     getAccount: (index: number) => Promise<LedgerBitcoinAccount>;
+    hasAccountsDiscovery: () => Promise<boolean>;
     openAccountsDiscovery: () => Promise<LedgerAccountsDiscoveryService>;
     verifyAddress: (index: number, addressIndex: number) => Promise<string>;
     signPsbt: (index: number, psbt: string) => Promise<SignPsbtDAOutput>;
@@ -390,6 +402,38 @@ export const createLedgerBitcoinService = (
         },
         isConnectionOwner: owner => owner === connectionOwner,
         getDeviceInfo: () => deviceInfo,
+        async hasAccountsDiscovery() {
+            const connectedSessionId = sessionId;
+            const revision = connectionRevision;
+            if (!connectedSessionId) throw new Error('Ledger device is not connected');
+
+            if (!isEmulated) {
+                const apps = await runAction(deps.listApps(connectedSessionId));
+                if (revision !== connectionRevision) throw new LedgerActionError('cancelled');
+
+                return apps.some(app => app.appName === 'Accounts Discovery');
+            }
+
+            // Speculos has no OS app list; inspect the metadata of its running ELF instead.
+            const discovery = createLedgerAccountsDiscoveryService({
+                dmk: deps.dmk,
+                getSessionId: () => (revision === connectionRevision ? sessionId : undefined),
+            });
+            try {
+                await discovery.getInfo();
+                if (revision !== connectionRevision) throw new LedgerActionError('cancelled');
+
+                return true;
+            } catch (error) {
+                if (revision !== connectionRevision) throw new LedgerActionError('cancelled');
+                if (
+                    error instanceof LedgerAccountsDiscoveryError &&
+                    error.code === 'unsupported-app'
+                )
+                    return false;
+                throw error;
+            }
+        },
         async openAccountsDiscovery() {
             const connectedSessionId = sessionId;
             const revision = connectionRevision;

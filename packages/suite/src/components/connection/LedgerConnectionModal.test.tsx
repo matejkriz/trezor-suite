@@ -61,6 +61,7 @@ const renderModal = (selectedDevice?: LedgerSuiteDevice) => {
             getDeviceInfo: null,
             getMasterFingerprint: null,
             getAccount: null,
+            hasAccountsDiscovery: () => Promise.resolve(false),
             openAccountsDiscovery: null,
             verifyAddress: null,
             signPsbt: null,

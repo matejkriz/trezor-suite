@@ -56,6 +56,7 @@ const prepareTest = () => {
                 listenToAvailableDevices: null,
                 startDiscovery: null,
                 getMasterFingerprint: null,
+                hasAccountsDiscovery: () => Promise.resolve(false),
                 openAccountsDiscovery: () =>
                     Promise.resolve({
                         getInfo: () =>
