@@ -35,12 +35,12 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
       - name: Setup node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version-file: ".nvmrc"
 
       - name: Install SafeDep PMG
-        uses: safedep/pmg@be0a93f10fbec6a5c94dd78bc722abf1b7fbfc2d # v0.26.0
+        uses: safedep/pmg@0fa0fa1b4bc279f45d40d77764a0833ecf58824b # v0.31.0
         continue-on-error: true
         with:
           version: v0.19.1
@@ -77,12 +77,12 @@ jobs:
           ref: ${{ needs.extract-branch.outputs.branch }}
 
       - name: Setup node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version-file: ".nvmrc"
 
       - name: Install SafeDep PMG
-        uses: safedep/pmg@be0a93f10fbec6a5c94dd78bc722abf1b7fbfc2d # v0.26.0
+        uses: safedep/pmg@0fa0fa1b4bc279f45d40d77764a0833ecf58824b # v0.31.0
         continue-on-error: true
         with:
           version: v0.19.1
@@ -96,7 +96,7 @@ jobs:
           yarn workspace @trezor/transport-test build:e2e:api:browser
 
       - name: Configure aws credentials
-        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6
         with:
           role-to-assume: arn:aws:iam::538326561891:role/gh_actions_trezor_suite_dev_deploy
           aws-region: eu-central-1
