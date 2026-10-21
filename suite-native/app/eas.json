@@ -6,7 +6,7 @@
     },
     "build": {
         "base": {
-            "node": "24.17.0",
+            "node": "24.22.1",
             "ios": {
                 "image": "macos-tahoe-26.6-xcode-27.0"
             },
